@@ -61,9 +61,211 @@ VPSpace : VitreoProxySpace {
 
 }
 
+VitreoProxyBlock {
+
+	//the proxies for this block
+	var <>dictOfProxies;
+
+	//the ordered array of proxies for the block
+	var <>orderedArray;
+
+	//A dict storing proxy -> (true or false) to state if all inputs have been checked or not
+	var <>statesDict;
+
+	//Counter for correct ordering of entries in orderedArray
+	var <>runningIndex;
+
+	//bottom most and top most proxies in this block
+	var <>bottomOutProxies, <>topInProxies;
+
+	var <>changed = false;
+
+	var <>blockIndex;
+
+	*new {
+		arg inBlockIndex;
+		^super.new.init(inBlockIndex);
+	}
+
+	init {
+		arg inBlockIndex;
+
+		this.blockIndex = inBlockIndex;
+
+		dictOfProxies    = IdentityDictionary.new(20);
+		statesDict       = Dictionary.new(20);
+		bottomOutProxies = IdentityDictionary.new;
+		topInProxies     = IdentityDictionary.new;
+	}
+
+	addProxy {
+		arg proxy;
+
+		this.dictOfProxies.put(proxy, proxy);
+
+		this.changed = true;
+	}
+
+	removeProxy {
+		arg proxy;
+
+		var oldBlockIndex = proxy.blockIndex;
+
+		this.dictOfProxies.removeAt(proxy);
+
+		//Remove this block from dict if it's empty!
+		if(this.dictOfProxies.size == 0, {
+			VitreoBlocksDict.blocksDict.removeAt(oldBlockIndex);
+		});
+
+		this.changed = true;
+	}
+
+	rearrangeBlock {
+		arg server;
+
+		//Only rearrangeBlock when new connections have been done... It should check for inner connections,
+		//not general connections though... It should be done from NodeProxy's side.
+		if(this.changed == true, {
+
+			//ordered collection
+			this.orderedArray = Array.newClear(dictOfProxies.size);
+
+			("Reordering proxies for block number " ++ this.blockIndex).warn;
+
+			//this.orderedArray.size.postln;
+
+			//Find the proxies with no outProxies (so, the last ones in the chain!),
+			//and init the statesDict
+			this.findBottomMostOutProxiesAndInitStatesDict;
+
+			//"Block's bottomOutProxies: ".postln;
+			//this.bottomOutProxies.postln;
+
+			//"Block's statesDict: ".postln;
+			//this.statesDict.postln;
+
+			//init runningIndex
+			this.runningIndex = 0;
+
+			this.bottomOutProxies.do({
+				arg proxy;
+
+				this.rearrangeBlockLoop(proxy); //start from index 0
+			});
+
+			//"Block's orderedArray: ".postln;
+			//this.orderedArray.postln;
+
+			//Actual ordering of groups. Need to be s.bind so that concurrent operations are synced together!
+			//Routine.run({
+
+			//server.sync;
+
+			//server.bind allows here to be sure that this bundle will be sent in any case after
+			//the NodeProxy creation bundle for interpolation proxies.
+			server.bind({
+
+				var sizeMinusOne = orderedArray.size - 1;
+				var firstProxy = orderedArray[0];
+
+				//Must loop reverse to correct order stuff
+				sizeMinusOne.reverseDo({
+					arg counts;
+
+					var count = counts + 1;
+
+					var thisEntry = orderedArray[count];
+					var prevEntry = orderedArray[count - 1];
+
+					//(prevEntry.asString ++ " before " ++ thisEntry.asString).postln;
+
+					prevEntry.beforeMoveNextInterpProxies(thisEntry);
+				});
+
+				//Also move first one (so that its interpolationProxies are correct)
+				firstProxy.before(firstProxy);
+
+			});
+
+			//REVIEW THIS:
+			this.changed = false;
+
+			//}, 1024);
+
+		});
+
+	}
+
+	rearrangeBlockLoop {
+		arg proxy;
+
+		var currentState = statesDict[proxy];
+
+		//If this proxy has never been touched, avoids repetition
+		if(currentState == false, {
+			//("inProxies to " ++  proxy.asString ++ " : ").postln;
+
+			proxy.inProxies.do ({
+				arg inProxy;
+
+				//inProxy.postln;
+
+				//rearrangeInputs to this, this will add the inProxies
+				this.rearrangeBlockLoop(inProxy);
+			});
+
+			//Add this
+			this.orderedArray[runningIndex] = proxy;
+
+			//Completed: put it to true so it's not added again
+			statesDict[proxy] = true;
+
+			//Advance counter
+			this.runningIndex = this.runningIndex + 1;
+		});
+	}
+
+	findBottomMostOutProxiesAndInitStatesDict {
+		this.bottomOutProxies.clear;
+		this.statesDict.clear;
+
+		this.dictOfProxies.do({
+			arg proxy;
+
+			//Find the ones with no outProxies
+			if(proxy.outProxies.size == 0, {
+				this.bottomOutProxies.put(proxy, proxy);
+			});
+
+			//reset statesDict to false
+			this.statesDict.put(proxy, false);
+
+		});
+	}
+
+}
+
+//Have a global one, so that NodeProxies can be shared across Ndef, NodeProxy and ProxySpace...
+VitreoBlocksDict {
+	classvar< blocksDict;
+
+	*initClass {
+		blocksDict = Dictionary.new(50);
+	}
+
+}
+
 VitreoNodeProxy : NodeProxy {
-	var <>interpolationProxies, <>interpolationProxiesCopy, <>defaultParamsVals, <>inProxies, <>outProxies;
 	classvar <>defaultAddAction=\addToTail;
+
+	//The actual dict of all blocks, keys are generated with UniqueID.next
+	//classvar <>VitreoBlocksDict.blocksDict;
+
+	//The block index that contains this proxy
+	var <>blockIndex = -1;
+
+	var <>interpolationProxies, <>interpolationProxiesCopy, <>defaultParamsVals, <>inProxies, <>outProxies;
 
 	//Add the SynthDef for ins creation at startup!
 	*initClass {
@@ -97,6 +299,9 @@ VitreoNodeProxy : NodeProxy {
 				Out.kr(\out.ir(0), \in.kr(0) * fadeTimeEnv);
 			}).add;
 		});
+
+		//Keys are unique, generated with UniqueID.next
+		//VitreoBlocksDict.blocksDict = Dictionary.new;
 	}
 
 	init {
@@ -112,8 +317,8 @@ VitreoNodeProxy : NodeProxy {
 		defaultParamsVals = IdentityDictionary.new;
 
 		//General I/O
-		inProxies = IdentityDictionary.new;
-		outProxies = IdentityDictionary.new;
+		inProxies  = IdentityDictionary.new(20);
+		outProxies = IdentityDictionary.new(20);
 
 		loaded = false;
 		reshaping = defaultReshaping;
@@ -121,26 +326,24 @@ VitreoNodeProxy : NodeProxy {
 	}
 
 	clear { | fadeTime = 0, isInterpolationProxy = false |
-
 		//copy interpolationProxies in new IdentityDictionary in order to free them only
-		//after everything
+		//after everything.
+		//Also, remove block from VitreoBlocksDict.blocksDict
 		if(isInterpolationProxy.not, {
+			var blockWithThisProxy;
+
 			interpolationProxiesCopy = interpolationProxies.copy;
+
+			//remove from block in VitreoBlocksDict.blocksDict
+			blockWithThisProxy = VitreoBlocksDict.blocksDict[this.blockIndex];
+
+			if(blockWithThisProxy != nil, {
+				blockWithThisProxy.removeProxy(this);
+			});
 		});
 
 		//This will run through before anything.. that's why the copies
 		this.free(fadeTime, true, isInterpolationProxy); 	// free group and objects
-
-		this.removeAll; 			// take out all objects
-
-		children = nil;             // for now: also remove children
-
-		this.stop(fadeTime, true);		// stop any monitor
-
-		monitor = nil;
-
-		this.fadeTime = fadeTime; // set the fadeTime one last time for freeBus
-		this.freeBus;	 // free the bus from the server allocator
 
 		//Remove all connected inProxies
 		inProxies.keysValuesDo({
@@ -154,10 +357,8 @@ VitreoNodeProxy : NodeProxy {
 			proxy.inProxies.removeAt(param);
 		});
 
-
-		//Remove all NodeProxies used for param interpolation
-
-		//interpolationProxies don't have other interpolation proxies, don't need to run this:
+		//Remove all NodeProxies used for param interpolation!!
+		//(interpolationProxies don't have other interpolation proxies, don't need to run this:)
 		if(isInterpolationProxy.not, {
 
 			if(fadeTime == nil, {fadeTime = 0});
@@ -168,7 +369,7 @@ VitreoNodeProxy : NodeProxy {
 
 				"Clearing interp proxies".postln;
 
-				interpolationProxiesCopy.postln;
+				//interpolationProxiesCopy.postln;
 
 				interpolationProxiesCopy.do({
 					arg proxy;
@@ -177,13 +378,27 @@ VitreoNodeProxy : NodeProxy {
 
 				//Only clear at the end of routine
 				interpolationProxiesCopy.clear; interpolationProxiesCopy = nil;
+
 			});
 		});
+
+		this.removeAll; 			// take out all objects
+
+		children = nil;             // for now: also remove children
+
+		this.stop(fadeTime, true);		// stop any monitor
+
+		monitor = nil;
+
+		this.fadeTime = fadeTime; // set the fadeTime one last time for freeBus
+		this.freeBus;	 // free the bus from the server allocator
 
 		//Reset
 		inProxies.clear; inProxies  = nil;
 		outProxies.clear; outProxies = nil;
 		defaultParamsVals.clear; defaultParamsVals = nil;
+
+		this.blockIndex = -1;
 
 		this.init;	// reset the environment
 		this.changed(\clear, [fadeTime]);
@@ -259,6 +474,8 @@ VitreoNodeProxy : NodeProxy {
 	put { | index, obj, channelOffset = 0, extraArgs, now = true |
 		var container, bundle, oldBus = bus;
 
+		var entryInBlocksDict;
+
 		if(obj.isNil) { this.removeAt(index); ^this };
 		if(index.isSequenceableCollection) {
 			^this.putAll(obj.asArray, index, channelOffset)
@@ -284,56 +501,24 @@ VitreoNodeProxy : NodeProxy {
 		//("New VitreoNodeProxy: " ++ obj.class).warn;
 		//("New VitreoNodeProxy: " ++ container.asDefName).warn;
 
-
 		////////////////////////////////////////////////////////////////
-		//RESTORE CONNECTIONS:
-		//Re-arrange the graph by moving the connected NodeProxies to this (which is the modulator) back up.
 
-		//If it's connected to anything, run this
-		if(this.outProxies.size > 0, {
-			Routine.run({
-				var bottomMostOutProxy;
+		//REARRANGE BLOCK!
 
-				//Need to sync it to make sure that prepareToBundle (called in putNewObject) has been caleld.
-				server.sync;
-
-				//Find the bottom of the chain
-				bottomMostOutProxy = this.findBottomMostOutProxy;
-
-				//Re-arrange all proxies in relation to it
-				bottomMostOutProxy.rearrangeProxies(bottomMostOutProxy);
-
-				("Re-arranging all proxies according to " ++ bottomMostOutProxy).warn;
-			});
-		});
-
-		//Elfe if no out proxies but inProxies, re-arrange according to this
-		if((this.outProxies.size == 0).and(this.inProxies.size > 0), {
-			Routine.run({
-				//Need to sync it to make sure that prepareToBundle (called in putNewObject) has been caleld.
-				server.sync;
-
-				this.rearrangeProxies(this);
-
-				("Re-arranging all proxies according to " ++ this).warn;
-			});
+		entryInBlocksDict = VitreoBlocksDict.blocksDict[this.blockIndex];
+		if(entryInBlocksDict != nil, {
+			entryInBlocksDict.rearrangeBlock(server);
 		});
 
 		//////////////////////////////////////////////////////////////
 	}
 
-	findBottomMostOutProxy {
-		this.outProxies.do({
-			arg outProxy;
+	/*
+	//play function, rearrange block!
+	play {
 
-			if(outProxy.outProxies.size == 0, {
-				^outProxy;
-			}, {
-				^outProxy.findBottomMostOutProxy;
-			});
-
-		});
 	}
+	*/
 
 	//Start group if necessary. Here is the defaultAddAction at work.
 	//This function is called in put -> putNewObject
@@ -345,6 +530,60 @@ VitreoNodeProxy : NodeProxy {
 			if(argGroup.isNil and: { parentGroup.isPlaying }) { argGroup = parentGroup };
 			bundle.addPrepare(group.newMsg(argGroup ?? { server.asGroup }, addAction));
 		}
+	}
+
+	//These are straight up copied from BusPlug. Overwriting to retain group ordering stuff
+	play { | out, numChannels, group, multi=false, vol, fadeTime, addAction |
+		var entryInBlocksDict;
+		var bundle = MixedBundle.new;
+		if(this.homeServer.serverRunning.not) {
+			("server not running:" + this.homeServer).warn;
+			^this
+		};
+		if(bus.rate == \control) { "Can't monitor a control rate bus.".warn; monitor.stop; ^this };
+		group = group ?? {this.homeServer.defaultGroup};
+		this.playToBundle(bundle, out, numChannels, group, multi, vol, fadeTime, addAction);
+		// homeServer: multi client support: monitor only locally
+		bundle.schedSend(this.homeServer, this.clock ? TempoClock.default, this.quant);
+
+		////////////////////////////////////////////////////////////////
+
+		//REARRANGE BLOCK!
+
+		entryInBlocksDict = VitreoBlocksDict.blocksDict[this.blockIndex];
+		if(entryInBlocksDict != nil, {
+			entryInBlocksDict.rearrangeBlock(server);
+		});
+
+		////////////////////////////////////////////////////////////////
+
+		this.changed(\play, [out, numChannels, group, multi, vol, fadeTime, addAction]);
+	}
+
+	playN { | outs, amps, ins, vol, fadeTime, group, addAction |
+		var entryInBlocksDict;
+		var bundle = MixedBundle.new;
+		if(this.homeServer.serverRunning.not) {
+			("server not running:" + this.homeServer).warn;
+			^this
+		};
+		if(bus.rate == \control) { "Can't monitor a control rate bus.".warn; monitor.stop; ^this };
+		group = group ?? {this.homeServer.defaultGroup};
+		this.playNToBundle(bundle, outs, amps, ins, vol, fadeTime, group, addAction);
+		bundle.schedSend(this.homeServer, this.clock ? TempoClock.default, this.quant);
+
+		////////////////////////////////////////////////////////////////
+
+		//REARRANGE BLOCK!
+
+		entryInBlocksDict = VitreoBlocksDict.blocksDict[this.blockIndex];
+		if(entryInBlocksDict != nil, {
+			entryInBlocksDict.rearrangeBlock(server);
+		});
+
+		////////////////////////////////////////////////////////////////
+
+		this.changed(\playN, [outs, amps, ins, vol, fadeTime, group, addAction]);
 	}
 
 	//Same as <<> but uses .xset instead of .xmap.
@@ -393,103 +632,14 @@ VitreoNodeProxy : NodeProxy {
 		^proxy // returns first argument for further chaining
 	}
 
-	/*
-	//Old way, standard xset used:
-	=> {
-		arg nextProxy, param = \in;
-
-		//Retrieve if the there already was a connection
-		var thisParamEntryInNextProxyInProxies = nextProxy.inProxies[param];
-
-		//If connecting to a new NodeProxy, xfade them (BUT NOT THE modulated one)??
-		//If it's the same NodeProxy, simply use the connectMap alternative??
-
-		//Only reconnect entries if a different NodeProxy is used for this entry.
-		if(thisParamEntryInNextProxyInProxies != this, {
-
-			//Should this be moved regardless?
-			this.before(nextProxy);
-
-			//This creates a new one of the modulated NodeProxy, and xfade in volume
-			//between the two. How to crossfade JUST the modulation NodeProxies?
-			nextProxy.connectXSet(this, param);
-
-			//overwrite entries if necessary
-			nextProxy.inProxies.put(param, this);
-			outProxies.put(param, nextProxy);
-
-			//re-arrange the graph by moving the connected NodeProxies back up
-			//FIND A WAY TO MAINTAIN THE ORIGINAL CODING ORDER...
-			inProxies.keysValuesDo({
-				arg inParamName, inProxy;
-				inProxy.rearrangeProxies(this);
-			});
-
-		});
-
-		//return nextProxy for further chaining
-		^nextProxy;
-	}
-
-	//Best working version:
-	=> {
-		arg nextProxy, param = \in;
-
-		//Retrieve if the there already was a connection
-		var thisParamEntryInNextProxyInProxies = nextProxy.inProxies[param];
-
-		//Doesn't work when nextProxy is a Pbind...
-		var paramRate = nextProxy.controlNames.detect { |x| x.name == param };
-
-		//("Param rate:" ++ paramRate.rate.asString).postln;
-
-		//If connecting to the param for the first time, create a new NodeProxy
-		//to be used for interpolated connections, and store it in the outProxies for this, and
-		//into nextProxy.inProxies.
-
-		//Then, in the inProxies of the newly created NodeProxy, insert the sources of modulation
-
-		//Only reconnect entries if a different NodeProxy is used for this entry. It also works when
-		//thisParamEntryInNextProxyInProxies == nil
-		if(thisParamEntryInNextProxyInProxies != this, {
-
-			//Should this be moved regardless?
-			this.before(nextProxy);
-
-			//This creates a new one of the modulated NodeProxy, and xfade in volume
-			//between the two. How to crossfade JUST the modulation NodeProxies?
-
-			//If param is \in, it gives for granted that the connection
-			//is used for some sort of effecting, so it should not apply the new crossfading
-			//version...
-			nextProxy.connectXSet(this, param);
-
-			//overwrite entries if necessary
-			nextProxy.inProxies.put(param, this);
-			outProxies.put(param, nextProxy);
-
-			//ALWAYS make sure that when rearraging proxies, the "in-between" interpolation NodeProxies
-			//are kept right before the modulated proxy, and all the source of modulation are kept
-			//before the "in-between" NodeProxy.
-
-			//re-arrange the graph by moving the connected NodeProxies back up
-			inProxies.keysValuesDo({
-				arg inParamName, inProxy;
-				inProxy.rearrangeProxies(this);
-			});
-
-		});
-
-		//return nextProxy for further chaining
-		^nextProxy;
-	}
-	*/
-
 	//Combines before with <<>
 	=> {
 		arg nextProxy, param = \in;
 
-		var isNextProxyAProxy, interpolationProxyEntry, thisParamEntryInNextProxy, thisParamEntryInNextProxyIsAProxy, paramRate;
+		var isNextProxyAProxy, interpolationProxyEntry, thisParamEntryInNextProxy, paramRate;
+
+		var thisBlockIndex;
+		var nextProxyBlockIndex;
 
 		isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
 
@@ -513,11 +663,14 @@ VitreoNodeProxy : NodeProxy {
 		//This is the connection that is in place with the interpolation NodeProxy.
 		thisParamEntryInNextProxy = nextProxy.inProxies[param];
 
-		//Check if the previous connection was a NodeProxy at all
-		thisParamEntryInNextProxyIsAProxy = (thisParamEntryInNextProxy.class == VitreoNodeProxy).or(thisParamEntryInNextProxy.class.superclass == VitreoNodeProxy).or(thisParamEntryInNextProxy.class.superclass.superclass == VitreoNodeProxy);
+		//Free previous connections to the nextProxy, if there were any
+		nextProxy.freePreviousConnection(param);
 
 		//Returns nil with a Pbind.. this could be problematic for connections, rework it!
 		paramRate = (nextProxy.controlNames.detect{ |x| x.name == param }).rate;
+
+		//Create a new block if needed
+		this.createNewBlockIfNeeded(nextProxy);
 
 		//If connecting to the param for the first time, create a new NodeProxy
 		//to be used for interpolated connections, and store it in the outProxies for this, and
@@ -547,61 +700,45 @@ VitreoNodeProxy : NodeProxy {
 			});
 
 			//This needs to be forked for the .before stuff to work properly
-			Routine.run({
+			//Routine.run({
 
-				//Need to wait for the NodeProxy's group to be instantiated on the server.
-				server.sync;
+			//Need to wait for the NodeProxy's group to be instantiated on the server.
+			//server.sync;
 
-				//Set it before the modulated NodeProxy but after the modulation proxy
-				//interpolationProxy.before(nextProxy);
-				//this.before(interpolationProxy);
+			//Default fadeTime: use nextProxy's (the modulated one) fadeTime
+			interpolationProxy.fadeTime = nextProxy.fadeTime;
 
-				//Default fadeTime: use nextProxy's (the modulated one) fadeTime
-				interpolationProxy.fadeTime = nextProxy.fadeTime;
+			//Add the new interpolation NodeProxy to interpolationProxies dict
+			nextProxy.interpolationProxies.put(param, interpolationProxy);
 
-				//Add the new interpolation NodeProxy to interpolationProxies dict
-				nextProxy.interpolationProxies.put(param, interpolationProxy);
+			//These are the actual connections that take place, excluding interpolationProxy
+			nextProxy.inProxies.put(param, this);              //modulated
 
-				//These are the actual connections that take place, excluding interpolationProxy
-				nextProxy.inProxies.put(param, this);              //modulated
+			//Don't use param indexing for outs, as this proxy could be linked
+			//to multiple proxies with same param names
+			outProxies.put(nextProxy, nextProxy);           //modulator
 
-				//Don't use param indexing for outs, as this proxy could be linked
-				//to multiple proxies with same param names
-				outProxies.put(nextProxy, nextProxy);           //modulator
+			//Also add connections for interpolationProxy
+			interpolationProxy.inProxies.put(\in, this);
+			interpolationProxy.outProxies.put(param, nextProxy);
 
-				//Also add connections for interpolationProxy
-				interpolationProxy.inProxies.put(\in, this);
-				interpolationProxy.outProxies.put(param, nextProxy);
+			//REARRANGE BLOCK!...
+			//this needs server syncing (since the interpolationProxy's group needs to be instantiated on srvr)
+			VitreoBlocksDict.blocksDict[this.blockIndex].rearrangeBlock(server);
 
-				//Re-arrange the WHOLE graph.. It's not the most efficient way
-				nextProxy.rearrangeProxies(nextProxy);
-				//this.rearrangeProxies(interpolationProxy);
+			//Connections:
+			//Without fade: with the modulation proxy at the "\in" param
+			interpolationProxy.connectSet(this, \in);
 
-				//this.postln;
+			//With fade: with modulated proxy at the specified param
+			nextProxy.connectXSet(interpolationProxy, param);
 
-				//Connections:
-				//Without fade: with the modulation proxy at the "\in" param
-				interpolationProxy.connectSet(this, \in);
-
-				//With fade: with modulated proxy at the specified param
-				nextProxy.connectXSet(interpolationProxy, param);
-
-			});
+			//});
 
 		}, {
 
 			//Only reconnect entries if a different NodeProxy is used for this entry.
 			if(thisParamEntryInNextProxy != this, {
-
-				//Should these be moved regardless?
-				//interpolationProxyEntry.before(nextProxy);
-				//this.before(interpolationProxyEntry);
-
-				//Remove older connection for the previously used NodeProxy, if it was a NodeProxy, before
-				//using the new nextProxy
-				if(thisParamEntryInNextProxyIsAProxy, {
-					thisParamEntryInNextProxy.outProxies.removeAt(param);
-				});
 
 				//Remake connections
 				nextProxy.inProxies.put(param, this);
@@ -613,16 +750,8 @@ VitreoNodeProxy : NodeProxy {
 				//interpolationProxyEntry.outProxies remains the same!
 				interpolationProxyEntry.inProxies.put(\in, this);
 
-				/*
-				ALWAYS make sure that when rearraging proxies,
-				the "in-between" interpolation NodeProxies are kept right before
-				the modulated proxy, and all the source of modulation are kept
-				before the "in-between" NodeProxy.
-				*/
-
-				//Re-arrange the WHOLE graph.. It's not the most efficient way
-				nextProxy.rearrangeProxies(nextProxy);
-				//this.rearrangeProxies(interpolationProxyEntry);
+				//REARRANGE BLOCK!
+				VitreoBlocksDict.blocksDict[this.blockIndex].rearrangeBlock(server);
 
 				//Switch connections just for interpolationProxy. nextProxy is already connected to
 				//interpolationProxy
@@ -652,7 +781,7 @@ VitreoNodeProxy : NodeProxy {
 
 		}, {
 
-			var nextObj, previousEntry, isPreviousEntryAProxy, interpolationProxyEntry;
+			var nextObj, interpolationProxyEntry;
 
 			/*
 			What if interpolationProxies to set are an array ???
@@ -666,16 +795,8 @@ VitreoNodeProxy : NodeProxy {
 
 			nextObj = nextProxy;
 
-			//First, empty the connections that were on before (if there were any)
-			previousEntry = inProxies[param];
-
-			isPreviousEntryAProxy = (previousEntry.class == VitreoNodeProxy).or(previousEntry.class.superclass == VitreoNodeProxy).or(previousEntry.class.superclass.superclass == VitreoNodeProxy);
-
 			//Free previous connections
-			if(isPreviousEntryAProxy, {
-				inProxies.removeAt(param);
-				previousEntry.outProxies.removeAt(param);
-			});
+			this.freePreviousConnection(param);
 
 			//Retrieve if there was already a interpolationProxy going on
 			interpolationProxyEntry = interpolationProxies[param];
@@ -685,6 +806,9 @@ VitreoNodeProxy : NodeProxy {
 
 				//Create it anew
 				var interpolationProxy, paramRate;
+
+				//Create block if needed
+				this.createNewBlockIfNeeded(nextProxy);
 
 				//Returns nil with a Pbind.. this could be problematic for connections, rework it!
 				paramRate = (this.controlNames.detect{ |x| x.name == param }).rate;
@@ -709,36 +833,30 @@ VitreoNodeProxy : NodeProxy {
 				});
 
 				//This needs to be forked for the .before stuff to work properly
-				Routine.run({
+				//Routine.run({
 
-					//Need to wait for the NodeProxy's group to be instantiated on the server.
-					server.sync;
+				//Need to wait for the NodeProxy's group to be instantiated on the server.
+				//server.sync;
 
-					//Set it before the modulated NodeProxy but after the modulation proxy
-					//interpolationProxy.before(this);
+				//Default fadeTime: use nextObj's (the modulated one) fadeTime
+				interpolationProxy.fadeTime = this.fadeTime;
 
-					//Default fadeTime: use nextObj's (the modulated one) fadeTime
-					interpolationProxy.fadeTime = this.fadeTime;
+				//Add the new interpolation NodeProxy to interpolationProxies dict
+				this.interpolationProxies.put(param, interpolationProxy);
 
-					//Add the new interpolation NodeProxy to interpolationProxies dict
-					this.interpolationProxies.put(param, interpolationProxy);
+				//Also add connections for interpolationProxy
+				interpolationProxy.outProxies.put(param, this);
 
-					//Also add connections for interpolationProxy
-					interpolationProxy.outProxies.put(param, this);
+				//REARRANGE BLOCK!...
+				//this needs server syncing (since the interpolationProxy's group needs to be instantiated on srvr)
+				VitreoBlocksDict.blocksDict[this.blockIndex].rearrangeBlock(server);
 
-					//Re-arrange the WHOLE graph
-					this.rearrangeProxies(this);
-					//nextProxy.rearrangeProxies(interpolationProxy);
-
-					//Connections:
-					//Without fade: with the modulation proxy at the "\in" param
-					interpolationProxy.connectSet(nextObj, \in);
-
-					//With fade: with modulated proxy at the specified param
-					this.connectXSet(interpolationProxy, param);
-				});
+				//With fade: with modulated proxy at the specified param
+				this.connectXSet(interpolationProxy, param);
+				//});
 
 			}, {
+
 
 				//Disconnect input to interpolation proxy...
 				//The outProxies of the previous NodeProxy have already been cleared
@@ -775,69 +893,175 @@ VitreoNodeProxy : NodeProxy {
 		^this;
 	}
 
-	//Simply re-arrange the whole graph, keeping the same connections.
-	//Should this bundled in a single OSC message to maintain order??
-	rearrangeProxies {
-		arg parentProxy;
+	freePreviousConnection {
+		arg param;
 
-		//parentProxy.group.postln;
+		//First, empty the connections that were on before (if there were any)
+		var previousEntry = this.inProxies[param];
 
-		//reset it before the parent proxy
-		this.before(parentProxy);
 
-		//First, re-arrange the graph by moving the connected NodeProxies back up
-		inProxies.keysValuesDo({
-			arg paramName, inProxy;
+		var isPreviousEntryAProxy = (previousEntry.class == VitreoNodeProxy).or(previousEntry.class.superclass == VitreoNodeProxy).or(previousEntry.class.superclass.superclass == VitreoNodeProxy);
 
-			("inProxy : " ++ paramName).postln;
+		//("prev entry " ++ previousEntry.asString).postln;
 
-			inProxy.rearrangeProxies(this);
-		});
+		if(isPreviousEntryAProxy, {
+			//Remove older connection to this.. outProxies are stored with proxy -> proxy, not param -> proxy
+			previousEntry.outProxies.removeAt(this);
 
-		//Then, move the interpolationProxies back up too, so that it's ensured they are set
-		//after all the modulators (which are in inProxies)
-		interpolationProxies.keysValuesDo({
-			arg paramName, interpProxy;
-
-			//("interpolationProxy : " ++ paramName).postln;
-
-			interpProxy.before(this);
-
-			//interpProxy.rearrangeProxies(this);
-		});
-
-		//Make sure that the outProxies are maintained after the modified proxy (this)
-		outProxies.keysValuesDo({
-			arg paramName, outProxy;
-
-			//("outProxy : " ++ paramName).postln;
-
-			//First move the proxy itself
-			outProxy.after(this);
-
-			//Then move all related interpolation proxies back up, with all branching!
-			outProxy.interpolationProxies.keysValuesDo({
-				arg interpParamName, outInterpolationProxy;
-
-				//("outInterpolationProxy : " ++ interpParamName).postln;
-
-				outInterpolationProxy.before(outProxy);
-
-				//outInterpolationProxy.rearrangeProxies(outProxy);
-
+			//Also reset block index if needed
+			if((previousEntry.outProxies.size == 0).and(previousEntry.inProxies.size == 0), {
+				previousEntry.blockIndex = -1;
 			});
+
+			//Remove connection to old one
+			this.inProxies.removeAt(param);
 		});
 	}
 
+	createNewBlockIfNeeded {
+		arg nextProxy;
+
+		var newBlockIndex;
+		var newBlock;
+
+		var thisBlockIndex = this.blockIndex;
+		var nextProxyBlockIndex = nextProxy.blockIndex;
+
+		//Create new block if both connections didn't have any
+		if((thisBlockIndex == -1).and(nextProxyBlockIndex == -1), {
+			newBlockIndex = UniqueID.next;
+			newBlock = VitreoProxyBlock.new(newBlockIndex);
+
+			"new block".postln;
+
+			this.blockIndex = newBlockIndex;
+			nextProxy.blockIndex = newBlockIndex;
+
+			//Add block to blocksDict
+			VitreoBlocksDict.blocksDict.put(newBlockIndex, newBlock);
+
+			//Add proxies to the block
+			VitreoBlocksDict.blocksDict[newBlockIndex].addProxy(this);
+			VitreoBlocksDict.blocksDict[newBlockIndex].addProxy(nextProxy);
+
+		}, {
+
+			//If they are not already in same block
+			if(thisBlockIndex != nextProxyBlockIndex, {
+
+				//Else, add this proxy to nextProxy's block
+				if(thisBlockIndex == -1, {
+					"add this to nextProxy's block".postln;
+					this.blockIndex = nextProxyBlockIndex;
+
+					//Add proxy to the block
+					VitreoBlocksDict.blocksDict[nextProxyBlockIndex].addProxy(this);
+
+					//This is for the changed at the end of function...
+					newBlockIndex = nextProxyBlockIndex;
+				}, {
+
+					//Else, add nextProxy to this block
+					if(nextProxyBlockIndex == -1, {
+						"add nextProxy to this' block".postln;
+						nextProxy.blockIndex = thisBlockIndex;
+
+						//Add proxy to the block
+						VitreoBlocksDict.blocksDict[thisBlockIndex].addProxy(nextProxy);
+
+						//This is for the changed at the end of function...
+						newBlockIndex = thisBlockIndex;
+					});
+				});
+			});
+		});
+
+		//If both are already into blocks and the block is different, the two blocks should merge into a new one!
+		if((thisBlockIndex != nextProxyBlockIndex).and((thisBlockIndex != -1).and(nextProxyBlockIndex != -1)), {
+
+			newBlockIndex = UniqueID.next;
+			newBlock = VitreoProxyBlock.new(newBlockIndex);
+
+			"both already into blocks. creating new".postln;
+
+			//Change all proxies' group to the new one and add then to new block
+			VitreoBlocksDict.blocksDict[thisBlockIndex].dictOfProxies.do({
+				arg proxy;
+				proxy.blockIndex = newBlockIndex;
+
+				newBlock.addProxy(proxy);
+			});
+
+			VitreoBlocksDict.blocksDict[nextProxyBlockIndex].dictOfProxies.do({
+				arg proxy;
+				proxy.blockIndex = newBlockIndex;
+
+				newBlock.addProxy(proxy);
+			});
+
+			//Remove previous' groups
+			VitreoBlocksDict.blocksDict.removeAt(thisBlockIndex);
+			VitreoBlocksDict.blocksDict.removeAt(nextProxyBlockIndex);
+
+			//Also add the two connected proxies to this new group
+			this.blockIndex = newBlockIndex;
+			nextProxy.blockIndex = newBlockIndex;
+
+			//Finally, add the actual block to the dict
+			VitreoBlocksDict.blocksDict.put(newBlockIndex, newBlock);
+		});
+
+		//If the function pass through, pass this' blockIndex instead
+		if(newBlockIndex == nil, {newBlockIndex = this.blockIndex;});
+
+		//A new connection happened in any case! Some things might have changed in the block
+		VitreoBlocksDict.blocksDict[newBlockIndex].changed = true;
+	}
+
+	//Also moves interpolation proxies
 	after {
 		arg nextProxy;
+
 		this.group.moveAfter(nextProxy.group);
+
+		this.interpolationProxies.do({
+			arg interpolationProxy;
+			interpolationProxy.group.moveBefore(this.group);
+		});
+
 		^this;
 	}
 
+	//Also moves interpolation proxies
 	before {
 		arg nextProxy;
+
 		this.group.moveBefore(nextProxy.group);
+
+		this.interpolationProxies.do({
+			arg interpolationProxy;
+			interpolationProxy.group.moveBefore(this.group);
+		});
+
+		^this;
+	}
+
+	//Also moves interpolation proxies for next one, used for reverseDo when reordering a block
+	beforeMoveNextInterpProxies {
+		arg nextProxy;
+
+		this.group.moveBefore(nextProxy.group);
+
+		this.interpolationProxies.do({
+			arg interpolationProxy;
+			interpolationProxy.group.moveBefore(this.group);
+		});
+
+		nextProxy.interpolationProxies.do({
+			arg interpolationProxy;
+			interpolationProxy.group.moveBefore(nextProxy.group);
+		});
+
 		^this;
 	}
 }
