@@ -475,6 +475,7 @@ VitreoNodeProxy : NodeProxy {
 		var container, bundle, oldBus = bus;
 
 		var entryInBlocksDict;
+		var isObjAFunction;
 
 		if(obj.isNil) { this.removeAt(index); ^this };
 		if(index.isSequenceableCollection) {
@@ -500,6 +501,51 @@ VitreoNodeProxy : NodeProxy {
 
 		//("New VitreoNodeProxy: " ++ obj.class).warn;
 		//("New VitreoNodeProxy: " ++ container.asDefName).warn;
+
+		//Check if there are any NodeProxy in the body of the function. They would be stored as constants.
+		isObjAFunction = obj.class == Function;
+		if(isObjAFunction, {
+			var funcDef = obj.def;
+
+			//constants will also show params, but if there is a NodeProxy
+			//of some kind, it's been created on the relative ProxySpace.
+			//It can be retrieved with: VitreoProxySpace.findSpace(~d);
+			var possibleProxies = funcDef.constants;
+
+			if(possibleProxies.size > 0, {
+				var proxySpace;
+				var isThisAnVNdef = (this.class.superclass == VitreoNodeProxy).or(this.class.superclass.superclass == VitreoNodeProxy);
+
+				//"possibleProxies: ".postln;
+
+				//possibleProxies.postln;
+
+				if(isThisAnVNdef.not, {
+					//A VitreoNodeProxy
+					proxySpace = VitreoProxySpace.findSpace(this);
+
+				}, {
+					//A VitreoNdef
+					proxySpace = VNdef.all.at(server.name)
+				});
+
+
+				if(proxySpace != nil, {
+					possibleProxies.do({
+						arg possibleProxy;
+
+						//Check if the possibleProxy is in the proxySpace
+						var nodeProxy = proxySpace[possibleProxy];
+
+						//Non-valid symbols will return a VitreoNodeProxy with nil channels
+						if(nodeProxy.numChannels != nil, {
+							("Found one VitreoNodeProxy : " ++ possibleProxy.asString).postln;
+						});
+					})
+
+				});
+			});
+		});
 
 		////////////////////////////////////////////////////////////////
 
@@ -636,26 +682,38 @@ VitreoNodeProxy : NodeProxy {
 	=> {
 		arg nextProxy, param = \in;
 
-		var isNextProxyAProxy, interpolationProxyEntry, thisParamEntryInNextProxy, paramRate;
+		var isNextProxyAProxy, isThisProxyAnOp, isThisProxyAFunction,
+		interpolationProxyEntry, thisParamEntryInNextProxy, paramRate;
 
 		var thisBlockIndex;
 		var nextProxyBlockIndex;
 
 		isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
 
-		if(isNextProxyAProxy.not, {
-			"nextProxy is not a VitreoNodeProxy!!!".error;
+		if((isNextProxyAProxy.not), {
+			"nextProxy is not a valid VitreoNodeProxy!!!".error;
 		});
 
 		if(this.group == nil, {
 			("This proxy hasn't been instantiated yet!!!").warn;
-			^nil;
+			^this;
 		});
 
 		if(nextProxy.group == nil, {
 			("nextProxy hasn't been instantiated yet!!!").warn;
-			^nil;
+			^this;
 		});
+
+		//Different cases:
+		//Binary / Unary operators:
+		isThisProxyAnOp = (this.source.class.superclass == AbstractOpPlug);
+		if(isThisProxyAnOp, {
+			//Run the function from the overloaded functions in ClassExtensions.sc
+			^this.source.perform('=>', nextProxy, param);
+		});
+
+		//Function:
+
 
 		//Retrieve if a connection was already created a first time
 		interpolationProxyEntry = nextProxy.interpolationProxies[param];
@@ -772,8 +830,16 @@ VitreoNodeProxy : NodeProxy {
 
 		var isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
 
+		/* ALSO INCLUDE OTHER CASES: */
+		//Binary or Unary ops, e.g. ~b <= ~a * 0.5
+		isNextProxyAProxy = isNextProxyAProxy.or(nextProxy.class.superclass == AbstractOpPlug);
+
+		nextProxy.class.asString.warn;
+
 		//Standard case with another NodeProxy
 		if(isNextProxyAProxy, {
+
+			//If next proxy is an AbstractOpPlug, check ClassExtensions.sc
 			nextProxy.perform('=>', this, param);
 
 			//Return nextProxy for further chaining
@@ -889,6 +955,12 @@ VitreoNodeProxy : NodeProxy {
 			//Simply restore the default original value using the <= operator
 			this.perform('<=', defaultValue, param);
 		});
+
+		^this;
+	}
+
+	nextProxyIsAnOp {
+		arg op;
 
 		^this;
 	}
