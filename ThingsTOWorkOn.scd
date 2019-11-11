@@ -13,12 +13,12 @@ p = VitreoProxySpace.new.push(s.boot)
 ~b.play
 
 //Problem 2:
-//This doesn't insure ~c to be before ~a
-~c = ~a * 0.1
+//This doesn't insure ~b to be before ~a
+~b = ~a * 0.1
 
-//Yep, it shows that it's a BinaryPlug
-~b <= ~c
-~c => ~b
+//While this ensures ~b before ~c
+~c <= ~b
+~b => ~c
 
 //Problem 3:
 //FUNCTION
@@ -31,7 +31,10 @@ p = VitreoProxySpace.new.push(s.boot)
 ~d.source.def.constants
 
 //This is the space where I could look for those constants
-VitreoProxySpace.findSpace(~d)[\b].numChannels
+VitreoProxySpace.findSpace(~d)
+
+//If it's a VNdef:
+VNdef.all.at(\localhost)
 
 //Problem 4:
 //Array
