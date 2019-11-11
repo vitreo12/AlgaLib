@@ -476,6 +476,8 @@ VitreoNodeProxy : NodeProxy {
 
 		var entryInBlocksDict;
 		var isObjAFunction;
+		var isObjAnOp;
+		var isObjAnArray;
 
 		if(obj.isNil) { this.removeAt(index); ^this };
 		if(index.isSequenceableCollection) {
@@ -502,54 +504,37 @@ VitreoNodeProxy : NodeProxy {
 		//("New VitreoNodeProxy: " ++ obj.class).warn;
 		//("New VitreoNodeProxy: " ++ container.asDefName).warn;
 
-		//Check if there are any NodeProxy in the body of the function. They would be stored as constants.
+		//Different cases!
+
+		//Function:
+		//~c = {~a * 0.5}, ensuring ~a is before ~c
 		isObjAFunction = obj.class == Function;
 		if(isObjAFunction, {
-			var funcDef = obj.def;
 
-			//constants will also show params, but if there is a NodeProxy
-			//of some kind, it's been created on the relative ProxySpace.
-			//It can be retrieved with: VitreoProxySpace.findSpace(~d);
-			var possibleProxies = funcDef.constants;
+			//Defer the ordering stuff to the putObjBefore operator for Function (note the server argument)
+			obj.putObjBefore(this, server);
+		});
 
-			if(possibleProxies.size > 0, {
-				var proxySpace;
-				var isThisAnVNdef = (this.class.superclass == VitreoNodeProxy).or(this.class.superclass.superclass == VitreoNodeProxy);
+		//Binary/Unary ops:
+		//~c = ~a * 0.5, ensuring ~a is before ~c
+		isObjAnOp = obj.class.superclass == AbstractOpPlug;
+		if(isObjAnOp, {
 
-				//"possibleProxies: ".postln;
+			//Defer the ordering stuff to the putObjBefore operator for AbstractOpPlug
+			obj.putObjBefore(this);
+		});
 
-				//possibleProxies.postln;
+		//Array:
+		//~c = [~a, ~b], ensuring ~a and ~b are before ~c
+		isObjAnArray = obj.class == Array;
+		if(isObjAnArray, {
 
-				if(isThisAnVNdef.not, {
-					//A VitreoNodeProxy
-					proxySpace = VitreoProxySpace.findSpace(this);
-
-				}, {
-					//A VitreoNdef
-					proxySpace = VNdef.all.at(server.name)
-				});
-
-
-				if(proxySpace != nil, {
-					possibleProxies.do({
-						arg possibleProxy;
-
-						//Check if the possibleProxy is in the proxySpace
-						var nodeProxy = proxySpace[possibleProxy];
-
-						//Non-valid symbols will return a VitreoNodeProxy with nil channels
-						if(nodeProxy.numChannels != nil, {
-							("Found one VitreoNodeProxy : " ++ possibleProxy.asString).postln;
-						});
-					})
-
-				});
-			});
+			obj.putObjBefore(this);
 		});
 
 		////////////////////////////////////////////////////////////////
 
-		//REARRANGE BLOCK!
+		//REARRANGE BLOCK!!
 
 		entryInBlocksDict = VitreoBlocksDict.blocksDict[this.blockIndex];
 		if(entryInBlocksDict != nil, {
@@ -682,7 +667,7 @@ VitreoNodeProxy : NodeProxy {
 	=> {
 		arg nextProxy, param = \in;
 
-		var isNextProxyAProxy, isThisProxyAnOp, isThisProxyAFunction,
+		var isNextProxyAProxy, isThisProxyAnOp, isThisProxyAFunc, isThisProxyAnArray,
 		interpolationProxyEntry, thisParamEntryInNextProxy, paramRate;
 
 		var thisBlockIndex;
@@ -705,14 +690,33 @@ VitreoNodeProxy : NodeProxy {
 		});
 
 		//Different cases:
+
 		//Binary / Unary operators:
+		//~b <= (~a * = 0.1)
 		isThisProxyAnOp = (this.source.class.superclass == AbstractOpPlug);
 		if(isThisProxyAnOp, {
+
 			//Run the function from the overloaded functions in ClassExtensions.sc
 			^this.source.perform('=>', nextProxy, param);
 		});
 
 		//Function:
+		//~b <= {~a * 0.1}
+		isThisProxyAFunc = (this.source.class == Function);
+		if(isThisProxyAFunc, {
+
+			//Run the function from the overloaded functions in ClassExtensions.sc
+			^this.source.perform('=>', nextProxy, param);
+		});
+
+		//Array:
+		//~a <=.freq [~lfo1, ~lfo2]
+		isThisProxyAnArray = (this.source.class == Array);
+		if(isThisProxyAnArray, {
+
+			//Run the function from the overloaded functions in ClassExtensions.sc
+			^this.source.perform('=>', nextProxy, param);
+		});
 
 
 		//Retrieve if a connection was already created a first time
@@ -831,15 +835,26 @@ VitreoNodeProxy : NodeProxy {
 		var isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
 
 		/* ALSO INCLUDE OTHER CASES: */
-		//Binary or Unary ops, e.g. ~b <= ~a * 0.5
+		//Binary or Unary ops, e.g. ~b <= (~a * 0.5)
 		isNextProxyAProxy = isNextProxyAProxy.or(nextProxy.class.superclass == AbstractOpPlug);
 
-		nextProxy.class.asString.warn;
+		//Function, e.g. ~b <= {~a * 0.5}
+		isNextProxyAProxy = isNextProxyAProxy.or(nextProxy.class == Function);
+
+		//Array, e.g. ~a <=.freq [~lfo1, ~lfo2]
+		isNextProxyAProxy = isNextProxyAProxy.or(nextProxy.class == Array);
+
+		/*
+		What if interpolationProxies to set are an array ???
+		e.g.: ~sines <=.freq [~lfo1, ~lfo2]
+		*/
+
+		//nextProxy.class.asString.warn;
 
 		//Standard case with another NodeProxy
 		if(isNextProxyAProxy, {
 
-			//If next proxy is an AbstractOpPlug, check ClassExtensions.sc
+			//If next proxy is an AbstractOpPlug or Function, check ClassExtensions.sc
 			nextProxy.perform('=>', this, param);
 
 			//Return nextProxy for further chaining
@@ -848,11 +863,6 @@ VitreoNodeProxy : NodeProxy {
 		}, {
 
 			var nextObj, interpolationProxyEntry;
-
-			/*
-			What if interpolationProxies to set are an array ???
-			e.g.: ~sines <=.freq [~lfo1, ~lfo2]
-			*/
 
 			/*
 			What if interpolationProxies to set are a function ???
