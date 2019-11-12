@@ -3,6 +3,8 @@ THINGS TO DO:
 
 1) Create all the interpolationProxies for every param AT VitreoNodeProxy instantiation (in the "put" function)
 
+2) Supernova ParGroups used by default in Patterns?
+
 X) Make "Restoring previous connections!" actually work
 
 X) Make SURE that all connections work fine, ensuring that interpolationProxies are ALWAYS before the modulated
@@ -758,7 +760,13 @@ VitreoNodeProxy : NodeProxy {
 		isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
 
 		if((isNextProxyAProxy.not), {
-			"nextProxy is not a valid VitreoNodeProxy!!!".error;
+			"nextProxy is not a valid VitreoNodeProxy!!!".warn;
+			^this;
+		});
+
+		if(this.server != nextProxy.server, {
+			"nextProxy is on a different server!!!".warn;
+			^this;
 		});
 
 		if(this.group == nil, {
