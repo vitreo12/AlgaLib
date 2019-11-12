@@ -3,7 +3,7 @@ THINGS TO DO:
 
 1) Create all the interpolationProxies for every param AT VitreoNodeProxy instantiation (in the "put" function)
 
-2) Make "Restoring previous connections!" actually work
+X) Make "Restoring previous connections!" actually work
 
 X) Make SURE that all connections work fine, ensuring that interpolationProxies are ALWAYS before the modulated
 proxy and after the modulator. This gets screwed up with long chains.
@@ -32,30 +32,36 @@ VitreoTempoBusClock : TempoBusClock {
 
 	//Called when changing tempo
 	setTempoAtBeat { | newTempo, beats |
-		control.set(\fadeTime, 0.0, \tempo, newTempo);
-
 		slavesControl.do({
 			arg slaveControl;
 
-			slaveControl.postln;
-
-			slaveControl.set(\fadeTime, 0.0, \tempo, newTempo);
+			if(slaveControl.numChannels != nil, {
+				slaveControl.set(\fadeTime, 0.0, \tempo, newTempo);
+			}, {
+				//It's been deleted from its parent ProxySpace, remove it from array
+				slavesControl.removeAt(slaveControl);
+			});
 		});
+
+		control.set(\fadeTime, 0.0, \tempo, newTempo);
 
 		^super.setTempoAtBeat(newTempo, beats)
 	}
 
 	//Called when changing tempo
 	setTempoAtSec { | newTempo, secs |
-		control.set(\fadeTime, 0.0, \tempo, newTempo);
-
 		slavesControl.do({
 			arg slaveControl;
 
-			slaveControl.postln;
-
-			slaveControl.set(\fadeTime, 0.0, \tempo, newTempo);
+			if(slaveControl.numChannels != nil, {
+				slaveControl.set(\fadeTime, 0.0, \tempo, newTempo);
+			}, {
+				//It's been deleted from its parent ProxySpace, remove it from array
+				slavesControl.removeAt(slaveControl);
+			});
 		});
+
+		control.set(\fadeTime, 0.0, \tempo, newTempo);
 
 		^super.setTempoAtSec(newTempo, secs)
 	}
@@ -79,19 +85,20 @@ VitreoProxySpace : ProxySpace {
 		if(quant.isNil) { this.quant = 1.0 };
 	}
 
-	makeSlaveClock { | masterClock |
-		var clock, proxy, tempo;
+	makeSlaveClock { | masterProxySpace |
+		var masterClock, proxy, tempo;
 
-		if(masterClock.class == VitreoProxySpace, {
-			masterClock = masterClock.clock;
-		});
-
-		if(masterClock.class != VitreoTempoBusClock, {
-			"A VitreoTempoBusClock is required as a master clock".warn;
+		if(masterProxySpace.class != VitreoProxySpace, {
+			"A VitreoProxySpace is required as a master proxy space".warn;
 			^nil;
 		});
 
-		masterClock.postln;
+		masterClock = masterProxySpace.clock;
+
+		if(masterClock.class != VitreoTempoBusClock, {
+			"A VitreoProxySpace with a running VitreoTempoBusClock is required".warn;
+			^nil;
+		});
 
 		tempo = masterClock.tempo;
 
@@ -100,13 +107,16 @@ VitreoProxySpace : ProxySpace {
 		proxy.fadeTime = 0.0;
 		proxy.put(0, { |tempo = 1.0| tempo }, 0, [\tempo, tempo]);
 
+		//Add slave control to this ProxySpace's ~tempo proxy
 		masterClock.slavesControl.put(proxy, proxy);
 
+		//Set tempo and quant
 		this.clock = masterClock;
+		this.quant = masterProxySpace.quant;
 
 		//re-sync
-		masterClock.tempo = tempo + 0.1;
-		masterClock.tempo = tempo;
+		//masterClock.tempo = tempo + 0.1;
+		//masterClock.tempo = tempo;
 	}
 
 	clear { |fadeTime|
