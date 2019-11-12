@@ -1,21 +1,4 @@
 /*
-+ NodeProxy {
-	after {
-		arg nextProxy;
-		this.group.moveAfter(nextProxy.group);
-		^this;
-	}
-
-	before {
-		arg nextProxy;
-		this.group.moveBefore(nextProxy.group);
-		^this;
-	}
-}
-*/
-
-
-/*
 THINGS TO DO:
 
 1) Create all the interpolationProxies for every param AT VitreoNodeProxy instantiation (in the "put" function)
@@ -29,6 +12,55 @@ X) When using clear / free, interpolationProxies should not fade
 
 */
 
+//Just as TempoBusClock, but with slaves for multiple servers
+VitreoTempoBusClock : TempoBusClock {
+
+	//Slaves' tempo proxy functions
+	var <>slavesControl;
+
+	init {
+		arg tempo, beats, seconds, queueSize;
+
+		//Init clock, actually:
+		super.init(tempo, beats, seconds, queueSize);
+
+		//Init dictionary
+		slavesControl = IdentityDictionary.new;
+
+		^this;
+	}
+
+	//Called when changing tempo
+	setTempoAtBeat { | newTempo, beats |
+		control.set(\fadeTime, 0.0, \tempo, newTempo);
+
+		slavesControl.do({
+			arg slaveControl;
+
+			slaveControl.postln;
+
+			slaveControl.set(\fadeTime, 0.0, \tempo, newTempo);
+		});
+
+		^super.setTempoAtBeat(newTempo, beats)
+	}
+
+	//Called when changing tempo
+	setTempoAtSec { | newTempo, secs |
+		control.set(\fadeTime, 0.0, \tempo, newTempo);
+
+		slavesControl.do({
+			arg slaveControl;
+
+			slaveControl.postln;
+
+			slaveControl.set(\fadeTime, 0.0, \tempo, newTempo);
+		});
+
+		^super.setTempoAtSec(newTempo, secs)
+	}
+}
+
 VitreoProxySpace : ProxySpace {
 
 	makeProxy {
@@ -37,14 +69,54 @@ VitreoProxySpace : ProxySpace {
 		^proxy
 	}
 
-	makeTempoClock { | tempo = 1.0, beats, seconds |
+	makeMasterClock { | tempo = 1.0, beats, seconds |
 		var clock, proxy;
 		proxy = envir[\tempo];
 		if(proxy.isNil) { proxy = VitreoNodeProxy.control(server, 1); envir.put(\tempo, proxy); };
 		proxy.fadeTime = 0.0;
 		proxy.put(0, { |tempo = 1.0| tempo }, 0, [\tempo, tempo]);
-		this.clock = TempoBusClock.new(proxy, tempo, beats, seconds).permanent_(true);
+		this.clock = VitreoTempoBusClock.new(proxy, tempo, beats, seconds).permanent_(true);
 		if(quant.isNil) { this.quant = 1.0 };
+	}
+
+	makeSlaveClock { | masterClock |
+		var clock, proxy, tempo;
+
+		if(masterClock.class == VitreoProxySpace, {
+			masterClock = masterClock.clock;
+		});
+
+		if(masterClock.class != VitreoTempoBusClock, {
+			"A VitreoTempoBusClock is required as a master clock".warn;
+			^nil;
+		});
+
+		masterClock.postln;
+
+		tempo = masterClock.tempo;
+
+		proxy = envir[\tempo];
+		if(proxy.isNil) { proxy = VitreoNodeProxy.control(server, 1); envir.put(\tempo, proxy); };
+		proxy.fadeTime = 0.0;
+		proxy.put(0, { |tempo = 1.0| tempo }, 0, [\tempo, tempo]);
+
+		masterClock.slavesControl.put(proxy, proxy);
+
+		this.clock = masterClock;
+
+		//re-sync
+		masterClock.tempo = tempo + 0.1;
+		masterClock.tempo = tempo;
+	}
+
+	clear { |fadeTime|
+		this.do({ arg proxy; proxy.clear(fadeTime) });
+		tempoProxy !? { tempoProxy.clear };
+
+		this.clock.slavesControl.removeAt(envir[\tempo]);
+
+		//this.unregisterServer;
+		super.clear;
 	}
 
 	ft_ { | dur |
@@ -690,9 +762,9 @@ VitreoNodeProxy : NodeProxy {
 		});
 
 		//Different cases:
-
 		//Binary / Unary operators:
-		//~b <= (~a * = 0.1)
+		//~b = ~a * 0.1
+		//~b => ~c
 		isThisProxyAnOp = (this.source.class.superclass == AbstractOpPlug);
 		if(isThisProxyAnOp, {
 
@@ -700,17 +772,16 @@ VitreoNodeProxy : NodeProxy {
 			^this.source.perform('=>', nextProxy, param);
 		});
 
-		//Function:
-		//~b <= {~a * 0.1}
-		isThisProxyAFunc = (this.source.class == Function);
-		if(isThisProxyAFunc, {
-
-			//Run the function from the overloaded functions in ClassExtensions.sc
-			^this.source.perform('=>', nextProxy, param);
-		});
+		//DON't RUN Function's as this.source will always be a functio anyway.
+		//It would overwrite standard casese like:
+		//~saw = {Saw.ar(\f.kr(100))}
+		//~lfo = {SinOsc.kr(1).range(1, 10)}
+		//~lfo =>.f ~saw
+		//~lfo.source here is a function!! I don't want to overwrite that
 
 		//Array:
-		//~a <=.freq [~lfo1, ~lfo2]
+		//~a = [~lfo1, ~lfo2]
+		//~a => b
 		isThisProxyAnArray = (this.source.class == Array);
 		if(isThisProxyAnArray, {
 
@@ -832,17 +903,35 @@ VitreoNodeProxy : NodeProxy {
 	<= {
 		arg nextProxy, param = \in;
 
-		var isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
+		var isNextProxyAProxy, isNextProxyAnOp, isNextProxyAFunc, isNextProxyAnArray;
 
 		/* ALSO INCLUDE OTHER CASES: */
+
 		//Binary or Unary ops, e.g. ~b <= (~a * 0.5)
-		isNextProxyAProxy = isNextProxyAProxy.or(nextProxy.class.superclass == AbstractOpPlug);
+		isNextProxyAnOp = nextProxy.class.superclass == AbstractOpPlug;
+		if(isNextProxyAnOp, {
+
+			//Run the function from the overloaded functions in ClassExtensions.sc
+			^nextProxy.perform('=>', this, param);
+		});
 
 		//Function, e.g. ~b <= {~a * 0.5}
-		isNextProxyAProxy = isNextProxyAProxy.or(nextProxy.class == Function);
+		isNextProxyAFunc = nextProxy.class == Function;
+		if(isNextProxyAFunc, {
+
+			//Run the function from the overloaded functions in ClassExtensions.sc
+			^nextProxy.source.perform('=>', this, param);
+		});
 
 		//Array, e.g. ~a <=.freq [~lfo1, ~lfo2]
-		isNextProxyAProxy = isNextProxyAProxy.or(nextProxy.class == Array);
+		isNextProxyAnArray = nextProxy.class == Array;
+		if(isNextProxyAnArray, {
+
+			//Run the function from the overloaded functions in ClassExtensions.sc
+			^nextProxy.perform('=>', this, param);
+		});
+
+		isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
 
 		/*
 		What if interpolationProxies to set are an array ???
