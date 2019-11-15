@@ -5,6 +5,10 @@ THINGS TO DO:
 
 2) Supernova ParGroups used by default in Patterns?
 
+3) Multiple servers connection.
+   (boot servers with a lot of I/O and stream bettween them, with a block size difference OFC).
+   (Also, servers must be linked in Jack)
+
 X) Make "Restoring previous connections!" actually work
 
 X) Make SURE that all connections work fine, ensuring that interpolationProxies are ALWAYS before the modulated
