@@ -1,16 +1,65 @@
+(
+s.options.sampleRate = 44100;
+s.options.inDevice = "Built-in Microph";
+s.options.outDevice = "Built-in Output";
+)
+
 p = VitreoProxySpace.new.push(s.boot)
 
 //Problem 1:
-~a = {SinOsc.ar}
+(
+~a = {SinOsc.ar};
+~b = {\in.ar(0)};
+~b.play
+)
 
 //Needs brackets if using this syntax, or it will chain the operators...
-~b <= (~a * 0.2)
-(~a * 0.2) => ~b
+~b <= (~a * 0.1)
+(~a * ~a * ~a) => ~b
+
+
+//Doesn't switch over anymore??? wtf
+~b <= ~a
+
+
+~b.fadeTime = 4
+
+~a.outProxies
+~b.inProxies
+
+
+(
+~a = {SinOsc.ar(\freq.kr(300))};
+~a.play;
+
+~b = {DC.ar(100)};
+~c = {DC.ar(400)};
+)
+
+~a.fadeTime = 5;
+
+~a <=.freq (~b * 1.0)
+~a <=.freq (~c * 1.0)
+
+
+c = ProxySpace.new.push(s.boot);
+
+(
+~a = {SinOsc.ar};
+~b = {\in.ar(0)};
+)
+
+~c = (~a * 0.6)
+~b <<> ~c
+~b.play
+
+
+
+
+
 
 //Should this be supported too? It doesn't work if ddwChuckLib is installed
 ~b <= {~a * 0.1}
-
-~b.play
 
 //Problem 2:
 //This doesn't insure ~b to be before ~a
@@ -47,6 +96,8 @@ VNdef.all.at(\localhost)
 ~c = [~lfo1, ~lfo2]
 
 
+//Problem 5:
+//Have a specialized inProxies.do() function that spits out Array entries too..
 
 
 //Problem 5:
@@ -56,10 +107,19 @@ VNdef.all.at(\localhost)
 
 
 
+//Problem 6:
+//Mapping the same NodeProxy to different params doesn't work right.
+//Its outParams will just show the nodeProxy. this screws up connections if one of the
+//multiple connections is unset, it will unset them all for the block situation
 
+~a = {SinOsc.ar(mul: \amp1.kr(1) * \amp2.kr(1))}
 
+~c = {DC.ar(1)}
 
+~c =>.amp1 ~a <=.amp2 ~c
 
+//Then, it won't be registered that ~c is still used for amp1 in its outProxies
+~a <| \amp1;
 
 
 

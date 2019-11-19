@@ -268,6 +268,9 @@ VitreoProxyBlock {
 
 					//(prevEntry.asString ++ " before " ++ thisEntry.asString).postln;
 
+					//thisEntry.class.postln;
+					//prevEntry.class.postln;
+
 					prevEntry.beforeMoveNextInterpProxies(thisEntry);
 				});
 
@@ -292,12 +295,13 @@ VitreoProxyBlock {
 
 		//If this proxy has never been touched, avoids repetition
 		if(currentState == false, {
+
 			//("inProxies to " ++  proxy.asString ++ " : ").postln;
 
-			proxy.inProxies.do ({
+			proxy.inProxies.doProxiesLoop ({
 				arg inProxy;
 
-				//inProxy.postln;
+				//inProxy.class.postln;
 
 				//rearrangeInputs to this, this will add the inProxies
 				this.rearrangeBlockLoop(inProxy);
@@ -751,6 +755,73 @@ VitreoNodeProxy : NodeProxy {
 		^proxy // returns first argument for further chaining
 	}
 
+	createNewInterpProxyIfNeeded {
+		arg param = \in, src = nil;
+
+		var interpolationProxyEntry = this.interpolationProxies[param];
+
+		//Returns nil with a Pbind.. this could be problematic for connections, rework it!
+		var paramRate = (this.controlNames.detect{ |x| x.name == param }).rate;
+
+		if(interpolationProxyEntry == nil, {
+			var interpolationProxy;
+
+			//Get the original default value, used to restore things when unmapping ( <| )
+			block ({
+				arg break;
+				this.getKeysValues.do({
+					arg paramAndValPair;
+					if(paramAndValPair[0] == param, {
+						this.defaultParamsVals.put(param, paramAndValPair[1]);
+						break.(nil);
+					});
+				});
+			});
+
+			//Pass in something as src (used for Function, Binops, Array, etc..)
+			if(src != nil, {
+				//Doesn't work with Pbinds, would just create a kr version
+				if(paramRate == \audio, {
+					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = src;
+				}, {
+					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = src;
+				});
+
+			}, {
+				//Doesn't work with Pbinds, would just create a kr version
+				if(paramRate == \audio, {
+					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar;
+				}, {
+					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr;
+				});
+
+			});
+
+			//Default fadeTime: use nextProxy's (the modulated one) fadeTime
+			interpolationProxy.fadeTime = this.fadeTime;
+
+			//Add the new interpolation NodeProxy to interpolationProxies dict
+			this.interpolationProxies.put(param, interpolationProxy);
+
+			//Make connection from the interpolation proxy..
+			//This connection is quite useless, as interpolationProxy already belongs to this proxy... it could easily be removed.
+			interpolationProxy.outProxies.put(param, this);
+
+			//Returns true if has just been created
+			^true;
+
+		}, {
+
+			//Just switch the function
+			if(src != nil, {
+				interpolationProxyEntry.source = src;
+			});
+
+			//Return false if the interp proxy was already in place
+			^false;
+		});
+	}
+
 	//Combines before with <<>
 	=> {
 		arg nextProxy, param = \in;
@@ -794,7 +865,7 @@ VitreoNodeProxy : NodeProxy {
 			^this.source.perform('=>', nextProxy, param);
 		});
 
-		//DON't RUN Function's as this.source will always be a functio anyway.
+		//DON'T RUN Function's as this.source will always be a function anyway.
 		//It would overwrite standard casese like:
 		//~saw = {Saw.ar(\f.kr(100))}
 		//~lfo = {SinOsc.kr(1).range(1, 10)}
@@ -895,12 +966,24 @@ VitreoNodeProxy : NodeProxy {
 			//Only reconnect entries if a different NodeProxy is used for this entry.
 			if(thisParamEntryInNextProxy != this, {
 
+				var interpolationProxySource = interpolationProxyEntry.source;
+
 				//Remake connections
 				nextProxy.inProxies.put(param, this);
 
 				//Don't use param indexing for outs, as this proxy could be linked
 				//to multiple proxies with same param names
 				outProxies.put(nextProxy, nextProxy);
+
+				//re-instantiate source if it's not correct, could have been modified by Binops, Function, array
+				if((interpolationProxySource != \proxyIn_ar).or(interpolationProxySource != \proxyIn_kr), {
+					if(paramRate == \audio, {
+						interpolationProxyEntry.source = \proxyIn_ar;
+					}, {
+						interpolationProxyEntry.source = \proxyIn_kr;
+					});
+				});
+
 
 				//interpolationProxyEntry.outProxies remains the same!
 				interpolationProxyEntry.inProxies.put(\in, this);
@@ -925,7 +1008,7 @@ VitreoNodeProxy : NodeProxy {
 	<= {
 		arg nextProxy, param = \in;
 
-		var isNextProxyAProxy, isNextProxyAnOp, isNextProxyAFunc, isNextProxyAnArray;
+		var isNextProxyAProxy, isNextProxyAnOp, isNextProxyAFunc, isNextProxyAnArray, paramRate;
 
 		/* ALSO INCLUDE OTHER CASES: */
 
@@ -962,6 +1045,9 @@ VitreoNodeProxy : NodeProxy {
 
 		//nextProxy.class.asString.warn;
 
+		//Returns nil with a Pbind.. this could be problematic for connections, rework it!
+			paramRate = (this.controlNames.detect{ |x| x.name == param }).rate;
+
 		//Standard case with another NodeProxy
 		if(isNextProxyAProxy, {
 
@@ -996,9 +1082,6 @@ VitreoNodeProxy : NodeProxy {
 
 				//Create block if needed
 				this.createNewBlockIfNeeded(nextProxy);
-
-				//Returns nil with a Pbind.. this could be problematic for connections, rework it!
-				paramRate = (this.controlNames.detect{ |x| x.name == param }).rate;
 
 				//Get the original default value, used to restore things when unmapping ( <| )
 				block ({
@@ -1044,6 +1127,16 @@ VitreoNodeProxy : NodeProxy {
 
 			}, {
 
+				var interpolationProxySource = interpolationProxyEntry.source;
+
+				//re-instantiate source if it's not correct, could have been modified by Binops, Function, array
+				if((interpolationProxySource != \proxyIn_ar).or(interpolationProxySource != \proxyIn_kr), {
+					if(paramRate == \audio, {
+						interpolationProxyEntry.source = \proxyIn_ar;
+					}, {
+						interpolationProxyEntry.source = \proxyIn_kr;
+					});
+				});
 
 				//Disconnect input to interpolation proxy...
 				//The outProxies of the previous NodeProxy have already been cleared
@@ -1087,27 +1180,104 @@ VitreoNodeProxy : NodeProxy {
 	}
 
 	freePreviousConnection {
-		arg param;
+		arg param = \in;
 
 		//First, empty the connections that were on before (if there were any)
 		var previousEntry = this.inProxies[param];
 
-
 		var isPreviousEntryAProxy = (previousEntry.class == VitreoNodeProxy).or(previousEntry.class.superclass == VitreoNodeProxy).or(previousEntry.class.superclass.superclass == VitreoNodeProxy);
+
+		if(isPreviousEntryAProxy, {
+			//Remove connection in previousEntry's outProxies to this one
+			previousEntry.removeOutProxy(this);
+		}, {
+
+			//Array is used to store connections for Function, AbstractOpPlug and Array, since multiple NodeProxies might be connected to the same param.
+			var isPreviousEntryAnArray = previousEntry.class == Array;
+
+			if(isPreviousEntryAnArray, {
+				previousEntry.do({
+					arg previousProxyEntry;
+					previousProxyEntry.removeOutProxy(this);
+				});
+			});
+		});
+
+		//Remove this' connection to previousEntry
+		this.inProxies.removeAt(param);
+
+		/*
+		//First, empty the connections that were on before (if there were any)
+		var previousEntry = this.inProxies[param];
+
+
 
 		//("prev entry " ++ previousEntry.asString).postln;
 
 		if(isPreviousEntryAProxy, {
+
+			/*
+
 			//Remove older connection to this.. outProxies are stored with proxy -> proxy, not param -> proxy
 			previousEntry.outProxies.removeAt(this);
 
-			//Also reset block index if needed
+			//Also reset block index if needed, if its outProxies have size 0
 			if((previousEntry.outProxies.size == 0).and(previousEntry.inProxies.size == 0), {
 				previousEntry.blockIndex = -1;
 			});
 
+			*/
+
+			previousEntry.removeOutProxy(this, param);
+
 			//Remove connection to old one
 			this.inProxies.removeAt(param);
+
+		}, {
+
+			//Array is used to store connections for Function, AbstractOpPlug and Array, since multiple NodeProxies might be connected to the same param.
+			var isPreviousEntryAnArray = previousEntry.class == Array;
+
+			if(isPreviousEntryAnArray, {
+
+				previousEntry.do({
+					arg previousProxyEntry;
+
+					("GOT ARRAY ENTRY").postln;
+
+				});
+
+			});
+
+
+		});
+		*/
+	}
+
+	removeOutProxy {
+		arg proxyToRemove;
+
+		var isThisConnectedToAnotherParam = false;
+
+		//First, check if the this was perhaps connected to another param of the other proxy
+		block ({
+			arg break;
+			proxyToRemove.inProxies.doProxiesLoop({
+				arg inProxy;
+				if(inProxy == this, { isThisConnectedToAnotherParam = true; break.(nil); });
+			});
+		});
+
+		if(isThisConnectedToAnotherParam == false, {
+			//Remove older connection to this only if it's not connected to
+			//any other param of this proxy..
+			//Remember that outProxies are stored with proxy -> proxy, not param -> proxy
+			this.outProxies.removeAt(proxyToRemove);
+		}, );
+
+		//Also reset block index if needed, if its outProxies have size 0
+		if((this.outProxies.size == 0).and(this.inProxies.size == 0), {
+			this.blockIndex = -1;
 		});
 	}
 
