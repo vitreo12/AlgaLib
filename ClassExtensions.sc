@@ -53,7 +53,78 @@
 	=> {
 		arg nextProxy, param = \in;
 
-		"Function's => : need to add all the logic".warn;
+		var isNextProxyAProxy, interpolationProxyEntry, thisParamEntryInNextProxy, paramRate, hasInterpolationProxyBeenCreated;
+
+		var functionProxy;
+
+		var interpolationProxy;
+
+		var allProxiesDict, functionProxiesArray;
+
+		isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
+
+		if((isNextProxyAProxy.not), {
+			"nextProxy is not a valid VitreoNodeProxy!!!".warn;
+			^this;
+		});
+
+		if(nextProxy.group == nil, {
+			("nextProxy hasn't been instantiated yet!!!").warn;
+			^this;
+		});
+
+		/************************/
+		/* nextProxy init stuff */
+		/************************/
+
+		//This is the connection that is in place with the interpolation NodeProxy.
+		thisParamEntryInNextProxy = nextProxy.inProxies[param];
+
+		//Free previous connections to the nextProxy, if there were any
+		nextProxy.freePreviousConnection(param);
+
+		//Create a new block if needed
+		nextProxy.createNewBlockIfNeeded(nextProxy);
+
+		/****************************************/
+		/* Retrieve all proxies in the Function */
+		/****************************************/
+
+		//Dict containing all the NodeProxies in the OpPlug. Could it be an array instead???
+		allProxiesDict = IdentityDictionary.new;
+		this.findAllProxies(nextProxy, nextProxy.server, allProxiesDict);
+
+		/***********************************************/
+		/* Create interpProxy  for nextProxy if needed */
+		/***********************************************/
+
+		//Returns true if new interp proxy is created, false if it already existed. Pass the Op in as source to use.
+		nextProxy.createNewInterpProxyIfNeeded(param, this);
+
+		//This has been created by now, or just retrieved. It now stores the AbstractOpPlug function instead of standard interpolationProxy's stuff
+		interpolationProxy = nextProxy.interpolationProxies[param];
+
+		//This is what will be stored as inProxy in nextProxy
+		functionProxiesArray = this.createAndPopulateFunctionProxiesArray(allProxiesDict, nextProxy);
+
+		//Set the proxies array as inProxy entry for nextProxy
+		nextProxy.inProxies.put(param, functionProxiesArray);
+
+		//Also add connections for interpolationProxy for this param
+		interpolationProxy.inProxies.put(\in, functionProxiesArray);
+
+		"mhhhh".postln;
+
+		nextProxy.blockIndex.postln;
+
+		//REARRANGE BLOCK!...
+		//this needs server syncing (since the interpolationProxy's group needs to be instantiated on server)
+		VitreoBlocksDict.blocksDict[nextProxy.blockIndex].rearrangeBlock(nextProxy.server);
+
+
+		//With fade: with modulated proxy at the specified param
+		nextProxy.connectXSet(interpolationProxy, param);
+
 
 		^nextProxy;
 	}
@@ -61,12 +132,67 @@
 	//To allow ~c = {~a * 0.5}, ensuring ~a is before ~c
 	putObjBefore {
 
-		arg targetProxy, server;
+		arg targetProxy, index;
+
+		var server, allProxiesDict, functionProxiesArray;
+
+		server = targetProxy.server;
+
+		allProxiesDict = IdentityDictionary.new;
+		this.findAllProxies(targetProxy, server, allProxiesDict);
+
+		functionProxiesArray = this.createAndPopulateFunctionProxiesArray(allProxiesDict, targetProxy);
+
+		if(index == nil, {index = \ALL});
+
+		//Set the proxies array as inProxy entry for nextProxy... Special symbol name to store the ins to
+		targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, functionProxiesArray);
+
+		//outProxies are already assigned in createAndPopulateFunctionProxiesArray
+	}
+
+	createAndPopulateFunctionProxiesArray {
+		arg allProxiesDict, nextProxy;
+
+		var functionProxiesArray = Array.newClear(allProxiesDict.size);
+
+		// Deal with inProxies and outProxies stuff
+		allProxiesDict.do({
+			arg functionProxyEntry, index;
+
+			//Check all proxies are on same server as nextProxy's
+			if(functionProxyEntry.server != nextProxy.server, {
+				"nextProxy is on a different server!!!".warn;
+				^nil;
+			});
+
+			/*
+			if(functionProxyEntry.group == nil, {
+				("This proxy hasn't been instantiated yet!!!").warn;
+				^nil;
+			});
+			*/
+
+			functionProxyEntry.group.postln;
+			functionProxyEntry.outProxies.postln;
+
+			//Create a new block if needed. All successive loop entries will be added to the same block.
+			functionProxyEntry.createNewBlockIfNeeded(nextProxy);
+
+			//Set the outProxy for the proxy. Don't use param name as it could be linked to multiple nextProxies.
+			functionProxyEntry.outProxies.put(nextProxy, nextProxy);
+
+			//Add entry to the array
+			functionProxiesArray[index] = functionProxyEntry;
+		});
+
+		^functionProxiesArray;
+	}
+
+	findAllProxies {
+		arg targetProxy, server, dict;
 
 		var funcDef = this.def;
-
-		//Find all proxies recursively for this binary operations
-		var allProxiesDict;
 
 		//constants will also show params, but if there is a NodeProxy
 		//of some kind, it's been created on the relative ProxySpace.
@@ -76,9 +202,6 @@
 		if(possibleProxies.size > 0, {
 			var proxySpace;
 			var isTargetProxyAnVNdef = (targetProxy.class.superclass == VitreoNodeProxy).or(targetProxy.class.superclass.superclass == VitreoNodeProxy);
-
-			//Array instead?
-			allProxiesDict = IdentityDictionary.new;
 
 			//"possibleProxies: ".postln;
 
@@ -93,7 +216,7 @@
 				proxySpace = VNdef.all.at(server.name)
 			});
 
-
+			//Search if the proxies in the func body are actually in same proxy space as the target
 			if(proxySpace != nil, {
 				possibleProxies.do({
 
@@ -106,16 +229,11 @@
 					if(nodeProxy.numChannels != nil, {
 
 						("Found one VitreoNodeProxy : " ++ possibleProxySymbolName.asString).postln;
-						allProxiesDict.put(possibleProxySymbolName, nodeProxy);
+						dict.put(possibleProxySymbolName, nodeProxy);
 					});
 				})
 			});
 		});
-
-		"Function's putObjBefore : need to add all the logic now".warn;
-
-		allProxiesDict.postln;
-
 	}
 
 }
@@ -132,7 +250,7 @@
 
 		var interpolationProxy;
 
-		var allProxiesDict, inProxiesArray;
+		var allProxiesDict, opProxiesArray;
 
 		isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
 
@@ -157,6 +275,8 @@
 		//Free previous connections to the nextProxy, if there were any
 		nextProxy.freePreviousConnection(param);
 
+		//Create a new block if needed
+		nextProxy.createNewBlockIfNeeded(nextProxy);
 
 		/**********************************************/
 		/* Retrieve all proxies in the AbstractOpPlug */
@@ -166,13 +286,6 @@
 		allProxiesDict = IdentityDictionary.new;
 
 		this.findAllProxies(allProxiesDict);
-
-		//This is what will be stored as inProxy in nextProxy
-		inProxiesArray = Array.newClear(allProxiesDict.size);
-
-		//"AbstractOpPlug's => : need to add all the logic now".warn;
-
-		//allProxiesDict.postln;
 
 		/***********************************************/
 		/* Create interpProxy  for nextProxy if needed */
@@ -184,40 +297,14 @@
 		//This has been created by now, or just retrieved. It now stores the AbstractOpPlug function instead of standard interpolationProxy's stuff
 		interpolationProxy = nextProxy.interpolationProxies[param];
 
-		// Deal with inProxies and outProxies stuff
-		allProxiesDict.do({
-			arg proxyInOp, index;
-
-			//Check all proxies are on same server as nextProxy's
-			if(proxyInOp.server != nextProxy.server, {
-				"nextProxy is on a different server!!!".warn;
-				^this;
-			});
-
-			if(proxyInOp.group == nil, {
-				("This proxy hasn't been instantiated yet!!!").warn;
-				^this;
-			});
-
-			//Create a new block if needed. All successive loop entries will be added to the same block.
-			proxyInOp.createNewBlockIfNeeded(nextProxy);
-
-			//Set the outProxy for the proxy. Don't use param name as it could be linked to multiple nextProxies.
-			proxyInOp.outProxies.put(nextProxy, nextProxy);
-
-			index.postln;
-
-			inProxiesArray[index] = proxyInOp;
-		});
-
-		//Use interpolationProxy as gateway!!!
-		//interpolationProxy.source = this;
+		//This is what will be stored as inProxy in nextProxy
+		opProxiesArray = this.createAndPopulateOpProxiesArray(allProxiesDict, nextProxy);
 
 		//Set the proxies array as inProxy entry for nextProxy
-		nextProxy.inProxies.put(param, inProxiesArray);
+		nextProxy.inProxies.put(param, opProxiesArray);
 
 		//Also add connections for interpolationProxy for this param
-		interpolationProxy.inProxies.put(\in, inProxiesArray);
+		interpolationProxy.inProxies.put(\in, opProxiesArray);
 
 		//REARRANGE BLOCK!...
 		//this needs server syncing (since the interpolationProxy's group needs to be instantiated on server)
@@ -228,13 +315,48 @@
 		nextProxy.connectXSet(interpolationProxy, param);
 
 
-		^this;
+		^nextProxy;
+	}
+
+	createAndPopulateOpProxiesArray {
+		arg allProxiesDict, nextProxy;
+
+		var opProxiesArray = Array.newClear(allProxiesDict.size);
+
+		// Deal with inProxies and outProxies stuff
+		allProxiesDict.do({
+			arg opProxyEntry, index;
+
+			//Check all proxies are on same server as nextProxy's
+			if(opProxyEntry.server != nextProxy.server, {
+				"nextProxy is on a different server!!!".warn;
+				^this;
+			});
+
+			/*
+			if(opProxyEntry.group == nil, {
+				("This proxy hasn't been instantiated yet!!!").warn;
+				^this;
+			});
+			*/
+
+			//Create a new block if needed. All successive loop entries will be added to the same block.
+			opProxyEntry.createNewBlockIfNeeded(nextProxy);
+
+			//Set the outProxy for the proxy. Don't use param name as it could be linked to multiple nextProxies.
+			opProxyEntry.outProxies.put(nextProxy, nextProxy);
+
+			opProxiesArray[index] = opProxyEntry;
+		});
+
+		^opProxiesArray;
+
 	}
 
 	//To allow ~c = ~a * 0.5, ensuring ~a is before ~c
 	putObjBefore {
 
-		arg targetProxy;
+		arg targetProxy, index;
 
 		//Array instead?
 		var allProxiesDict = IdentityDictionary.new;
@@ -252,6 +374,7 @@
 
 + BinaryOpPlug {
 
+	//This works recursively if a or b are another Ops
 	findAllProxies {
 		arg dict;
 
@@ -294,8 +417,16 @@
 
 }
 
+
+
 + UnaryOpPlug {
 
+	//Need to define the getter for a
+	a {
+		^a;
+	}
+
+	//This works recursively if a is another Op
 	findAllProxies {
 		arg dict;
 

@@ -1,67 +1,43 @@
-(
-s.options.sampleRate = 44100;
-s.options.inDevice = "Built-in Microph";
-s.options.outDevice = "Built-in Output";
-)
-
 p = VitreoProxySpace.new.push(s.boot)
+
+p.clear
 
 //Problem 1:
 (
 ~a = {SinOsc.ar};
 ~b = {\in.ar(0)};
-~b.play
+~b.play;
 )
 
 //Needs brackets if using this syntax, or it will chain the operators...
-~b <= (~a * 0.1)
-(~a * ~a * ~a) => ~b
+~b <= (~a * ~a)
+(~a.tanh * ~a.tanh * ~a) => ~b
 
 
-//Doesn't switch over anymore??? wtf
-~b <= ~a
+//Problem 2
+~b = {\in.ar(0)}
 
+//This should be allowed (connection before definition of the modulator (modulated too maybe)?
+~c => ~b
 
-~b.fadeTime = 4
+~c.group
 
-~a.outProxies
-~b.inProxies
+~c = {SinOsc.ar(\freq.kr(100))}
 
-
-(
-~a = {SinOsc.ar(\freq.kr(300))};
-~a.play;
-
-~b = {DC.ar(100)};
-~c = {DC.ar(400)};
-)
-
-~a.fadeTime = 5;
-
-~a <=.freq (~b * 1.0)
-~a <=.freq (~c * 1.0)
-
-
-c = ProxySpace.new.push(s.boot);
-
-(
-~a = {SinOsc.ar};
-~b = {\in.ar(0)};
-)
-
-~c = (~a * 0.6)
-~b <<> ~c
 ~b.play
 
+~c <=.freq {rrand(300, 1000)}
+
+~c.fadeTime = 5
+
+~c.reshaping
+
+~c <=.freq 440
+
+~c.play
 
 
-
-
-
-//Should this be supported too? It doesn't work if ddwChuckLib is installed
-~b <= {~a * 0.1}
-
-//Problem 2:
+//Problem 3:
 //This doesn't insure ~b to be before ~a
 ~b = ~a * 0.1
 
@@ -69,9 +45,26 @@ c = ProxySpace.new.push(s.boot);
 ~c <= ~b
 ~b => ~c
 
-//Problem 3:
+//Problem 34
 //FUNCTION
-~d = {~a * SinOsc.ar(\a.kr(2)) * \b.kr(0.5)}
+~d = {~a.ar * ~b.ar}
+
+~d = {~a.ar * 2}
+
+~d[1] = {~b.ar * 2}
+
+~d.inProxies
+~a.outProxies
+~b.outProxies
+
+~d = \default
+
+
+c = ProxySpace.new.push(s.boot)
+
+
+
+
 
 //How can I find if ~d internally refers to another NodeProxy?
 ~d.source.def.sourceCode
@@ -104,22 +97,6 @@ VNdef.all.at(\localhost)
 //Pbinds, generally
 
 ~c = Pbind(\dur, 1)
-
-
-
-//Problem 6:
-//Mapping the same NodeProxy to different params doesn't work right.
-//Its outParams will just show the nodeProxy. this screws up connections if one of the
-//multiple connections is unset, it will unset them all for the block situation
-
-~a = {SinOsc.ar(mul: \amp1.kr(1) * \amp2.kr(1))}
-
-~c = {DC.ar(1)}
-
-~c =>.amp1 ~a <=.amp2 ~c
-
-//Then, it won't be registered that ~c is still used for amp1 in its outProxies
-~a <| \amp1;
 
 
 
