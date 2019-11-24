@@ -173,8 +173,8 @@
 			});
 			*/
 
-			functionProxyEntry.group.postln;
-			functionProxyEntry.outProxies.postln;
+			//functionProxyEntry.group.postln;
+			//functionProxyEntry.outProxies.postln;
 
 			//Create a new block if needed. All successive loop entries will be added to the same block.
 			functionProxyEntry.createNewBlockIfNeeded(nextProxy);
@@ -358,14 +358,20 @@
 
 		arg targetProxy, index;
 
-		//Array instead?
-		var allProxiesDict = IdentityDictionary.new;
+		var allProxiesDict, opProxiesArray;
+
+		allProxiesDict = IdentityDictionary.new;
 
 		this.findAllProxies(allProxiesDict);
 
-		"AbstractOpPlug's putObjBefore : need to add all the logic now".warn;
+		opProxiesArray = this.createAndPopulateOpProxiesArray(allProxiesDict, targetProxy);
 
-		allProxiesDict.postln;
+		if(index == nil, {index = \ALL});
+
+		//Set the proxies array as inProxy entry for nextProxy... Special symbol name to store the ins to
+		targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, opProxiesArray);
+
+		//outProxies are already assigned in createAndPopulateFunctionProxiesArray
 
 		^this;
 	}

@@ -38,12 +38,24 @@ p.clear
 
 
 //Problem 3:
+
+(
+~a = {SinOsc.ar};
+//~b = {\in.ar(0)};
+~b.play;
+)
+
 //This doesn't insure ~b to be before ~a
 ~b = ~a * 0.1
+
+~b.inProxies
 
 //While this ensures ~b before ~c
 ~c <= ~b
 ~b => ~c
+
+
+
 
 //Problem 34
 //FUNCTION

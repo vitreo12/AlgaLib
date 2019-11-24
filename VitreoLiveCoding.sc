@@ -699,7 +699,7 @@ VitreoNodeProxy : NodeProxy {
 
 		entryInBlocksDict.postln;
 
-		"MDMDMDMMD".postln;
+		//"MDMDMDMMD".postln;
 
 		if(entryInBlocksDict != nil, {
 			entryInBlocksDict.rearrangeBlock(server);
