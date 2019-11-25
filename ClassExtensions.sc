@@ -46,6 +46,8 @@
 	putObjBefore {
 
 		"Array's putObjBefore : need to add all the logic now".warn;
+
+		^this;
 	}
 }
 
@@ -149,6 +151,8 @@
 		targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, functionProxiesArray);
 
 		//outProxies are already assigned in createAndPopulateFunctionProxiesArray
+
+		^this;
 	}
 
 	createAndPopulateFunctionProxiesArray {

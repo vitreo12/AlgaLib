@@ -18,6 +18,34 @@ X) When using clear / free, interpolationProxies should not fade
 
 */
 
+//From https://github.com/cappelnord/BenoitLib/blob/master/patterns/Pkr.sc
+Pkr : Pfunc {
+	*new {
+		arg bus;
+
+		var check;
+		var last = 0.0;
+
+		bus = bus.asBus;
+
+		// audio?
+		bus.isSettable.not.if {
+			"Not a kr Bus or NodeProxy. This will only yield 0".warn;
+			^Pfunc({0});
+		};
+
+		check = {bus.server.hasShmInterface}.try;
+
+		check.if ({
+			^Pfunc({bus.getSynchronous()});
+		}, {
+			"No shared memory interface detected. Use localhost server on SC 3.5 or higher to get better performance".warn;
+			bus.get({|v| last = v;});
+			^Pfunc({bus.get({|v| last = v;}); last;});
+		});
+	}
+}
+
 //Just as TempoBusClock, but with slaves for multiple servers
 VitreoTempoBusClock : TempoBusClock {
 
@@ -380,6 +408,56 @@ VitreoNodeProxy : NodeProxy {
 	//Add the SynthDef for ins creation at startup!
 	*initClass {
 		StartUp.add({
+
+			//Generate:
+
+			/*
+			SynthDef(\proxyIn_ar, {
+				var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'sin');
+				Out.ar(\out.ir(0), \in.ar(0) * fadeTimeEnv);
+			}).add;
+
+			SynthDef(\proxyIn_kr, {
+				var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin');
+				Out.kr(\out.ir(0), \in.kr(0) * fadeTimeEnv);
+			}).add;
+			*/
+
+			16.do({
+				arg counter;
+
+				var synthDefString_ar, synthDefString_kr, arrayOfZeros = "[";
+
+				counter = counter + 1;
+
+				if(counter == 1, {
+					synthDefString_ar = "SynthDef(\\proxyIn_ar1, {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'sin'); Out.ar(\\out.ir(0), \\in.ar(0) * fadeTimeEnv); }).add;";
+
+					synthDefString_kr = "SynthDef(\\proxyIn_kr1, {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin'); Out.kr(\\out.ir(0), \\in.ar(0) * fadeTimeEnv); }).add;";
+				}, {
+
+					counter.do({
+						arrayOfZeros = arrayOfZeros ++ "0,"
+					});
+
+					//Also remove trailing coma ,
+					arrayOfZeros = arrayOfZeros[0..(arrayOfZeros.size - 2)] ++ "]";
+
+					synthDefString_ar = "SynthDef(\\proxyIn_ar" ++ counter.asString ++ ", {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'sin'); Out.ar(\\out.ir(0), \\in.ar(" ++ arrayOfZeros ++ ") * fadeTimeEnv); }).add;";
+
+					synthDefString_kr = "SynthDef(\\proxyIn_kr" ++ counter.asString ++ ", {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin'); Out.kr(\\out.ir(0), \\in.ar(" ++ arrayOfZeros ++ ") * fadeTimeEnv); }).add;";
+				});
+
+				//synthDefString_ar.postln;
+				//synthDefString_kr.postln;
+
+				synthDefString_ar.interpret;
+				synthDefString_kr.interpret;
+			});
+
+			});
+
+			/*
 			SynthDef(\proxyIn_ar, {
 
 				/*
@@ -409,6 +487,8 @@ VitreoNodeProxy : NodeProxy {
 				Out.kr(\out.ir(0), \in.kr(0) * fadeTimeEnv);
 			}).add;
 		});
+		*/
+
 
 		//Keys are unique, generated with UniqueID.next
 		//VitreoBlocksDict.blocksDict = Dictionary.new;
@@ -855,12 +935,14 @@ VitreoNodeProxy : NodeProxy {
 			}, {
 				//Doesn't work with Pbinds, would just create a kr version
 				if(paramRate == \audio, {
-					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar;
+					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar1;
 				}, {
-					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr;
+					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr1;
 				});
 
 			});
+
+			interpolationProxy.reshaping = \elastic;
 
 			//Default fadeTime: use nextProxy's (the modulated one) fadeTime
 			interpolationProxy.fadeTime = this.fadeTime;
@@ -925,6 +1007,8 @@ VitreoNodeProxy : NodeProxy {
 
 			//^this;
 		});
+
+		("nextProxy's num of channels: " ++ nextProxy.numChannels).postln;
 
 		//Different cases:
 		//Binary / Unary operators:
@@ -992,10 +1076,12 @@ VitreoNodeProxy : NodeProxy {
 
 			//Doesn't work with Pbinds, would just create a kr version
 			if(paramRate == \audio, {
-				interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar;
+				interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar1;
 			}, {
-				interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr;
+				interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr1;
 			});
+
+			interpolationProxy.reshaping = \elastic;
 
 			//This needs to be forked for the .before stuff to work properly
 			//Routine.run({
@@ -1025,9 +1111,13 @@ VitreoNodeProxy : NodeProxy {
 				VitreoBlocksDict.blocksDict[this.blockIndex].rearrangeBlock(server);
 			});
 
+			//"ye".postln;
+
 			//Connections:
 			//Without fade: with the modulation proxy at the "\in" param
 			interpolationProxy.connectSet(this, \in);
+
+			//"yeye".postln;
 
 			//With fade: with modulated proxy at the specified param
 			nextProxy.connectXSet(interpolationProxy, param);
@@ -1049,11 +1139,11 @@ VitreoNodeProxy : NodeProxy {
 				outProxies.put(nextProxy, nextProxy);
 
 				//re-instantiate source if it's not correct, could have been modified by Binops, Function, array
-				if((interpolationProxySource != \proxyIn_ar).or(interpolationProxySource != \proxyIn_kr), {
+				if((interpolationProxySource != \proxyIn_ar1).or(interpolationProxySource != \proxyIn_kr1), {
 					if(paramRate == \audio, {
-						interpolationProxyEntry.source = \proxyIn_ar;
+						interpolationProxyEntry.source = \proxyIn_ar1;
 					}, {
-						interpolationProxyEntry.source = \proxyIn_kr;
+						interpolationProxyEntry.source = \proxyIn_kr1;
 					});
 				});
 
@@ -1169,10 +1259,12 @@ VitreoNodeProxy : NodeProxy {
 
 				//Doesn't work with Pbinds, would just create a kr version
 				if(paramRate == \audio, {
-					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar;
+					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar1;
 				}, {
-					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr;
+					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr1;
 				});
+
+				interpolationProxy.reshaping = \elastic;
 
 				//This needs to be forked for the .before stuff to work properly
 				//Routine.run({
@@ -1203,11 +1295,11 @@ VitreoNodeProxy : NodeProxy {
 				var interpolationProxySource = interpolationProxyEntry.source;
 
 				//re-instantiate source if it's not correct, could have been modified by Binops, Function, array
-				if((interpolationProxySource != \proxyIn_ar).or(interpolationProxySource != \proxyIn_kr), {
+				if((interpolationProxySource != \proxyIn_ar1).or(interpolationProxySource != \proxyIn_kr1), {
 					if(paramRate == \audio, {
-						interpolationProxyEntry.source = \proxyIn_ar;
+						interpolationProxyEntry.source = \proxyIn_ar1;
 					}, {
-						interpolationProxyEntry.source = \proxyIn_kr;
+						interpolationProxyEntry.source = \proxyIn_kr1;
 					});
 				});
 
@@ -1532,6 +1624,51 @@ VitreoNodeProxy : NodeProxy {
 
 		^this;
 	}
+
+	// map receiver to proxy input
+	// second argument is an adverb
+	<>> { | proxy, key = \in |
+		proxy.perform('<<>', this, key);
+		^proxy
+	}
+
+	// map proxy to receiver input
+	// second argument is an adverb
+	<<> { | proxy, key = \in |
+		var ctl, rate, numChannels, canBeMapped;
+		if(proxy.isNil) { ^this.unmap(key) };
+
+		ctl = this.controlNames.detect { |x| x.name == key };
+
+		ctl.postln;
+
+		rate = ctl.rate ?? {
+			if(proxy.isNeutral) {
+				if(this.isNeutral) { \audio } { this.rate }
+			} {
+				proxy.rate
+			}
+		};
+
+		rate.postln;
+
+		numChannels = ctl !? { ctl.defaultValue.asArray.size };
+
+		numChannels.postln;
+
+		canBeMapped = proxy.initBus(rate, numChannels); // warning: proxy should still have a fixed bus
+
+		canBeMapped.postln;
+
+		if(canBeMapped) {
+			if(this.isNeutral) { this.defineBus(rate, numChannels) };
+			this.xmap(key, proxy);
+		} {
+			"Could not link node proxies, no matching input found.".warn
+		};
+		^proxy // returns first argument for further chaining
+	}
+
 }
 
 //Alias
