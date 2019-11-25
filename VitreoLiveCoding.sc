@@ -279,6 +279,8 @@ VitreoProxyBlock {
 			//"Block's statesDict: ".postln;
 			//this.statesDict.postln;
 
+			//this.orderedArray.postln;
+
 			//init runningIndex
 			this.runningIndex = 0;
 
@@ -342,7 +344,7 @@ VitreoProxyBlock {
 		//If this proxy has never been touched, avoids repetition
 		if(currentState == false, {
 
-			//("inProxies to " ++  proxy.asString ++ " : ").postln;
+			("inProxies to " ++  proxy.asString ++ " : ").postln;
 
 			proxy.inProxies.doProxiesLoop ({
 				arg inProxy;
@@ -927,17 +929,17 @@ VitreoNodeProxy : NodeProxy {
 			if(src != nil, {
 				//Doesn't work with Pbinds, would just create a kr version
 				if(paramRate == \audio, {
-					interpolationProxy = VitreoNodeProxy.new(server, \audio, 2).source   = src;
+					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = src;
 				}, {
-					interpolationProxy = VitreoNodeProxy.new(server, \control, 2).source = src;
+					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = src;
 				});
 
 			}, {
 				//Doesn't work with Pbinds, would just create a kr version
 				if(paramRate == \audio, {
-					interpolationProxy = VitreoNodeProxy.new(server, \audio, 2).source   = \proxyIn_ar2;
+					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar1;
 				}, {
-					interpolationProxy = VitreoNodeProxy.new(server, \control, 2).source = \proxyIn_kr2;
+					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr1;
 				});
 
 			});
@@ -1076,9 +1078,9 @@ VitreoNodeProxy : NodeProxy {
 
 			//Doesn't work with Pbinds, would just create a kr version
 			if(paramRate == \audio, {
-				interpolationProxy = VitreoNodeProxy.new(server, \audio, 2).source   = \proxyIn_ar2;
+				interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar1;
 			}, {
-				interpolationProxy = VitreoNodeProxy.new(server, \control, 2).source = \proxyIn_kr2;
+				interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr1;
 			});
 
 			interpolationProxy.reshaping = \elastic;
@@ -1139,11 +1141,11 @@ VitreoNodeProxy : NodeProxy {
 				outProxies.put(nextProxy, nextProxy);
 
 				//re-instantiate source if it's not correct, could have been modified by Binops, Function, array
-				if((interpolationProxySource != \proxyIn_ar2).or(interpolationProxySource != \proxyIn_kr2), {
+				if((interpolationProxySource != \proxyIn_ar1).or(interpolationProxySource != \proxyIn_kr1), {
 					if(paramRate == \audio, {
-						interpolationProxyEntry.source = \proxyIn_ar2;
+						interpolationProxyEntry.source = \proxyIn_ar1;
 					}, {
-						interpolationProxyEntry.source = \proxyIn_kr2;
+						interpolationProxyEntry.source = \proxyIn_kr1;
 					});
 				});
 
@@ -1259,9 +1261,9 @@ VitreoNodeProxy : NodeProxy {
 
 				//Doesn't work with Pbinds, would just create a kr version
 				if(paramRate == \audio, {
-					interpolationProxy = VitreoNodeProxy.new(server, \audio, 2).source   = \proxyIn_ar2;
+					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar1;
 				}, {
-					interpolationProxy = VitreoNodeProxy.new(server, \control, 2).source = \proxyIn_kr2;
+					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr1;
 				});
 
 				interpolationProxy.reshaping = \elastic;
@@ -1295,11 +1297,11 @@ VitreoNodeProxy : NodeProxy {
 				var interpolationProxySource = interpolationProxyEntry.source;
 
 				//re-instantiate source if it's not correct, could have been modified by Binops, Function, array
-				if((interpolationProxySource != \proxyIn_ar2).or(interpolationProxySource != \proxyIn_kr2), {
+				if((interpolationProxySource != \proxyIn_ar1).or(interpolationProxySource != \proxyIn_kr1), {
 					if(paramRate == \audio, {
-						interpolationProxyEntry.source = \proxyIn_ar2;
+						interpolationProxyEntry.source = \proxyIn_ar1;
 					}, {
-						interpolationProxyEntry.source = \proxyIn_kr2;
+						interpolationProxyEntry.source = \proxyIn_kr1;
 					});
 				});
 
@@ -1401,7 +1403,7 @@ VitreoNodeProxy : NodeProxy {
 		});
 
 		//Remove this' connection to previousEntry
-		this.inProxies.removeAt(param);
+		//this.inProxies.removeAt(param);
 
 		/*
 		//First, empty the connections that were on before (if there were any)

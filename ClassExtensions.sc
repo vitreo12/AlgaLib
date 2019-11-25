@@ -33,6 +33,9 @@
 	}
 }
 
+/*
+
+
 + Array {
 	=> {
 		arg nextProxy, param = \in;
@@ -148,7 +151,9 @@
 		if(index == nil, {index = \ALL});
 
 		//Set the proxies array as inProxy entry for nextProxy... Special symbol name to store the ins to
-		targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, functionProxiesArray);
+		if(functionProxiesArray.size > 0, {
+			targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, functionProxiesArray);
+		});
 
 		//outProxies are already assigned in createAndPopulateFunctionProxiesArray
 
@@ -368,12 +373,15 @@
 
 		this.findAllProxies(allProxiesDict);
 
-		opProxiesArray = this.createAndPopulateOpProxiesArray(allProxiesDict, targetProxy);
+		"To be implemented...".warn;
 
-		if(index == nil, {index = \ALL});
+		//opProxiesArray = this.createAndPopulateOpProxiesArray(allProxiesDict, targetProxy);
+
+		//if(index == nil, {index = \ALL});
 
 		//Set the proxies array as inProxy entry for nextProxy... Special symbol name to store the ins to
-		targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, opProxiesArray);
+
+		//targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, opProxiesArray);
 
 		//outProxies are already assigned in createAndPopulateFunctionProxiesArray
 
@@ -461,3 +469,6 @@
 	}
 
 }
+
+
+*/
