@@ -18,7 +18,26 @@
 	}
 }
 
+//Fixes: https://github.com/supercollider/supercollider/issues/4311
++ ProxyNodeMap {
 
+	controlNames {
+		var res = Array.new;
+
+		//"NODE MAP EXTENSION".warn;
+
+		this.keysValuesDo { |key, value|
+			var rate = if(value.rate == \audio) { \audio } { \control };
+			res = res.add(ControlName(key, nil, rate, value))
+		};
+
+		^res
+	}
+
+}
+
+
+/*
 + NodeProxy {
 	after {
 		arg nextProxy;
@@ -32,8 +51,20 @@
 		^this;
 	}
 }
+*/
 
 /*
+
++ Number {
+
+	=> {
+		arg nextProxy, param = \in;
+
+		"Number's => : need to add all the logic".warn;
+
+		^nextProxy;
+	}
+}
 
 
 + Array {

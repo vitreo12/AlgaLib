@@ -3,17 +3,52 @@ p = VitreoProxySpace.new.push(s.boot);
 p.clear;
 
 (
-~a = {SinOsc.ar};
-~c = {Saw.ar  * 0.1};
+~a = {SinOsc.ar(\freq.kr(440))};
+~c = {Saw.ar(\freq.kr(440))  * 0.2};
+~lfo = {LFNoise0.kr(1).range(100, 500)};
 ~b = {\in.ar(0)};
 ~b.play;
 )
 
 
 //Problem 1, general behaviours:
-~b <= ~a //works
+~b <= ~a
 
-~c => ~b //crashes
+~c => ~b
+
+~a <=.freq 500
+
+~b <= ~a
+
+~a.ft = 2
+
+//Error here
+~a <=.freq ~lfo
+
+~a.free
+
+
+(
+VNdef(\a,{SinOsc.ar(\freq.kr(440))});
+VNdef(\c, {Saw.ar(\freq.kr(440))  * 0.2});
+VNdef(\lfo, {LFNoise0.kr(1).range(100, 500)});
+VNdef(\b, {\in.ar(0)}).play;
+)
+
+
+//Problem 1, general behaviours:
+VNdef(\b) <= VNdef(\a)
+
+VNdef(\c) => VNdef(\b)
+
+VNdef(\a) <=.freq 500
+
+VNdef(\b) <= VNdef(\a)
+
+VNdef(\a) <=.freq VNdef(\lfo)
+
+
+VNdef.clear
 
 
 //Problem 2, Funcions:
@@ -22,8 +57,12 @@ p.clear;
 
 
 
+contains
+a = Array.new
 
+a.add(2)
 
+a
 
 
 
