@@ -1030,7 +1030,7 @@ VitreoNodeProxy : NodeProxy {
 			});
 
 			//If changing the connections with a new NodeProxy
-			if(paramEntryInInProxies != prevProxy, {
+			if(paramEntryInInProxiesIsPrevProxy.not, {
 
 				//Previous interpProxy
 				var interpolationProxySource = interpolationProxyEntry.source;
@@ -1284,11 +1284,12 @@ VitreoNodeProxy : NodeProxy {
 			});
 		});
 
+
 		//FIX HERE!
 		//Remove the entry from inProxies... This fucks up things for paramEntryInInProxies
-		//if(previousEntry != nil, {
-			//this.inProxies.removeAt[param];
-		//});
+		if(previousEntry != nil, {
+			this.inProxies.removeAt(param);
+		});
 	}
 
 	removeOutProxy {

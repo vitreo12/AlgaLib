@@ -50,6 +50,12 @@ VNdef(\a) <=.freq VNdef(\lfo)
 
 VNdef.clear
 
+(
+Ndef(\a,{SinOsc.ar(\freq.kr(440))});
+Ndef(\c, {Saw.ar(\freq.kr(440))  * 0.2});
+Ndef(\lfo, {LFNoise0.kr(1).range(100, 500)});
+Ndef(\b, {\in.ar(0)}).play;
+)
 
 //Problem 2, Funcions:
 //This multiple times, crashes.
