@@ -41,6 +41,9 @@ VNdef(\b) <= VNdef(\a)
 
 VNdef(\c) => VNdef(\b)
 
+VNdef(\a).outProxies
+VNdef(\c).outProxies
+
 VNdef(\a) <=.freq 500
 
 VNdef(\b) <= VNdef(\a)

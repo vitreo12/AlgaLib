@@ -934,8 +934,7 @@ VitreoNodeProxy : NodeProxy {
 		var isPrevProxyInstantiated = true;
 
 		//This is the connection that is in place with the interpolation NodeProxy.
-		var paramEntryInInProxies = this.inProxies[param];
-		var paramEntryInInProxiesIsPrevProxy = false;
+		var previousParamEntry = this.inProxies[param];
 
 		//This is used to discern the different behaviours
 		var prevProxyClass = prevProxy.class;
@@ -945,12 +944,6 @@ VitreoNodeProxy : NodeProxy {
 			prevProxyClass.superclass.superclass == VitreoNodeProxy);
 
 		var isPrevProxyANumber = false;
-
-		if((paramEntryInInProxies != nil), {
-			if(paramEntryInInProxies == prevProxy, {
-				paramEntryInInProxiesIsPrevProxy = true;
-			});
-		});
 
 		if(isPrevProxyAProxy.not, {
 			isPrevProxyANumber = (prevProxyClass == Number).or(
@@ -1064,7 +1057,7 @@ VitreoNodeProxy : NodeProxy {
 
 			//If changing the connections with a new NodeProxy
 			//if(paramEntryInInProxiesIsPrevProxy.not, {
-			if(paramEntryInInProxies != prevProxy, {
+			if(previousParamEntry != prevProxy, {
 
 				//Previous interpProxy
 				var interpolationProxySource = interpolationProxyEntry.source;
@@ -1103,6 +1096,11 @@ VitreoNodeProxy : NodeProxy {
 				interpolationProxyEntry.connectXSet(prevProxy, \in);
 			});
 
+		});
+
+		//This is the previous connection!!
+		if(previousParamEntry != nil, {
+			("Previous connection: " ++ previousParamEntry.asString).postln;
 		});
 	}
 
