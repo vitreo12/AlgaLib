@@ -45,6 +45,8 @@ VNdef(\a) <=.freq 500
 
 VNdef(\b) <= VNdef(\a)
 
+
+//This creates a double proxyIn_kr ???
 VNdef(\a) <=.freq VNdef(\lfo)
 
 

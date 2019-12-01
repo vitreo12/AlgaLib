@@ -310,9 +310,6 @@ VitreoProxyBlock {
 			//"AHAH".postln;
 			this.sanitizeArray;
 
-			this.dictOfProxies.postln;
-			this.orderedArray.postln;
-
 			//server.bind allows here to be sure that this bundle will be sent in any case after
 			//the NodeProxy creation bundle for interpolation proxies.
 			server.bind({
@@ -354,8 +351,16 @@ VitreoProxyBlock {
 
 		});
 
-		//Remove all the proxies that were not used in the loop
+		//"BEFORE".postln;
+		//this.dictOfProxies.postln;
+		//this.orderedArray.postln;
+
+		//Remove all the proxies that were not used in the connections
 		this.sanitizeDict;
+
+		//"AFTER".postln;
+		//this.dictOfProxies.postln;
+		//this.orderedArray.postln;
 
 	}
 
@@ -364,8 +369,36 @@ VitreoProxyBlock {
 		this.orderedArray.removeEvery([nil]);
 	}
 
-	//Remove non-used entries
+	//Remove non-used entries and set their blockIndex back to -1
 	sanitizeDict {
+
+		this.dictOfProxies = this.dictOfProxies.select({
+			arg proxy;
+			var result;
+
+			block ({
+				arg break;
+
+				this.orderedArray.do({
+					arg proxyInArray;
+					result = proxy == proxyInArray;
+
+					//Break on true, otherwise keep searching.
+					if(result, {
+						break.(nil);
+					});
+				});
+			});
+
+			//Reset blockIndex too
+			if(result.not, {
+				("Removing proxy: " ++ proxy.asString ++ " from block number " ++ this.blockIndex).warn;
+				proxy.blockIndex = -1;
+			});
+
+			result;
+
+		});
 
 	}
 
@@ -1030,10 +1063,13 @@ VitreoNodeProxy : NodeProxy {
 			});
 
 			//If changing the connections with a new NodeProxy
-			if(paramEntryInInProxiesIsPrevProxy.not, {
+			//if(paramEntryInInProxiesIsPrevProxy.not, {
+			if(paramEntryInInProxies != prevProxy, {
 
 				//Previous interpProxy
 				var interpolationProxySource = interpolationProxyEntry.source;
+
+				interpolationProxySource.postln;
 
 				//Remake connections
 				this.inProxies.put(param, prevProxy);
@@ -1044,8 +1080,9 @@ VitreoNodeProxy : NodeProxy {
 					prevProxy.outProxies.put(this, this);
 				});
 
+
 				//re-instantiate source if it's not correct, could have been modified by Binops, Function, array
-				if((interpolationProxySource != \proxyIn_ar1).or(interpolationProxySource != \proxyIn_kr1), {
+				if((interpolationProxySource != \proxyIn_ar1).and(interpolationProxySource != \proxyIn_kr1), {
 					if(paramRate == \audio, {
 						interpolationProxyEntry.source = \proxyIn_ar1;
 					}, {
@@ -1287,9 +1324,9 @@ VitreoNodeProxy : NodeProxy {
 
 		//FIX HERE!
 		//Remove the entry from inProxies... This fucks up things for paramEntryInInProxies
-		if(previousEntry != nil, {
-			this.inProxies.removeAt(param);
-		});
+		//if(previousEntry != nil, {
+		//	this.inProxies.removeAt(param);
+		//});
 	}
 
 	removeOutProxy {
@@ -1314,7 +1351,8 @@ VitreoNodeProxy : NodeProxy {
 			this.outProxies.removeAt(proxyToRemove);
 		}, );
 
-		//Also reset block index if needed, if its outProxies have size 0 (meaning it's not connected to anything anymore)
+		//Also reset block index if needed, if its outProxies
+		//and inProxies have size 0 (meaning it's not connected to anything anymore)
 		if((this.outProxies.size == 0).and(this.inProxies.size == 0), {
 			this.blockIndex = -1;
 		});
