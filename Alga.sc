@@ -1,7 +1,7 @@
 /*
 THINGS TO DO:
 
-1) Create all the interpolationProxies for every param AT VitreoNodeProxy instantiation (in the "put" function)
+1) Create all the interpolationProxies for every param AT AlgaNodeProxy instantiation (in the "put" function)
 
 2) Supernova ParGroups used by default in Patterns?
 
@@ -47,7 +47,7 @@ Pkr : Pfunc {
 }
 
 //Just as TempoBusClock, but with slaves for multiple servers
-VitreoTempoBusClock : TempoBusClock {
+AlgaTempoBusClock : TempoBusClock {
 
 	//Slaves' tempo proxy functions
 	var <>slavesControl;
@@ -101,14 +101,14 @@ VitreoTempoBusClock : TempoBusClock {
 	}
 }
 
-VitreoProxySpace : ProxySpace {
+AlgaProxySpace : ProxySpace {
 
 	/*
 
 	makeProxy {
 
-		//VitreoProxySpace's default is a one channel audio proxy
-		var proxy = VitreoNodeProxy.new(server, \audio, 1);
+		//AlgaProxySpace's default is a one channel audio proxy
+		var proxy = AlgaNodeProxy.new(server, \audio, 1);
 
 		this.initProxy(proxy);
 
@@ -121,7 +121,7 @@ VitreoProxySpace : ProxySpace {
 	*/
 
 	makeProxy {
-		var proxy = VitreoNodeProxy.new(server);
+		var proxy = AlgaNodeProxy.new(server);
 
 		this.initProxy(proxy);
 
@@ -134,32 +134,32 @@ VitreoProxySpace : ProxySpace {
 	makeMasterClock { | tempo = 1.0, beats, seconds |
 		var clock, proxy;
 		proxy = envir[\tempo];
-		if(proxy.isNil) { proxy = VitreoNodeProxy.control(server, 1); envir.put(\tempo, proxy); };
+		if(proxy.isNil) { proxy = AlgaNodeProxy.control(server, 1); envir.put(\tempo, proxy); };
 		proxy.fadeTime = 0.0;
 		proxy.put(0, { |tempo = 1.0| tempo }, 0, [\tempo, tempo]);
-		this.clock = VitreoTempoBusClock.new(proxy, tempo, beats, seconds).permanent_(true);
+		this.clock = AlgaTempoBusClock.new(proxy, tempo, beats, seconds).permanent_(true);
 		if(quant.isNil) { this.quant = 1.0 };
 	}
 
 	makeSlaveClock { | masterProxySpace |
 		var masterClock, proxy, tempo;
 
-		if(masterProxySpace.class != VitreoProxySpace, {
-			"A VitreoProxySpace is required as a master proxy space".warn;
+		if(masterProxySpace.class != AlgaProxySpace, {
+			"A AlgaProxySpace is required as a master proxy space".warn;
 			^nil;
 		});
 
 		masterClock = masterProxySpace.clock;
 
-		if(masterClock.class != VitreoTempoBusClock, {
-			"A VitreoProxySpace with a running VitreoTempoBusClock is required".warn;
+		if(masterClock.class != AlgaTempoBusClock, {
+			"A AlgaProxySpace with a running AlgaTempoBusClock is required".warn;
 			^nil;
 		});
 
 		tempo = masterClock.tempo;
 
 		proxy = envir[\tempo];
-		if(proxy.isNil) { proxy = VitreoNodeProxy.control(server, 1); envir.put(\tempo, proxy); };
+		if(proxy.isNil) { proxy = AlgaNodeProxy.control(server, 1); envir.put(\tempo, proxy); };
 		proxy.fadeTime = 0.0;
 		proxy.put(0, { |tempo = 1.0| tempo }, 0, [\tempo, tempo]);
 
@@ -175,8 +175,8 @@ VitreoProxySpace : ProxySpace {
 		//Call ProxySpace's clear
 		super.clear;
 
-		//Remove this VitreoProxySpace from Clock's slaves
-		if(this.clock.class == VitreoTempoBusClock, {
+		//Remove this AlgaProxySpace from Clock's slaves
+		if(this.clock.class == AlgaTempoBusClock, {
 			this.clock.slavesControl.removeAt(this.envir[\tempo]);
 		});
 	}
@@ -191,11 +191,11 @@ VitreoProxySpace : ProxySpace {
 }
 
 //Alias
-VPSpace : VitreoProxySpace {
+APSpace : AlgaProxySpace {
 
 }
 
-VitreoProxyBlock {
+AlgaProxyBlock {
 
 	//all the proxies for this block
 	var <>dictOfProxies;
@@ -215,7 +215,7 @@ VitreoProxyBlock {
 	//if the block has changed form (new proxies added, etc...)
 	var <>changed = true;
 
-	//the index for this block in the VitreoBlocksDict global dict
+	//the index for this block in the AlgaBlocksDict global dict
 	var <>blockIndex;
 
 	*new {
@@ -254,9 +254,9 @@ VitreoProxyBlock {
 
 		this.dictOfProxies.removeAt(proxy);
 
-		//Remove this block from VitreoBlocksDict if it's empty!
+		//Remove this block from AlgaBlocksDict if it's empty!
 		if(this.dictOfProxies.size == 0, {
-			VitreoBlocksDict.blocksDict.removeAt(proxyBlockIndex);
+			AlgaBlocksDict.blocksDict.removeAt(proxyBlockIndex);
 		});
 
 		//this.changed = true;
@@ -452,7 +452,7 @@ VitreoProxyBlock {
 }
 
 //Have a global one, so that NodeProxies can be shared across VNdef, VNProxy and VPSpace...
-VitreoBlocksDict {
+AlgaBlocksDict {
 	classvar< blocksDict;
 
 	*initClass {
@@ -474,7 +474,7 @@ VitreoBlocksDict {
 
 }
 
-VitreoNodeProxy : NodeProxy {
+AlgaNodeProxy : NodeProxy {
 
 	classvar <>defaultAddAction = \addToTail;
 	classvar <>defaultReshaping = \elastic;   //Use \elasitc as default. It's set in NodeProxy's init (super.init)
@@ -559,7 +559,7 @@ VitreoNodeProxy : NodeProxy {
 
 		//copy interpolationProxies in new IdentityDictionary in order to free them only
 		//after everything has been freed already.
-		//Also, remove block from VitreoBlocksDict.blocksDict
+		//Also, remove block from AlgaBlocksDict.blocksDict
 		if(isInterpolationProxy.not, {
 			var blockWithThisProxy;
 
@@ -567,8 +567,8 @@ VitreoNodeProxy : NodeProxy {
 
 			interpolationProxiesCopy = interpolationProxies.copy;
 
-			//remove from block in VitreoBlocksDict.blocksDict
-			blockWithThisProxy = VitreoBlocksDict.blocksDict[this.blockIndex];
+			//remove from block in AlgaBlocksDict.blocksDict
+			blockWithThisProxy = AlgaBlocksDict.blocksDict[this.blockIndex];
 
 			if(blockWithThisProxy != nil, {
 				blockWithThisProxy.removeProxy(this);
@@ -719,7 +719,7 @@ VitreoNodeProxy : NodeProxy {
 		^this.interpolationProxies;
 	}
 
-	//When a new object is assigned to a VitreoNodeProxy!
+	//When a new object is assigned to a AlgaNodeProxy!
 	put { | index, obj, channelOffset = 0, extraArgs, now = true |
 
 		var isObjAFunction, isObjAnOp, isObjAnArray;
@@ -798,7 +798,7 @@ VitreoNodeProxy : NodeProxy {
 
 		//REARRANGE BLOCK!!
 
-		VitreoBlocksDict.reorderBlock(this.blockIndex, server);
+		AlgaBlocksDict.reorderBlock(this.blockIndex, server);
 
 		//////////////////////////////////////////////////////////////
 	}
@@ -826,7 +826,7 @@ VitreoNodeProxy : NodeProxy {
 
 		//REARRANGE BLOCK!!
 
-		VitreoBlocksDict.reorderBlock(this.blockIndex, server);
+		AlgaBlocksDict.reorderBlock(this.blockIndex, server);
 
 		////////////////////////////////////////////////////////////////
 
@@ -855,7 +855,7 @@ VitreoNodeProxy : NodeProxy {
 
 		//REARRANGE BLOCK!!
 
-		VitreoBlocksDict.reorderBlock(this.blockIndex, server);
+		AlgaBlocksDict.reorderBlock(this.blockIndex, server);
 
 		////////////////////////////////////////////////////////////////
 
@@ -939,9 +939,9 @@ VitreoNodeProxy : NodeProxy {
 		//This is used to discern the different behaviours
 		var prevProxyClass = prevProxy.class;
 
-		var isPrevProxyAProxy = (prevProxyClass == VitreoNodeProxy).or(
-			prevProxyClass.superclass == VitreoNodeProxy).or(
-			prevProxyClass.superclass.superclass == VitreoNodeProxy);
+		var isPrevProxyAProxy = (prevProxyClass == AlgaNodeProxy).or(
+			prevProxyClass.superclass == AlgaNodeProxy).or(
+			prevProxyClass.superclass.superclass == AlgaNodeProxy);
 
 		var isPrevProxyANumber = false;
 
@@ -992,18 +992,18 @@ VitreoNodeProxy : NodeProxy {
 
 				//Doesn't work with Pbinds with ar param, would just create a kr version
 				if(paramRate == \audio, {
-					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = src;
+					interpolationProxy = AlgaNodeProxy.new(server, \audio, 1).source   = src;
 				}, {
-					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = src;
+					interpolationProxy = AlgaNodeProxy.new(server, \control, 1).source = src;
 				});
 
 			}, {
 
 				//Doesn't work with Pbinds with ar param, would just create a kr version
 				if(paramRate == \audio, {
-					interpolationProxy = VitreoNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar1;
+					interpolationProxy = AlgaNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar1;
 				}, {
-					interpolationProxy = VitreoNodeProxy.new(server, \control, 1).source = \proxyIn_kr1;
+					interpolationProxy = AlgaNodeProxy.new(server, \control, 1).source = \proxyIn_kr1;
 				});
 
 			});
@@ -1038,7 +1038,7 @@ VitreoNodeProxy : NodeProxy {
 
 			//Only rearrange block if both proxies are actually instantiated.
 			if(isThisProxyInstantiated.and(isPrevProxyInstantiated), {
-				VitreoBlocksDict.blocksDict[this.blockIndex].rearrangeBlock(server);
+				AlgaBlocksDict.blocksDict[this.blockIndex].rearrangeBlock(server);
 			});
 
 			//Connections:
@@ -1088,7 +1088,7 @@ VitreoNodeProxy : NodeProxy {
 
 				//Only rearrange block if both proxies are actually instantiated.
 				if(isThisProxyInstantiated.and(isPrevProxyInstantiated), {
-					VitreoBlocksDict.blocksDict[this.blockIndex].rearrangeBlock(server);
+					AlgaBlocksDict.blocksDict[this.blockIndex].rearrangeBlock(server);
 				});
 
 				//Switch connections just for interpolationProxy. nextProxy is already connected to
@@ -1113,12 +1113,12 @@ VitreoNodeProxy : NodeProxy {
 		var thisBlockIndex;
 		var nextProxyBlockIndex;
 
-		isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(
-			nextProxy.class.superclass == VitreoNodeProxy).or(
-			nextProxy.class.superclass.superclass == VitreoNodeProxy);
+		isNextProxyAProxy = (nextProxy.class == AlgaNodeProxy).or(
+			nextProxy.class.superclass == AlgaNodeProxy).or(
+			nextProxy.class.superclass.superclass == AlgaNodeProxy);
 
 		if((isNextProxyAProxy.not), {
-			"nextProxy is not a valid VitreoNodeProxy!!!".warn;
+			"nextProxy is not a valid AlgaNodeProxy!!!".warn;
 			^this;
 		});
 
@@ -1206,9 +1206,9 @@ VitreoNodeProxy : NodeProxy {
 		});
 		*/
 
-		isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(
-			nextProxy.class.superclass == VitreoNodeProxy).or(
-			nextProxy.class.superclass.superclass == VitreoNodeProxy);
+		isNextProxyAProxy = (nextProxy.class == AlgaNodeProxy).or(
+			nextProxy.class.superclass == AlgaNodeProxy).or(
+			nextProxy.class.superclass.superclass == AlgaNodeProxy);
 
 		/*
 		What if interpolationProxies to set are an array ???
@@ -1297,9 +1297,9 @@ VitreoNodeProxy : NodeProxy {
 		//First, empty the connections that were on before (if there were any)
 		var previousEntry = this.inProxies[param];
 
-		var isPreviousEntryAProxy = (previousEntry.class == VitreoNodeProxy).or(
-			previousEntry.class.superclass == VitreoNodeProxy).or(
-			previousEntry.class.superclass.superclass == VitreoNodeProxy);
+		var isPreviousEntryAProxy = (previousEntry.class == AlgaNodeProxy).or(
+			previousEntry.class.superclass == AlgaNodeProxy).or(
+			previousEntry.class.superclass.superclass == AlgaNodeProxy);
 
 		if(isPreviousEntryAProxy, {
 			//Remove connection in previousEntry's outProxies to this one
@@ -1356,7 +1356,7 @@ VitreoNodeProxy : NodeProxy {
 		});
 	}
 
-	//This function should be moved to VitreoProxyBlock
+	//This function should be moved to AlgaProxyBlock
 	createNewBlockIfNeeded {
 		arg nextProxy;
 
@@ -1371,7 +1371,7 @@ VitreoNodeProxy : NodeProxy {
 		//Create new block if both connections didn't have any
 		if((thisBlockIndex == -1).and(nextProxyBlockIndex == -1), {
 			newBlockIndex = UniqueID.next;
-			newBlock = VitreoProxyBlock.new(newBlockIndex);
+			newBlock = AlgaProxyBlock.new(newBlockIndex);
 
 			"new block".postln;
 
@@ -1379,11 +1379,11 @@ VitreoNodeProxy : NodeProxy {
 			nextProxy.blockIndex = newBlockIndex;
 
 			//Add block to blocksDict
-			VitreoBlocksDict.blocksDict.put(newBlockIndex, newBlock);
+			AlgaBlocksDict.blocksDict.put(newBlockIndex, newBlock);
 
 			//Add proxies to the block
-			VitreoBlocksDict.blocksDict[newBlockIndex].addProxy(this);
-			VitreoBlocksDict.blocksDict[newBlockIndex].addProxy(nextProxy);
+			AlgaBlocksDict.blocksDict[newBlockIndex].addProxy(this);
+			AlgaBlocksDict.blocksDict[newBlockIndex].addProxy(nextProxy);
 
 		}, {
 
@@ -1396,7 +1396,7 @@ VitreoNodeProxy : NodeProxy {
 					this.blockIndex = nextProxyBlockIndex;
 
 					//Add proxy to the block
-					VitreoBlocksDict.blocksDict[nextProxyBlockIndex].addProxy(this);
+					AlgaBlocksDict.blocksDict[nextProxyBlockIndex].addProxy(this);
 
 					//This is for the changed at the end of function...
 					newBlockIndex = nextProxyBlockIndex;
@@ -1408,7 +1408,7 @@ VitreoNodeProxy : NodeProxy {
 						nextProxy.blockIndex = thisBlockIndex;
 
 						//Add proxy to the block
-						VitreoBlocksDict.blocksDict[thisBlockIndex].addProxy(nextProxy);
+						AlgaBlocksDict.blocksDict[thisBlockIndex].addProxy(nextProxy);
 
 						//This is for the changed at the end of function...
 						newBlockIndex = thisBlockIndex;
@@ -1421,19 +1421,19 @@ VitreoNodeProxy : NodeProxy {
 		if((thisBlockIndex != nextProxyBlockIndex).and((thisBlockIndex != -1).and(nextProxyBlockIndex != -1)), {
 
 			newBlockIndex = UniqueID.next;
-			newBlock = VitreoProxyBlock.new(newBlockIndex);
+			newBlock = AlgaProxyBlock.new(newBlockIndex);
 
 			"both already into blocks. creating new".postln;
 
 			//Change all proxies' group to the new one and add then to new block
-			VitreoBlocksDict.blocksDict[thisBlockIndex].dictOfProxies.do({
+			AlgaBlocksDict.blocksDict[thisBlockIndex].dictOfProxies.do({
 				arg proxy;
 				proxy.blockIndex = newBlockIndex;
 
 				newBlock.addProxy(proxy);
 			});
 
-			VitreoBlocksDict.blocksDict[nextProxyBlockIndex].dictOfProxies.do({
+			AlgaBlocksDict.blocksDict[nextProxyBlockIndex].dictOfProxies.do({
 				arg proxy;
 				proxy.blockIndex = newBlockIndex;
 
@@ -1441,22 +1441,22 @@ VitreoNodeProxy : NodeProxy {
 			});
 
 			//Remove previous' groups
-			VitreoBlocksDict.blocksDict.removeAt(thisBlockIndex);
-			VitreoBlocksDict.blocksDict.removeAt(nextProxyBlockIndex);
+			AlgaBlocksDict.blocksDict.removeAt(thisBlockIndex);
+			AlgaBlocksDict.blocksDict.removeAt(nextProxyBlockIndex);
 
 			//Also add the two connected proxies to this new group
 			this.blockIndex = newBlockIndex;
 			nextProxy.blockIndex = newBlockIndex;
 
 			//Finally, add the actual block to the dict
-			VitreoBlocksDict.blocksDict.put(newBlockIndex, newBlock);
+			AlgaBlocksDict.blocksDict.put(newBlockIndex, newBlock);
 		});
 
 		//If the function pass through, pass this' blockIndex instead
 		if(newBlockIndex == nil, {newBlockIndex = this.blockIndex;});
 
 		//A new connection happened in any case! Some things might have changed in the block
-		VitreoBlocksDict.blocksDict[newBlockIndex].changed = true;
+		AlgaBlocksDict.blocksDict[newBlockIndex].changed = true;
 	}
 
 	//Also moves interpolation proxies
@@ -1508,14 +1508,14 @@ VitreoNodeProxy : NodeProxy {
 }
 
 //Alias
-VNProxy : VitreoNodeProxy {
+ANProxy : AlgaNodeProxy {
 
 }
 
 
-//Just copied over from Ndef, and ProxySpace replaced with VitreoProxySpace.
-//I need to inherit from VitreoNodeProxy though, to make it act the same.
-VitreoNdef : VitreoNodeProxy {
+//Just copied over from Ndef, and ProxySpace replaced with AlgaProxySpace.
+//I need to inherit from AlgaNodeProxy though, to make it act the same.
+AlgaNdef : AlgaNodeProxy {
 
 	classvar <>defaultServer, <>all;
 	var <>key;
@@ -1529,7 +1529,7 @@ VitreoNdef : VitreoNodeProxy {
 		if(key.isKindOf(Association)) {
 			server = Server.named.at(key.value);
 			if(server.isNil) {
-				Error("VitreoNdef(%): no server found with this name.".format(key)).throw
+				Error("AlgaNdef(%): no server found with this name.".format(key)).throw
 			};
 			key = key.key;
 		} {
@@ -1564,7 +1564,7 @@ VitreoNdef : VitreoNodeProxy {
 	*dictFor { | server |
 		var dict = all.at(server.name);
 		if(dict.isNil) {
-			dict = VitreoProxySpace.new(server); // use a proxyspace for ease of access.
+			dict = AlgaProxySpace.new(server); // use a proxyspace for ease of access.
 			all.put(server.name, dict);
 			dict.registerServer;
 		};
@@ -1593,6 +1593,6 @@ VitreoNdef : VitreoNodeProxy {
 }
 
 //Alias
-VNdef : VitreoNdef {
+ANdef : AlgaNdef {
 
 }
