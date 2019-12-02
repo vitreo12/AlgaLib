@@ -1,4 +1,4 @@
-p = VitreoProxySpace.new.push(s.boot);
+p = AlgaProxySpace.new.push(s.boot);
 
 p.clear;
 
@@ -29,31 +29,31 @@ p.clear;
 
 
 (
-VNdef(\a,{SinOsc.ar(\freq.kr(440))});
-VNdef(\c, {Saw.ar(\freq.kr(440))  * 0.2});
-VNdef(\lfo, {LFNoise0.kr(1).range(100, 500)});
-VNdef(\b, {\in.ar(0)}).play;
+ANdef(\a,{SinOsc.ar(\freq.kr(440))});
+ANdef(\c, {Saw.ar(\freq.kr(440))  * 0.2});
+ANdef(\lfo, {LFNoise0.kr(1).range(100, 500)});
+ANdef(\b, {\in.ar(0)}).play;
 )
 
 
 //Problem 1, general behaviours:
-VNdef(\b) <= VNdef(\a)
+ANdef(\b) <= ANdef(\a)
 
-VNdef(\c) => VNdef(\b)
+ANdef(\c) => ANdef(\b)
 
-VNdef(\a).outProxies
-VNdef(\c).outProxies
+ANdef(\a).outProxies
+ANdef(\c).outProxies
 
-VNdef(\a) <=.freq 500
+ANdef(\a) <=.freq 500
 
-VNdef(\b) <= VNdef(\a)
+ANdef(\b) <= ANdef(\a)
 
 
 //This creates a double proxyIn_kr ???
-VNdef(\a) <=.freq VNdef(\lfo)
+ANdef(\a) <=.freq ANdef(\lfo)
 
 
-VNdef.clear
+ANdef.clear
 
 (
 Ndef(\a,{SinOsc.ar(\freq.kr(440))});
@@ -78,7 +78,7 @@ a
 
 
 //Problem 3: MULTICHANNEL STUFF
-p = VitreoProxySpace.new.push(s.boot);
+p = AlgaProxySpace.new.push(s.boot);
 
 p.clear
 
@@ -114,7 +114,7 @@ p.clear
 //Problem 4:
 //Patterns, generally
 
-p = VitreoProxySpace.new.push(s.boot)
+p = AlgaProxySpace.new.push(s.boot)
 
 (
 ~b = {SinOsc.kr(0.3).range(0.01, 0.3)};
