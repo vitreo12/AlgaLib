@@ -1,4 +1,4 @@
-AlgaSC
+AlgaLib
 ======
 
 SuperCollider code for Alga.
