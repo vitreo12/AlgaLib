@@ -1,10 +1,12 @@
 + IdentityDictionary {
 
 	//To loop over all inProxies for a ANProxy, including if they are Array and treating them normally.
+	//Alias for do
 	doProxiesLoop {
 		arg function;
 
-		this.keysValuesDo({ arg key, value, i;
+		this.keysValuesDo({
+			arg key, value, i;
 
 			if(value.class == Array, {
 				value.do({
@@ -13,6 +15,25 @@
 				});
 			}, {
 				function.value(value, i);
+			});
+		});
+	}
+
+	//To loop over all inProxies for a ANProxy, including if they are Array and treating them normally.
+	//Alias for keysValuesDo
+	keysValuesDoProxiesLoop {
+		arg function;
+
+		this.keysValuesDo({
+			arg key, value, i;
+
+			if(value.class == Array, {
+				value.do({
+					arg entry;
+					function.value(key, entry, i);
+				});
+			}, {
+				function.value(key, value, i);
 			});
 		});
 	}

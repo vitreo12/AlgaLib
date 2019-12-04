@@ -25,35 +25,60 @@ p.clear;
 //Error here
 ~a <=.freq ~lfo
 
-~a.free
+
+// ?????
+~c <=.freq ~lfo
+
+~c => ~b
+
+~c <=.freq 500
+
 
 
 (
 ANdef(\a,{SinOsc.ar(\freq.kr(440))});
-ANdef(\c, {Saw.ar(\freq.kr(440))  * 0.2});
-ANdef(\lfo, {LFNoise0.kr(1).range(100, 500)});
-ANdef(\b, {\in.ar(0)}).play;
+ANdef(\c, {Saw.ar(\freq.kr(440)) * 0.2});
+ANdef(\lfo, {LFNoise0.kr(\speed.kr(1)).range(100, 500)});
+ANdef(\d, {\in.ar(0)});
+ANdef(\b, {(\in.ar(0) * 0.5) + (\in2.ar(0) * 0.5)}).play;
 )
 
 
+ANdef(\d).ft = 3;
+
+ANdef(\b) <= ANdef(\d);
+
+ANdef(\a) <=.freq ANdef(\lfo)
+
 //Problem 1, general behaviours:
-ANdef(\b) <= ANdef(\a)
+ANdef(\d) <= ANdef(\a);
+
+ANdef(\c) <=.freq ANdef(\lfo)
+
+//Why does it click here??? Cause ANdef(\a)'s group gets moved and it's not done yet..
+//ANdef(\a) here should be removed from the block though...
+ANdef(\c) => ANdef(\d);
+
+ANdef(\lfo).ft = 2
+ANdef(\lfo) <=.speed 2
+
+
+ANdef(\a) <=.freq 500;
+
+ANdef(\b) <= ANdef(\a);
+
 
 ANdef(\c) => ANdef(\b)
 
-ANdef(\a).outProxies
-ANdef(\c).outProxies
+ANdef(\a) =>.in2 ANdef(\b)
 
-ANdef(\a) <=.freq 500
+ANdef(\c) <=.freq 500
 
-ANdef(\b) <= ANdef(\a)
-
-
-//This creates a double proxyIn_kr ???
-ANdef(\a) <=.freq ANdef(\lfo)
-
+ANdef(\lfo).outProxies
 
 ANdef.clear
+
+ANdef(\a).outProxies
 
 (
 Ndef(\a,{SinOsc.ar(\freq.kr(440))});

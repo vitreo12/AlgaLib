@@ -235,9 +235,23 @@ AlgaProxyBlock {
 	}
 
 	addProxy {
-		arg proxy;
+		arg proxy, addingInRearrangeBlockLoop = false;
 
 		this.dictOfProxies.put(proxy, proxy);
+
+		if(proxy.blockIndex != this.blockIndex, {
+
+			("blockIndex mismatch detected. Using " ++ this.blockIndex).warn;
+			proxy.blockIndex = this.blockIndex;
+
+			//Also update statesDict and add one more entry to ordered array
+			if(addingInRearrangeBlockLoop, {
+				this.statesDict.put(proxy, false);
+
+				this.orderedArray.add(nil);
+			});
+
+		});
 
 		//this.changed = true;
 	}
@@ -307,41 +321,52 @@ AlgaProxyBlock {
 
 			//server.sync;
 
-			//"AHAH".postln;
+			//this.orderedArray.postln;
+
+			this.dictOfProxies.postln;
+
 			this.sanitizeArray;
 
 			//server.bind allows here to be sure that this bundle will be sent in any case after
 			//the NodeProxy creation bundle for interpolation proxies.
-			server.bind({
+			if(orderedArray.size > 0, {
+				server.bind({
 
-				var sizeMinusOne = orderedArray.size - 1;
+					var sizeMinusOne = orderedArray.size - 1;
 
-				//First one here is the last in the chain.. I think this should actually be done for each
-				//bottomOutProxy...
-				var firstProxy = orderedArray[0];
-
-				//Must loop reverse to correct order stuff
-				sizeMinusOne.reverseDo({
-					arg counts;
-
-					var count = counts + 1;
-
-					var thisEntry = orderedArray[count];
-					var prevEntry = orderedArray[count - 1];
-
-					prevEntry.beforeMoveNextInterpProxies(thisEntry);
-
-					//(prevEntry.asString ++ " before " ++ thisEntry.asString).postln;
-
-					//thisEntry.class.postln;
-					//prevEntry.class.postln;
+					//First one here is the last in the chain.. I think this should actually be done for each
+					//bottomOutProxy...
+					var firstProxy = orderedArray[0];
 
 
+					//is proxy playing?
+
+
+
+					//Must loop reverse to correct order stuff
+					sizeMinusOne.reverseDo({
+						arg index;
+
+						var count = index + 1;
+
+						var thisEntry = orderedArray[count];
+						var prevEntry = orderedArray[count - 1];
+
+						prevEntry.beforeMoveNextInterpProxies(thisEntry);
+
+						(prevEntry.asString ++ " before " ++ thisEntry.asString).postln;
+
+						//thisEntry.class.postln;
+						//prevEntry.class.postln;
+
+
+					});
+
+					//Also move first one (so that its interpolationProxies are correct)
+					if(firstProxy != nil, {
+						firstProxy.before(firstProxy);
+					});
 				});
-
-				//Also move first one (so that its interpolationProxies are correct)
-				firstProxy.before(firstProxy);
-
 			});
 
 			//REVIEW THIS:
@@ -360,44 +385,78 @@ AlgaProxyBlock {
 
 		//"AFTER".postln;
 		//this.dictOfProxies.postln;
-		//this.orderedArray.postln;
+		this.orderedArray.postln;
 
 	}
 
-	//Remove nil entries, coming from mistakes in adding/removing elements to block
+	//Remove nil entries, coming from mistakes in adding/removing elements to block.
+	//Also remove entries that have no outProxies and are not playing to output. This
+	//is needed for a particular case when switching proxies connection to something that
+	//is playing to output, the ordering could bring the previous playing proxy after the
+	//one that is playing out, not accounting if there was fadetime, generating click.
 	sanitizeArray {
-		this.orderedArray.removeEvery([nil]);
+		//this.orderedArray.removeEvery([nil]);
+
+		this.orderedArray.removeAllSuchThat({
+
+			arg item;
+
+			var removeCondition;
+
+			//If nil, remove entry anyway. Otherwise, look for the other cases.
+			if(item == nil, {
+				removeCondition = true;
+			}, {
+				removeCondition = (item.isMonitoring == false).and(item.outProxies.size == 0);
+			});
+
+			removeCondition;
+
+		});
+
 	}
 
 	//Remove non-used entries and set their blockIndex back to -1
 	sanitizeDict {
 
-		this.dictOfProxies = this.dictOfProxies.select({
-			arg proxy;
-			var result;
+		if(this.orderedArray.size > 0, {
+			this.dictOfProxies = this.dictOfProxies.select({
+				arg proxy;
+				var result;
 
-			block ({
-				arg break;
+				block ({
+					arg break;
 
-				this.orderedArray.do({
-					arg proxyInArray;
-					result = proxy == proxyInArray;
+					this.orderedArray.do({
+						arg proxyInArray;
+						result = proxy == proxyInArray;
 
-					//Break on true, otherwise keep searching.
-					if(result, {
-						break.(nil);
+						//Break on true, otherwise keep searching.
+						if(result, {
+							break.(nil);
+						});
 					});
 				});
-			});
 
-			//Reset blockIndex too
-			if(result.not, {
-				("Removing proxy: " ++ proxy.asString ++ " from block number " ++ this.blockIndex).warn;
+				//Reset blockIndex too
+				if(result.not, {
+					("Removing proxy: " ++ proxy.asString ++ " from block number " ++ this.blockIndex).warn;
+					proxy.blockIndex = -1;
+				});
+
+				result;
+
+			});
+		}, {
+
+			//Ordered array has size 0. Free all
+
+			this.dictOfProxies.do({
+				arg proxy;
 				proxy.blockIndex = -1;
 			});
 
-			result;
-
+			this.dictOfProxies.clear;
 		});
 
 	}
@@ -406,28 +465,36 @@ AlgaProxyBlock {
 	rearrangeBlockLoop {
 		arg proxy;
 
-		var currentState = statesDict[proxy];
+		if(proxy != nil, {
 
-		//If this proxy has never been touched, avoids repetition
-		if((currentState == false).and(proxy != nil), {
+			var currentState;
 
-			//("inProxies to " ++  proxy.asString ++ " : ").postln;
+			//If for any reason the proxy wasn't already in the dictOfProxies, add it
+			this.addProxy(proxy, true);
 
-			proxy.inProxies.doProxiesLoop ({
-				arg inProxy;
+			currentState = statesDict[proxy];
 
-				//rearrangeInputs to this, this will add the inProxies
-				this.rearrangeBlockLoop(inProxy);
+			//If this proxy has never been touched, avoids repetition
+			if(currentState == false, {
+
+				//("inProxies to " ++  proxy.asString ++ " : ").postln;
+
+				proxy.inProxies.doProxiesLoop ({
+					arg inProxy;
+
+					//rearrangeInputs to this, this will add the inProxies
+					this.rearrangeBlockLoop(inProxy);
+				});
+
+				//Add this
+				this.orderedArray[runningIndex] = proxy;
+
+				//Completed: put it to true so it's not added again
+				statesDict[proxy] = true;
+
+				//Advance counter
+				this.runningIndex = this.runningIndex + 1;
 			});
-
-			//Add this
-			this.orderedArray[runningIndex] = proxy;
-
-			//Completed: put it to true so it's not added again
-			statesDict[proxy] = true;
-
-			//Advance counter
-			this.runningIndex = this.runningIndex + 1;
 		});
 	}
 
@@ -438,8 +505,8 @@ AlgaProxyBlock {
 		this.dictOfProxies.do({
 			arg proxy;
 
-			//Find the ones with no outProxies
-			if(proxy.outProxies.size == 0, {
+			//Find the ones with no outProxies but at least one inProxy
+			if((proxy.outProxies.size == 0).and(proxy.inProxies.size > 0), {
 				this.bottomOutProxies.put(proxy, proxy);
 			});
 
@@ -513,7 +580,7 @@ AlgaNodeProxy : NodeProxy {
 				if(counter == 1, {
 					synthDefString_ar = "SynthDef(\\proxyIn_ar1, {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'sin'); Out.ar(\\out.ir(0), \\in.ar(0) * fadeTimeEnv); }).add;";
 
-					synthDefString_kr = "SynthDef(\\proxyIn_kr1, {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin'); Out.kr(\\out.ir(0), \\in.ar(0) * fadeTimeEnv); }).add;";
+					synthDefString_kr = "SynthDef(\\proxyIn_kr1, {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin'); Out.kr(\\out.ir(0), \\in.kr(0) * fadeTimeEnv); }).add;";
 				}, {
 
 					//Generate [0, 0, 0, ...
@@ -526,7 +593,7 @@ AlgaNodeProxy : NodeProxy {
 
 					synthDefString_ar = "SynthDef(\\proxyIn_ar" ++ counter.asString ++ ", {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'sin'); Out.ar(\\out.ir(0), \\in.ar(" ++ arrayOfZeros ++ ") * fadeTimeEnv); }).add;";
 
-					synthDefString_kr = "SynthDef(\\proxyIn_kr" ++ counter.asString ++ ", {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin'); Out.kr(\\out.ir(0), \\in.ar(" ++ arrayOfZeros ++ ") * fadeTimeEnv); }).add;";
+					synthDefString_kr = "SynthDef(\\proxyIn_kr" ++ counter.asString ++ ", {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin'); Out.kr(\\out.ir(0), \\in.kr(" ++ arrayOfZeros ++ ") * fadeTimeEnv); }).add;";
 				});
 
 
@@ -885,6 +952,8 @@ AlgaNodeProxy : NodeProxy {
 		canBeMapped = proxy.initBus(rate, numChannels); // warning: proxy should still have a fixed bus
 
 		//("ConnectXSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ key.asString).postln;
+		//rate.postln;
+
 
 		if(canBeMapped) {
 			if(this.isNeutral) { this.defineBus(rate, numChannels) };
@@ -911,6 +980,7 @@ AlgaNodeProxy : NodeProxy {
 		canBeMapped = proxy.initBus(rate, numChannels); // warning: proxy should still have a fixed bus
 
 		//("ConnectSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ key.asString).postln;
+		//rate.postln;
 
 		if(canBeMapped) {
 			if(this.isNeutral) { this.defineBus(rate, numChannels) };
@@ -970,6 +1040,8 @@ AlgaNodeProxy : NodeProxy {
 
 		//Free previous connections to the this, if there were any
 		this.freePreviousConnection(param);
+
+		//paramRate.postln;
 
 		//If there was no interpProxy already, create a new one
 		if(interpolationProxyEntry == nil, {
@@ -1098,10 +1170,12 @@ AlgaNodeProxy : NodeProxy {
 
 		});
 
+		/*
 		//This is the previous connection!!
 		if(previousParamEntry != nil, {
 			("Previous connection: " ++ previousParamEntry.asString).postln;
 		});
+		*/
 	}
 
 	//Combines before with <<>
@@ -1231,6 +1305,9 @@ AlgaNodeProxy : NodeProxy {
 			//Create a new block if needed
 			this.createNewBlockIfNeeded(this);
 
+			//Free previous connections to the this, if there were any
+			this.freePreviousConnection(param);
+
 			this.createInterpProxyIfNeeded(nextProxy, param);
 
 		});
@@ -1303,7 +1380,8 @@ AlgaNodeProxy : NodeProxy {
 
 		if(isPreviousEntryAProxy, {
 			//Remove connection in previousEntry's outProxies to this one
-			previousEntry.removeOutProxy(this);
+			previousEntry.removeOutProxy(this, param);
+
 		}, {
 			//ARRAY!
 
@@ -1314,7 +1392,7 @@ AlgaNodeProxy : NodeProxy {
 			if(isPreviousEntryAnArray, {
 				previousEntry.do({
 					arg previousProxyEntry;
-					previousProxyEntry.removeOutProxy(this);
+					previousProxyEntry.removeOutProxy(this, param);
 				});
 			});
 		});
@@ -1328,7 +1406,7 @@ AlgaNodeProxy : NodeProxy {
 	}
 
 	removeOutProxy {
-		arg proxyToRemove;
+		arg proxyToRemove, param = \in;
 
 		var isThisConnectedToAnotherParam = false;
 
@@ -1336,18 +1414,27 @@ AlgaNodeProxy : NodeProxy {
 		//This is a little to expensive, find a better way
 		block ({
 			arg break;
-			proxyToRemove.inProxies.doProxiesLoop({
-				arg inProxy;
-				if(inProxy == this, { isThisConnectedToAnotherParam = true; break.(nil); });
+			proxyToRemove.inProxies.keysValuesDoProxiesLoop({
+				arg inParam, inProxy;
+
+				//Check for param duplicates and identity
+				if((inParam != param).and(inProxy == this), {
+					isThisConnectedToAnotherParam = true;
+					break.(nil);
+				});
 			});
 		});
+
+		//this.postln;
+		//proxyToRemove.postln;
+		//isThisConnectedToAnotherParam.postln;
 
 		if(isThisConnectedToAnotherParam == false, {
 			//Remove older connection to this only if it's not connected to
 			//any other param of this proxy..
 			//Remember that outProxies are stored with proxy -> proxy, not param -> proxy
 			this.outProxies.removeAt(proxyToRemove);
-		}, );
+		});
 
 		//Also reset block index if needed, if its outProxies
 		//and inProxies have size 0 (meaning it's not connected to anything anymore)
@@ -1390,7 +1477,7 @@ AlgaNodeProxy : NodeProxy {
 			//If they are not already in same block
 			if(thisBlockIndex != nextProxyBlockIndex, {
 
-				//Else, add this proxy to nextProxy's block
+				//Else, add this proxy to nextProxy's block, together with all proxies from this' block
 				if(thisBlockIndex == -1, {
 					"add this to nextProxy's block".postln;
 					this.blockIndex = nextProxyBlockIndex;
@@ -1402,7 +1489,7 @@ AlgaNodeProxy : NodeProxy {
 					newBlockIndex = nextProxyBlockIndex;
 				}, {
 
-					//Else, add nextProxy to this block
+					//Else, add nextProxy to this block, together with all proxies from nextProxy's block
 					if(nextProxyBlockIndex == -1, {
 						"add nextProxy to this' block".postln;
 						nextProxy.blockIndex = thisBlockIndex;
@@ -1413,44 +1500,49 @@ AlgaNodeProxy : NodeProxy {
 						//This is for the changed at the end of function...
 						newBlockIndex = thisBlockIndex;
 					});
+				}, {
+
+					//Else, it means bot proxies are already in blocks. Merge them into a new one!
+
+					newBlockIndex = UniqueID.next;
+					newBlock = AlgaProxyBlock.new(newBlockIndex);
+
+					"both proxies already into blocks. creating new".postln;
+
+					//Change all proxies' group to the new one and add then to new block
+					AlgaBlocksDict.blocksDict[thisBlockIndex].dictOfProxies.do({
+						arg proxy;
+
+						proxy.blockIndex = newBlockIndex;
+
+						newBlock.addProxy(proxy);
+					});
+
+					AlgaBlocksDict.blocksDict[nextProxyBlockIndex].dictOfProxies.do({
+						arg proxy;
+
+						proxy.blockIndex = newBlockIndex;
+
+						newBlock.addProxy(proxy);
+					});
+
+					//Remove previous' groups
+					AlgaBlocksDict.blocksDict.removeAt(thisBlockIndex);
+					AlgaBlocksDict.blocksDict.removeAt(nextProxyBlockIndex);
+
+					//Also add the two connected proxies to this new group
+					this.blockIndex = newBlockIndex;
+					nextProxy.blockIndex = newBlockIndex;
+
+					//Finally, add the actual block to the dict
+					AlgaBlocksDict.blocksDict.put(newBlockIndex, newBlock);
 				});
 			});
 		});
 
 		//If both are already into blocks and the block is different, the two blocks should merge into a new one!
-		if((thisBlockIndex != nextProxyBlockIndex).and((thisBlockIndex != -1).and(nextProxyBlockIndex != -1)), {
-
-			newBlockIndex = UniqueID.next;
-			newBlock = AlgaProxyBlock.new(newBlockIndex);
-
-			"both already into blocks. creating new".postln;
-
-			//Change all proxies' group to the new one and add then to new block
-			AlgaBlocksDict.blocksDict[thisBlockIndex].dictOfProxies.do({
-				arg proxy;
-				proxy.blockIndex = newBlockIndex;
-
-				newBlock.addProxy(proxy);
-			});
-
-			AlgaBlocksDict.blocksDict[nextProxyBlockIndex].dictOfProxies.do({
-				arg proxy;
-				proxy.blockIndex = newBlockIndex;
-
-				newBlock.addProxy(proxy);
-			});
-
-			//Remove previous' groups
-			AlgaBlocksDict.blocksDict.removeAt(thisBlockIndex);
-			AlgaBlocksDict.blocksDict.removeAt(nextProxyBlockIndex);
-
-			//Also add the two connected proxies to this new group
-			this.blockIndex = newBlockIndex;
-			nextProxy.blockIndex = newBlockIndex;
-
-			//Finally, add the actual block to the dict
-			AlgaBlocksDict.blocksDict.put(newBlockIndex, newBlock);
-		});
+		//if((thisBlockIndex != nextProxyBlockIndex).and((thisBlockIndex != -1).and(nextProxyBlockIndex != -1)), {
+		//});
 
 		//If the function pass through, pass this' blockIndex instead
 		if(newBlockIndex == nil, {newBlockIndex = this.blockIndex;});
