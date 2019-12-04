@@ -1,10 +1,12 @@
 + IdentityDictionary {
 
-	//To loop over all inProxies, including if they are Array and treating them normally.
+	//To loop over all inProxies for a ANProxy, including if they are Array and treating them normally.
+	//Alias for do
 	doProxiesLoop {
 		arg function;
 
-		this.keysValuesDo({ arg key, value, i;
+		this.keysValuesDo({
+			arg key, value, i;
 
 			if(value.class == Array, {
 				value.do({
@@ -16,9 +18,47 @@
 			});
 		});
 	}
+
+	//To loop over all inProxies for a ANProxy, including if they are Array and treating them normally.
+	//Alias for keysValuesDo
+	keysValuesDoProxiesLoop {
+		arg function;
+
+		this.keysValuesDo({
+			arg key, value, i;
+
+			if(value.class == Array, {
+				value.do({
+					arg entry;
+					function.value(key, entry, i);
+				});
+			}, {
+				function.value(key, value, i);
+			});
+		});
+	}
+}
+
+//Fixes: https://github.com/supercollider/supercollider/issues/4311
++ ProxyNodeMap {
+
+	controlNames {
+		var res = Array.new;
+
+		//"NODE MAP EXTENSION".warn;
+
+		this.keysValuesDo { |key, value|
+			var rate = if(value.rate == \audio) { \audio } { \control };
+			res = res.add(ControlName(key, nil, rate, value))
+		};
+
+		^res
+	}
+
 }
 
 
+/*
 + NodeProxy {
 	after {
 		arg nextProxy;
@@ -32,6 +72,21 @@
 		^this;
 	}
 }
+*/
+
+/*
+
++ Number {
+
+	=> {
+		arg nextProxy, param = \in;
+
+		"Number's => : need to add all the logic".warn;
+
+		^nextProxy;
+	}
+}
+
 
 + Array {
 	=> {
@@ -63,10 +118,10 @@
 
 		var allProxiesDict, functionProxiesArray;
 
-		isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
+		isNextProxyAProxy = (nextProxy.class == AlgaNodeProxy).or(nextProxy.class.superclass == AlgaNodeProxy).or(nextProxy.class.superclass.superclass == AlgaNodeProxy);
 
 		if((isNextProxyAProxy.not), {
-			"nextProxy is not a valid VitreoNodeProxy!!!".warn;
+			"nextProxy is not a valid AlgaNodeProxy!!!".warn;
 			^this;
 		});
 
@@ -121,7 +176,7 @@
 
 		//REARRANGE BLOCK!...
 		//this needs server syncing (since the interpolationProxy's group needs to be instantiated on server)
-		VitreoBlocksDict.blocksDict[nextProxy.blockIndex].rearrangeBlock(nextProxy.server);
+		AlgaBlocksDict.blocksDict[nextProxy.blockIndex].rearrangeBlock(nextProxy.server);
 
 
 		//With fade: with modulated proxy at the specified param
@@ -148,7 +203,9 @@
 		if(index == nil, {index = \ALL});
 
 		//Set the proxies array as inProxy entry for nextProxy... Special symbol name to store the ins to
-		targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, functionProxiesArray);
+		if(functionProxiesArray.size > 0, {
+			targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, functionProxiesArray);
+		});
 
 		//outProxies are already assigned in createAndPopulateFunctionProxiesArray
 
@@ -200,23 +257,23 @@
 
 		//constants will also show params, but if there is a NodeProxy
 		//of some kind, it's been created on the relative ProxySpace.
-		//It can be retrieved with: VitreoProxySpace.findSpace(~d);
+		//It can be retrieved with: AlgaProxySpace.findSpace(~d);
 		var possibleProxies = funcDef.constants;
 
 		if(possibleProxies.size > 0, {
 			var proxySpace;
-			var isTargetProxyAnVNdef = (targetProxy.class.superclass == VitreoNodeProxy).or(targetProxy.class.superclass.superclass == VitreoNodeProxy);
+			var isTargetProxyAnVNdef = (targetProxy.class.superclass == AlgaNodeProxy).or(targetProxy.class.superclass.superclass == AlgaNodeProxy);
 
 			//"possibleProxies: ".postln;
 
 			//possibleProxies.postln;
 
 			if(isTargetProxyAnVNdef.not, {
-				//A VitreoNodeProxy
-				proxySpace = VitreoProxySpace.findSpace(targetProxy);
+				//A AlgaNodeProxy
+				proxySpace = AlgaProxySpace.findSpace(targetProxy);
 
 			}, {
-				//A VitreoNdef
+				//A AlgaNdef
 				proxySpace = VNdef.all.at(server.name)
 			});
 
@@ -229,10 +286,10 @@
 					//Check if the possibleProxy is in the proxySpace
 					var nodeProxy = proxySpace[possibleProxySymbolName];
 
-					//Non-valid symbols will return a VitreoNodeProxy with nil channels
+					//Non-valid symbols will return a AlgaNodeProxy with nil channels
 					if(nodeProxy.numChannels != nil, {
 
-						("Found one VitreoNodeProxy : " ++ possibleProxySymbolName.asString).postln;
+						("Found one AlgaNodeProxy : " ++ possibleProxySymbolName.asString).postln;
 						dict.put(possibleProxySymbolName, nodeProxy);
 					});
 				})
@@ -256,10 +313,10 @@
 
 		var allProxiesDict, opProxiesArray;
 
-		isNextProxyAProxy = (nextProxy.class == VitreoNodeProxy).or(nextProxy.class.superclass == VitreoNodeProxy).or(nextProxy.class.superclass.superclass == VitreoNodeProxy);
+		isNextProxyAProxy = (nextProxy.class == AlgaNodeProxy).or(nextProxy.class.superclass == AlgaNodeProxy).or(nextProxy.class.superclass.superclass == AlgaNodeProxy);
 
 		if((isNextProxyAProxy.not), {
-			"nextProxy is not a valid VitreoNodeProxy!!!".warn;
+			"nextProxy is not a valid AlgaNodeProxy!!!".warn;
 			^this;
 		});
 
@@ -312,7 +369,7 @@
 
 		//REARRANGE BLOCK!...
 		//this needs server syncing (since the interpolationProxy's group needs to be instantiated on server)
-		VitreoBlocksDict.blocksDict[nextProxy.blockIndex].rearrangeBlock(nextProxy.server);
+		AlgaBlocksDict.blocksDict[nextProxy.blockIndex].rearrangeBlock(nextProxy.server);
 
 
 		//With fade: with modulated proxy at the specified param
@@ -368,12 +425,15 @@
 
 		this.findAllProxies(allProxiesDict);
 
-		opProxiesArray = this.createAndPopulateOpProxiesArray(allProxiesDict, targetProxy);
+		"To be implemented...".warn;
 
-		if(index == nil, {index = \ALL});
+		//opProxiesArray = this.createAndPopulateOpProxiesArray(allProxiesDict, targetProxy);
+
+		//if(index == nil, {index = \ALL});
 
 		//Set the proxies array as inProxy entry for nextProxy... Special symbol name to store the ins to
-		targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, opProxiesArray);
+
+		//targetProxy.inProxies.put(\___SPECIAL_ASSIGNMENT___ ++ index.asSymbol, opProxiesArray);
 
 		//outProxies are already assigned in createAndPopulateFunctionProxiesArray
 
@@ -400,7 +460,7 @@
 
 		}, {
 
-			var isFirstOpAProxy = (firstOp.class == VitreoNodeProxy).or(firstOp.class.superclass == VitreoNodeProxy).or(firstOp.class.superclass.superclass == VitreoNodeProxy);
+			var isFirstOpAProxy = (firstOp.class == AlgaNodeProxy).or(firstOp.class.superclass == AlgaNodeProxy).or(firstOp.class.superclass.superclass == AlgaNodeProxy);
 
 			if(isFirstOpAProxy, {
 				//Add to dict, found a proxy
@@ -415,7 +475,7 @@
 
 		}, {
 
-			var isSecondOpAProxy = (secondOp.class == VitreoNodeProxy).or(secondOp.class.superclass == VitreoNodeProxy).or(secondOp.class.superclass.superclass == VitreoNodeProxy);
+			var isSecondOpAProxy = (secondOp.class == AlgaNodeProxy).or(secondOp.class.superclass == AlgaNodeProxy).or(secondOp.class.superclass.superclass == AlgaNodeProxy);
 
 			if(isSecondOpAProxy, {
 				//Add to dict, found a proxy
@@ -449,7 +509,7 @@
 
 		}, {
 
-			var isFirstOpAProxy = (firstOp.class == VitreoNodeProxy).or(firstOp.class.superclass == VitreoNodeProxy).or(firstOp.class.superclass.superclass == VitreoNodeProxy);
+			var isFirstOpAProxy = (firstOp.class == AlgaNodeProxy).or(firstOp.class.superclass == AlgaNodeProxy).or(firstOp.class.superclass.superclass == AlgaNodeProxy);
 
 			if(isFirstOpAProxy, {
 
@@ -461,3 +521,6 @@
 	}
 
 }
+
+
+*/

@@ -107,10 +107,19 @@ VNdef.all.at(\localhost)
 
 
 
-
+reshaping
 
 
 //Problem 5: MULTICHANNEL STUFF
+/*
+Things to look into:
+
+reshaping = \elastic
+
+mold
+
+*/
+
 p = VitreoProxySpace.new.push(s.boot);
 
 p.clear
@@ -118,13 +127,18 @@ p.clear
 ~out  = { \in.ar([0, 0]) };
 ~out.play
 
-~s1 = {SinOsc.ar([440, 447])}
+~s1 = {SinOsc.ar([440, 500])}
 
+//Binops broken with new changes...
 ~s2 = (~s1 * 0.5)
 
 //Problem is interpolationProxies, which now just defaults as 1 channel!
 ~s1 => ~out
-~s1 => ~out
+
+~s2 => ~out
+
+
+
 
 ~out <= {SinOsc.ar}
 

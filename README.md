@@ -1,2 +1,4 @@
-# VitreoLiveCoding
-ProxySpace, NodeProxy and Ndef extensions
+AlgaSC
+======
+
+SuperCollider code for Alga.
