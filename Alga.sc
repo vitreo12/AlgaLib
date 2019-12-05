@@ -850,8 +850,6 @@ AlgaNodeProxy : NodeProxy {
 		//super.put(index, obj, channelOffset, extraArgs, now);
 		this.putExtended(index, obj, channelOffset, extraArgs, now);
 
-		isInterpProxy.postln;
-
 		//Create interpolationProxies for all params
 		if(isInterpProxy == false, {
 
@@ -1055,22 +1053,26 @@ AlgaNodeProxy : NodeProxy {
 
 	createAllInterpProxies {
 
-		defaultControlNames.do({
-			arg controlName;
+		server.bind({
 
-			var paramName = controlName.name;
-			var paramVal  = controlName.defaultValue;
+			defaultControlNames.do({
+				arg controlName;
 
-			var paramNumberOfChannels = controlName.numChannels;
+				var paramName = controlName.name;
+				var paramVal  = controlName.defaultValue;
 
-			//Retrieve the original default value, used to restore things when unmapping ( <| )
-			//this.defaultParamsVals.put(paramName, paramVal);
+				var paramNumberOfChannels = controlName.numChannels;
 
-			paramVal.postln;
-			paramNumberOfChannels.postln;
+				//Retrieve the original default value, used to restore things when unmapping ( <| )
+				//this.defaultParamsVals.put(paramName, paramVal);
 
-			//Create interpProxy for this paramName
-			this.createInterpProxy(paramName, controlName, paramNumberOfChannels);
+				paramVal.postln;
+				paramNumberOfChannels.postln;
+
+				//Create interpProxy for this paramName
+				this.createInterpProxy(paramName, controlName, paramNumberOfChannels);
+
+			});
 
 		});
 
@@ -1104,10 +1106,9 @@ AlgaNodeProxy : NodeProxy {
 		//Check if interpolationProxy was already created.
 		prevInterpProxy = this.interpolationProxies[paramName];
 
-		this.interpolationProxies.postln;
+		//this.interpolationProxies.postln;
 
 		if(prevInterpProxy == nil, {
-
 			//Doesn't work with Pbinds with ar param, would just create a kr version
 			if(paramRate == \audio, {
 				interpolationProxy = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
@@ -1129,7 +1130,8 @@ AlgaNodeProxy : NodeProxy {
 			interpolationProxy.outProxies.put(paramName, this);
 
 			//Without fade: with modulated proxy at the specified param
-			this.connectSet(interpolationProxy, paramName);
+			//this.connectSet(interpolationProxy, paramName);
+			this.set(paramName, interpolationProxy);
 		}, {
 
 			("Already Existing Param, " ++ paramName).warn;

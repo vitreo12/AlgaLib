@@ -20,26 +20,32 @@ ANdef(\b, { \in.ar(0) }).play;
 ANdef(\a) => ANdef(\b);
 )
 
+
+AlgaBlocksDict.blocksDict
+
+
 ANdef(\a, { SinOsc.ar([440, 446]) });
 
 ANdef(\b, { \in.ar([0, 0]) });
 
 
+s.latency = 0.2
+
 //Without s.bind, this sometimes works, sometimes doesn't...
 (
-s.bind({
+//s.bind({
 	Task({
 		20.do({
 			ANdef(\a, { SinOsc.ar([440, 446]) });
 			ANdef(\b, { \in.ar([0, 0]) }).play;
 			ANdef(\a) => ANdef(\b);
 
-			0.5.wait;
+			0.2.wait;
 
 			ANdef.clear;
 
-			0.2.wait;
+			0.1.wait;
 		})
 	}).start;
-})
+//})
 )
