@@ -1,3 +1,26 @@
++ SynthControl {
+
+	//This fixes correct number of outputs for ProxySynthDefs used as Symbol
+	build { | proxy, orderIndex | 	// assumes audio rate proxy if not initialized
+		var rate, desc, numChannels;
+
+		desc = this.synthDesc;
+
+		numChannels = desc.def.numChannels;
+
+		if(desc.notNil) {
+			canFreeSynth = desc.canFreeSynth;
+			canReleaseSynth = desc.hasGate && canFreeSynth;
+			hasFadeTimeControl = desc.controls.any { |x| x.name === \fadeTime };
+		};
+
+		if(proxy.isNeutral) { rate = \audio };
+
+		^proxy.initBus(rate, numChannels)
+	}
+
+}
+
 + IdentityDictionary {
 
 	//To loop over all inProxies for a ANProxy, including if they are Array and treating them normally.

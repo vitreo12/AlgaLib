@@ -112,13 +112,48 @@ p.clear
 
 ~s1 = {SinOsc.ar([440, 447])}
 
-~s2 = (~s1 * 0.5)
-
 //Problem is interpolationProxies, which now just defaults as 1 channel!
 ~s1 => ~out
-~s1 => ~out
 
-~out <= {SinOsc.ar}
+//Back to 1
+~s1 = {SinOsc.ar};
+
+~s1.numChannels;
+~out.interpolationProxies[\in].numChannels;
+
+
+
+p = AlgaProxySpace.new.push
+
+~a = { SinOsc.ar };
+~b = { \in.ar(0) };
+
+~b.play;
+
+~a => ~b
+
+~a.reshaping = \expanding;
+~a = { SinOsc.ar([440, 442]) }
+
+~b.reshaping = \expanding;
+~b = { \in.ar([0, 0]) }
+
+
+(
+ANdef(\a, { SinOsc.ar });
+ANdef(\b, { \in.ar(0) }).play;
+ANdef(\a) => ANdef(\b);
+)
+
+ANdef(\a, { SinOsc.ar([440, 441]) });
+
+(
+ANdef(\a, { SinOsc.ar([440, 446]) });
+ANdef(\b, { \in.ar([0, 0]) }).play;
+ANdef(\a) => ANdef(\b);
+)
+
+
 
 p = ProxySpace.new.push(s.boot);
 

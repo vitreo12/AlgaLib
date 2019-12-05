@@ -126,7 +126,7 @@ AlgaProxySpace : ProxySpace {
 		this.initProxy(proxy);
 
 		//Change reshaping to be elastic by default
-		proxy.reshaping = \elastic;
+		proxy.reshaping = \expanding;
 
 		^proxy
 	}
@@ -323,7 +323,7 @@ AlgaProxyBlock {
 
 			//this.orderedArray.postln;
 
-			this.dictOfProxies.postln;
+			//this.dictOfProxies.postln;
 
 			this.sanitizeArray;
 
@@ -385,7 +385,7 @@ AlgaProxyBlock {
 
 		//"AFTER".postln;
 		//this.dictOfProxies.postln;
-		this.orderedArray.postln;
+		//this.orderedArray.postln;
 
 	}
 
@@ -544,7 +544,7 @@ AlgaBlocksDict {
 AlgaNodeProxy : NodeProxy {
 
 	classvar <>defaultAddAction = \addToTail;
-	classvar <>defaultReshaping = \elastic;   //Use \elasitc as default. It's set in NodeProxy's init (super.init)
+	classvar <>defaultReshaping = \expanding;   //Use \elasitc as default. It's set in NodeProxy's init (super.init)
 
 	//The block index that contains this proxy
 	var <>blockIndex = -1;
@@ -578,9 +578,9 @@ AlgaNodeProxy : NodeProxy {
 				counter = counter + 1;
 
 				if(counter == 1, {
-					synthDefString_ar = "SynthDef(\\proxyIn_ar1, {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'sin'); Out.ar(\\out.ir(0), \\in.ar(0) * fadeTimeEnv); }).add;";
+					synthDefString_ar = "ProxySynthDef(\\proxyIn_ar1, {\\in.ar(0)}).add;";
 
-					synthDefString_kr = "SynthDef(\\proxyIn_kr1, {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin'); Out.kr(\\out.ir(0), \\in.kr(0) * fadeTimeEnv); }).add;";
+					synthDefString_kr = "ProxySynthDef(\\proxyIn_kr1, {\\in.kr(0)}).add;";
 				}, {
 
 					//Generate [0, 0, 0, ...
@@ -591,9 +591,9 @@ AlgaNodeProxy : NodeProxy {
 					//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
 					arrayOfZeros = arrayOfZeros[0..(arrayOfZeros.size - 2)] ++ "]";
 
-					synthDefString_ar = "SynthDef(\\proxyIn_ar" ++ counter.asString ++ ", {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'sin'); Out.ar(\\out.ir(0), \\in.ar(" ++ arrayOfZeros ++ ") * fadeTimeEnv); }).add;";
+					synthDefString_ar = "ProxySynthDef(\\proxyIn_ar" ++ counter.asString ++ ", {\\in.ar(" ++ arrayOfZeros ++ ")}).add;";
 
-					synthDefString_kr = "SynthDef(\\proxyIn_kr" ++ counter.asString ++ ", {var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin'); Out.kr(\\out.ir(0), \\in.kr(" ++ arrayOfZeros ++ ") * fadeTimeEnv); }).add;";
+					synthDefString_kr = "ProxySynthDef(\\proxyIn_kr" ++ counter.asString ++ ", {\\in.kr(" ++ arrayOfZeros ++ ")}).add;";
 				});
 
 
@@ -620,6 +620,9 @@ AlgaNodeProxy : NodeProxy {
 
 		//Call NodeProxy's init
 		super.init;
+
+		//Default reshaping is expanding
+		this.reshaping = \expanding;
 	}
 
 	clear { | fadeTime = 0, isInterpolationProxy = false |
@@ -789,10 +792,56 @@ AlgaNodeProxy : NodeProxy {
 	//When a new object is assigned to a AlgaNodeProxy!
 	put { | index, obj, channelOffset = 0, extraArgs, now = true |
 
+		var numberOfChannels;
 		var isObjAFunction, isObjAnOp, isObjAnArray;
 
 		//Call NodeProxy's put, first.
 		super.put(index, obj, channelOffset, extraArgs, now);
+
+		numberOfChannels = this.numChannels;
+
+		("Number of channels: " ++ numberOfChannels).postln;
+
+		//Check to what this is connected to!
+		this.outProxies.do({
+			arg proxy;
+
+			//Check for the right connection.. This is SO inefficient!!!
+			proxy.inProxies.keysValuesDoProxiesLoop({
+				arg proxyParam, proxyInput;
+
+				//Found match
+				if(proxyInput == this, {
+					var interpolationProxy = proxy.interpolationProxies[proxyParam];
+
+					if(interpolationProxy != nil, {
+						if(interpolationProxy.numChannels != numberOfChannels, {
+
+							//Should this be set according to proxyInput.param?
+							var inputRate = this.rate;
+
+							"Channel mismatch!".warn;
+
+							interpolationProxy.numChannels.postln;
+
+							if(inputRate == \audio, {
+								var proxyInSymbol = ("proxyIn_ar" ++ numberOfChannels).asSymbol;
+								proxyInSymbol.postln;
+								interpolationProxy.source = proxyInSymbol;
+							}, {
+								var proxyInSymbol = ("proxyIn_kr" ++ numberOfChannels).asSymbol;
+								proxyInSymbol.postln;
+								interpolationProxy.source = proxyInSymbol;
+							});
+
+							interpolationProxy.numChannels.postln;
+						});
+					});
+				});
+			});
+
+			//proxy.postln;
+		});
 
 		//Different cases!
 
@@ -954,7 +1003,6 @@ AlgaNodeProxy : NodeProxy {
 		//("ConnectXSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ key.asString).postln;
 		//rate.postln;
 
-
 		if(canBeMapped) {
 			if(this.isNeutral) { this.defineBus(rate, numChannels) };
 			this.xset(key, proxy);
@@ -991,6 +1039,17 @@ AlgaNodeProxy : NodeProxy {
 		^proxy // returns first argument for further chaining
 	}
 
+	changeInterpProxyChannels {
+		arg param = \in, numberOfChannels;
+
+		var interpProxy = this.interpolationProxies[param];
+
+		if(interpProxy != nil, {
+
+
+		});
+	}
+
 	createInterpProxyIfNeeded {
 		arg prevProxy, param = \in, src = nil;
 
@@ -998,7 +1057,9 @@ AlgaNodeProxy : NodeProxy {
 		var interpolationProxyEntry = this.interpolationProxies[param];
 
 		//Returns nil with a Pbind.. this could be problematic for connections, rework it!
-		var paramRate = (this.controlNames.detect{ |x| x.name == param }).rate;
+		var paramRate;
+
+		var numberOfChannels;
 
 		var isThisProxyInstantiated = true;
 		var isPrevProxyInstantiated = true;
@@ -1038,10 +1099,16 @@ AlgaNodeProxy : NodeProxy {
 			});
 		});
 
-		//Free previous connections to the this, if there were any
-		this.freePreviousConnection(param);
+		paramRate = (this.controlNames.detect{ |x| x.name == param }).rate;
+
+		//Should this according to prevProxy or to this???
+		numberOfChannels = prevProxy.numChannels;
 
 		//paramRate.postln;
+		("Num channels of input proxy: " ++ numberOfChannels).postln;
+
+		//Free previous connections to the this, if there were any
+		this.freePreviousConnection(param);
 
 		//If there was no interpProxy already, create a new one
 		if(interpolationProxyEntry == nil, {
@@ -1062,26 +1129,39 @@ AlgaNodeProxy : NodeProxy {
 			//Pass in something as src (used for Function, Binops, Array, etc..)
 			if(src != nil, {
 
+				/*
 				//Doesn't work with Pbinds with ar param, would just create a kr version
 				if(paramRate == \audio, {
 					interpolationProxy = AlgaNodeProxy.new(server, \audio, 1).source   = src;
 				}, {
 					interpolationProxy = AlgaNodeProxy.new(server, \control, 1).source = src;
 				});
+				*/
 
 			}, {
 
 				//Doesn't work with Pbinds with ar param, would just create a kr version
 				if(paramRate == \audio, {
+					var proxyInSymbol = ("proxyIn_ar" ++ numberOfChannels).asSymbol;
+					proxyInSymbol.postln;
+					interpolationProxy = AlgaNodeProxy.new(server, \audio, numberOfChannels).source   = proxyInSymbol;
+				}, {
+					var proxyInSymbol = ("proxyIn_kr" ++ numberOfChannels).asSymbol;
+					proxyInSymbol.postln;
+					interpolationProxy = AlgaNodeProxy.new(server, \control, numberOfChannels).source = proxyInSymbol;
+				});
+
+				/*
+				if(paramRate == \audio, {
 					interpolationProxy = AlgaNodeProxy.new(server, \audio, 1).source   = \proxyIn_ar1;
 				}, {
 					interpolationProxy = AlgaNodeProxy.new(server, \control, 1).source = \proxyIn_kr1;
 				});
-
+				*/
 			});
 
 			//Should it not be elastic?
-			interpolationProxy.reshaping = \elastic;
+			interpolationProxy.reshaping = \expanding;
 
 			//Default fadeTime: use nextProxy's (the modulated one) fadeTime
 			interpolationProxy.fadeTime = this.fadeTime;
