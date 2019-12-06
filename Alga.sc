@@ -19,7 +19,7 @@ X) When using clear / free, interpolationProxies should not fade
 */
 
 //From https://github.com/cappelnord/BenoitLib/blob/master/patterns/Pkr.sc
-Pkr : Pfunc {
+PAlgakr : Pfunc {
 	*new {
 		arg bus;
 
@@ -583,7 +583,6 @@ AlgaNodeProxy : NodeProxy {
 
 				if(counter == 1, {
 					synthDefString_ar = "ProxySynthDef(\\proxyIn_ar1, {\\in.ar(0)}).add;";
-
 					synthDefString_kr = "ProxySynthDef(\\proxyIn_kr1, {\\in.kr(0)}).add;";
 				}, {
 
@@ -596,7 +595,6 @@ AlgaNodeProxy : NodeProxy {
 					arrayOfZeros = arrayOfZeros[0..(arrayOfZeros.size - 2)] ++ "]";
 
 					synthDefString_ar = "ProxySynthDef(\\proxyIn_ar" ++ counter.asString ++ ", {\\in.ar(" ++ arrayOfZeros ++ ")}).add;";
-
 					synthDefString_kr = "ProxySynthDef(\\proxyIn_kr" ++ counter.asString ++ ", {\\in.kr(" ++ arrayOfZeros ++ ")}).add;";
 				});
 
@@ -997,57 +995,113 @@ AlgaNodeProxy : NodeProxy {
 		this.changed(\playN, [outs, amps, ins, vol, fadeTime, group, addAction]);
 	}
 
-	//Same as <<> but uses .xset instead of .xmap.
-	connectXSet { | proxy, key = \in |
-		var ctl, rate, numChannels, canBeMapped;
-		if(proxy.isNil) { ^this.unmap(key) };
-		ctl = this.controlNames.detect { |x| x.name == key };
-		rate = ctl.rate ?? {
-			if(proxy.isNeutral) {
-				if(this.isNeutral) { \audio } { this.rate }
-			} {
-				proxy.rate
-			}
-		};
-		numChannels = ctl !? { ctl.defaultValue.asArray.size };
-		canBeMapped = proxy.initBus(rate, numChannels); // warning: proxy should still have a fixed bus
+	connectToInterpProxy {
+		//Pass interpolationProxy as argument to save CPU cycles of retrieving it from dict
+		arg param = \in, interpolationProxy = nil, proxy;
 
-		//("ConnectXSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ key.asString).postln;
+		var controlName, rate, numChannels, canBeMapped;
+
+		if(proxy.isNil) { ^this.unmap(param) };
+
+		controlName = this.defaultControlNames[param];
+
+		if(controlName == nil, {
+			("ERROR: Could not find param " ++ param).warn;
+			^proxy;
+		});
+
+		//If nil, try to retrieve it from the dict
+		if(interpolationProxy == nil, {
+
+			interpolationProxy = this.interpolationProxies[param];
+
+			//If still nil, exit
+			if(interpolationProxy == nil, {
+				("ERROR: Could not find interpolationProxy for " ++ param).warn;
+				^proxy;
+			});
+		});
+
+		rate = controlName.rate;
+		numChannels = controlName.numChannels;
+
+		//warning: proxy should still have a fixed bus
+		canBeMapped = proxy.initBus(rate, numChannels);
+
+		//("ConnectXSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ param.asString).postln;
 		//rate.postln;
 
 		if(canBeMapped) {
-			if(this.isNeutral) { this.defineBus(rate, numChannels) };
-			this.xset(key, proxy);
+			if(interpolationProxy.isNeutral) { interpolationProxy.defineBus(rate, numChannels) };
+			interpolationProxy.xset(\in, proxy);
 		} {
 			"Could not link node proxies, no matching input found.".warn
 		};
+
+		^proxy // returns first argument for further chaining
+	}
+
+	//Same as <<> but uses .xset instead of .xmap.
+	connectXSet { | proxy, key = \in |
+		var controlName, rate, numChannels, canBeMapped;
+
+		if(proxy.isNil) { ^this.unmap(key) };
+
+		controlName = this.defaultControlNames[key];
+
+		if(controlName != nil, {
+			rate = controlName.rate;
+
+			numChannels = controlName.numChannels;
+
+			canBeMapped = proxy.initBus(rate, numChannels); // warning: proxy should still have a fixed bus
+
+			("ConnectXSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ key.asString).postln;
+			rate.postln;
+
+			if(canBeMapped) {
+				if(this.isNeutral) { this.defineBus(rate, numChannels) };
+				this.xset(key, proxy);
+			} {
+				"Could not link node proxies, no matching input found.".warn
+			};
+
+		}, {
+			("ERROR: Could not find param " ++ key).warn;
+		});
+
 		^proxy // returns first argument for further chaining
 	}
 
 	//Same as <<> but uses .set instead of .xmap.
 	connectSet { | proxy, key = \in |
-		var ctl, rate, numChannels, canBeMapped;
+		var controlName, rate, numChannels, canBeMapped;
+
 		if(proxy.isNil) { ^this.unmap(key) };
-		ctl = this.controlNames.detect { |x| x.name == key };
-		rate = ctl.rate ?? {
-			if(proxy.isNeutral) {
-				if(this.isNeutral) { \audio } { this.rate }
+
+		controlName = this.defaultControlNames[key];
+
+		if(controlName != nil, {
+			rate = controlName.rate;
+
+			numChannels = controlName.numChannels;
+
+			canBeMapped = proxy.initBus(rate, numChannels); // warning: proxy should still have a fixed bus
+
+			("ConnectXSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ key.asString).postln;
+			rate.postln;
+
+			if(canBeMapped) {
+				if(this.isNeutral) { this.defineBus(rate, numChannels) };
+				this.set(key, proxy);
 			} {
-				proxy.rate
-			}
-		};
-		numChannels = ctl !? { ctl.defaultValue.asArray.size };
-		canBeMapped = proxy.initBus(rate, numChannels); // warning: proxy should still have a fixed bus
+				"Could not link node proxies, no matching input found.".warn
+			};
 
-		//("ConnectSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ key.asString).postln;
-		//rate.postln;
+		}, {
+			("ERROR: Could not find param " ++ key).warn;
+		});
 
-		if(canBeMapped) {
-			if(this.isNeutral) { this.defineBus(rate, numChannels) };
-			this.set(key, proxy);
-		} {
-			"Could not link node proxies, no matching input found.".warn
-		};
 		^proxy // returns first argument for further chaining
 	}
 
@@ -1066,8 +1120,8 @@ AlgaNodeProxy : NodeProxy {
 				//Retrieve the original default value, used to restore things when unmapping ( <| )
 				//this.defaultParamsVals.put(paramName, paramVal);
 
-				paramVal.postln;
-				paramNumberOfChannels.postln;
+				//paramVal.postln;
+				//paramNumberOfChannels.postln;
 
 				//Create interpProxy for this paramName
 				this.createInterpProxy(paramName, controlName, paramNumberOfChannels);
@@ -1109,6 +1163,9 @@ AlgaNodeProxy : NodeProxy {
 		//this.interpolationProxies.postln;
 
 		if(prevInterpProxy == nil, {
+
+			var defaultValue = controlName.defaultValue;
+
 			//Doesn't work with Pbinds with ar param, would just create a kr version
 			if(paramRate == \audio, {
 				interpolationProxy = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
@@ -1129,9 +1186,31 @@ AlgaNodeProxy : NodeProxy {
 
 			interpolationProxy.outProxies.put(paramName, this);
 
-			//Without fade: with modulated proxy at the specified param
-			//this.connectSet(interpolationProxy, paramName);
-			this.set(paramName, interpolationProxy);
+			//This routine stuff needs to be tested on Linux...
+			Routine.run({
+
+				//Initialize the value
+				if(paramRate == \audio, {
+					var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
+					proxyInSymbol.postln;
+					interpolationProxy.source = proxyInSymbol;
+				}, {
+					var proxyInSymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
+					proxyInSymbol.postln;
+					interpolationProxy.source = proxyInSymbol;
+				});
+
+				//sync server so group is correctly created for interpolationProxy
+				server.sync;
+
+				//Assign the defaultValue to the interpolationProxy
+				interpolationProxy.set(\in, defaultValue);
+
+				//this.connectSet(interpolationProxy, paramName);
+				//Connect the interpolationProxy to the correct param
+				this.set(paramName, interpolationProxy);
+
+			});
 		}, {
 
 			("Already Existing Param, " ++ paramName).warn;
@@ -1219,9 +1298,9 @@ AlgaNodeProxy : NodeProxy {
 		this.freePreviousConnection(param);
 
 		//Just switch the function
-		if(src != nil, {
-			interpolationProxyEntry.source = src;
-		});
+		//if(src != nil, {
+		//	interpolationProxyEntry.source = src;
+		//});
 
 		//If changing the connections with a new NodeProxy
 		//if(paramEntryInInProxiesIsPrevProxy.not, {
@@ -1262,9 +1341,10 @@ AlgaNodeProxy : NodeProxy {
 				AlgaBlocksDict.reorderBlock(this.blockIndex, server);
 			});
 
-			//Switch connections just for interpolationProxy. nextProxy is already connected to
-			//interpolationProxy
-			interpolationProxyEntry.connectXSet(prevProxy, \in);
+			//interpolationProxyEntry.connectXSet(prevProxy, \in);
+
+			//Make connection to the interpolationProxy
+			this.connectToInterpProxy(param, interpolationProxyEntry, prevProxy);
 		});
 	}
 
