@@ -14,24 +14,19 @@ p.clear;
 //Problem 1, general behaviours:
 ~b <= ~a
 
-~c => ~b
+~a <=.freq 600
 
-~a <=.freq 500
-
-~b <= ~a
-
-~a.ft = 2
-
-//Error here
 ~a <=.freq ~lfo
 
+~a <=.freq 600
 
-// ?????
-~c <=.freq ~lfo
+//error here!! Doesn't restore lfo!
+~a <=.freq ~lfo
 
 ~c => ~b
 
-~c <=.freq 500
+
+
 
 
 
@@ -42,6 +37,8 @@ ANdef(\lfo, {LFNoise0.kr(\speed.kr(1)).range(100, 500)});
 ANdef(\d, {\in.ar(0)});
 ANdef(\b, {(\in.ar(0) * 0.5) + (\in2.ar(0) * 0.5)}).play;
 )
+
+ANdef.clear
 
 
 ANdef(\d).ft = 3;

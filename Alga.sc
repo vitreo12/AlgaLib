@@ -1228,7 +1228,7 @@ AlgaNodeProxy : NodeProxy {
 		});
 	}
 
-	createInterpProxyIfNeeded {
+	setInterpProxy {
 		arg prevProxy, param = \in, src = nil;
 
 		//Check if there already was an interpProxy for the parameter
@@ -1254,6 +1254,7 @@ AlgaNodeProxy : NodeProxy {
 			prevProxyClass.superclass == AlgaNodeProxy).or(
 			prevProxyClass.superclass.superclass == AlgaNodeProxy);
 
+		/*
 		var isPrevProxyANumber = false;
 
 		if(isPrevProxyAProxy.not, {
@@ -1261,6 +1262,7 @@ AlgaNodeProxy : NodeProxy {
 				prevProxyClass.superclass == Number).or(
 				prevProxyClass.superclass.superclass == Number);
 		});
+		*/
 
 
 		if(this.group == nil, {
@@ -1288,7 +1290,9 @@ AlgaNodeProxy : NodeProxy {
 			^nil;
 		});
 
-		numberOfChannels = prevProxy.numChannels;
+		if(isPrevProxyAProxy, {
+			numberOfChannels = prevProxy.numChannels;
+		});
 
 		//Retrieved from the default value!
 		//numberOfChannels = this.defaultParamsVals[param].size;
@@ -1311,12 +1315,10 @@ AlgaNodeProxy : NodeProxy {
 
 			//interpolationProxySource.postln;
 
-			//Remake connections
-			this.inProxies.put(param, prevProxy);
-
 			//Don't use param indexing for outs, as this proxy could be linked
 			//to multiple proxies with same param names
 			if(isPrevProxyAProxy, {
+				this.inProxies.put(param, prevProxy);
 				prevProxy.outProxies.put(this, this);
 			});
 
@@ -1324,17 +1326,19 @@ AlgaNodeProxy : NodeProxy {
 			if(interpolationProxySource.asString.beginsWith("\proxyIn").not, {
 				if(paramRate == \audio, {
 					var proxyInSymbol = ("proxyIn_ar" ++ numberOfChannels).asSymbol;
-					proxyInSymbol.postln;
+					//proxyInSymbol.postln;
 					interpolationProxyEntry.source = proxyInSymbol;
 				}, {
 					var proxyInSymbol = ("proxyIn_kr" ++ numberOfChannels).asSymbol;
-					proxyInSymbol.postln;
+					//proxyInSymbol.postln;
 					interpolationProxyEntry.source = proxyInSymbol;
 				});
 			});
 
 			//interpolationProxyEntry.outProxies remains the same, connected to this!
-			interpolationProxyEntry.inProxies.put(\in, prevProxy);
+			if(isPrevProxyAProxy, {
+				interpolationProxyEntry.inProxies.put(\in, prevProxy);
+			});
 
 			//Only rearrange block if both proxies are actually instantiated.
 			if(isThisProxyInstantiated.and(isPrevProxyInstantiated), {
@@ -1407,7 +1411,7 @@ AlgaNodeProxy : NodeProxy {
 		this.createNewBlockIfNeeded(nextProxy);
 
 		//Create a new interp proxy if needed, and make correct connections
-		nextProxy.createInterpProxyIfNeeded(this, param);
+		nextProxy.setInterpProxy(this, param);
 
 		//return nextProxy for further chaining
 		^nextProxy;
@@ -1478,7 +1482,7 @@ AlgaNodeProxy : NodeProxy {
 			//Free previous connections to the this, if there were any
 			this.freePreviousConnection(param);
 
-			this.createInterpProxyIfNeeded(nextProxy, param);
+			this.setInterpProxy(nextProxy, param);
 
 		});
 
@@ -1572,9 +1576,9 @@ AlgaNodeProxy : NodeProxy {
 
 		//FIX HERE!
 		//Remove the entry from inProxies... This fucks up things for paramEntryInInProxies
-		//if(previousEntry != nil, {
-		//	this.inProxies.removeAt(param);
-		//});
+		if(previousEntry != nil, {
+			this.inProxies.removeAt(param);
+		});
 	}
 
 	removeOutProxy {
