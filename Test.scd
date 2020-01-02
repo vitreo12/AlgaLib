@@ -26,6 +26,7 @@ p.clear;
 ~c => ~b
 
 
+~c <=.freq ~lfo
 
 
 

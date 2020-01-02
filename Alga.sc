@@ -999,7 +999,11 @@ AlgaNodeProxy : NodeProxy {
 		//Pass interpolationProxy as argument to save CPU cycles of retrieving it from dict
 		arg param = \in, interpolationProxy = nil, proxy;
 
-		var controlName, rate, numChannels, canBeMapped;
+		var controlName, rate, isProxyAProxy, numChannels, canBeMapped;
+
+		isProxyAProxy = (proxy.class == AlgaNodeProxy).or(
+			proxy.class.superclass == AlgaNodeProxy).or(
+			proxy.class.superclass.superclass == AlgaNodeProxy);
 
 		if(proxy.isNil) { ^this.unmap(param) };
 
@@ -1023,13 +1027,28 @@ AlgaNodeProxy : NodeProxy {
 		});
 
 		rate = controlName.rate;
-		numChannels = controlName.numChannels;
+
+		//numChannels set according to proxy if proxy is a proxy, otherwise they are set according to
+		//interpolationProxies' parameter spec if not a proxy
+		if(isProxyAProxy, {
+			numChannels = proxy.numChannels;
+		}, {
+			numChannels = controlName.numChannels;
+		});
 
 		//warning: proxy should still have a fixed bus
 		canBeMapped = proxy.initBus(rate, numChannels);
 
-		//("ConnectXSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ param.asString).postln;
-		//rate.postln;
+		/*
+		"connectToInterpProxy".postln;
+		proxy.asString.postln;
+		proxy.numChannels.postln;
+
+		if(numChannels != proxy.numChannels, {
+			("Channel mismatch. Input proxy has " ++ proxy.numChannels.asString ++
+			", while parameter \"" ++ param.asString ++ " \" has " ++ numChannels.asString).warn;
+		});
+		*/
 
 		if(canBeMapped) {
 			if(interpolationProxy.isNeutral) { interpolationProxy.defineBus(rate, numChannels) };
@@ -1291,7 +1310,7 @@ AlgaNodeProxy : NodeProxy {
 		});
 
 		if(isPrevProxyAProxy, {
-			numberOfChannels = prevProxy.numChannels;
+			numberOfChannels = controlName.numChannels;
 		});
 
 		//Retrieved from the default value!
@@ -1322,15 +1341,17 @@ AlgaNodeProxy : NodeProxy {
 				prevProxy.outProxies.put(this, this);
 			});
 
-			//re-instantiate source if it's not correct, could have been modified by Binops, Function, array
+			//re-instantiate source if not correct, could have been modified by Binops, Function, array
 			if(interpolationProxySource.asString.beginsWith("\proxyIn").not, {
 				if(paramRate == \audio, {
 					var proxyInSymbol = ("proxyIn_ar" ++ numberOfChannels).asSymbol;
-					//proxyInSymbol.postln;
+					proxyInSymbol.postln;
+
 					interpolationProxyEntry.source = proxyInSymbol;
 				}, {
 					var proxyInSymbol = ("proxyIn_kr" ++ numberOfChannels).asSymbol;
-					//proxyInSymbol.postln;
+					proxyInSymbol.postln;
+
 					interpolationProxyEntry.source = proxyInSymbol;
 				});
 			});
@@ -1346,6 +1367,12 @@ AlgaNodeProxy : NodeProxy {
 			});
 
 			//interpolationProxyEntry.connectXSet(prevProxy, \in);
+
+			/*
+			"setInterpProxy".postln;
+			prevProxy.asString.postln;
+			prevProxy.numChannels.postln;
+			*/
 
 			//Make connection to the interpolationProxy
 			this.connectToInterpProxy(param, interpolationProxyEntry, prevProxy);
@@ -1409,6 +1436,12 @@ AlgaNodeProxy : NodeProxy {
 
 		//Create a new block if needed
 		this.createNewBlockIfNeeded(nextProxy);
+
+		/*
+		"=>".postln;
+		this.asString.postln;
+		this.numChannels.postln;
+		*/
 
 		//Create a new interp proxy if needed, and make correct connections
 		nextProxy.setInterpProxy(this, param);
