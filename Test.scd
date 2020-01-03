@@ -14,24 +14,20 @@ p.clear;
 //Problem 1, general behaviours:
 ~b <= ~a
 
-~c => ~b
+~a <=.freq 600
 
-~a <=.freq 500
-
-~b <= ~a
-
-~a.ft = 2
-
-//Error here
 ~a <=.freq ~lfo
 
+~a <=.freq 600
 
-// ?????
-~c <=.freq ~lfo
+//error here!! Doesn't restore lfo!
+~a <=.freq ~lfo
 
 ~c => ~b
 
-~c <=.freq 500
+
+~c <=.freq ~lfo
+
 
 
 
@@ -42,6 +38,8 @@ ANdef(\lfo, {LFNoise0.kr(\speed.kr(1)).range(100, 500)});
 ANdef(\d, {\in.ar(0)});
 ANdef(\b, {(\in.ar(0) * 0.5) + (\in2.ar(0) * 0.5)}).play;
 )
+
+ANdef.clear
 
 
 ANdef(\d).ft = 3;
@@ -112,13 +110,48 @@ p.clear
 
 ~s1 = {SinOsc.ar([440, 447])}
 
-~s2 = (~s1 * 0.5)
-
 //Problem is interpolationProxies, which now just defaults as 1 channel!
 ~s1 => ~out
-~s1 => ~out
 
-~out <= {SinOsc.ar}
+//Back to 1
+~s1 = {SinOsc.ar};
+
+~s1.numChannels;
+~out.interpolationProxies[\in].numChannels;
+
+
+
+p = AlgaProxySpace.new.push
+
+~a = { SinOsc.ar };
+~b = { \in.ar(0) };
+
+~b.play;
+
+~a => ~b
+
+~a.reshaping = \expanding;
+~a = { SinOsc.ar([440, 442]) }
+
+~b.reshaping = \expanding;
+~b = { \in.ar([0, 0]) }
+
+
+(
+ANdef(\a, { SinOsc.ar });
+ANdef(\b, { \in.ar(0) }).play;
+ANdef(\a) => ANdef(\b);
+)
+
+ANdef(\a, { SinOsc.ar([440, 441]) });
+
+(
+ANdef(\a, { SinOsc.ar([440, 446]) });
+ANdef(\b, { \in.ar([0, 0]) }).play;
+ANdef(\a) => ANdef(\b);
+)
+
+
 
 p = ProxySpace.new.push(s.boot);
 
