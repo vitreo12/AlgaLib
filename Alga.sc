@@ -806,6 +806,7 @@ AlgaNodeProxy : NodeProxy {
 		container = obj.makeProxyControl(channelOffset, this);
 		container.build(this, index ? 0); // bus allocation happens here
 
+		//server.bind({
 		//Need this to retrieve default values and number of channels per parameter
 		if(isInterpProxy == false, {
 			container.controlNames.do({
@@ -821,7 +822,12 @@ AlgaNodeProxy : NodeProxy {
 
 				});
 			});
+
+			//create all interp proxies
+			//this.createAllInterpProxies;
+
 		});
+
 
 		if(this.shouldAddObject(container, index)) {
 			// server sync happens here if necessary
@@ -834,7 +840,7 @@ AlgaNodeProxy : NodeProxy {
 
 		this.putNewObject(bundle, index, container, extraArgs, now);
 		this.changed(\source, [obj, index, channelOffset, extraArgs, now]);
-
+		//});
 	}
 
 	//When a new object is assigned to a AlgaNodeProxy!
@@ -987,7 +993,7 @@ AlgaNodeProxy : NodeProxy {
 
 		/*
 		//Add defaultAddAction
-		if(addAction == nil, {
+		if(addAction == nil,
 			addAction = defaultAddAction;
 		});
 		*/
@@ -1185,6 +1191,8 @@ AlgaNodeProxy : NodeProxy {
 
 			var defaultValue = controlName.defaultValue;
 
+			//"new interp".postln;
+
 			//Doesn't work with Pbinds with ar param, would just create a kr version
 			if(paramRate == \audio, {
 				interpolationProxy = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
@@ -1198,11 +1206,12 @@ AlgaNodeProxy : NodeProxy {
 			interpolationProxy.reshaping = defaultReshaping;
 
 			//Default fadeTime: use nextProxy's (the modulated one) fadeTime
-			interpolationProxy.fadeTime = this.fadeTime;
+			interpolationProxy.fadeTime = 0;
 
 			//Add the new interpolation NodeProxy to interpolationProxies dict
 			this.interpolationProxies.put(paramName, interpolationProxy);
 
+			//This is quite useless. interpolationProxies are kept in the appropriate dictionary of the proxy
 			interpolationProxy.outProxies.put(paramName, this);
 
 			//This routine stuff needs to be tested on Linux...
@@ -1211,11 +1220,11 @@ AlgaNodeProxy : NodeProxy {
 				//Initialize the value
 				if(paramRate == \audio, {
 					var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
-					proxyInSymbol.postln;
+					//proxyInSymbol.postln;
 					interpolationProxy.source = proxyInSymbol;
 				}, {
 					var proxyInSymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
-					proxyInSymbol.postln;
+					//proxyInSymbol.postln;
 					interpolationProxy.source = proxyInSymbol;
 				});
 
@@ -1225,23 +1234,35 @@ AlgaNodeProxy : NodeProxy {
 				//Assign the defaultValue to the interpolationProxy
 				interpolationProxy.set(\in, defaultValue);
 
+				//Make sure interpolationProxy is set before connecting it to the param!
+				server.sync;
+
 				//this.connectSet(interpolationProxy, paramName);
 				//Connect the interpolationProxy to the correct param
 				this.set(paramName, interpolationProxy);
 
+				interpolationProxy.fadeTime = this.fadeTime;
+
 			});
+
 		}, {
 
-			("Already Existing Param, " ++ paramName).warn;
+			//"old interp".postln;
 
-			if(paramRate == \audio, {
-				var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
-				proxyInSymbol.postln;
-				prevInterpProxy.source = proxyInSymbol;
-			}, {
-				var proxyInSymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
-				proxyInSymbol.postln;
-				prevInterpProxy.source = proxyInSymbol;
+			//Only re-instantiate if not using a \proxyIn interpolationProxy
+			prevInterpProxy.source.asString.beginsWith("\proxyIn").not({
+
+				("Already Existing Param, " ++ paramName ++ ", with wrong interpolationProxy").warn;
+
+				if(paramRate == \audio, {
+					var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
+					proxyInSymbol.postln;
+					prevInterpProxy.source = proxyInSymbol;
+				}, {
+					var proxyInSymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
+					proxyInSymbol.postln;
+					prevInterpProxy.source = proxyInSymbol;
+				});
 			});
 
 		});
@@ -1663,6 +1684,9 @@ AlgaNodeProxy : NodeProxy {
 		var nextProxyBlockIndex = nextProxy.blockIndex;
 
 		"createNewBlockIfNeeded".postln;
+
+		//thisBlockIndex.postln;
+		//nextProxyBlockIndex.postln;
 
 		//Create new block if both connections didn't have any
 		if((thisBlockIndex == -1).and(nextProxyBlockIndex == -1), {
