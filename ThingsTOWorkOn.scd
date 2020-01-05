@@ -180,7 +180,7 @@ p = VitreoProxySpace.new.push(s.boot)
 
 /* 2: Using a .kr VNProxy. It should be wrapped in Pkr and passed as .asStream too */
 //~c <=.dur ~b
-~c <<>.dur Pkr(~b).asStream
+~c <<>.dur PAlgakr(~b).asStream
 
 
 /* 3: Using Functions and AbstractOpPlugs */

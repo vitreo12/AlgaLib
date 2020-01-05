@@ -283,96 +283,97 @@ AlgaProxyBlock {
 		//not general connections though... It should be done from NodeProxy's side.
 		//if(this.changed == true, {
 
-			//ordered collection
-			this.orderedArray = Array.newClear(dictOfProxies.size);
+		//ordered collection
+		this.orderedArray = Array.newClear(dictOfProxies.size);
 
-			//dictOfProxies.postln;
+		//dictOfProxies.postln;
 
-			("Reordering proxies for block number " ++ this.blockIndex).warn;
+		("Reordering proxies for block number " ++ this.blockIndex).warn;
 
-			//this.orderedArray.size.postln;
+		//this.orderedArray.size.postln;
 
-			//Find the proxies with no outProxies (so, the last ones in the chain!), and init the statesDict
-			this.findBottomMostOutProxiesAndInitStatesDict;
+		//Find the proxies with no outProxies (so, the last ones in the chain!), and init the statesDict
+		this.findBottomMostOutProxiesAndInitStatesDict;
 
-			//"Block's bottomOutProxies: ".postln;
-			//this.bottomOutProxies.postln;
+		//"Block's bottomOutProxies: ".postln;
+		//this.bottomOutProxies.postln;
 
-			//"Block's statesDict: ".postln;
-			//this.statesDict.postln;
+		//"Block's statesDict: ".postln;
+		//this.statesDict.postln;
 
-			//this.orderedArray.postln;
+		//this.orderedArray.postln;
 
-			//init runningIndex
-			this.runningIndex = 0;
+		//init runningIndex
+		this.runningIndex = 0;
 
-			//Store the rearranging results in this.orderedArray
-			this.bottomOutProxies.do({
-				arg proxy;
+		//Store the rearranging results in this.orderedArray
+		this.bottomOutProxies.do({
+			arg proxy;
 
-				this.rearrangeBlockLoop(proxy); //start from index 0
-			});
+			this.rearrangeBlockLoop(proxy); //start from index 0
+		});
 
-			//"Block's orderedArray: ".postln;
-			//this.orderedArray.postln;
+		//"Block's orderedArray: ".postln;
+		//this.orderedArray.postln;
 
-			//Actual ordering of groups. Need to be s.bind so that concurrent operations are synced together!
-			//Routine.run({
+		//Actual ordering of groups. Need to be s.bind so that concurrent operations are synced together!
+		//Routine.run({
 
-			//server.sync;
+		//server.sync;
 
-			//this.orderedArray.postln;
+		//this.orderedArray.postln;
 
-			//this.dictOfProxies.postln;
+		//this.dictOfProxies.postln;
 
-			this.sanitizeArray;
+		this.dictOfProxies.postln;
 
-			//server.bind allows here to be sure that this bundle will be sent in any case after
-			//the NodeProxy creation bundle for interpolation proxies.
-			if(orderedArray.size > 0, {
-				server.bind({
-
-					var sizeMinusOne = orderedArray.size - 1;
-
-					//First one here is the last in the chain.. I think this should actually be done for each
-					//bottomOutProxy...
-					var firstProxy = orderedArray[0];
+		this.sanitizeArray;
 
 
-					//is proxy playing?
+		//server.bind allows here to be sure that this bundle will be sent in any case after
+		//the NodeProxy creation bundle for interpolation proxies.
+		if(orderedArray.size > 0, {
+			server.bind({
+
+				var sizeMinusOne = orderedArray.size - 1;
+
+				//First one here is the last in the chain.. I think this should actually be done for each
+				//bottomOutProxy...
+				var firstProxy = orderedArray[0];
 
 
+				//is proxy playing?
 
-					//Must loop reverse to correct order stuff
-					sizeMinusOne.reverseDo({
-						arg index;
+				//Must loop reverse to correct order stuff
+				sizeMinusOne.reverseDo({
+					arg index;
 
-						var count = index + 1;
+					var count = index + 1;
 
-						var thisEntry = orderedArray[count];
-						var prevEntry = orderedArray[count - 1];
+					var thisEntry = orderedArray[count];
+					var prevEntry = orderedArray[count - 1];
 
-						prevEntry.beforeMoveNextInterpProxies(thisEntry);
+					prevEntry.beforeMoveNextInterpProxies(thisEntry);
 
-						(prevEntry.asString ++ " before " ++ thisEntry.asString).postln;
+					(prevEntry.asString ++ " before " ++ thisEntry.asString).postln;
 
-						//thisEntry.class.postln;
-						//prevEntry.class.postln;
+					//thisEntry.class.postln;
+					//prevEntry.class.postln;
 
 
-					});
+				});
 
-					//Also move first one (so that its interpolationProxies are correct)
-					if(firstProxy != nil, {
-						firstProxy.before(firstProxy);
-					});
+				//Also move first one (so that its interpolationProxies are correct)
+				if(firstProxy != nil, {
+					firstProxy.before(firstProxy);
 				});
 			});
+		});
 
-			//REVIEW THIS:
-			//this.changed = false;
+		//REVIEW THIS:
+		//this.changed = false;
 
-			//}, 1024);
+		//}, 1024);
 
 		//});
 
@@ -502,17 +503,27 @@ AlgaProxyBlock {
 		this.bottomOutProxies.clear;
 		this.statesDict.clear;
 
-		this.dictOfProxies.do({
-			arg proxy;
-
-			//Find the ones with no outProxies but at least one inProxy
-			if((proxy.outProxies.size == 0).and(proxy.inProxies.size > 0), {
+		//If only one proxy, just add that one.
+		if(dictOfProxies.size == 1, {
+			this.dictOfProxies.do({
+				arg proxy;
 				this.bottomOutProxies.put(proxy, proxy);
+				this.statesDict.put(proxy, false);
 			});
+		}, {
 
-			//init statesDict for all proxies to false
-			this.statesDict.put(proxy, false);
+			this.dictOfProxies.do({
+				arg proxy;
 
+				//Find the ones with no outProxies but at least one inProxy
+				if((proxy.outProxies.size == 0).and(proxy.inProxies.size > 0), {
+					this.bottomOutProxies.put(proxy, proxy);
+				});
+
+				//init statesDict for all proxies to false
+				this.statesDict.put(proxy, false);
+
+			});
 		});
 	}
 
@@ -532,9 +543,12 @@ AlgaBlocksDict {
 		var entryInBlocksDict = blocksDict[blockIndex];
 
 		if(entryInBlocksDict != nil, {
-			entryInBlocksDict.rearrangeBlock(server);
-		//}, {
-		//	"Invalid block index".warn;
+
+			//Make sure everything is synced with server!
+			Routine.run({
+				server.sync;
+				entryInBlocksDict.rearrangeBlock(server);
+			});
 		});
 
 	}
@@ -806,41 +820,113 @@ AlgaNodeProxy : NodeProxy {
 		container = obj.makeProxyControl(channelOffset, this);
 		container.build(this, index ? 0); // bus allocation happens here
 
-		//server.bind({
-		//Need this to retrieve default values and number of channels per parameter
-		if(isInterpProxy == false, {
-			container.controlNames.do({
-				arg controlName;
+		server.bind({
 
-				var controlNameName = controlName.name;
+			//Need this to retrieve default values and number of channels per parameter
+			if(isInterpProxy == false, {
+				//Instantiating a Synth or SynthDef:
+				if((container.class == SynthControl).or(container.class == SynthDefControl), {
+					container.controlNames.do({
+						arg controlName;
 
-				if((controlNameName != \gate).and(
-					controlNameName != \out).and(
-					controlNameName != \fadeTime), {
+						var controlNameName = controlName.name;
 
-					defaultControlNames.put(controlNameName, controlName);
+						//Ignore gate, out and fadeTime params
+						if((controlNameName != \gate).and(
+							controlNameName != \out).and(
+							controlNameName != \fadeTime), {
 
+							//Add param to dict
+							defaultControlNames.put(controlNameName, controlName);
+						});
+					});
 				});
+
+				//Instantiating a Pattern:
+				if(container.class == PatternControl, {
+					//Make sure \instrument is ALWAYS provided
+					block ({
+						arg break;
+
+						obj.patternpairs.do({
+							arg val, index;
+
+							//found instrument entry
+							if(val == \instrument, {
+								var synthDefName, synthDesc;
+
+								//out of bounds, provided \instrument without the synthdef name at the end of array
+								if(index + 1 >= obj.patternpairs.size, {
+									"\instrument must be followed by a SynthDef name".error;
+								});
+
+								//the one that follows \instrument
+								synthDefName = obj.patternpairs[index + 1];
+
+								if(synthDefName.class != Symbol, {
+									"\instrument must be followed by a SynthDef name".error;
+								});
+
+								synthDesc = SynthDescLib.global.at(synthDefName);
+
+								if(synthDesc == nil, {
+									"invalid SynthDef for \instrument".error;
+								});
+
+								//Retrieve parameters from the SynthDesc
+								synthDesc.controls.do({
+									arg controlName;
+
+									var controlNameName = controlName.name;
+
+									//Ignore gate, out and fadeTime params
+									if((controlNameName != \gate).and(
+										controlNameName != \out).and(
+										controlNameName != \fadeTime), {
+
+										//Add param to dict
+										defaultControlNames.put(controlNameName, controlName);
+									});
+								});
+
+								//break statement
+								break.(nil);
+							});
+						});
+
+						"Alga patterns must always provide an \instrument".error;
+					});
+				});
+
+				//defaultControlNames.postln;
+
+				//create all interp proxies
+				this.createAllInterpProxies;
+
 			});
 
-			//create all interp proxies
-			//this.createAllInterpProxies;
+
+			if(this.shouldAddObject(container, index)) {
+				// server sync happens here if necessary
+				if(server.serverRunning) { container.loadToBundle(bundle, server) } { loaded = false; };
+				this.prepareOtherObjects(bundle, index, oldBus.notNil and: { oldBus !== bus });
+			} {
+				format("failed to add % to node proxy: %", obj, this).postln;
+				^this
+			};
+
+			this.putNewObject(bundle, index, container, extraArgs, now);
+			this.changed(\source, [obj, index, channelOffset, extraArgs, now]);
+
+			////////////////////////////////////////////////////////////////
+
+			//REARRANGE BLOCK!!
+			this.createNewBlockIfNeeded(this);
+			AlgaBlocksDict.reorderBlock(this.blockIndex, server);
+
+			//////////////////////////////////////////////////////////////
 
 		});
-
-
-		if(this.shouldAddObject(container, index)) {
-			// server sync happens here if necessary
-			if(server.serverRunning) { container.loadToBundle(bundle, server) } { loaded = false; };
-			this.prepareOtherObjects(bundle, index, oldBus.notNil and: { oldBus !== bus });
-		} {
-			format("failed to add % to node proxy: %", obj, this).postln;
-			^this
-		};
-
-		this.putNewObject(bundle, index, container, extraArgs, now);
-		this.changed(\source, [obj, index, channelOffset, extraArgs, now]);
-		//});
 	}
 
 	//When a new object is assigned to a AlgaNodeProxy!
@@ -930,7 +1016,7 @@ AlgaNodeProxy : NodeProxy {
 
 			//REARRANGE BLOCK!!
 
-			AlgaBlocksDict.reorderBlock(this.blockIndex, server);
+			//AlgaBlocksDict.reorderBlock(this.blockIndex, server);
 
 			//////////////////////////////////////////////////////////////
 		});
@@ -999,6 +1085,146 @@ AlgaNodeProxy : NodeProxy {
 		*/
 
 		this.changed(\playN, [outs, amps, ins, vol, fadeTime, group, addAction]);
+	}
+
+	createAllInterpProxies {
+
+		server.bind({
+
+			defaultControlNames.do({
+				arg controlName;
+
+				var paramName = controlName.name;
+				var paramVal  = controlName.defaultValue;
+
+				var paramNumberOfChannels = controlName.numChannels;
+
+				//Retrieve the original default value, used to restore things when unmapping ( <| )
+				//this.defaultParamsVals.put(paramName, paramVal);
+
+				//paramVal.postln;
+				//paramNumberOfChannels.postln;
+
+				//Create interpProxy for this paramName
+				this.createInterpProxy(paramName, controlName, paramNumberOfChannels);
+
+			});
+
+		});
+
+		//this.defaultControlNames.postln;
+		//this.interpolationProxies.postln;
+	}
+
+	createInterpProxy {
+		arg paramName = \in, controlName, paramNumberOfChannels = 1, src = nil;
+
+		var paramRate;
+
+		var isThisProxyInstantiated = true;
+
+		var prevInterpProxy;
+
+		var interpolationProxy;
+
+		/*
+		if(this.group == nil, {
+			("This proxy hasn't been instantiated yet!!!").warn;
+			isThisProxyInstantiated = false;
+		});
+		*/
+
+		if(controlName != nil, {
+			paramRate = controlName.rate;
+		}, {
+			("Can't retrieve parameter rate for " ++ paramName).postln;
+			^nil;
+		});
+
+		//Check if interpolationProxy was already created.
+		prevInterpProxy = this.interpolationProxies[paramName];
+
+		//this.interpolationProxies.postln;
+
+		if(prevInterpProxy == nil, {
+
+			var defaultValue = controlName.defaultValue;
+
+			//"new interp".postln;
+
+			//Doesn't work with Pbinds with ar param, would just create a kr version
+			if(paramRate == \audio, {
+				interpolationProxy = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
+			}, {
+				interpolationProxy = AlgaNodeProxy.new(server, \control, paramNumberOfChannels);
+			});
+
+			interpolationProxy.isInterpProxy = true;
+
+			//Should it not be elastic?
+			interpolationProxy.reshaping = defaultReshaping;
+
+			//Default fadeTime: use nextProxy's (the modulated one) fadeTime
+			//interpolationProxy.fadeTime = 0;
+			interpolationProxy.fadeTime = this.fadeTime;
+
+			//Add the new interpolation NodeProxy to interpolationProxies dict
+			this.interpolationProxies.put(paramName, interpolationProxy);
+
+			//This is quite useless. interpolationProxies are kept in the appropriate dictionary of the proxy
+			interpolationProxy.outProxies.put(paramName, this);
+
+			//This routine stuff needs to be tested on Linux...
+			Routine.run({
+
+				//Initialize the value
+				if(paramRate == \audio, {
+					var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
+					//proxyInSymbol.postln;
+					interpolationProxy.source = proxyInSymbol;
+				}, {
+					var proxyInSymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
+					//proxyInSymbol.postln;
+					interpolationProxy.source = proxyInSymbol;
+				});
+
+				//sync server so group is correctly created for interpolationProxy
+				server.sync;
+
+				//Assign the defaultValue to the interpolationProxy
+				interpolationProxy.set(\in, defaultValue);
+
+				//Make sure interpolationProxy is set before connecting it to the param!
+				//server.sync;
+
+				//Don't yet make the connection to the parameter. It will be simply done on the first time it's connected
+				//to something with => / <=
+				//this.set(paramName, interpolatonProxy)
+
+				//interpolationProxy.fadeTime = this.fadeTime;
+			});
+
+		}, {
+
+			//"old interp".postln;
+
+			//Only re-instantiate if not using a \proxyIn interpolationProxy
+			prevInterpProxy.source.asString.beginsWith("\proxyIn").not({
+
+				("Already Existing Param, " ++ paramName ++ ", with wrong interpolationProxy").warn;
+
+				if(paramRate == \audio, {
+					var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
+					proxyInSymbol.postln;
+					prevInterpProxy.source = proxyInSymbol;
+				}, {
+					var proxyInSymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
+					proxyInSymbol.postln;
+					prevInterpProxy.source = proxyInSymbol;
+				});
+			});
+
+		});
 	}
 
 	connectToInterpProxy {
@@ -1130,144 +1356,6 @@ AlgaNodeProxy : NodeProxy {
 		^proxy // returns first argument for further chaining
 	}
 
-	createAllInterpProxies {
-
-		server.bind({
-
-			defaultControlNames.do({
-				arg controlName;
-
-				var paramName = controlName.name;
-				var paramVal  = controlName.defaultValue;
-
-				var paramNumberOfChannels = controlName.numChannels;
-
-				//Retrieve the original default value, used to restore things when unmapping ( <| )
-				//this.defaultParamsVals.put(paramName, paramVal);
-
-				//paramVal.postln;
-				//paramNumberOfChannels.postln;
-
-				//Create interpProxy for this paramName
-				this.createInterpProxy(paramName, controlName, paramNumberOfChannels);
-
-			});
-
-		});
-
-		//this.defaultControlNames.postln;
-		//this.interpolationProxies.postln;
-	}
-
-	createInterpProxy {
-		arg paramName = \in, controlName, paramNumberOfChannels = 1, src = nil;
-
-		var paramRate;
-
-		var isThisProxyInstantiated = true;
-
-		var prevInterpProxy;
-
-		var interpolationProxy;
-
-		if(this.group == nil, {
-			("This proxy hasn't been instantiated yet!!!").warn;
-			isThisProxyInstantiated = false;
-		});
-
-		if(controlName != nil, {
-			paramRate = controlName.rate;
-		}, {
-			("Can't retrieve parameter rate for " ++ paramName).postln;
-			^nil;
-		});
-
-		//Check if interpolationProxy was already created.
-		prevInterpProxy = this.interpolationProxies[paramName];
-
-		//this.interpolationProxies.postln;
-
-		if(prevInterpProxy == nil, {
-
-			var defaultValue = controlName.defaultValue;
-
-			//"new interp".postln;
-
-			//Doesn't work with Pbinds with ar param, would just create a kr version
-			if(paramRate == \audio, {
-				interpolationProxy = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
-			}, {
-				interpolationProxy = AlgaNodeProxy.new(server, \control, paramNumberOfChannels);
-			});
-
-			interpolationProxy.isInterpProxy = true;
-
-			//Should it not be elastic?
-			interpolationProxy.reshaping = defaultReshaping;
-
-			//Default fadeTime: use nextProxy's (the modulated one) fadeTime
-			interpolationProxy.fadeTime = 0;
-
-			//Add the new interpolation NodeProxy to interpolationProxies dict
-			this.interpolationProxies.put(paramName, interpolationProxy);
-
-			//This is quite useless. interpolationProxies are kept in the appropriate dictionary of the proxy
-			interpolationProxy.outProxies.put(paramName, this);
-
-			//This routine stuff needs to be tested on Linux...
-			Routine.run({
-
-				//Initialize the value
-				if(paramRate == \audio, {
-					var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
-					//proxyInSymbol.postln;
-					interpolationProxy.source = proxyInSymbol;
-				}, {
-					var proxyInSymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
-					//proxyInSymbol.postln;
-					interpolationProxy.source = proxyInSymbol;
-				});
-
-				//sync server so group is correctly created for interpolationProxy
-				server.sync;
-
-				//Assign the defaultValue to the interpolationProxy
-				interpolationProxy.set(\in, defaultValue);
-
-				//Make sure interpolationProxy is set before connecting it to the param!
-				server.sync;
-
-				//this.connectSet(interpolationProxy, paramName);
-				//Connect the interpolationProxy to the correct param
-				this.set(paramName, interpolationProxy);
-
-				interpolationProxy.fadeTime = this.fadeTime;
-
-			});
-
-		}, {
-
-			//"old interp".postln;
-
-			//Only re-instantiate if not using a \proxyIn interpolationProxy
-			prevInterpProxy.source.asString.beginsWith("\proxyIn").not({
-
-				("Already Existing Param, " ++ paramName ++ ", with wrong interpolationProxy").warn;
-
-				if(paramRate == \audio, {
-					var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
-					proxyInSymbol.postln;
-					prevInterpProxy.source = proxyInSymbol;
-				}, {
-					var proxyInSymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
-					proxyInSymbol.postln;
-					prevInterpProxy.source = proxyInSymbol;
-				});
-			});
-
-		});
-	}
-
 	setInterpProxy {
 		arg prevProxy, param = \in, src = nil;
 
@@ -1394,6 +1482,10 @@ AlgaNodeProxy : NodeProxy {
 			prevProxy.asString.postln;
 			prevProxy.numChannels.postln;
 			*/
+
+			//Actually make the connection from the interpolationProxy.
+			//This should just be done once on the first connection, but it's fine for now to keep it here.
+			this.set(param, interpolationProxyEntry);
 
 			//Make connection to the interpolationProxy
 			this.connectToInterpProxy(param, interpolationProxyEntry, prevProxy);
