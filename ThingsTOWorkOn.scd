@@ -1,4 +1,4 @@
-p = VitreoProxySpace.new.push(s.boot)
+p = AlgaProxySpace.new.push(s.boot)
 
 p.clear
 
@@ -85,7 +85,7 @@ c = ProxySpace.new.push(s.boot)
 ~d.source.def.constants
 
 //This is the space where I could look for those constants
-VitreoProxySpace.findSpace(~d)
+AlgaProxySpace.findSpace(~d)
 
 //If it's a VNdef:
 VNdef.all.at(\localhost)
@@ -120,7 +120,7 @@ mold
 
 */
 
-p = VitreoProxySpace.new.push(s.boot);
+p = AlgaProxySpace.new.push(s.boot);
 
 p.clear
 
@@ -161,7 +161,7 @@ p.clear
 //Problem 6:
 //Patterns, generally
 
-p = VitreoProxySpace.new.push(s.boot)
+p = AlgaProxySpace.new.push(s.boot)
 
 (
 ~b = {SinOsc.kr(0.3).range(0.01, 0.3)};
@@ -183,7 +183,7 @@ p = VitreoProxySpace.new.push(s.boot)
 ~c <<>.dur PAlgakr(~b).asStream
 
 
-/* 3: Using Functions and AbstractOpPlugs */
+/* 3: Using Functions and AbstractOpPlugs.. should be turned to PAlgakr */
 //~c <=.dur {LFNoise0.kr(1).range(0.1, 1)}
 //~c <=.dur {~b * SinOsc.kr(1).range(0.1, 1)}
 //etc...

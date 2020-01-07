@@ -824,6 +824,7 @@ AlgaNodeProxy : NodeProxy {
 
 			//Need this to retrieve default values and number of channels per parameter
 			if(isInterpProxy == false, {
+
 				//Instantiating a Synth or SynthDef:
 				if((container.class == SynthControl).or(container.class == SynthDefControl), {
 					container.controlNames.do({
@@ -844,65 +845,81 @@ AlgaNodeProxy : NodeProxy {
 
 				//Instantiating a Pattern:
 				if(container.class == PatternControl, {
-					//Make sure \instrument is ALWAYS provided
-					block ({
-						arg break;
+					var foundInstrument = false;
+					var synthDesc;
 
-						obj.patternpairs.do({
-							arg val, index;
+					var foundFreq = false;
+					var foundAmp = false;
 
-							//found instrument entry
-							if(val == \instrument, {
-								var synthDefName, synthDesc;
+					obj.patternpairs.do({
+						arg val, index;
 
-								//out of bounds, provided \instrument without the synthdef name at the end of array
-								if(index + 1 >= obj.patternpairs.size, {
-									"\instrument must be followed by a SynthDef name".error;
-								});
+						//found instrument entry
+						if(val == \instrument, {
+							var synthDefName;
 
-								//the one that follows \instrument
-								synthDefName = obj.patternpairs[index + 1];
-
-								if(synthDefName.class != Symbol, {
-									"\instrument must be followed by a SynthDef name".error;
-								});
-
-								synthDesc = SynthDescLib.global.at(synthDefName);
-
-								if(synthDesc == nil, {
-									"invalid SynthDef for \instrument".error;
-								});
-
-								//Retrieve parameters from the SynthDesc
-								synthDesc.controls.do({
-									arg controlName;
-
-									var controlNameName = controlName.name;
-
-									//Ignore gate, out and fadeTime params
-									if((controlNameName != \gate).and(
-										controlNameName != \out).and(
-										controlNameName != \fadeTime), {
-
-										//Add param to dict
-										defaultControlNames.put(controlNameName, controlName);
-									});
-								});
-
-								//break statement
-								break.(nil);
+							//out of bounds, provided \instrument without the synthdef name at the end of array
+							if(index + 1 >= obj.patternpairs.size, {
+								"\instrument must be followed by a SynthDef name".error;
 							});
+
+							//the one that follows \instrument
+							synthDefName = obj.patternpairs[index + 1];
+
+							if(synthDefName.class != Symbol, {
+								"\instrument must be followed by a SynthDef name".error;
+							});
+
+							//Look for the synthDesc in the global library. From there, parameters can be extracted
+							synthDesc = SynthDescLib.global.at(synthDefName);
+
+							if(synthDesc == nil, {
+								"invalid SynthDef for \instrument".error;
+							});
+
+							foundInstrument = true;
 						});
 
+						if(val == \freq, { foundFreq = true; });
+						if(val == \amp, { foundAmp = true; });
+					});
+
+					if(foundInstrument, {
+						//Retrieve parameters from the SynthDesc
+						synthDesc.controls.do({
+							arg controlName;
+
+							var controlNameName = controlName.name;
+
+							//Ignore gate, out and fadeTime params
+							if((controlNameName != \gate).and(
+								controlNameName != \out).and(
+								controlNameName != \fadeTime), {
+
+								//Add param to dict
+								defaultControlNames.put(controlNameName, controlName);
+
+								//Also, if \freq is not provided in Pbind's param and param == freq, use it as default
+								if((foundFreq == false).and(controlNameName == \freq), {
+									this.set(controlNameName, controlName.defaultValue);
+								});
+
+								//Also, if \amp is not provided in Pbind's param and param == freq, use it as default
+								if((foundAmp == false).and(controlNameName == \amp), {
+									this.set(controlNameName, controlName.defaultValue);
+								});
+							});
+						});
+					}, {
+						//Make sure \instrument is ALWAYS provided
 						"Alga patterns must always provide an \instrument".error;
 					});
 				});
 
-				//defaultControlNames.postln;
+				defaultControlNames.postln;
 
 				//create all interp proxies
 				this.createAllInterpProxies;
-
 			});
 
 
