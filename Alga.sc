@@ -1451,6 +1451,8 @@ AlgaNodeProxy : NodeProxy {
 		//	interpolationProxyEntry.source = src;
 		//});
 
+		"New connection".postln;
+
 		//If changing the connections with a new NodeProxy
 		//if(paramEntryInInProxiesIsPrevProxy.not, {
 		if(previousParamEntry != prevProxy, {
