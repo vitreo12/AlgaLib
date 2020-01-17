@@ -916,7 +916,7 @@ AlgaNodeProxy : NodeProxy {
 					});
 				});
 
-				defaultControlNames.postln;
+				//defaultControlNames.postln;
 
 				//create all interp proxies
 				this.createAllInterpProxies;
@@ -938,8 +938,10 @@ AlgaNodeProxy : NodeProxy {
 			////////////////////////////////////////////////////////////////
 
 			//REARRANGE BLOCK!!
-			this.createNewBlockIfNeeded(this);
-			AlgaBlocksDict.reorderBlock(this.blockIndex, server);
+			if(isInterpProxy == false, {
+				this.createNewBlockIfNeeded(this);
+				AlgaBlocksDict.reorderBlock(this.blockIndex, server);
+			});
 
 			//////////////////////////////////////////////////////////////
 
@@ -959,8 +961,6 @@ AlgaNodeProxy : NodeProxy {
 
 		//Create interpolationProxies for all params
 		if(isInterpProxy == false, {
-
-			this.createAllInterpProxies;
 
 			//Different cases!
 
@@ -1144,6 +1144,8 @@ AlgaNodeProxy : NodeProxy {
 
 		var interpolationProxy;
 
+		var defaultValue;
+
 		/*
 		if(this.group == nil, {
 			("This proxy hasn't been instantiated yet!!!").warn;
@@ -1163,9 +1165,9 @@ AlgaNodeProxy : NodeProxy {
 
 		//this.interpolationProxies.postln;
 
-		if(prevInterpProxy == nil, {
+		//if(prevInterpProxy == nil, {
 
-			var defaultValue = controlName.defaultValue;
+			defaultValue = controlName.defaultValue;
 
 			//"new interp".postln;
 
@@ -1221,14 +1223,16 @@ AlgaNodeProxy : NodeProxy {
 				//interpolationProxy.fadeTime = this.fadeTime;
 			});
 
+		/*
 		}, {
+			//Already created interpProxy. Simply change
 
-			//"old interp".postln;
+			var prevInterpProxyStringVal = prevInterpProxy.source.asString;
 
-			//Only re-instantiate if not using a \proxyIn interpolationProxy
-			prevInterpProxy.source.asString.beginsWith("\proxyIn").not({
+			//Only re-instantiate if not using a \proxyIn interpolationProxy OR number of channels is different
+			if((prevInterpProxyStringVal.beginsWith("\proxyIn").not), {
 
-				("Already Existing Param, " ++ paramName ++ ", with wrong interpolationProxy").warn;
+				("Already Existing Param, " ++ paramName).warn;
 
 				if(paramRate == \audio, {
 					var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
@@ -1242,6 +1246,7 @@ AlgaNodeProxy : NodeProxy {
 			});
 
 		});
+		*/
 	}
 
 	connectToInterpProxy {
@@ -1249,6 +1254,8 @@ AlgaNodeProxy : NodeProxy {
 		arg param = \in, interpolationProxy = nil, proxy;
 
 		var controlName, rate, isProxyAProxy, numChannels, canBeMapped;
+
+		var tempVal;
 
 		isProxyAProxy = (proxy.class == AlgaNodeProxy).or(
 			proxy.class.superclass == AlgaNodeProxy).or(
@@ -1285,19 +1292,19 @@ AlgaNodeProxy : NodeProxy {
 			numChannels = controlName.numChannels;
 		});
 
+		/*
+		tempVal = interpolationProxy.bus.getSynchronous;
+
+		interpolationProxy.group.freeAll;
+
+		interpolationProxy.bus.setSynchronous(tempVal);
+
+		interpolationProxy.bus.index.postln;
+		interpolationProxy.bus.getSynchronous.postln;
+		*/
+
 		//warning: proxy should still have a fixed bus
 		canBeMapped = proxy.initBus(rate, numChannels);
-
-		/*
-		"connectToInterpProxy".postln;
-		proxy.asString.postln;
-		proxy.numChannels.postln;
-
-		if(numChannels != proxy.numChannels, {
-			("Channel mismatch. Input proxy has " ++ proxy.numChannels.asString ++
-			", while parameter \"" ++ param.asString ++ " \" has " ++ numChannels.asString).warn;
-		});
-		*/
 
 		if(canBeMapped) {
 			if(interpolationProxy.isNeutral) { interpolationProxy.defineBus(rate, numChannels) };
@@ -1356,7 +1363,7 @@ AlgaNodeProxy : NodeProxy {
 
 			canBeMapped = proxy.initBus(rate, numChannels); // warning: proxy should still have a fixed bus
 
-			("ConnectXSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ key.asString).postln;
+			("ConnectSet : " ++ this.asString ++ " from " ++ proxy.asString ++ " at " ++ key.asString).postln;
 			rate.postln;
 
 			if(canBeMapped) {
@@ -1450,8 +1457,6 @@ AlgaNodeProxy : NodeProxy {
 		//if(src != nil, {
 		//	interpolationProxyEntry.source = src;
 		//});
-
-		"New connection".postln;
 
 		//If changing the connections with a new NodeProxy
 		//if(paramEntryInInProxiesIsPrevProxy.not, {
