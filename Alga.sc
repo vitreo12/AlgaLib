@@ -46,6 +46,28 @@ PAlgakr : Pfunc {
 	}
 }
 
+AlgaEnvGate {
+
+	*ar { arg i_level=1, gate, fadeTime, doneAction=2, curve='sin';
+		var synthGate = gate ?? { NamedControl.kr(\gate, 1.0) };
+		var synthFadeTime = fadeTime ?? { NamedControl.kr(\fadeTime, 0.02) };
+		^EnvGen.ar(
+			Env.new([ i_level, 1.0, 0.0], #[1.0, 1.0], curve, 1),
+			synthGate, 1.0, 0.0, synthFadeTime, doneAction
+		)
+	}
+
+	*kr { arg i_level=1, gate, fadeTime, doneAction=2, curve='sin';
+		var synthGate = gate ?? { NamedControl.kr(\gate, 1.0) };
+		var synthFadeTime = fadeTime ?? { NamedControl.kr(\fadeTime, 0.02) };
+		^EnvGen.kr(
+			Env.new([ i_level, 1.0, 0.0], #[1.0, 1.0], curve, 1),
+			synthGate, 1.0, 0.0, synthFadeTime, doneAction
+		)
+	}
+
+}
+
 //Just as TempoBusClock, but with slaves for multiple servers
 AlgaTempoBusClock : TempoBusClock {
 
@@ -567,7 +589,10 @@ AlgaNodeProxy : NodeProxy {
 
 	var <>defaultControlNames;
 
-	var <>interpolationProxies, <>interpolationProxiesCopy, <>inProxies, <>outProxies;
+	var <>inProxies, <>outProxies;
+
+	var <>interpolationProxies, <>interpolationProxiesCopy;
+	var <>interpolatonProxiesNormalizer, <>interpolatonProxiesNormalizerCopy;
 
 	//Add the SynthDef for ins creation at startup!
 	*initClass {
@@ -591,39 +616,160 @@ AlgaNodeProxy : NodeProxy {
 			16.do({
 				arg counter;
 
-				var synthDefString_ar, synthDefString_kr, arrayOfZeros = "[";
+				var synthDefString_ar, synthDefString_kr;
+				var arrayOfZeros_arg = "[";
 
 				counter = counter + 1;
 
 				if(counter == 1, {
-					synthDefString_ar = "ProxySynthDef(\\proxyIn_ar1, {\\in.ar(0)}).add;";
-					synthDefString_kr = "ProxySynthDef(\\proxyIn_kr1, {\\in.kr(0)}).add;";
+					synthDefString_ar = "ProxySynthDef(\\proxyIn_ar1, {
+var in = \\in.ar(0);
+var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: \\sin);
+var out = in * env;
+var outs = Array.newClear(2);
+outs[0] = out;
+outs[1] = env;
+outs;
+}, makeFadeEnv:false).add;";
+
+					synthDefString_kr = "ProxySynthDef(\\proxyIn_kr1, {
+var in = \\in.kr(0);
+var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: \\lin);
+var out = in * env;
+var outs = Array.newClear(2);
+outs[0] = out;
+outs[1] = env;
+outs;
+}, makeFadeEnv:false).add;";
 				}, {
 
 					//Generate [0, 0, 0, ...
-					counter.do({
-						arrayOfZeros = arrayOfZeros ++ "0,"
+					(counter + 1).do({
+						arrayOfZeros_arg = arrayOfZeros_arg ++ "0,";
 					});
 
 					//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
-					arrayOfZeros = arrayOfZeros[0..(arrayOfZeros.size - 2)] ++ "]";
+					arrayOfZeros_arg = arrayOfZeros_arg[0..(arrayOfZeros_arg.size - 2)] ++ "]";
 
-					synthDefString_ar = "ProxySynthDef(\\proxyIn_ar" ++ counter.asString ++ ", {\\in.ar(" ++ arrayOfZeros ++ ")}).add;";
-					synthDefString_kr = "ProxySynthDef(\\proxyIn_kr" ++ counter.asString ++ ", {\\in.kr(" ++ arrayOfZeros ++ ")}).add;";
+					synthDefString_ar = "ProxySynthDef(\\proxyIn_ar" ++ counter.asString ++ ", {
+var in = \\in.ar(" ++ arrayOfZeros_arg ++ ");
+var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: \\sin);
+var out = in * env;
+var outs = Array.newClear(" ++ (counter + 1).asString ++ ");
+" ++ counter.asString ++ ".do({
+arg i;
+outs[i] = out[i];
+});
+outs[" ++ counter.asString ++ "] = env;
+outs;
+}, makeFadeEnv:false).add;";
+
+					synthDefString_kr = "ProxySynthDef(\\proxyIn_kr" ++ counter.asString ++ ", {
+var in = \\in.kr(" ++ arrayOfZeros_arg ++ ");
+var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: \\lin);
+var out = in * env;
+var outs = Array.newClear(" ++ (counter + 1).asString ++ ");
+" ++ counter.asString ++ ".do({
+arg i;
+outs[i] = out[i];
+});
+outs[" ++ counter.asString ++ "] = env;
+outs;
+}, makeFadeEnv:false).add;";
 				});
 
 
 				//Evaluate the generated code
 				synthDefString_ar.interpret;
 				synthDefString_kr.interpret;
+
+				//synthDefString_ar.postln;
+				//synthDefString_kr.postln;
 			});
 
+
+			16.do({
+				arg counter;
+
+				var synthDefString_ar, synthDefString_kr;
+				var arrayOfZeros_arg = "[";
+				var arrayOfZeros_out = "[";
+
+				counter = counter + 1;
+
+				if(counter == 1, {
+					synthDefString_ar = "SynthDef(\\interpProxyNorm_ar1, {
+var args = \\args.ar([0, 0]);
+var val = args[0];
+var env = args[1];
+var conditional = env > 1.0;
+var scaling = Select.ar(conditional, [val, DC.ar(1.0)]);
+var out = val / scaling;
+Out.ar(\\out.ir(0), out);
+}).add;";
+					synthDefString_kr = "SynthDef(\\interpProxyNorm_kr1, {
+var args = \\args.kr([0, 0]);
+var val = args[0];
+var env = args[1];
+var conditional = env > 1.0;
+var scaling = Select.kr(conditional, [val, DC.kr(1.0)]);
+var out = val / scaling;
+Out.kr(\\out.ir(0), out);
+}).add;";
+				}, {
+
+					//Generate [0, 0, 0, ...
+					(counter + 1).do({
+						arrayOfZeros_arg = arrayOfZeros_arg ++ "0,";
+
+						//skip first
+						if(counter > 0, {
+							arrayOfZeros_out = arrayOfZeros_out ++ "0,";
+						});
+					});
+
+					//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
+					arrayOfZeros_arg = arrayOfZeros_arg[0..(arrayOfZeros_arg.size - 2)] ++ "]";
+					arrayOfZeros_out = arrayOfZeros_out[0..(arrayOfZeros_out.size - 2)] ++ "]";
+
+					synthDefString_ar = "SynthDef(\\interpProxyNorm_ar" ++ counter.asString ++ ", {
+var args = \\args.ar( " ++ arrayOfZeros_arg ++ ");
+var val = args[0.." ++ (counter - 1).asString ++ "];
+var env = args[" ++ counter.asString ++ "];
+var conditional = env > 1.0;
+var scaling = Select.ar(conditional, [val, DC.ar(1.0)]);
+var out = val / scaling;
+Out.ar(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
+}).add;";
+
+					synthDefString_kr = "SynthDef(\\interpProxyNorm_kr" ++ counter.asString ++ ", {
+var args = \\args.kr( " ++ arrayOfZeros_arg ++ ");
+var val = args[0.." ++ (counter - 1).asString ++ "];
+var env = args[" ++ counter.asString ++ "];
+var conditional = env > 1.0;
+var scaling = Select.kr(conditional, [val, DC.kr(1.0)]);
+var out = val / scaling;
+Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
+}).add;";
+				});
+
+
+				//Evaluate the generated code
+				synthDefString_ar.interpret;
+				synthDefString_kr.interpret;
+
+				//synthDefString_ar.postln;
+				//synthDefString_kr.postln;
 			});
+
+		});
 	}
 
 	init {
 		//These are the interpolated ones!!
 		interpolationProxies = IdentityDictionary.new;
+
+		interpolatonProxiesNormalizer = IdentityDictionary.new;
 
 		//These are used for <| (unmap) to restore default values and to get number of channels per parameter
 		defaultControlNames = Dictionary.new;
@@ -652,6 +798,7 @@ AlgaNodeProxy : NodeProxy {
 			interpolationProxies.postln;
 
 			interpolationProxiesCopy = interpolationProxies.copy;
+			interpolatonProxiesNormalizerCopy = interpolatonProxiesNormalizer.copy;
 
 			//remove from block in AlgaBlocksDict.blocksDict
 			blockWithThisProxy = AlgaBlocksDict.blocksDict[this.blockIndex];
@@ -711,8 +858,14 @@ AlgaNodeProxy : NodeProxy {
 					proxy.clear(0, true, true);
 				});
 
+				interpolatonProxiesNormalizerCopy.do({
+					arg proxy;
+					proxy.clear(0, true, true);
+				});
+
 				//Only clear at the end of routine
 				interpolationProxiesCopy.clear; interpolationProxiesCopy = nil;
+				interpolatonProxiesNormalizerCopy.clear; interpolatonProxiesNormalizerCopy = nil;
 
 			});
 		});
@@ -767,6 +920,10 @@ AlgaNodeProxy : NodeProxy {
 				interpolationProxiesCopy = interpolationProxies.copy;
 			});
 
+			if(interpolatonProxiesNormalizerCopy.size != interpolatonProxiesNormalizer.size, {
+				interpolatonProxiesNormalizerCopy = interpolatonProxiesNormalizer.copy;
+			});
+
 			if(fadeTime == nil, {fadeTime = 0});
 
 			Routine.run({
@@ -775,6 +932,11 @@ AlgaNodeProxy : NodeProxy {
 				//"Freeing interp proxies".postln;
 
 				interpolationProxiesCopy.do({
+					arg proxy;
+					proxy.free(0, freeGroup, true);
+				});
+
+				interpolatonProxiesNormalizerCopy.do({
 					arg proxy;
 					proxy.free(0, freeGroup, true);
 				});
@@ -1143,6 +1305,7 @@ AlgaNodeProxy : NodeProxy {
 		var prevInterpProxy;
 
 		var interpolationProxy;
+		var interpolationProxyNormalizer;
 
 		var defaultValue;
 
@@ -1160,6 +1323,9 @@ AlgaNodeProxy : NodeProxy {
 			^nil;
 		});
 
+		//Create interpProyNormalizer for this paramName
+		this.createInterpProxyNormalizer(paramName, paramRate, paramNumberOfChannels);
+
 		//Check if interpolationProxy was already created.
 		prevInterpProxy = this.interpolationProxies[paramName];
 
@@ -1167,61 +1333,77 @@ AlgaNodeProxy : NodeProxy {
 
 		//if(prevInterpProxy == nil, {
 
-			defaultValue = controlName.defaultValue;
+		defaultValue = controlName.defaultValue;
 
-			//"new interp".postln;
+		//"new interp".postln;
 
-			//Doesn't work with Pbinds with ar param, would just create a kr version
+		//Doesn't work with Pbinds with ar param, would just create a kr version
+		if(paramRate == \audio, {
+			interpolationProxy = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
+			interpolationProxyNormalizer = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
+		}, {
+			interpolationProxy = AlgaNodeProxy.new(server, \control, paramNumberOfChannels);
+			interpolationProxyNormalizer = AlgaNodeProxy.new(server, \control, paramNumberOfChannels);
+		});
+
+		interpolationProxy.isInterpProxy = true;
+
+		//Should it not be elastic?
+		interpolationProxy.reshaping = defaultReshaping;
+
+		//Default fadeTime: use nextProxy's (the modulated one) fadeTime
+		//interpolationProxy.fadeTime = 0;
+		interpolationProxy.fadeTime = this.fadeTime;
+
+		interpolationProxyNormalizer.reshaping = defaultReshaping;
+		interpolationProxyNormalizer.fadeTime = 0;
+
+		//Add the new interpolation NodeProxy to interpolationProxies dict
+		this.interpolationProxies.put(paramName, interpolationProxy);
+
+		this.interpolationProxiesNormalizer.put(paramName, interpolationProxyNormalizer);
+
+		//This is quite useless. interpolationProxies are kept in the appropriate dictionary of the proxy
+		interpolationProxy.outProxies.put(paramName, this);
+
+		//This routine stuff needs to be tested on Linux...
+		Routine.run({
+
+			//Initialize the value
 			if(paramRate == \audio, {
-				interpolationProxy = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
+				var interpolationProxySymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
+				var interpolationProxyNormalizesSymbol = ("interpProxyNorm_ar" ++ paramNumberOfChannels).asSymbol;
+
+				interpolationProxy.source = interpolationProxySymbol;
+				interpolationProxyNormalizer.source = interpolationProxyNormalizesSymbol;
 			}, {
-				interpolationProxy = AlgaNodeProxy.new(server, \control, paramNumberOfChannels);
+				var interpolationProxySymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
+				var interpolationProxyNormalizesSymbol = ("interpProxyNorm_kr" ++ paramNumberOfChannels).asSymbol;
+
+				interpolationProxy.source = interpolationProxySymbol;
+				interpolationProxyNormalizer.source = interpolationProxyNormalizesSymbol;
 			});
 
-			interpolationProxy.isInterpProxy = true;
+			//sync server so group is correctly created for interpolationProxy
+			server.sync;
 
-			//Should it not be elastic?
-			interpolationProxy.reshaping = defaultReshaping;
+			//Assign the defaultValue to the interpolationProxy
+			interpolationProxy.set(\in, defaultValue);
 
-			//Default fadeTime: use nextProxy's (the modulated one) fadeTime
-			//interpolationProxy.fadeTime = 0;
-			interpolationProxy.fadeTime = this.fadeTime;
+			server.sync;
 
-			//Add the new interpolation NodeProxy to interpolationProxies dict
-			this.interpolationProxies.put(paramName, interpolationProxy);
+			//Connect interpolationProxy to normalizer
+			interpolationProxyNormalizer.set(\args, interpolationProxy);
 
-			//This is quite useless. interpolationProxies are kept in the appropriate dictionary of the proxy
-			interpolationProxy.outProxies.put(paramName, this);
+			//Make sure interpolationProxy is set before connecting it to the param!
+			//server.sync;
 
-			//This routine stuff needs to be tested on Linux...
-			Routine.run({
+			//Don't yet make the connection to the parameter. It will be simply done on the first time it's connected
+			//to something with => / <=
+			//this.set(paramName, interpolatonProxy)
 
-				//Initialize the value
-				if(paramRate == \audio, {
-					var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
-					//proxyInSymbol.postln;
-					interpolationProxy.source = proxyInSymbol;
-				}, {
-					var proxyInSymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
-					//proxyInSymbol.postln;
-					interpolationProxy.source = proxyInSymbol;
-				});
-
-				//sync server so group is correctly created for interpolationProxy
-				server.sync;
-
-				//Assign the defaultValue to the interpolationProxy
-				interpolationProxy.set(\in, defaultValue);
-
-				//Make sure interpolationProxy is set before connecting it to the param!
-				//server.sync;
-
-				//Don't yet make the connection to the parameter. It will be simply done on the first time it's connected
-				//to something with => / <=
-				//this.set(paramName, interpolatonProxy)
-
-				//interpolationProxy.fadeTime = this.fadeTime;
-			});
+			//interpolationProxy.fadeTime = this.fadeTime;
+		});
 
 		/*
 		}, {
@@ -1292,16 +1474,15 @@ AlgaNodeProxy : NodeProxy {
 			numChannels = controlName.numChannels;
 		});
 
-		/*
-		tempVal = interpolationProxy.bus.getSynchronous;
+		//tempVal = interpolationProxy.bus.getSynchronous;
+		//tempVal.postln;
 
-		interpolationProxy.group.freeAll;
+		//interpolationProxy.group.set(\in, tempVal);
 
-		interpolationProxy.bus.setSynchronous(tempVal);
+		//interpolationProxy.bus.setSynchronous(tempVal);
 
-		interpolationProxy.bus.index.postln;
-		interpolationProxy.bus.getSynchronous.postln;
-		*/
+		//interpolationProxy.bus.index.postln;
+		//interpolationProxy.bus.getSynchronous.postln;
 
 		//warning: proxy should still have a fixed bus
 		canBeMapped = proxy.initBus(rate, numChannels);
@@ -1385,6 +1566,7 @@ AlgaNodeProxy : NodeProxy {
 
 		//Check if there already was an interpProxy for the parameter
 		var interpolationProxyEntry = this.interpolationProxies[param];
+		var interpolationProxyNormalizerEntry = this.interpolatonProxiesNormalizer[param];
 
 		//Returns nil with a Pbind.. this could be problematic for connections, rework it!
 		var paramRate;
@@ -1477,15 +1659,17 @@ AlgaNodeProxy : NodeProxy {
 			//re-instantiate source if not correct, could have been modified by Binops, Function, array
 			if(interpolationProxySource.asString.beginsWith("\proxyIn").not, {
 				if(paramRate == \audio, {
-					var proxyInSymbol = ("proxyIn_ar" ++ numberOfChannels).asSymbol;
-					proxyInSymbol.postln;
+					var interpolationProxySymbol = ("proxyIn_ar" ++ numberOfChannels).asSymbol;
+					var interpolationProxyNormalizesSymbol = ("interpProxyNorm_ar" ++ numberOfChannels).asSymbol;
 
-					interpolationProxyEntry.source = proxyInSymbol;
+					interpolationProxyEntry.source = interpolationProxySymbol;
+					interpolationProxyNormalizerEntry.source = interpolationProxyNormalizesSymbol;
 				}, {
-					var proxyInSymbol = ("proxyIn_kr" ++ numberOfChannels).asSymbol;
-					proxyInSymbol.postln;
+					var interpolationProxySymbol = ("proxyIn_kr" ++ numberOfChannels).asSymbol;
+					var interpolationProxyNormalizesSymbol = ("interpProxyNorm_kr" ++ numberOfChannels).asSymbol;
 
-					interpolationProxyEntry.source = proxyInSymbol;
+					interpolationProxyEntry.source = interpolationProxySymbol;
+					interpolationProxyNormalizerEntry.source = interpolationProxyNormalizesSymbol;
 				});
 			});
 
@@ -1508,8 +1692,12 @@ AlgaNodeProxy : NodeProxy {
 			*/
 
 			//Actually make the connection from the interpolationProxy.
-			//This should just be done once on the first connection, but it's fine for now to keep it here.
-			this.set(param, interpolationProxyEntry);
+			//This should just be done once on the first connection, but it's fine for now to keep it here,
+			//especially if for any reason interpolationProxy changes
+			//this.set(param, interpolationProxyEntry);
+
+			//Make connection to the normalizer
+			this.set(param, interpolationProxyNormalizerEntry);
 
 			//Make connection to the interpolationProxy
 			this.connectToInterpProxy(param, interpolationProxyEntry, prevProxy);
@@ -1942,6 +2130,11 @@ AlgaNodeProxy : NodeProxy {
 		nextProxy.interpolationProxies.do({
 			arg interpolationProxy;
 			interpolationProxy.group.moveBefore(nextProxy.group);
+		});
+
+		nextProxy.interpolatonProxiesNormalizer.do({
+			arg interpolationProxyNormalizer;
+			interpolationProxyNormalizer.group.moveBefore(nextProxy.group);
 		});
 
 		^this;
