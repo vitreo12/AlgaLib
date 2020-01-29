@@ -592,7 +592,7 @@ AlgaNodeProxy : NodeProxy {
 	var <>inProxies, <>outProxies;
 
 	var <>interpolationProxies, <>interpolationProxiesCopy;
-	var <>interpolatonProxiesNormalizer, <>interpolatonProxiesNormalizerCopy;
+	var <>interpolationProxiesNormalizer, <>interpolationProxiesNormalizerCopy;
 
 	//Add the SynthDef for ins creation at startup!
 	*initClass {
@@ -602,13 +602,13 @@ AlgaNodeProxy : NodeProxy {
 
 			/*
 			SynthDef(\proxyIn_ar1, {
-				var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'sin');
-				Out.ar(\out.ir(0), \in.ar(0) * fadeTimeEnv);
+			var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'sin');
+			Out.ar(\out.ir(0), \in.ar(0) * fadeTimeEnv);
 			}, [\ir, \ar]).add;
 
 			SynthDef(\proxyIn_kr1, {
-				var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin');
-				Out.kr(\out.ir(0), \in.kr(0) * fadeTimeEnv);
+			var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin');
+			Out.kr(\out.ir(0), \in.kr(0) * fadeTimeEnv);
 			}).add;
 			*/
 
@@ -687,59 +687,89 @@ outs;
 				//synthDefString_kr.postln;
 			});
 
-
 			16.do({
 				arg counter;
 
 				var synthDefString_ar, synthDefString_kr;
 				var arrayOfZeros_arg = "[";
-				var arrayOfZeros_out = "[";
 
 				counter = counter + 1;
 
 				if(counter == 1, {
+
+					/*
 					synthDefString_ar = "SynthDef(\\interpProxyNorm_ar1, {
 var args = \\args.ar([0, 0]);
 var val = args[0];
 var env = args[1];
 var conditional = env > 1.0;
-var scaling = Select.ar(conditional, [val, DC.ar(1.0)]);
+var scaling = Select.ar(conditional, [DC.ar(1.0), env]);
 var out = val / scaling;
+scaling.poll(2, \"SCALING\");
+val.poll(2, \"VAL\");
+out.poll(2, \"OUT\");
 Out.ar(\\out.ir(0), out);
 }).add;";
+
 					synthDefString_kr = "SynthDef(\\interpProxyNorm_kr1, {
 var args = \\args.kr([0, 0]);
 var val = args[0];
 var env = args[1];
 var conditional = env > 1.0;
-var scaling = Select.kr(conditional, [val, DC.kr(1.0)]);
+var scaling = Select.kr(conditional, [DC.kr(1.0), env]);
 var out = val / scaling;
+scaling.poll(2, \"SCALING\");
+val.poll(2, \"VAL\");
+out.poll(2, \"OUT\");
 Out.kr(\\out.ir(0), out);
 }).add;";
+					*/
+
+					synthDefString_ar = "SynthDef(\\interpProxyNorm_ar1, {
+var args = \\args.ar([0, 0]);
+var val = args[0];
+var env = args[1];
+var conditional = env > 1.0;
+var scaling = Select.ar(conditional, [DC.ar(1.0), env]);
+var out = val / env;
+scaling.poll(2, \"SCALING\");
+val.poll(2, \"VAL\");
+out.poll(2, \"OUT\");
+Out.ar(\\out.ir(0), out);
+}).add;";
+
+					synthDefString_kr = "SynthDef(\\interpProxyNorm_kr1, {
+var args = \\args.kr([0, 0]);
+var val = args[0];
+var env = args[1];
+var conditional = env > 1.0;
+var scaling = Select.kr(conditional, [DC.kr(1.0), env]);
+var out = val / env;
+scaling.poll(2, \"SCALING\");
+val.poll(2, \"VAL\");
+out.poll(2, \"OUT\");
+Out.kr(\\out.ir(0), out);
+}).add;";
+
 				}, {
 
 					//Generate [0, 0, 0, ...
 					(counter + 1).do({
 						arrayOfZeros_arg = arrayOfZeros_arg ++ "0,";
-
-						//skip first
-						if(counter > 0, {
-							arrayOfZeros_out = arrayOfZeros_out ++ "0,";
-						});
 					});
 
 					//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
 					arrayOfZeros_arg = arrayOfZeros_arg[0..(arrayOfZeros_arg.size - 2)] ++ "]";
-					arrayOfZeros_out = arrayOfZeros_out[0..(arrayOfZeros_out.size - 2)] ++ "]";
 
+					/*
 					synthDefString_ar = "SynthDef(\\interpProxyNorm_ar" ++ counter.asString ++ ", {
 var args = \\args.ar( " ++ arrayOfZeros_arg ++ ");
 var val = args[0.." ++ (counter - 1).asString ++ "];
 var env = args[" ++ counter.asString ++ "];
 var conditional = env > 1.0;
-var scaling = Select.ar(conditional, [val, DC.ar(1.0)]);
+var scaling = Select.ar(conditional, [DC.ar(1.0), env]);
 var out = val / scaling;
-Out.ar(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
+Out.ar(\\out.ir(0), out);
 }).add;";
 
 					synthDefString_kr = "SynthDef(\\interpProxyNorm_kr" ++ counter.asString ++ ", {
@@ -747,12 +777,39 @@ var args = \\args.kr( " ++ arrayOfZeros_arg ++ ");
 var val = args[0.." ++ (counter - 1).asString ++ "];
 var env = args[" ++ counter.asString ++ "];
 var conditional = env > 1.0;
-var scaling = Select.kr(conditional, [val, DC.kr(1.0)]);
+var scaling = Select.kr(conditional, [DC.kr(1.0), env]);
 var out = val / scaling;
-Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
+Out.kr(\\out.ir(0), out);
 }).add;";
-				});
+					*/
 
+					synthDefString_ar = "SynthDef(\\interpProxyNorm_ar" ++ counter.asString ++ ", {
+var args = \\args.ar( " ++ arrayOfZeros_arg ++ ");
+var val = args[0.." ++ (counter - 1).asString ++ "];
+var env = args[" ++ counter.asString ++ "];
+var conditional = env > 1.0;
+var scaling = Select.ar(conditional, [DC.ar(1.0), env]);
+var out = val / env;
+scaling.poll(2, \"SCALING\");
+val.poll(2, \"VAL\");
+out.poll(2, \"OUT\");
+Out.ar(\\out.ir(0), out);
+}).add;";
+
+					synthDefString_kr = "SynthDef(\\interpProxyNorm_kr" ++ counter.asString ++ ", {
+var args = \\args.kr( " ++ arrayOfZeros_arg ++ ");
+var val = args[0.." ++ (counter - 1).asString ++ "];
+var env = args[" ++ counter.asString ++ "];
+var conditional = env > 1.0;
+var scaling = Select.kr(conditional, [DC.kr(1.0), env]);
+var out = val / env;
+scaling.poll(2, \"SCALING\");
+val.poll(2, \"VAL\");
+out.poll(2, \"OUT\");
+Out.kr(\\out.ir(0), out);
+}).add;";
+
+				});
 
 				//Evaluate the generated code
 				synthDefString_ar.interpret;
@@ -761,7 +818,6 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 				//synthDefString_ar.postln;
 				//synthDefString_kr.postln;
 			});
-
 		});
 	}
 
@@ -769,7 +825,7 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 		//These are the interpolated ones!!
 		interpolationProxies = IdentityDictionary.new;
 
-		interpolatonProxiesNormalizer = IdentityDictionary.new;
+		interpolationProxiesNormalizer = IdentityDictionary.new;
 
 		//These are used for <| (unmap) to restore default values and to get number of channels per parameter
 		defaultControlNames = Dictionary.new;
@@ -798,7 +854,7 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 			interpolationProxies.postln;
 
 			interpolationProxiesCopy = interpolationProxies.copy;
-			interpolatonProxiesNormalizerCopy = interpolatonProxiesNormalizer.copy;
+			interpolationProxiesNormalizerCopy = interpolationProxiesNormalizer.copy;
 
 			//remove from block in AlgaBlocksDict.blocksDict
 			blockWithThisProxy = AlgaBlocksDict.blocksDict[this.blockIndex];
@@ -858,14 +914,14 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 					proxy.clear(0, true, true);
 				});
 
-				interpolatonProxiesNormalizerCopy.do({
+				interpolationProxiesNormalizerCopy.do({
 					arg proxy;
 					proxy.clear(0, true, true);
 				});
 
 				//Only clear at the end of routine
 				interpolationProxiesCopy.clear; interpolationProxiesCopy = nil;
-				interpolatonProxiesNormalizerCopy.clear; interpolatonProxiesNormalizerCopy = nil;
+				interpolationProxiesNormalizerCopy.clear; interpolationProxiesNormalizerCopy = nil;
 
 			});
 		});
@@ -920,8 +976,8 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 				interpolationProxiesCopy = interpolationProxies.copy;
 			});
 
-			if(interpolatonProxiesNormalizerCopy.size != interpolatonProxiesNormalizer.size, {
-				interpolatonProxiesNormalizerCopy = interpolatonProxiesNormalizer.copy;
+			if(interpolationProxiesNormalizerCopy.size != interpolationProxiesNormalizer.size, {
+				interpolationProxiesNormalizerCopy = interpolationProxiesNormalizer.copy;
 			});
 
 			if(fadeTime == nil, {fadeTime = 0});
@@ -936,7 +992,7 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 					proxy.free(0, freeGroup, true);
 				});
 
-				interpolatonProxiesNormalizerCopy.do({
+				interpolationProxiesNormalizerCopy.do({
 					arg proxy;
 					proxy.free(0, freeGroup, true);
 				});
@@ -1323,9 +1379,6 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 			^nil;
 		});
 
-		//Create interpProyNormalizer for this paramName
-		this.createInterpProxyNormalizer(paramName, paramRate, paramNumberOfChannels);
-
 		//Check if interpolationProxy was already created.
 		prevInterpProxy = this.interpolationProxies[paramName];
 
@@ -1347,20 +1400,19 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 		});
 
 		interpolationProxy.isInterpProxy = true;
+		interpolationProxyNormalizer.isInterpProxy = true;
 
 		//Should it not be elastic?
 		interpolationProxy.reshaping = defaultReshaping;
+		interpolationProxyNormalizer.reshaping = defaultReshaping;
 
 		//Default fadeTime: use nextProxy's (the modulated one) fadeTime
 		//interpolationProxy.fadeTime = 0;
 		interpolationProxy.fadeTime = this.fadeTime;
-
-		interpolationProxyNormalizer.reshaping = defaultReshaping;
 		interpolationProxyNormalizer.fadeTime = 0;
 
 		//Add the new interpolation NodeProxy to interpolationProxies dict
 		this.interpolationProxies.put(paramName, interpolationProxy);
-
 		this.interpolationProxiesNormalizer.put(paramName, interpolationProxyNormalizer);
 
 		//This is quite useless. interpolationProxies are kept in the appropriate dictionary of the proxy
@@ -1400,7 +1452,7 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 
 			//Don't yet make the connection to the parameter. It will be simply done on the first time it's connected
 			//to something with => / <=
-			//this.set(paramName, interpolatonProxy)
+			//this.set(paramName, interpolationProxy)
 
 			//interpolationProxy.fadeTime = this.fadeTime;
 		});
@@ -1566,7 +1618,7 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 
 		//Check if there already was an interpProxy for the parameter
 		var interpolationProxyEntry = this.interpolationProxies[param];
-		var interpolationProxyNormalizerEntry = this.interpolatonProxiesNormalizer[param];
+		var interpolationProxyNormalizerEntry = this.interpolationProxiesNormalizer[param];
 
 		//Returns nil with a Pbind.. this could be problematic for connections, rework it!
 		var paramRate;
@@ -2099,6 +2151,11 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 			interpolationProxy.group.moveBefore(this.group);
 		});
 
+		this.interpolationProxiesNormalizer.do({
+			arg interpolationProxyNormalizer;
+			interpolationProxyNormalizer.group.moveBefore(this.group);
+		});
+
 		^this;
 	}
 
@@ -2111,6 +2168,11 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 		this.interpolationProxies.do({
 			arg interpolationProxy;
 			interpolationProxy.group.moveBefore(this.group);
+		});
+
+		this.interpolationProxiesNormalizer.do({
+			arg interpolationProxyNormalizer;
+			interpolationProxyNormalizer.group.moveBefore(this.group);
 		});
 
 		^this;
@@ -2127,12 +2189,17 @@ Out.kr(\\out.ir(" ++ arrayOfZeros_out ++ "), out);
 			interpolationProxy.group.moveBefore(this.group);
 		});
 
+		this.interpolationProxiesNormalizer.do({
+			arg interpolationProxyNormalizer;
+			interpolationProxyNormalizer.group.moveBefore(this.group);
+		});
+
 		nextProxy.interpolationProxies.do({
 			arg interpolationProxy;
 			interpolationProxy.group.moveBefore(nextProxy.group);
 		});
 
-		nextProxy.interpolatonProxiesNormalizer.do({
+		nextProxy.interpolationProxiesNormalizer.do({
 			arg interpolationProxyNormalizer;
 			interpolationProxyNormalizer.group.moveBefore(nextProxy.group);
 		});
