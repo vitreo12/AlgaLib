@@ -1301,12 +1301,6 @@ Out.kr(\\out.ir(0), out);
 
 				var paramNumberOfChannels = controlName.numChannels;
 
-				//Retrieve the original default value, used to restore things when unmapping ( <| )
-				//this.defaultParamsVals.put(paramName, paramVal);
-
-				//paramVal.postln;
-				//paramNumberOfChannels.postln;
-
 				//Create interpProxy for this paramName
 				this.createInterpProxy(paramName, controlName, paramNumberOfChannels);
 
@@ -1316,6 +1310,18 @@ Out.kr(\\out.ir(0), out);
 
 		//this.defaultControlNames.postln;
 		//this.interpolationProxies.postln;
+	}
+
+	freePreviousInterpProxies {
+		this.interpolationProxies.do({
+			arg interpProxy;
+			interpProxy.free(isInterpolationProxy:true);
+		});
+
+		this.interpolationProxiesNormalizer.do({
+			arg interpProxyNorm;
+			interpProxyNorm.free(isInterpolationProxy:true);
+		});
 	}
 
 	createInterpProxy {
@@ -1342,7 +1348,7 @@ Out.kr(\\out.ir(0), out);
 		if(controlName != nil, {
 			paramRate = controlName.rate;
 		}, {
-			("Can't retrieve parameter rate for " ++ paramName).postln;
+			("Can't retrieve parameter rate for " ++ paramName).warn;
 			^nil;
 		});
 
@@ -1351,84 +1357,82 @@ Out.kr(\\out.ir(0), out);
 
 		//this.interpolationProxies.postln;
 
-		//if(prevInterpProxy == nil, {
+		//Create new ones!
+		if(prevInterpProxy == nil, {
 
-		defaultValue = controlName.defaultValue;
+			defaultValue = controlName.defaultValue;
 
-		//"new interp".postln;
+			//"new interp".postln;
 
-		//Doesn't work with Pbinds with ar param, would just create a kr version
-		if(paramRate == \audio, {
-			interpolationProxy = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
-			interpolationProxyNormalizer = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
-		}, {
-			interpolationProxy = AlgaNodeProxy.new(server, \control, paramNumberOfChannels);
-			interpolationProxyNormalizer = AlgaNodeProxy.new(server, \control, paramNumberOfChannels);
-		});
-
-		interpolationProxy.isInterpProxy = true;
-		interpolationProxyNormalizer.isInterpProxy = true;
-
-		//Should it not be elastic?
-		interpolationProxy.reshaping = defaultReshaping;
-		interpolationProxyNormalizer.reshaping = defaultReshaping;
-
-		//Default fadeTime: use nextProxy's (the modulated one) fadeTime
-		//interpolationProxy.fadeTime = 0;
-		interpolationProxy.fadeTime = this.fadeTime;
-		interpolationProxyNormalizer.fadeTime = 0;
-
-		//Add the new interpolation NodeProxy to interpolationProxies dict
-		this.interpolationProxies.put(paramName, interpolationProxy);
-		this.interpolationProxiesNormalizer.put(paramName, interpolationProxyNormalizer);
-
-		//This is quite useless. interpolationProxies are kept in the appropriate dictionary of the proxy
-		interpolationProxy.outProxies.put(paramName, this);
-
-		//This routine stuff needs to be tested on Linux...
-		Routine.run({
-
-			//Initialize the value
+			//Doesn't work with Pbinds with ar param, would just create a kr version
 			if(paramRate == \audio, {
-				var interpolationProxySymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
-				var interpolationProxyNormalizesSymbol = ("interpProxyNorm_ar" ++ paramNumberOfChannels).asSymbol;
-
-				interpolationProxy.source = interpolationProxySymbol;
-				interpolationProxyNormalizer.source = interpolationProxyNormalizesSymbol;
+				interpolationProxy = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
+				interpolationProxyNormalizer = AlgaNodeProxy.new(server, \audio,   paramNumberOfChannels);
 			}, {
-				var interpolationProxySymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
-				var interpolationProxyNormalizesSymbol = ("interpProxyNorm_kr" ++ paramNumberOfChannels).asSymbol;
-
-				interpolationProxy.source = interpolationProxySymbol;
-				interpolationProxyNormalizer.source = interpolationProxyNormalizesSymbol;
+				interpolationProxy = AlgaNodeProxy.new(server, \control, paramNumberOfChannels);
+				interpolationProxyNormalizer = AlgaNodeProxy.new(server, \control, paramNumberOfChannels);
 			});
 
-			//sync server so group is correctly created for interpolationProxy
-			server.sync;
+			interpolationProxy.isInterpProxy = true;
+			interpolationProxyNormalizer.isInterpProxy = true;
 
-			//Assign the defaultValue to the interpolationProxy
-			interpolationProxy.set(\in, defaultValue);
+			//Should it not be elastic?
+			interpolationProxy.reshaping = defaultReshaping;
+			interpolationProxyNormalizer.reshaping = defaultReshaping;
 
-			server.sync;
+			//Default fadeTime: use nextProxy's (the modulated one) fadeTime
+			//interpolationProxy.fadeTime = 0;
+			interpolationProxy.fadeTime = this.fadeTime;
+			interpolationProxyNormalizer.fadeTime = 0;
 
-			//Connect interpolationProxy to normalizer
-			interpolationProxyNormalizer.set(\args, interpolationProxy);
+			//Add the new interpolation NodeProxy to interpolationProxies dict
+			this.interpolationProxies.put(paramName, interpolationProxy);
+			this.interpolationProxiesNormalizer.put(paramName, interpolationProxyNormalizer);
 
-			//Make sure interpolationProxy is set before connecting it to the param!
-			//server.sync;
+			//This is quite useless. interpolationProxies are kept in the appropriate dictionary of the proxy
+			interpolationProxy.outProxies.put(paramName, this);
 
-			//Don't yet make the connection to the parameter. It will be simply done on the first time it's connected
-			//to something with => / <=
-			//this.set(paramName, interpolationProxy)
 
-			//interpolationProxy.fadeTime = this.fadeTime;
-		});
+			//This routine stuff needs to be tested on Linux...
+			Routine.run({
 
-		/*
+				//Initialize the value
+				if(paramRate == \audio, {
+					var interpolationProxySymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
+					var interpolationProxyNormalizesSymbol = ("interpProxyNorm_ar" ++ paramNumberOfChannels).asSymbol;
+
+					interpolationProxy.source = interpolationProxySymbol;
+					interpolationProxyNormalizer.source = interpolationProxyNormalizesSymbol;
+				}, {
+					var interpolationProxySymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
+					var interpolationProxyNormalizesSymbol = ("interpProxyNorm_kr" ++ paramNumberOfChannels).asSymbol;
+
+					interpolationProxy.source = interpolationProxySymbol;
+					interpolationProxyNormalizer.source = interpolationProxyNormalizesSymbol;
+				});
+
+				//sync server so group is correctly created for interpolationProxy
+				server.sync;
+
+				//Assign the defaultValue to the interpolationProxy
+				interpolationProxy.set(\in, defaultValue);
+
+				server.sync;
+
+				//Connect interpolationProxy to normalizer
+				interpolationProxyNormalizer.set(\args, interpolationProxy);
+
+			});
+
 		}, {
 			//Already created interpProxy. Simply change
 
+			var prevInterpProxyNorm = this.interpolationProxiesNormalizer[paramName];
 			var prevInterpProxyStringVal = prevInterpProxy.source.asString;
+
+			if(prevInterpProxyNorm == nil, {
+				"Invalid parameter " ++ paramName.asString ++ "for interpProxyNorm".warn;
+			});
 
 			//Only re-instantiate if not using a \proxyIn interpolationProxy OR number of channels is different
 			if((prevInterpProxyStringVal.beginsWith("\proxyIn").not), {
@@ -1436,18 +1440,21 @@ Out.kr(\\out.ir(0), out);
 				("Already Existing Param, " ++ paramName).warn;
 
 				if(paramRate == \audio, {
-					var proxyInSymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
-					proxyInSymbol.postln;
-					prevInterpProxy.source = proxyInSymbol;
+					var interpolationProxySymbol = ("proxyIn_ar" ++ paramNumberOfChannels).asSymbol;
+					var interpolationProxyNormalizesSymbol = ("interpProxyNorm_ar" ++ paramNumberOfChannels).asSymbol;
+
+					prevInterpProxy.source = interpolationProxySymbol;
+					prevInterpProxyNorm.source = interpolationProxyNormalizesSymbol;
 				}, {
-					var proxyInSymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
-					proxyInSymbol.postln;
-					prevInterpProxy.source = proxyInSymbol;
+					var interpolationProxySymbol = ("proxyIn_kr" ++ paramNumberOfChannels).asSymbol;
+					var interpolationProxyNormalizesSymbol = ("interpProxyNorm_kr" ++ paramNumberOfChannels).asSymbol;
+
+					prevInterpProxy.source = interpolationProxySymbol;
+					prevInterpProxyNorm.source = interpolationProxyNormalizesSymbol;
 				});
 			});
 
 		});
-		*/
 	}
 
 	connectToInterpProxy {
@@ -1639,7 +1646,7 @@ Out.kr(\\out.ir(0), out);
 		if(controlName != nil, {
 			paramRate = controlName.rate;
 		}, {
-			("Can't retrieve parameter rate for " ++ param).postln;
+			("Can't retrieve parameter rate for " ++ param).warn;
 			^nil;
 		});
 

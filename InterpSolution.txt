@@ -1,7 +1,0 @@
-Have an individual output from each used ProxySynthDef with the ramp, and
-normalize all the ramps values at the entry of the interpolationProxy Bus.
-
-To do so, the ramps must be summed up and normalized. Then, values should be
-reassigned to EACH individual ramp. However, does this require to build my own
-Ramp UGen that shares the Bus in order to make the correct assumptions?
-
