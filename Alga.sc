@@ -599,20 +599,6 @@ AlgaNodeProxy : NodeProxy {
 		StartUp.add({
 
 			//Generate for each num of channels up to 16:
-
-			/*
-			SynthDef(\proxyIn_ar1, {
-			var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'sin');
-			Out.ar(\out.ir(0), \in.ar(0) * fadeTimeEnv);
-			}, [\ir, \ar]).add;
-
-			SynthDef(\proxyIn_kr1, {
-			var fadeTimeEnv = EnvGate.new(i_level: 0, doneAction:2, curve: 'lin');
-			Out.kr(\out.ir(0), \in.kr(0) * fadeTimeEnv);
-			}).add;
-			*/
-
-
 			16.do({
 				arg counter;
 
@@ -676,6 +662,7 @@ outs[i] = out[i];
 outs[" ++ counter.asString ++ "] = env;
 outs;
 }, makeFadeEnv:false).add;";
+
 				});
 
 
@@ -729,12 +716,7 @@ Out.kr(\\out.ir(0), out);
 var args = \\args.ar([0, 0]);
 var val = args[0];
 var env = args[1];
-var conditional = env > 1.0;
-var scaling = Select.ar(conditional, [DC.ar(1.0), env]);
 var out = val / env;
-scaling.poll(2, \"SCALING\");
-val.poll(2, \"VAL\");
-out.poll(2, \"OUT\");
 Out.ar(\\out.ir(0), out);
 }).add;";
 
@@ -742,12 +724,7 @@ Out.ar(\\out.ir(0), out);
 var args = \\args.kr([0, 0]);
 var val = args[0];
 var env = args[1];
-var conditional = env > 1.0;
-var scaling = Select.kr(conditional, [DC.kr(1.0), env]);
 var out = val / env;
-scaling.poll(2, \"SCALING\");
-val.poll(2, \"VAL\");
-out.poll(2, \"OUT\");
 Out.kr(\\out.ir(0), out);
 }).add;";
 
@@ -787,12 +764,7 @@ Out.kr(\\out.ir(0), out);
 var args = \\args.ar( " ++ arrayOfZeros_arg ++ ");
 var val = args[0.." ++ (counter - 1).asString ++ "];
 var env = args[" ++ counter.asString ++ "];
-var conditional = env > 1.0;
-var scaling = Select.ar(conditional, [DC.ar(1.0), env]);
 var out = val / env;
-scaling.poll(2, \"SCALING\");
-val.poll(2, \"VAL\");
-out.poll(2, \"OUT\");
 Out.ar(\\out.ir(0), out);
 }).add;";
 
@@ -800,12 +772,7 @@ Out.ar(\\out.ir(0), out);
 var args = \\args.kr( " ++ arrayOfZeros_arg ++ ");
 var val = args[0.." ++ (counter - 1).asString ++ "];
 var env = args[" ++ counter.asString ++ "];
-var conditional = env > 1.0;
-var scaling = Select.kr(conditional, [DC.kr(1.0), env]);
 var out = val / env;
-scaling.poll(2, \"SCALING\");
-val.poll(2, \"VAL\");
-out.poll(2, \"OUT\");
 Out.kr(\\out.ir(0), out);
 }).add;";
 
