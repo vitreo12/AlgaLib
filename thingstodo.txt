@@ -1,3 +1,3 @@
-1) Add mixing capabilities and binary operations! Like, (~in1 + ~in2) => ~out
-2) interpolationProxies should be created everytime a new source is declared
-3) Pbinds are still buggy, and their parameters are always considered kr... fix this
+1) Fix multichannel
+2) Implement Patterns (especially, Pattern's parameter control (\dur, \stretch, etc...))
+3) Implement Functions (this will be generally ALSO used for mixing {~a + ~b})
