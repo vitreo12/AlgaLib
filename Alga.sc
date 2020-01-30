@@ -784,6 +784,7 @@ Out.kr(\\out.ir(0), out);
 
 				//synthDefString_ar.postln;
 				//synthDefString_kr.postln;
+
 			});
 		});
 	}
