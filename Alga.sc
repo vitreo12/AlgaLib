@@ -1653,6 +1653,10 @@ Out.kr(\\out.ir(0), out);
 
 		if(isPrevProxyAProxy, {
 			numberOfChannels = controlName.numChannels;
+			("prev proxy channels : " ++ prevProxy.numChannels).postln;
+			("prev proxy rate : " ++ prevProxy.rate).postln;
+			("this proxy's " ++ param ++ " channels : " ++ numberOfChannels).postln;
+			("this proxy's " ++ param ++ " rate : " ++ paramRate).postln
 		});
 
 		//Retrieved from the default value!
