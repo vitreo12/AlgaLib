@@ -1,3 +1,11 @@
 1) Fix multichannel
 2) Implement Patterns (especially, Pattern's parameter control (\dur, \stretch, etc...))
 3) Implement Functions (this will be generally ALSO used for mixing {~a + ~b})
+
+
+1) 
+	1) New proxyIn_ar_kr should be allocated not just when there is a channel mismatch 
+	   between the current I/O, but also relative to what came before. This can be done
+	   by simply querying the previous "proxyIn_ar1_kr1" string and extracting "1" and "1".
+	   If they change, a new proxyIn_ar_kr should also be allocated.
+	   ALSO, this should be done when reallocating sources altogether
