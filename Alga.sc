@@ -347,10 +347,7 @@ AlgaProxyBlock {
 
 		//this.dictOfProxies.postln;
 
-		this.dictOfProxies.postln;
-
 		this.sanitizeArray;
-
 
 		//server.bind allows here to be sure that this bundle will be sent in any case after
 		//the NodeProxy creation bundle for interpolation proxies.
@@ -1320,7 +1317,7 @@ Out.kr(\\out.ir(0), out);
 			if(isInterpProxy == false, {
 
 				//Then, reinstantiate connections that were in place, adapting ins/outs and rates.
-				this.recoverConnections;
+				//this.recoverConnections;
 
 				////////////////////////////////////////////////////////////////
 
@@ -1347,6 +1344,7 @@ Out.kr(\\out.ir(0), out);
 
 					//found it! remake connection
 					if(inProxy == this, {
+						("Restoring connection of " ++ outProxy.asString ++ " with " ++ this.asString).postln;
 						outProxy.setInterpProxy(this, paramName, reorderBlock:false);
 						break.(nil);
 					});
@@ -1553,7 +1551,8 @@ Out.kr(\\out.ir(0), out);
 	}
 
 	createInterpProxy {
-		arg paramName = \in, controlName, paramNumberOfChannels = 1, src = nil;
+		arg paramName = \in, controlName, paramNumberOfChannels = 1,
+		recursiveCall = false, onCreation = nil, src = nil;
 
 		var paramRate, paramRateString;
 
@@ -1588,7 +1587,7 @@ Out.kr(\\out.ir(0), out);
 		//this.interpolationProxies.postln;
 
 		//Create new ones!
-		if(prevInterpProxy == nil, {
+		if((prevInterpProxy == nil).or(recursiveCall), {
 
 			defaultValue = controlName.defaultValue;
 
@@ -1615,7 +1614,6 @@ Out.kr(\\out.ir(0), out);
 			//This is quite useless. interpolationProxies are kept in the appropriate dictionary of the proxy
 			interpolationProxy.outProxies.put(paramName, this);
 
-
 			//This routine stuff needs to be tested on Linux...
 			Routine.run({
 				var interpolationProxySymbol = ("proxyIn_" ++
@@ -1635,6 +1633,8 @@ Out.kr(\\out.ir(0), out);
 				//sync server so group is correctly created for interpolationProxy
 				server.sync;
 
+				//if(recursiveCall, { interpolationProxy.unset(\in); });
+
 				//Assign the defaultValue to the interpolationProxy
 				interpolationProxy.set(\in, defaultValue);
 
@@ -1643,32 +1643,136 @@ Out.kr(\\out.ir(0), out);
 				//Connect interpolationProxy to normalizer
 				interpolationProxyNormalizer.set(\args, interpolationProxy);
 
+				//"a".postln;
+
+				if(onCreation != nil, {
+
+					server.sync;
+
+					//Execute callback function after server sync.
+					onCreation.value();
+				});
+
 			});
 
 		}, {
-			//Already created interpProxy. Simply change
+
+			var prevInterpProxyNorm = this.interpolationProxiesNormalizer[paramName];
+
+			var onCreationFunc = {
+
+				var proxyToRestore;
+				var newInterpProxy, newInterpProxyNorm;
+
+				//Unset from previous connections, this does the fadeout
+				//this.xunset(paramName);
+
+				//Old proxy connected to the param
+				proxyToRestore = prevInterpProxy.inProxies[\in];
+
+				//Free .inProxies and .outProxies
+				//this.freePreviousConnection(paramName);
+
+				//"b".postln;
+
+				//They now belong to a different group too
+				newInterpProxy = this.interpolationProxies[paramName];
+				newInterpProxyNorm = this.interpolationProxiesNormalizer[paramName];
+
+				(prevInterpProxy === newInterpProxy).postln;
+
+				if(proxyToRestore != nil, {
+
+					this.asString.postln;
+					paramName.postln;
+					proxyToRestore.postln;
+
+					this.perform('<=', proxyToRestore, paramName);
+
+					this.inProxies.postln;
+					proxyToRestore.outProxies.postln;
+
+				});
+
+				//Clear previous ones after fade time (this func is gonna be called in a Routine, so .wait can be used)
+				this.fadeTime.wait;
+				prevInterpProxy.clear(0, true);
+				prevInterpProxyNorm.clear(0, true);
+			};
+
+			if(prevInterpProxyNorm == nil, {
+				"Invalid parameter " ++ paramName.asString ++ "for interpProxyNorm".warn;
+				^this;
+			});
+
+			//Create new ones, then run the callback function onCreationFunc
+			this.createInterpProxy(paramName, controlName, paramNumberOfChannels,
+				recursiveCall: true,
+				onCreation: onCreationFunc);
+
+			/*
+
+			//Already created interpProxy. Simply change its .source
 
 			var prevInterpProxyNorm = this.interpolationProxiesNormalizer[paramName];
 			var prevInterpProxyStringVal = prevInterpProxy.source.asString;
 
+			var prevInterpProxyNormNumOfChannels;
+
+			var previousInterpProxyInsRate;
+			var previousInterpProxyIns = 1, previousInterpProxyOuts = 1;
+
 			if(prevInterpProxyNorm == nil, {
 				"Invalid parameter " ++ paramName.asString ++ "for interpProxyNorm".warn;
+				^this;
 			});
 
+			if(prevInterpProxyStringVal.beginsWith("\proxyIn"), {
+				previousInterpProxyInsRate = prevInterpProxyStringVal[8..9];
+				previousInterpProxyIns = prevInterpProxyStringVal[10..11];
+				previousInterpProxyOuts = prevInterpProxyStringVal[prevInterpProxyStringVal.size-2..prevInterpProxyStringVal.size-1];
+
+				//strip < 10 in/outs count
+				if(previousInterpProxyIns[1] == "_", { previousInterpProxyIns = previousInterpProxyIns[0]; });
+				if(previousInterpProxyOuts[0] == "r", { previousInterpProxyOuts = previousInterpProxyOuts[1]; });
+			});
+
+			prevInterpProxyNormNumOfChannels = prevInterpProxyNorm.numChannels;
+
+			("Already Existing Param, " ++ paramName).warn;
+
 			//Only re-instantiate if not using a \proxyIn interpolationProxy OR number of channels is different
-			if((prevInterpProxyStringVal.beginsWith("\proxyIn").not), {
-				var interpolationProxySymbol = ("proxyIn_" ++
-					paramRateString ++ paramNumberOfChannels ++
+			if((prevInterpProxyStringVal.beginsWith("\proxyIn").not).or(
+				paramNumberOfChannels != previousInterpProxyOuts), {
+
+				var interpolationProxySymbol;
+
+				if(previousInterpProxyInsRate == nil, {
+					previousInterpProxyInsRate = paramRateString;
+				});
+
+				interpolationProxySymbol = ("proxyIn_" ++
+					previousInterpProxyInsRate ++ paramNumberOfChannels ++
 					"_" ++ paramRateString ++ paramNumberOfChannels).asSymbol;
+
+				interpolationProxySymbol.postln;
+
+				prevInterpProxy.source = interpolationProxySymbol;
+
+				//this.connectToInterpProxy(paramName, prevInterpProxy, prevInterpProxy.inProxies[\in]);
+			});
+
+			//change interpolationProxyNorm when there is channel mismatch with param
+			if(prevInterpProxyNormNumOfChannels != paramNumberOfChannels, {
 
 				var interpolationProxyNormalizesSymbol = ("interpProxyNorm_" ++
 					paramRateString ++ paramNumberOfChannels).asSymbol;
 
-				("Already Existing Param, " ++ paramName).warn;
-
-				prevInterpProxy.source = interpolationProxySymbol;
 				prevInterpProxyNorm.source = interpolationProxyNormalizesSymbol;
+
 			});
+
+			*/
 		});
 	}
 
@@ -1717,6 +1821,9 @@ Out.kr(\\out.ir(0), out);
 			prevProxyRate = paramRate;
 			prevProxyNumChannels = paramNumberOfChannels
 		});
+
+		prevProxyRate.postln;
+		prevProxyNumChannels.postln;
 
 		//Init prev proxy's out bus!
 		canBeMapped = prevProxy.initBus(prevProxyRate, prevProxyNumChannels);
@@ -1840,7 +1947,16 @@ Out.kr(\\out.ir(0), out);
 			var interpolationProxySource = interpolationProxyEntry.source;
 			var interpolationProxySourceString = interpolationProxySource.asString;
 
-			//interpolationProxySource.postln;
+			var previousInterpProxyIns = 1, previousInterpProxyOuts = 1;
+
+			if(interpolationProxySourceString.beginsWith("\proxyIn"), {
+				previousInterpProxyIns = interpolationProxySourceString[10..11];
+				previousInterpProxyOuts = interpolationProxySourceString[interpolationProxySourceString.size-2..interpolationProxySourceString.size-1];
+
+				//strip < 10 in/outs count
+				if(previousInterpProxyIns[1] == "_", { previousInterpProxyIns = previousInterpProxyIns[0]; });
+				if(previousInterpProxyOuts[0] == "r", { previousInterpProxyOuts = previousInterpProxyOuts[1]; });
+			});
 
 			//Don't use param indexing for outs, as this proxy could be linked
 			//to multiple proxies with same param names
@@ -1851,6 +1967,8 @@ Out.kr(\\out.ir(0), out);
 
 			//re-instantiate source if not correct, here is where rate conversion and multichannel connectons happen.
 			if((interpolationProxySourceString.beginsWith("\proxyIn").not).or(
+				previousInterpProxyOuts != paramNumberOfChannels).or(
+				previousInterpProxyIns != prevProxyNumberOfChannels).or(
 				paramNumberOfChannels != prevProxyNumberOfChannels).or(
 				paramRate != prevProxyRate),
 			{
@@ -1874,11 +1992,14 @@ Out.kr(\\out.ir(0), out);
 				interpolationProxySymbol = ("proxyIn_" ++ prevProxyRateString ++ prevProxyNumberOfChannels
 					++ "_" ++ paramRateString ++ paramNumberOfChannels).asSymbol;
 
-
-				changeInterpProxySymbol = true;
+				//changeInterpProxySymbol = true;
 
 				//interpolationProxyNormalizesSymbol = ("interpProxyNorm_" ++ paramRateString ++ paramNumberOfChannels).asSymbol;
 
+				//free previous ones?
+				//interpolationProxyEntry.free(interpolationProxyEntry.fadeTime, true, true);
+
+				//Then create new one?
 				interpolationProxyEntry.source = interpolationProxySymbol;
 
 				//interpolationProxyNormalizerEntry.source = interpolationProxyNormalizesSymbol;
@@ -2193,7 +2314,7 @@ Out.kr(\\out.ir(0), out);
 		var thisBlockIndex = this.blockIndex;
 		var nextProxyBlockIndex = nextProxy.blockIndex;
 
-		"createNewBlockIfNeeded".postln;
+		//"createNewBlockIfNeeded".postln;
 
 		//thisBlockIndex.postln;
 		//nextProxyBlockIndex.postln;
@@ -2203,7 +2324,7 @@ Out.kr(\\out.ir(0), out);
 			newBlockIndex = UniqueID.next;
 			newBlock = AlgaProxyBlock.new(newBlockIndex);
 
-			"new block".postln;
+			//"new block".postln;
 
 			this.blockIndex = newBlockIndex;
 			nextProxy.blockIndex = newBlockIndex;
@@ -2222,7 +2343,7 @@ Out.kr(\\out.ir(0), out);
 
 				//Else, add this proxy to nextProxy's block, together with all proxies from this' block
 				if(thisBlockIndex == -1, {
-					"add this to nextProxy's block".postln;
+					//"add this to nextProxy's block".postln;
 					this.blockIndex = nextProxyBlockIndex;
 
 					//Add proxy to the block
@@ -2234,7 +2355,7 @@ Out.kr(\\out.ir(0), out);
 
 					//Else, add nextProxy to this block, together with all proxies from nextProxy's block
 					if(nextProxyBlockIndex == -1, {
-						"add nextProxy to this' block".postln;
+						//"add nextProxy to this' block".postln;
 						nextProxy.blockIndex = thisBlockIndex;
 
 						//Add proxy to the block
@@ -2250,7 +2371,7 @@ Out.kr(\\out.ir(0), out);
 					newBlockIndex = UniqueID.next;
 					newBlock = AlgaProxyBlock.new(newBlockIndex);
 
-					"both proxies already into blocks. creating new".postln;
+					//"both proxies already into blocks. creating new".postln;
 
 					//Change all proxies' group to the new one and add then to new block
 					AlgaBlocksDict.blocksDict[thisBlockIndex].dictOfProxies.do({
