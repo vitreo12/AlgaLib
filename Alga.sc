@@ -1626,6 +1626,18 @@ Out.kr(\\out.ir(0), out);
 				//interpolationProxySymbol.postln;
 				//interpolationProxyNormalizesSymbol.postln;
 
+
+				//REVIEW!
+				//Doing connections before the instantiation in order to make sure they are set when
+				//the proxies are created, avoiding any "clicks".
+				//Assign the defaultValue to the interpolationProxy
+				interpolationProxy.set(\in, defaultValue);
+
+				//Connect interpolationProxy to normalizer
+				interpolationProxyNormalizer.set(\args, interpolationProxy);
+
+				server.sync;
+
 				//Actually instantiate ProxySynthDef / SynthDef
 				interpolationProxy.source = interpolationProxySymbol;
 				interpolationProxyNormalizer.source = interpolationProxyNormalizesSymbol;
@@ -1633,17 +1645,16 @@ Out.kr(\\out.ir(0), out);
 				//sync server so group is correctly created for interpolationProxy
 				server.sync;
 
+				//REVIEW!
+				//Connect to Normalizer
+				//this.set(paramName, interpolationProxyNormalizer);
+
 				//if(recursiveCall, { interpolationProxy.unset(\in); });
 
-				//Assign the defaultValue to the interpolationProxy
-				interpolationProxy.set(\in, defaultValue);
-
-				server.sync;
-
-				//Connect interpolationProxy to normalizer
-				interpolationProxyNormalizer.set(\args, interpolationProxy);
-
-				//"a".postln;
+				//REVIEW!
+				//interpolationProxy.set(\in, defaultValue);
+				//server.sync;
+				//interpolationProxyNormalizer.set(\args, interpolationProxy);
 
 				if(onCreation != nil, {
 
@@ -1664,6 +1675,7 @@ Out.kr(\\out.ir(0), out);
 				var proxyToRestore;
 				var newInterpProxy, newInterpProxyNorm;
 
+				//REVIEW!
 				//Unset from previous connections, this does the fadeout
 				//this.xunset(paramName);
 
@@ -1671,27 +1683,20 @@ Out.kr(\\out.ir(0), out);
 				proxyToRestore = prevInterpProxy.inProxies[\in];
 
 				//Free .inProxies and .outProxies
-				//this.freePreviousConnection(paramName);
+				this.freePreviousConnection(paramName);
 
-				//"b".postln;
-
-				//They now belong to a different group too
+				//This will be the newly created in the createInterpProxy function.
 				newInterpProxy = this.interpolationProxies[paramName];
 				newInterpProxyNorm = this.interpolationProxiesNormalizer[paramName];
 
-				(prevInterpProxy === newInterpProxy).postln;
-
 				if(proxyToRestore != nil, {
-
-					this.asString.postln;
-					paramName.postln;
-					proxyToRestore.postln;
 
 					this.perform('<=', proxyToRestore, paramName);
 
+					server.sync;
+
 					this.inProxies.postln;
 					proxyToRestore.outProxies.postln;
-
 				});
 
 				//Clear previous ones after fade time (this func is gonna be called in a Routine, so .wait can be used)
@@ -1709,70 +1714,6 @@ Out.kr(\\out.ir(0), out);
 			this.createInterpProxy(paramName, controlName, paramNumberOfChannels,
 				recursiveCall: true,
 				onCreation: onCreationFunc);
-
-			/*
-
-			//Already created interpProxy. Simply change its .source
-
-			var prevInterpProxyNorm = this.interpolationProxiesNormalizer[paramName];
-			var prevInterpProxyStringVal = prevInterpProxy.source.asString;
-
-			var prevInterpProxyNormNumOfChannels;
-
-			var previousInterpProxyInsRate;
-			var previousInterpProxyIns = 1, previousInterpProxyOuts = 1;
-
-			if(prevInterpProxyNorm == nil, {
-				"Invalid parameter " ++ paramName.asString ++ "for interpProxyNorm".warn;
-				^this;
-			});
-
-			if(prevInterpProxyStringVal.beginsWith("\proxyIn"), {
-				previousInterpProxyInsRate = prevInterpProxyStringVal[8..9];
-				previousInterpProxyIns = prevInterpProxyStringVal[10..11];
-				previousInterpProxyOuts = prevInterpProxyStringVal[prevInterpProxyStringVal.size-2..prevInterpProxyStringVal.size-1];
-
-				//strip < 10 in/outs count
-				if(previousInterpProxyIns[1] == "_", { previousInterpProxyIns = previousInterpProxyIns[0]; });
-				if(previousInterpProxyOuts[0] == "r", { previousInterpProxyOuts = previousInterpProxyOuts[1]; });
-			});
-
-			prevInterpProxyNormNumOfChannels = prevInterpProxyNorm.numChannels;
-
-			("Already Existing Param, " ++ paramName).warn;
-
-			//Only re-instantiate if not using a \proxyIn interpolationProxy OR number of channels is different
-			if((prevInterpProxyStringVal.beginsWith("\proxyIn").not).or(
-				paramNumberOfChannels != previousInterpProxyOuts), {
-
-				var interpolationProxySymbol;
-
-				if(previousInterpProxyInsRate == nil, {
-					previousInterpProxyInsRate = paramRateString;
-				});
-
-				interpolationProxySymbol = ("proxyIn_" ++
-					previousInterpProxyInsRate ++ paramNumberOfChannels ++
-					"_" ++ paramRateString ++ paramNumberOfChannels).asSymbol;
-
-				interpolationProxySymbol.postln;
-
-				prevInterpProxy.source = interpolationProxySymbol;
-
-				//this.connectToInterpProxy(paramName, prevInterpProxy, prevInterpProxy.inProxies[\in]);
-			});
-
-			//change interpolationProxyNorm when there is channel mismatch with param
-			if(prevInterpProxyNormNumOfChannels != paramNumberOfChannels, {
-
-				var interpolationProxyNormalizesSymbol = ("interpProxyNorm_" ++
-					paramRateString ++ paramNumberOfChannels).asSymbol;
-
-				prevInterpProxyNorm.source = interpolationProxyNormalizesSymbol;
-
-			});
-
-			*/
 		});
 	}
 
@@ -1937,9 +1878,13 @@ Out.kr(\\out.ir(0), out);
 		//	interpolationProxyEntry.source = src;
 		//});
 
-		//If changing the connections with a new NodeProxy
-		//if(paramEntryInInProxiesIsPrevProxy.not, {
-		if(previousParamEntry != prevProxy, {
+		previousParamEntry.postln;
+		prevProxy.postln;
+
+		//REVIEW!
+		//if(previousParamEntry != prevProxy, {
+		//if(true, {
+		Routine.run({
 
 			var changeInterpProxySymbol = false, interpolationProxySymbol, interpolationProxyNormalizesSymbol;
 
@@ -1999,7 +1944,10 @@ Out.kr(\\out.ir(0), out);
 				//free previous ones?
 				//interpolationProxyEntry.free(interpolationProxyEntry.fadeTime, true, true);
 
-				//Then create new one?
+				//REVIEW!
+				//Should .source be modified like this OR should a new interpolationProxy be created
+				//on a new group and freeing this one after fadeTime? This is done in createInterpProxy, check
+				//it there!
 				interpolationProxyEntry.source = interpolationProxySymbol;
 
 				//interpolationProxyNormalizerEntry.source = interpolationProxyNormalizesSymbol;
@@ -2015,9 +1963,10 @@ Out.kr(\\out.ir(0), out);
 				AlgaBlocksDict.reorderBlock(this.blockIndex, server);
 			});
 
-			//re-make connection from interpProxy to normalizer
-			//interpolationProxyNormalizerEntry.set(\args, interpolationProxyEntry);
+			//sync server (so it's sure that .source got executed before making the connections)
+			server.sync;
 
+			//REVIEW!
 			//Make connection to the normalizer
 			this.set(param, interpolationProxyNormalizerEntry);
 
