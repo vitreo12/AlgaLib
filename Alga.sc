@@ -310,7 +310,7 @@ AlgaProxyBlock {
 
 		//dictOfProxies.postln;
 
-		("Reordering proxies for block number " ++ this.blockIndex).warn;
+		//("Reordering proxies for block number " ++ this.blockIndex).warn;
 
 		//this.orderedArray.size.postln;
 
@@ -374,7 +374,7 @@ AlgaProxyBlock {
 
 					prevEntry.beforeMoveNextInterpProxies(thisEntry);
 
-					(prevEntry.asString ++ " before " ++ thisEntry.asString).postln;
+					//(prevEntry.asString ++ " before " ++ thisEntry.asString).postln;
 
 					//thisEntry.class.postln;
 					//prevEntry.class.postln;
@@ -1660,6 +1660,8 @@ Out.kr(\\out.ir(0), out);
 
 					server.sync;
 
+					//"before".postln;
+
 					//Execute callback function after server sync.
 					onCreation.value();
 				});
@@ -1682,8 +1684,10 @@ Out.kr(\\out.ir(0), out);
 				//Old proxy connected to the param
 				proxyToRestore = prevInterpProxy.inProxies[\in];
 
-				//Free .inProxies and .outProxies
-				this.freePreviousConnection(paramName);
+				//Clear PREVIOUS .inProxies and .outProxies
+				//this.freePreviousConnection(paramName);
+
+				//"after".postln;
 
 				//This will be the newly created in the createInterpProxy function.
 				newInterpProxy = this.interpolationProxies[paramName];
@@ -1691,15 +1695,20 @@ Out.kr(\\out.ir(0), out);
 
 				if(proxyToRestore != nil, {
 
-					this.perform('<=', proxyToRestore, paramName);
+					//This is where fadeout/fadein happens
+					//this.perform('<=', proxyToRestore, paramName);
+					this.backwardConnectionInner(proxyToRestore, paramName, newlyCreatedInterpProxyNorm:true);
 
 					server.sync;
 
-					this.inProxies.postln;
-					proxyToRestore.outProxies.postln;
+					//this.inProxies.postln;
+					//proxyToRestore.outProxies.postln;
 				});
 
+				"Start fade time clear".postln;
+
 				//Clear previous ones after fade time (this func is gonna be called in a Routine, so .wait can be used)
+				//This should take account of parameter's fade time, not proxy's !!!
 				this.fadeTime.wait;
 				prevInterpProxy.clear(0, true);
 				prevInterpProxyNorm.clear(0, true);
@@ -1781,7 +1790,7 @@ Out.kr(\\out.ir(0), out);
 	}
 
 	setInterpProxy {
-		arg prevProxy, param = \in, src = nil, reorderBlock = true;
+		arg prevProxy, param = \in, src = nil, reorderBlock = true, newlyCreatedInterpProxyNorm = false;
 
 		//Check if there already was an interpProxy for the parameter
 		var interpolationProxyEntry = this.interpolationProxies[param];
@@ -1878,8 +1887,8 @@ Out.kr(\\out.ir(0), out);
 		//	interpolationProxyEntry.source = src;
 		//});
 
-		previousParamEntry.postln;
-		prevProxy.postln;
+		//previousParamEntry.postln;
+		//prevProxy.postln;
 
 		//REVIEW!
 		//if(previousParamEntry != prevProxy, {
@@ -1911,11 +1920,11 @@ Out.kr(\\out.ir(0), out);
 			});
 
 			//re-instantiate source if not correct, here is where rate conversion and multichannel connectons happen.
-			if((interpolationProxySourceString.beginsWith("\proxyIn").not).or(
+			if(((interpolationProxySourceString.beginsWith("\proxyIn").not).or(
 				previousInterpProxyOuts != paramNumberOfChannels).or(
 				previousInterpProxyIns != prevProxyNumberOfChannels).or(
 				paramNumberOfChannels != prevProxyNumberOfChannels).or(
-				paramRate != prevProxyRate),
+				paramRate != prevProxyRate)),
 			{
 				var prevProxyRateString;
 				var paramRateString;
@@ -1968,10 +1977,20 @@ Out.kr(\\out.ir(0), out);
 
 			//REVIEW!
 			//Make connection to the normalizer
-			this.set(param, interpolationProxyNormalizerEntry);
+			if(newlyCreatedInterpProxyNorm.not, {
+				//This is executed with normal connections. It will set the parameter
+				//right now (the interpolation happens in the interpProxy, not interpProxyNorm).
+				this.set(param, interpolationProxyNormalizerEntry);
+			}, {
+				//This means that the previous interpNorm has been replaced by re-instantiating.
+				//interpolation between the two is needed to switch states.
+				this.xset(param, interpolationProxyNormalizerEntry);
+			});
 
 			//Make connection to the interpolationProxy
 			this.connectToInterpProxy(param, interpolationProxyEntry, prevProxy);
+
+			"End of setInterpProxy".postln;
 
 			//Actually change the source
 			//if(changeInterpProxySymbol, {
@@ -1980,9 +1999,8 @@ Out.kr(\\out.ir(0), out);
 		});
 	}
 
-	//Combines before with <<>
-	=> {
-		arg nextProxy, param = \in;
+	forwardConnectionInner {
+		arg nextProxy, param = \in, newlyCreatedInterpProxyNorm = false;
 
 		var isNextProxyAProxy, isThisProxyAnOp, isThisProxyAFunc, isThisProxyAnArray;
 
@@ -2045,17 +2063,20 @@ Out.kr(\\out.ir(0), out);
 		*/
 
 		//Create a new interp proxy if needed, and make correct connections
-		nextProxy.setInterpProxy(this, param);
+		nextProxy.setInterpProxy(this, param, newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm);
 
 		//return nextProxy for further chaining
 		^nextProxy;
 	}
 
-	//combines before (on nextProxy) with <>>
-	//It also allows to set to plain numbers, e.g. ~sine <=.freq 440
-
-	<= {
+	//Combines before with <<>
+	=> {
 		arg nextProxy, param = \in;
+		this.connectionInner(nextProxy, param);
+	}
+
+	backwardConnectionInner {
+		arg nextProxy, param = \in, newlyCreatedInterpProxyNorm = false;
 
 		var isNextProxyAProxy, isNextProxyAnOp, isNextProxyAFunc, isNextProxyAnArray, paramRate;
 
@@ -2101,7 +2122,8 @@ Out.kr(\\out.ir(0), out);
 		if(isNextProxyAProxy, {
 
 			//If next proxy is an AbstractOpPlug or Function, check ClassExtensions.sc
-			nextProxy.perform('=>', this, param);
+			//nextProxy.perform('=>', this, param);
+			nextProxy.forwardConnectionInner(this, param, newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm); // equal to '=>'
 
 			//Return nextProxy for further chaining
 			^nextProxy;
@@ -2116,12 +2138,18 @@ Out.kr(\\out.ir(0), out);
 			//Free previous connections to the this, if there were any
 			this.freePreviousConnection(param);
 
-			this.setInterpProxy(nextProxy, param);
-
+			this.setInterpProxy(nextProxy, param, newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm);
 		});
 
 		//return this for further chaining
 		^this;
+	}
+
+	//combines before (on nextProxy) with <>>
+	//It also allows to set to plain numbers, e.g. ~sine <=.freq 440
+	<= {
+		arg nextProxy, param = \in;
+		this.backwardConnectionInner(nextProxy, param);
 	}
 
 	//Unmap
