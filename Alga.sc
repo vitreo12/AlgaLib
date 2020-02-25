@@ -1584,8 +1584,6 @@ Out.kr(\\out.ir(0), out);
 		//Check if interpolationProxy was already created.
 		prevInterpProxy = this.interpolationProxies[paramName];
 
-		//this.interpolationProxies.postln;
-
 		//Create new ones!
 		if((prevInterpProxy == nil).or(recursiveCall), {
 
@@ -1684,10 +1682,7 @@ Out.kr(\\out.ir(0), out);
 				//Old proxy connected to the param
 				proxyToRestore = prevInterpProxy.inProxies[\in];
 
-				//Clear PREVIOUS .inProxies and .outProxies
-				//this.freePreviousConnection(paramName);
-
-				//"after".postln;
+				("proxyToRestore: " ++ proxyToRestore.asString).postln;
 
 				//This will be the newly created in the createInterpProxy function.
 				newInterpProxy = this.interpolationProxies[paramName];
@@ -1925,6 +1920,7 @@ Out.kr(\\out.ir(0), out);
 			});
 
 			//re-instantiate source if not correct, here is where rate conversion and multichannel connectons happen.
+			//SHOULD WE CHECK HERE FOR newlyCreatedInterpProxyNorm.not too??
 			if(((interpolationProxySourceString.beginsWith("\proxyIn").not).or(
 				previousInterpProxyOuts != paramNumberOfChannels).or(
 				previousInterpProxyIns != prevProxyNumberOfChannels).or(
@@ -1992,17 +1988,25 @@ Out.kr(\\out.ir(0), out);
 				//Make connection to the interpolationProxy. Values are here interpolated using xset.
 				this.connectToInterpProxy(param, interpolationProxyEntry, prevProxy);
 			}, {
-				//This means that the previous interpNorm has been replaced by re-instantiating.
-				//interpolation between the two is needed to switch states.
-				this.xset(param, interpolationProxyNormalizerEntry);
-
 				//Make connection to the interpolationProxy. No need of interpolating as it's happening already
 				//between the two different interpNorms.
 				//This should not make much of a difference, as interpolation values are scaled in the interpNorm anyway.
 				this.connectToInterpProxy(param, interpolationProxyEntry, prevProxy, useXSet:false);
+
+				//This means that the previous interpNorm has been replaced by re-instantiating.
+				//interpolation between the two is needed to switch states.
+				this.xset(param, interpolationProxyNormalizerEntry);
 			});
 
-			"End of setInterpProxy".postln;
+
+			//If prevProxy is not a NodeProxy, also run the unset command.
+			//The connection to prevProxy (if it was like, a number) has already been set anyway.
+			//this just helps removing connectons that are actually not in place anymore
+			if(isPrevProxyAProxy.not, {
+				"Unsetting param".postln;
+				this.unset(param);
+			});
+
 
 			//Actually change the source
 			//if(changeInterpProxySymbol, {
@@ -2147,9 +2151,7 @@ Out.kr(\\out.ir(0), out);
 			//Create a new block if needed
 			this.createNewBlockIfNeeded(this);
 
-			//Free previous connections to the this, if there were any
-			this.freePreviousConnection(param);
-
+			//Actually set the connections.
 			this.setInterpProxy(nextProxy, param, newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm);
 		});
 
@@ -2223,6 +2225,7 @@ Out.kr(\\out.ir(0), out);
 
 		//First, empty the connections that were on before (if there were any)
 		var previousEntry = this.inProxies[param];
+		var previousInterpolatonProxy = this.interpolationProxies[param];
 
 		var isPreviousEntryAProxy = (previousEntry.class == AlgaNodeProxy).or(
 			previousEntry.class.superclass == AlgaNodeProxy).or(
@@ -2247,9 +2250,13 @@ Out.kr(\\out.ir(0), out);
 			});
 		});
 
-
 		//FIX HERE!
-		//Remove the entry from inProxies... This fucks up things for paramEntryInInProxies
+		//Clear interpolationProxies' previous connection (Abslutely needed)
+		if(previousInterpolatonProxy != nil, {
+			previousInterpolatonProxy.inProxies.removeAt(\in);
+		});
+
+		//Clear previousEntry
 		if(previousEntry != nil, {
 			this.inProxies.removeAt(param);
 		});
