@@ -1700,7 +1700,7 @@ Out.kr(\\out.ir(0), out);
 					//proxyToRestore.outProxies.postln;
 				});
 
-				"Start fade time clear".postln;
+				//"Start fade time clear".postln;
 
 				//Clear previous ones after fade time (this func is gonna be called in a Routine, so .wait can be used)
 				//This should take account of parameter's fade time, not proxy's !!!
@@ -1767,8 +1767,8 @@ Out.kr(\\out.ir(0), out);
 			prevProxyNumChannels = paramNumberOfChannels
 		});
 
-		prevProxyRate.postln;
-		prevProxyNumChannels.postln;
+		//prevProxyRate.postln;
+		//prevProxyNumChannels.postln;
 
 		//Init prev proxy's out bus!
 		canBeMapped = prevProxy.initBus(prevProxyRate, prevProxyNumChannels);
@@ -1908,8 +1908,8 @@ Out.kr(\\out.ir(0), out);
 				previousInterpProxyOuts = interpolationProxySourceString[interpolationProxySourceString.size-2..interpolationProxySourceString.size-1];
 
 				//strip < 10 in/outs count
-				if(previousInterpProxyIns[1] == "_", { previousInterpProxyIns = previousInterpProxyIns[0]; });
-				if(previousInterpProxyOuts[0] == "r", { previousInterpProxyOuts = previousInterpProxyOuts[1]; });
+				if(previousInterpProxyIns[1].asString == "_", { previousInterpProxyIns = previousInterpProxyIns[0].asString; });
+				if(previousInterpProxyOuts[0].asString == "r", { previousInterpProxyOuts = previousInterpProxyOuts[1].asString; });
 			});
 
 			//Don't use param indexing for outs, as this proxy could be linked
@@ -1920,7 +1920,6 @@ Out.kr(\\out.ir(0), out);
 			});
 
 			//re-instantiate source if not correct, here is where rate conversion and multichannel connectons happen.
-			//SHOULD WE CHECK HERE FOR newlyCreatedInterpProxyNorm.not too??
 			if(((interpolationProxySourceString.beginsWith("\proxyIn").not).or(
 				previousInterpProxyOuts != paramNumberOfChannels).or(
 				previousInterpProxyIns != prevProxyNumberOfChannels).or(
@@ -1929,6 +1928,17 @@ Out.kr(\\out.ir(0), out);
 			{
 				var prevProxyRateString;
 				var paramRateString;
+
+				/*
+				("previousInterpProxyOuts: " ++ previousInterpProxyOuts).postln;
+				("paramNumberOfChannels: " ++ paramNumberOfChannels).postln;
+				("previousInterpProxyIns: " ++ previousInterpProxyIns).postln;
+				("prevProxyNumberOfChannels: " ++ prevProxyNumberOfChannels).postln;
+				("paramNumberOfChannels: " ++ paramNumberOfChannels).postln;
+				("prevProxyNumberOfChannels: " ++ prevProxyNumberOfChannels).postln;
+				("paramRate: " ++ paramRate).postln;
+				("prevProxyRate: " ++ prevProxyRate).postln;
+				*/
 
 				if(paramRate == \audio, {
 					paramRateString = "ar";
