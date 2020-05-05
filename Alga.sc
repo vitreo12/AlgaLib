@@ -2098,7 +2098,7 @@ Out.kr(\\out.ir(0), out);
 	//Combines before with <<>
 	=> {
 		arg nextProxy, param = \in;
-		this.connectionInner(nextProxy, param);
+		this.forwardConnectionInner(nextProxy, param);
 	}
 
 	backwardConnectionInner {
