@@ -34,7 +34,7 @@ PAlgakr : Pfunc {
 
 		bus_sync = Pfunc({bus.getSynchronous()}).asStream;
 
-		^Pif(bus_sync <= limi, limit, bus_sync);
+		^Pif(bus_sync <= limit, limit, bus_sync);
 	}
 }
 
