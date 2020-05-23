@@ -21,28 +21,20 @@ X) When using clear / free, interpolationProxies should not fade
 //From https://github.com/cappelnord/BenoitLib/blob/master/patterns/Pkr.sc
 PAlgakr : Pfunc {
 	*new {
-		arg bus;
+		arg bus, limit = 0.0;
 
-		var check;
-		var last = 0.0;
-
+		var bus_sync;
 		bus = bus.asBus;
 
 		// audio?
 		bus.isSettable.not.if {
 			"Not a kr Bus or NodeProxy. This will only yield 0".warn;
-			^Pfunc({0});
+			^Pfunc({0}).asStream;
 		};
 
-		check = {bus.server.hasShmInterface}.try;
+		bus_sync = Pfunc({bus.getSynchronous()}).asStream;
 
-		check.if ({
-			^Pfunc({bus.getSynchronous()});
-		}, {
-			"No shared memory interface detected. Use localhost server on SC 3.5 or higher to get better performance".warn;
-			bus.get({|v| last = v;});
-			^Pfunc({bus.get({|v| last = v;}); last;});
-		});
+		^Pif(bus_sync <= limi, limit, bus_sync);
 	}
 }
 
