@@ -22,42 +22,53 @@ AlgaLib {
 
 	*boot {
 		arg server = Server.local, algaServerOptions = AlgaServerOptions();
-		server.sampleRate = algaServerOptions.sampleRate;
-		server.bufSize = algaServerOptions.bufSize;
-		server.memSize = algaServerOptions.memSize;
-		server.numBuffers = algaServerOptions.numBuffers;
-		server.numAudioBusChannels = algaServerOptions.numAudioBusChannels;
-		server.numControlBusChannels = algaServerOptions.numControlBusChannels;
-		server.maxSynthDefs = algaServerOptions.maxSynthDefs;
-		server.numWireBufs = algaServerOptions.numWireBufs;
-		server.numInputBusChannels = algaServerOptions.numInputBusChannels;
-		server.numOutputBusChannels = algaServerOptions.numOutputBusChannels;
-		if(algaServerOptions.numOutputBusChannels, {Server.supernova}, {Server.scsynth});
-		server.threads = algaServerOptions.threads;
+		var algaProxySpace;
+
+		server.options.sampleRate = algaServerOptions.sampleRate;
+		server.options.blockSize = algaServerOptions.blockSize;
+		server.options.memSize = algaServerOptions.memSize;
+		server.options.numBuffers = algaServerOptions.numBuffers;
+		server.options.numAudioBusChannels = algaServerOptions.numAudioBusChannels;
+		server.options.numControlBusChannels = algaServerOptions.numControlBusChannels;
+		server.options.maxSynthDefs = algaServerOptions.maxSynthDefs;
+		server.options.numWireBufs = algaServerOptions.numWireBufs;
+		server.options.numInputBusChannels = algaServerOptions.numInputBusChannels;
+		server.options.numOutputBusChannels = algaServerOptions.numOutputBusChannels;
+		if(algaServerOptions.supernova, {Server.supernova}, {Server.scsynth});
+		server.options.threads = algaServerOptions.threads;
 		server.latency = algaServerOptions.latency;
 
 		server.quit;
 
+		//Add to SynthDescLib in order for .add to work... Find a leaner solution.
+		SynthDescLib.global.addServer(server);
+
 		server.waitForBoot({
 			AlgaStartup.initSynthDefs(server);
-			AlgaProxySpace.new.push;
 		});
+
+		algaProxySpace = AlgaProxySpace.new.push(server);
+		algaProxySpace.makeMasterClock;
+
+		^algaProxySpace;
 	}
 
 }
 
 AlgaServerOptions {
-	var <sampleRate, <bufSize, <memSize, <numBuffers, <numAudioBusChannels, <numControlBusChannels, <maxSynthDefs, <numWireBufs, <numInputBusChannels, <numOutputBusChannels, <supernova, <threads, <latency;
+	var <>sampleRate, <>blockSize, <>memSize, <>numBuffers, <>numAudioBusChannels, <>numControlBusChannels, <>maxSynthDefs, <>numWireBufs, <>numInputBusChannels, <>numOutputBusChannels, <>supernova, <>threads, <>latency;
 
 	*new {
-		arg sampleRate=48000, bufSize=256, memSize=8192*256, numBuffers=1024*8, numAudioBusChannels=1024*8, numControlBusChannels=1024*8,  maxSynthDefs=16384, numWireBufs=1024, numInputBusChannels=2, numOutputBusChannels=2, supernova=false, threads=12, latency=0.1;
+		arg sampleRate=48000, blockSize=256, memSize=8192*256, numBuffers=1024*8, numAudioBusChannels=1024*8, numControlBusChannels=1024*8,  maxSynthDefs=16384, numWireBufs=1024, numInputBusChannels=2, numOutputBusChannels=2, supernova=false, threads=12, latency=0.1;
 
-		^super.new.init(sampleRate, bufSize, memSize, numBuffers, numAudioBusChannels, numControlBusChannels,  maxSynthDefs, numWireBufs, numInputBusChannels, numOutputBusChannels, supernova, threads, latency);
+		^super.new.init(sampleRate, blockSize, memSize, numBuffers, numAudioBusChannels, numControlBusChannels,  maxSynthDefs, numWireBufs, numInputBusChannels, numOutputBusChannels, supernova, threads, latency);
 	}
 
 	init {
+		arg sampleRate=48000, blockSize=256, memSize=8192*256, numBuffers=1024*8, numAudioBusChannels=1024*8, numControlBusChannels=1024*8,  maxSynthDefs=16384, numWireBufs=1024, numInputBusChannels=2, numOutputBusChannels=2, supernova=false, threads=12, latency=0.1;
+
 		this.sampleRate = sampleRate;
-		this.bufSize = bufSize;
+		this.blockSize = blockSize;
 		this.memSize = memSize;
 		this.numBuffers = numBuffers;
 		this.numAudioBusChannels = numAudioBusChannels;

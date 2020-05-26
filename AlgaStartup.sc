@@ -57,7 +57,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//kr -> kr
 							result_kr_kr = "
@@ -72,7 +72,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//ar -> kr
 							result_ar_kr = "
@@ -87,7 +87,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//kr -> ar
 							result_kr_ar = "
@@ -102,7 +102,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 						}, {
 							//ar -> ar
@@ -118,7 +118,7 @@ outs[i] = out[i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//kr -> kr
 							result_kr_kr = "
@@ -133,7 +133,7 @@ outs[i] = out[i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//ar -> kr
 							result_ar_kr = "
@@ -148,7 +148,7 @@ outs[i] = out[i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//kr -> ar
 							result_kr_ar = "
@@ -163,7 +163,7 @@ outs[i] = out[i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 						});
 
@@ -186,7 +186,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//kr -> kr
 							result_kr_kr = "
@@ -201,7 +201,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//ar -> kr
 							result_ar_kr = "
@@ -216,7 +216,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//kr -> ar
 							result_kr_ar = "
@@ -231,7 +231,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 						}, {
 
@@ -249,7 +249,7 @@ outs[i] = out[mod_i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//kr -> kr
 							result_kr_kr = "
@@ -265,7 +265,7 @@ outs[i] = out[mod_i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//ar -> kr
 							result_ar_kr = "
@@ -281,7 +281,7 @@ outs[i] = out[mod_i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 							//kr -> ar
 							result_kr_ar = "
@@ -297,7 +297,7 @@ outs[i] = out[mod_i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).send(server);";
+}, makeFadeEnv:false).add;";
 
 						});
 
@@ -338,7 +338,7 @@ var val = args[0];
 var env = args[1];
 var out = val / env;
 Out.ar(\\out.ir(0), out);
-}).send(server);";
+}).add;";
 
 				result_kr = "SynthDef(\\interpProxyNorm_kr1, {
 var args = \\args.kr([0, 0]);
@@ -346,7 +346,7 @@ var val = args[0];
 var env = args[1];
 var out = val / env;
 Out.kr(\\out.ir(0), out);
-}).send(server);";
+}).add;";
 
 			}, {
 
@@ -364,7 +364,7 @@ var val = args[0.." ++ (counter - 1).asString ++ "];
 var env = args[" ++ counter.asString ++ "];
 var out = val / env;
 Out.ar(\\out.ir(0), out);
-}).send(server);";
+}).add;";
 
 				result_kr = "SynthDef(\\interpProxyNorm_kr" ++ counter.asString ++ ", {
 var args = \\args.kr( " ++ arrayOfZeros ++ ");
@@ -372,7 +372,7 @@ var val = args[0.." ++ (counter - 1).asString ++ "];
 var env = args[" ++ counter.asString ++ "];
 var out = val / env;
 Out.kr(\\out.ir(0), out);
-}).send(server);";
+}).add;";
 
 			});
 
