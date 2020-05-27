@@ -202,6 +202,12 @@ AlgaNodeProxy : NodeProxy {
 
 	}
 
+	//This should be used to shush, NOT free ...
+	stop { | fadeTime = 0, reset = false |
+		if(fadeTime == 0, {fadeTime = this.fadeTime});
+		super.stop(fadeTime, reset);
+	}
+
 	fadeTime_ { | dur |
 		if(dur.isNil) { this.unset(\fadeTime) } { this.set(\fadeTime, dur) };
 
@@ -499,12 +505,16 @@ AlgaNodeProxy : NodeProxy {
 	}
 
 	//These are straight up copied from BusPlug. Overwriting to retain group ordering stuff
-	play { | out, numChannels, group, multi=false, vol, fadeTime, addAction |
+	play { | out, numChannels, group, multi=false, vol, fadeTime = 0, addAction |
 		var bundle = MixedBundle.new;
+
+		if(fadeTime == 0, {fadeTime = this.fadeTime});
+
 		if(this.homeServer.serverRunning.not) {
 			("server not running:" + this.homeServer).warn;
 			^this
 		};
+
 		if(bus.rate == \control) { "Can't monitor a control rate bus.".warn; monitor.stop; ^this };
 		group = group ?? {this.homeServer.defaultGroup};
 		this.playToBundle(bundle, out, numChannels, group, multi, vol, fadeTime, addAction);
@@ -517,13 +527,6 @@ AlgaNodeProxy : NodeProxy {
 		AlgaBlocksDict.reorderBlock(this.blockIndex, server);
 
 		////////////////////////////////////////////////////////////////
-
-		/*
-		//Add defaultAddAction
-		if(addAction == nil, {
-			addAction = defaultAddAction;
-		});
-		*/
 
 		this.changed(\play, [out, numChannels, group, multi, vol, fadeTime, addAction]);
 	}
