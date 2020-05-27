@@ -533,6 +533,9 @@ AlgaNodeProxy : NodeProxy {
 
 	playN { | outs, amps, ins, vol, fadeTime, group, addAction |
 		var bundle = MixedBundle.new;
+
+		if(fadeTime == 0, {fadeTime = this.fadeTime});
+
 		if(this.homeServer.serverRunning.not) {
 			("server not running:" + this.homeServer).warn;
 			^this
@@ -549,13 +552,6 @@ AlgaNodeProxy : NodeProxy {
 		AlgaBlocksDict.reorderBlock(this.blockIndex, server);
 
 		////////////////////////////////////////////////////////////////
-
-		/*
-		//Add defaultAddAction
-		if(addAction == nil,
-			addAction = defaultAddAction;
-		});
-		*/
 
 		this.changed(\playN, [outs, amps, ins, vol, fadeTime, group, addAction]);
 	}
@@ -641,7 +637,6 @@ AlgaNodeProxy : NodeProxy {
 			interpolationProxy.isInterpProxy = true;
 			interpolationProxyNormalizer.isInterpProxy = true;
 
-			//Should it not be elastic?
 			interpolationProxy.reshaping = defaultReshaping;
 			interpolationProxyNormalizer.reshaping = defaultReshaping;
 
