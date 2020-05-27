@@ -19,6 +19,7 @@ AlgaNodeProxy : NodeProxy {
 		//These are the interpolated ones!!
 		interpolationProxies = IdentityDictionary.new;
 
+    //These are the one that normalize all the interpolationProxies
 		interpolationProxiesNormalizer = IdentityDictionary.new;
 
 		//These are used for <| (unmap) to restore default values and to get number of channels per parameter
@@ -39,14 +40,17 @@ AlgaNodeProxy : NodeProxy {
 
 	clear { | fadeTime = 0, isInterpolationProxy = false |
 
+		if(fadeTime == 0, {fadeTime = this.fadeTime});
+
 		//copy interpolationProxies in new IdentityDictionary in order to free them only
 		//after everything has been freed already.
 		//Also, remove block from AlgaBlocksDict.blocksDict
 		if(isInterpolationProxy.not, {
 			var blockWithThisProxy;
 
-			interpolationProxies.postln;
+			//interpolationProxies.postln;
 
+      //copy both the interpProxies and the interpNoamlizers
 			interpolationProxiesCopy = interpolationProxies.copy;
 			interpolationProxiesNormalizerCopy = interpolationProxiesNormalizer.copy;
 
@@ -146,6 +150,9 @@ AlgaNodeProxy : NodeProxy {
 	free { | fadeTime = 0, freeGroup = true, isInterpolationProxy = false |
 		var bundle, freetime;
 		var oldGroup = group;
+
+		if(fadeTime == 0, {fadeTime = this.fadeTime});
+
 		if(this.isPlaying) {
 			bundle = MixedBundle.new;
 			if(fadeTime.notNil) {
@@ -1021,6 +1028,19 @@ AlgaNodeProxy : NodeProxy {
 			//sync server (so it's sure that .source got executed before making the connections)
 			server.sync;
 
+			//If param is a number or an array, needs to make sure that the thing passed through
+			//accounts for all the channels of the param:
+			if(isPrevProxyAProxy.not, {
+				if(prevProxy.class == Array, {
+					prevProxy = prevProxy.reshape(paramNumberOfChannels);
+				}, {
+					//Number
+					if(paramNumberOfChannels > 1, {
+						prevProxy = Array.fill(paramNumberOfChannels, prevProxy);
+					});
+				});
+			});
+
 			//REVIEW!
 			//Make connection to the normalizer
 			if(newlyCreatedInterpProxyNorm.not, {
@@ -1048,7 +1068,7 @@ AlgaNodeProxy : NodeProxy {
 			//The connection to prevProxy (if it was like, a number) has already been set anyway.
 			//this just helps removing connectons that are actually not in place anymore
 			if(isPrevProxyAProxy.not, {
-				"Unsetting param".postln;
+				//"Unsetting param".postln;
 				this.unset(param);
 			});
 
