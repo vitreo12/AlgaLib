@@ -1,25 +1,26 @@
-AlgaLib.boot
+/* All possible values for an AlgaNodeProxy: */
 
-~a = {SinOsc.ar(\f.kr([440, 441]))}
-~a.play
-~a.stop
+//Function
+~a = {SinOsc.ar}
 
-~a.ft = 5
-~a.free
+//Symbol (SynthDef)
+~b = \default
 
-~b = {LFNoise0.kr(1).range(300, 1000)}
+//Array
+~c = [440, 441]
 
-~c = {LFNoise1.ar([2, 10]).range(300, 1000)}
+//Pbind instrument: when \instrument is provided (to be patched as audio)
+~d = Pbind(\instrument, \default, \dur, 0.5)
 
-~a <=.f ~b
+//Pbind control: when \instrument is not provided (to be patched as control)
+~e = Pbind(\dur, 0.5)
 
-~a <=.f 440
+//Standard pattern (to be patched in Pbinds (both instrument and control)
+~f = Pseq([0, 1, 2], inf)
 
-~a <=.f ~c
 
-~a.clear
-~a.stop
-~a.play
+/* Connections should work for all, plus Functions and Arrays */
 
-s.vol = -10
-s.quit
+~a <=.freq {SinOsc.ar.range(10, 100)}
+
+~b <=.freq [440, 441]

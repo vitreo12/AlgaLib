@@ -19,7 +19,7 @@ AlgaNodeProxy : NodeProxy {
 		//These are the interpolated ones!!
 		interpolationProxies = IdentityDictionary.new;
 
-    //These are the one that normalize all the interpolationProxies
+		//These are the one that normalize all the interpolationProxies
 		interpolationProxiesNormalizer = IdentityDictionary.new;
 
 		//These are used for <| (unmap) to restore default values and to get number of channels per parameter
@@ -246,7 +246,6 @@ AlgaNodeProxy : NodeProxy {
 		container.build(this, index ? 0); // bus allocation happens here
 
 		server.bind({
-
 			//Need this to retrieve default values and number of channels per parameter
 			if(isInterpProxy == false, {
 
@@ -268,16 +267,17 @@ AlgaNodeProxy : NodeProxy {
 					});
 				});
 
-				//Instantiating a Pattern...
+				//Instantiating a Pattern:
 				if(container.class == PatternControl, {
 					var foundInstrument = false;
 					var synthDesc;
 
 					var foundFreq = false;
 					var foundAmp = false;
+					var foundDur = false;
+					var durVal = 1.0;
 
-					//CHECK IF IT'S A PBIND HERE!
-
+					//Check the arguments provided: \instrument must always be provided
 					obj.patternpairs.do({
 						arg val, index;
 
@@ -307,6 +307,16 @@ AlgaNodeProxy : NodeProxy {
 							foundInstrument = true;
 						});
 
+						if(val == \dur, {
+							//out of bounds, provided \instrument without the synthdef name at the end of array
+							if(index + 1 >= obj.patternpairs.size, {
+								"\dur must be followed number or pattern".error;
+							});
+
+							durVal = obj.patternpairs[index + 1];
+							foundDur = true;
+						});
+
 						if(val == \freq, { foundFreq = true; });
 						if(val == \amp, { foundAmp = true; });
 					});
@@ -317,6 +327,8 @@ AlgaNodeProxy : NodeProxy {
 							arg controlName;
 
 							var controlNameName = controlName.name;
+
+							controlName.postln;
 
 							//Ignore gate, out and fadeTime params
 							if((controlNameName != \gate).and(
@@ -331,7 +343,7 @@ AlgaNodeProxy : NodeProxy {
 									this.set(controlNameName, controlName.defaultValue);
 								});
 
-								//Also, if \amp is not provided in Pbind's param and param == freq, use it as default
+								//Also, if \amp is not provided in Pbind's param and param == amp, use it as default
 								if((foundAmp == false).and(controlNameName == \amp), {
 									this.set(controlNameName, controlName.defaultValue);
 								});
@@ -340,6 +352,17 @@ AlgaNodeProxy : NodeProxy {
 					}, {
 						//Make sure \instrument is ALWAYS provided
 						"Alga Pbinds must always provide an \instrument".error;
+					});
+
+					//Add dur / delta / stretch
+					if(foundDur, {
+						var durControlName = ControlName(\dur, -1, \control, durVal);
+
+						//Add param to dict
+						defaultControlNames.put(\dur, durControlName);
+
+					}, {
+						"Alga Pbinds must always provide a \dur".error;
 					});
 				});
 
@@ -856,18 +879,10 @@ AlgaNodeProxy : NodeProxy {
 			prevProxyClass.superclass == AlgaNodeProxy).or(
 			prevProxyClass.superclass.superclass == AlgaNodeProxy);
 
-		/*
-		var isPrevProxyANumber = false;
-
-		if(isPrevProxyAProxy.not, {
-			isPrevProxyANumber = (prevProxyClass == Number).or(
-				prevProxyClass.superclass == Number).or(
-				prevProxyClass.superclass.superclass == Number);
-		});
-		*/
+		this.interpolationProxies.postln;
 
 		if((interpolationProxyEntry == nil).or(interpolationProxyNormalizerEntry == nil), {
-			("Invalid interpolation proxy").warn;
+			("Invalid interpolation proxy: " ++ param).warn;
 			^this;
 		});
 
