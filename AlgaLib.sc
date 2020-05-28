@@ -19,6 +19,11 @@ X) When using clear / free, interpolationProxies should not fade
 */
 
 AlgaLib {
+	classvar activeProxySpaces;
+
+	*initClass {
+		activeProxySpaces = IdentityDictionary.new;
+	}
 
 	*boot {
 		arg server = Server.local, algaServerOptions = AlgaServerOptions();
@@ -50,9 +55,23 @@ AlgaLib {
 		algaProxySpace = AlgaProxySpace.new.push(server);
 		algaProxySpace.makeMasterClock;
 
+		//Add to global dict
+		activeProxySpaces[algaProxySpace] = algaProxySpace;
+
 		^algaProxySpace;
 	}
 
+	*clear {
+		activeProxySpaces.do({
+			arg algaProxySpace;
+			algaProxySpace.clear;
+		});
+	}
+
+	//Gonna quit all instances
+	*quit {
+
+	}
 }
 
 AlgaServerOptions {
