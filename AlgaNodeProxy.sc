@@ -1,7 +1,19 @@
+//Types of AlgaNodeProxies, used like enum
+AlgaNodeProxyType {}
+AlgaNodeProxySynth : AlgaNodeProxyType {}
+AlgaNodeProxyScalar : AlgaNodeProxyType {}
+AlgaNodeProxyArray : AlgaNodeProxyType {}
+AlgaNodeProxyPatternInstrument : AlgaNodeProxyType {}
+AlgaNodeProxyPatternControl : AlgaNodeProxyType {}
+AlgaNodeProxyPatternStream : AlgaNodeProxyType {}
+
 AlgaNodeProxy : NodeProxy {
 
 	classvar <>defaultAddAction = \addToTail;
 	classvar <>defaultReshaping = \elastic;   //Use \elasitc as default. It's set in NodeProxy's init (super.init)
+
+	//Which AlgaNodeProxyType
+	var <>type;
 
 	//The block index that contains this proxy
 	var <>blockIndex = -1;
@@ -249,8 +261,21 @@ AlgaNodeProxy : NodeProxy {
 			//Need this to retrieve default values and number of channels per parameter
 			if(isInterpProxy == false, {
 
+				//Instantiating a number OR array
+				if((container.class == StreamControl), {
+					if(container.source.size == 0, {
+						this.type = AlgaNodeProxyScalar;
+					}, {
+						this.type = AlgaNodeProxyArray;
+					});
+				});
+
 				//Instantiating a Synth or SynthDef:
 				if((container.class == SynthControl).or(container.class == SynthDefControl), {
+
+					//Synth or SynthDef -> AlgaNodeProxySynth
+					this.type = AlgaNodeProxySynth;
+
 					container.controlNames.do({
 						arg controlName;
 
@@ -269,109 +294,118 @@ AlgaNodeProxy : NodeProxy {
 
 				//Instantiating a Pattern:
 				if(container.class == PatternControl, {
-					var foundInstrument = false;
 					var synthDesc;
-
+					var foundInstrument = false;
 					var foundFreq = false;
 					var foundAmp = false;
 					var foundDur = false;
 					var durVal = 1.0;
 
-					//Check the arguments provided: \instrument must always be provided
-					obj.patternpairs.do({
-						arg val, index;
+					var patternType = container.source.class;
 
-						//found instrument entry
-						if(val == \instrument, {
-							var synthDefName;
+					if((patternType == Pbind).or(patternType == PbindProxy), {
 
-							//out of bounds, provided \instrument without the synthdef name at the end of array
-							if(index + 1 >= obj.patternpairs.size, {
-								"\instrument must be followed by a SynthDef name".error;
-							});
+						//Check the arguments provided: \instrument must always be provided
+						obj.patternpairs.do({
+							arg val, index;
 
-							//the one that follows \instrument
-							synthDefName = obj.patternpairs[index + 1];
+							//found instrument entry
+							if(val == \instrument, {
+								var synthDefName;
 
-							if(synthDefName.class != Symbol, {
-								"\instrument must be followed by a SynthDef name".error;
-							});
-
-							//Look for the synthDesc in the global library. From there, parameters can be extracted
-							synthDesc = SynthDescLib.global.at(synthDefName);
-
-							if(synthDesc == nil, {
-								"invalid SynthDef for \instrument".error;
-							});
-
-							foundInstrument = true;
-						});
-
-						if(val == \dur, {
-							//out of bounds, provided \instrument without the synthdef name at the end of array
-							if(index + 1 >= obj.patternpairs.size, {
-								"\dur must be followed number or pattern".error;
-							});
-
-							durVal = obj.patternpairs[index + 1];
-							foundDur = true;
-						});
-
-						if(val == \freq, { foundFreq = true; });
-						if(val == \amp, { foundAmp = true; });
-					});
-
-					if(foundInstrument, {
-						//Retrieve parameters from the SynthDesc
-						synthDesc.controls.do({
-							arg controlName;
-
-							var controlNameName = controlName.name;
-
-							controlName.postln;
-
-							//Ignore gate, out and fadeTime params
-							if((controlNameName != \gate).and(
-								controlNameName != \out).and(
-								controlNameName != \fadeTime), {
-
-								//Add param to dict
-								defaultControlNames.put(controlNameName, controlName);
-
-								//Also, if \freq is not provided in Pbind's param and param == freq, use it as default
-								if((foundFreq == false).and(controlNameName == \freq), {
-									this.set(controlNameName, controlName.defaultValue);
+								//out of bounds, provided \instrument without the synthdef name at the end of array
+								if(index + 1 >= obj.patternpairs.size, {
+									"\instrument must be followed by a SynthDef name".error;
 								});
 
-								//Also, if \amp is not provided in Pbind's param and param == amp, use it as default
-								if((foundAmp == false).and(controlNameName == \amp), {
-									this.set(controlNameName, controlName.defaultValue);
+								//the one that follows \instrument
+								synthDefName = obj.patternpairs[index + 1];
+
+								if(synthDefName.class != Symbol, {
+									"\instrument must be followed by a SynthDef name".error;
+								});
+
+								//Look for the synthDesc in the global library. From there, parameters can be extracted
+								synthDesc = SynthDescLib.global.at(synthDefName);
+
+								if(synthDesc == nil, {
+									"invalid SynthDef for \instrument".error;
+								});
+
+								foundInstrument = true;
+							});
+
+							if(val == \dur, {
+								//out of bounds, provided \instrument without the synthdef name at the end of array
+								if(index + 1 >= obj.patternpairs.size, {
+									"\dur must be followed number or pattern".error;
+								});
+
+								durVal = obj.patternpairs[index + 1];
+								foundDur = true;
+							});
+
+							if(val == \freq, { foundFreq = true; });
+							if(val == \amp, { foundAmp = true; });
+						});
+
+						if(foundInstrument, {
+							this.type = AlgaNodeProxyPatternInstrument;
+
+							//Retrieve parameters from the SynthDesc
+							synthDesc.controls.do({
+								arg controlName;
+
+								var controlNameName = controlName.name;
+
+								//Ignore gate, out and fadeTime params
+								if((controlNameName != \gate).and(
+									controlNameName != \out).and(
+									controlNameName != \fadeTime), {
+
+									//Add param to dict
+									defaultControlNames.put(controlNameName, controlName);
+
+									//Also, if \freq is not provided in Pbind's param and param == freq, use it as default
+									if((foundFreq == false).and(controlNameName == \freq), {
+										this.set(controlNameName, controlName.defaultValue);
+									});
+
+									//Also, if \amp is not provided in Pbind's param and param == amp, use it as default
+									if((foundAmp == false).and(controlNameName == \amp), {
+										this.set(controlNameName, controlName.defaultValue);
+									});
 								});
 							});
+						}, {
+							//no \instrument provided: it's a pbind that will be used to control
+							//parameters  (it would need to implement a \val one though)
+							this.type = AlgaNodeProxyPatternControl;
+						});
+
+						//Add dur / delta / stretch
+						if(foundDur, {
+							var durControlName = ControlName(\dur, -1, \control, durVal);
+
+							//Add param to dict
+							defaultControlNames.put(\dur, durControlName);
+
+						}, {
+							"Alga Pbinds must always provide a \dur".error;
 						});
 					}, {
-						//Make sure \instrument is ALWAYS provided
-						"Alga Pbinds must always provide an \instrument".error;
-					});
 
-					//Add dur / delta / stretch
-					if(foundDur, {
-						var durControlName = ControlName(\dur, -1, \control, durVal);
+						//All other pattern types!
+						this.type = AlgaNodeProxyPatternStream;
 
-						//Add param to dict
-						defaultControlNames.put(\dur, durControlName);
-
-					}, {
-						"Alga Pbinds must always provide a \dur".error;
 					});
 				});
-
-				//defaultControlNames.postln;
 
 				//create all interp proxies
 				this.createAllInterpProxies;
 			});
 
+			//Standard Proxy init from here on
 
 			if(this.shouldAddObject(container, index)) {
 				// server sync happens here if necessary

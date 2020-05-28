@@ -6,8 +6,8 @@
 //Symbol (SynthDef) WORKS
 ~b = \default
 
-//Array
-~c = [440, 441]
+//Array / Number
+~c = [440, 441]; ~c = 440
 
 //Pbind instrument: when \instrument is provided (to be patched as audio)     WIP
 ~d = Pbind(\instrument, \default, \dur, 0.5)
