@@ -25,6 +25,10 @@ AlgaProxySpace : ProxySpace {
 		//Change reshaping to be elastic by default
 		proxy.reshaping = \elastic;
 
+		//default ft / ct
+		proxy.ft = 0;
+		proxy.ct = 0;
+
 		^proxy
 	}
 

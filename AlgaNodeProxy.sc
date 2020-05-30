@@ -510,7 +510,7 @@ AlgaNodeProxy : NodeProxy {
 					if(inProxy == this, {
 						//("Restoring connection of " ++ outProxy.asString ++ " with " ++ this.asString).postln;
 						//outProxy.synth_setInterpProxy(this, paramName, reorderBlock:false);
-						this.forwardConnectionInner(outProxy, paramName, useInputFadeTime:true);
+						this.forwardConnectionInner(outProxy, paramName);
 						break.(nil);
 					});
 				});
@@ -889,7 +889,7 @@ AlgaNodeProxy : NodeProxy {
 	}
 
 	forwardConnectionInner {
-		arg nextProxy, param = \in, newlyCreatedInterpProxyNorm = false, useInputFadeTime = false;
+		arg nextProxy, param = \in, newlyCreatedInterpProxyNorm = false;
 
 		var isNextProxyAProxy, isThisProxyAnOp, isThisProxyAFunc, isThisProxyAnArray;
 
@@ -960,9 +960,7 @@ AlgaNodeProxy : NodeProxy {
 				//Create a new block if needed
 				this.createNewBlockIfNeeded(nextProxy);
 				nextProxy.synth_setInterpProxy(this, param,
-					newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm,
-					useInputFadeTime:useInputFadeTime
-				);
+					newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm);
 			});
 
 		});
