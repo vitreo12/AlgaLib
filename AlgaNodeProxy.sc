@@ -20,6 +20,8 @@ AlgaNodeProxy : NodeProxy {
 
 	var <>isInterpProxy = false;
 
+	var <>instantiated = false;
+
 	var <>defaultControlNames;
 
 	var <>inProxies, <>outProxies;
@@ -214,6 +216,24 @@ AlgaNodeProxy : NodeProxy {
 
 	}
 
+	queryInstantiation {
+		var oscfunc = OSCFunc({
+			arg msg;
+			var numChildren = msg[3];
+			if(numChildren > 0, {
+				this.instantiated = true;
+			});
+		}, '/g_queryTree.reply', server.addr).oneShot;
+
+		server.sendMsg("/g_queryTree", this.group.nodeID);
+
+		SystemClock.sched(2, {
+			if(this.instantiated.not, {
+				oscfunc.free;
+			})
+		})
+	}
+
 	//This should be used to shush, NOT free ...
 	stop { | fadeTime = 0, reset = false |
 		if(fadeTime == 0, {fadeTime = this.fadeTime});
@@ -246,6 +266,17 @@ AlgaNodeProxy : NodeProxy {
 	//Copied over from NodeProxy with added defaultControlNames
 	putExtended { | index, obj, channelOffset = 0, extraArgs, now = true |
 		var container, bundle, oldBus = bus;
+
+		//Don't re-instantiate same function... Should also to the same for all the other cases!
+		if((this.source.class == Function).and(obj.source.class == Function), {
+			var thisFunDef = this.source.def;
+			var objFunDef = obj.source.def;
+			if(thisFunDef.code == objFunDef.code, {^this});
+		});
+
+
+		//Reset instantiation stage
+		this.instantiated = false;
 
 		if(obj.isNil) { this.removeAt(index); ^this };
 		if(index.isSequenceableCollection) {
@@ -698,6 +729,7 @@ AlgaNodeProxy : NodeProxy {
 			interpolationProxy.outProxies.put(paramName, this);
 
 			//This routine stuff needs to be tested on Linux...
+			//if(true, {
 			Routine.run({
 				var interpolationProxySymbol = ("proxyIn_" ++
 					paramRateString ++ paramNumberOfChannels ++
@@ -872,14 +904,26 @@ AlgaNodeProxy : NodeProxy {
 		});
 		*/
 
+		Routine.run({
 
-		//AlgaNodeProxySynth -> AlgaNodeProxySynth OR
-		//AlgaNodeProxyScalar/Array -> AlgaNodeProxySynth
-		if(((nextProxy.type == AlgaNodeProxySynth).and(this.type == AlgaNodeProxySynth)).or(
-			(nextProxy.type == AlgaNodeProxySynth).and((this.type == AlgaNodeProxyScalar).or(this.type == AlgaNodeProxyArray))), {
-			//Create a new block if needed
-			this.createNewBlockIfNeeded(nextProxy);
-			nextProxy.synth_setInterpProxy(this, param, newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm);
+			//Spinlock for instantiation of both proxies
+			while(
+				{(this.instantiated.not).or(nextProxy.instantiated.not)}, {
+					0.01.wait;
+					"Waiting for both proxies' instantiation".warn;
+					this.queryInstantiation;
+					nextProxy.queryInstantiation;
+			});
+
+			//AlgaNodeProxySynth -> AlgaNodeProxySynth OR
+			//AlgaNodeProxyScalar/Array -> AlgaNodeProxySynth
+			if(((nextProxy.type == AlgaNodeProxySynth).and(this.type == AlgaNodeProxySynth)).or(
+				(nextProxy.type == AlgaNodeProxySynth).and((this.type == AlgaNodeProxyScalar).or(this.type == AlgaNodeProxyArray))), {
+				//Create a new block if needed
+				this.createNewBlockIfNeeded(nextProxy);
+				nextProxy.synth_setInterpProxy(this, param, newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm);
+			});
+
 		});
 
 		//return nextProxy for further chaining

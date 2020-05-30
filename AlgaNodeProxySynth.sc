@@ -140,10 +140,6 @@
 			prevProxyNumberOfChannels = prevProxy.numChannels;
 			prevProxyRate = prevProxy.rate;
 
-			//("prev proxy channels : " ++ prevProxy.numChannels).postln;
-			//("prev proxy rate : " ++ prevProxyRate).postln;
-			//("this proxy's " ++ param ++ " channels : " ++ paramNumberOfChannels).postln;
-			//("this proxy's " ++ param ++ " rate : " ++ paramRate).postln
 		}, {
 			//If not a proxy (but, like, a number), use same number of channels and rate
 			prevProxyNumberOfChannels = paramNumberOfChannels;
@@ -242,6 +238,14 @@
 				//it there!
 				interpolationProxyEntry.source = interpolationProxySymbol;
 
+				//Wait for instantiation of interpProxy
+				while(
+					{(interpolationProxyEntry.instantiated.not)}, {
+						0.01.wait;
+						"Waiting for interp proxy instantiation".warn;
+						interpolationProxyEntry.queryInstantiation;
+				});
+
 				//interpolationProxyNormalizerEntry.source = interpolationProxyNormalizesSymbol;
 			});
 
@@ -292,7 +296,6 @@
 				//interpolation between the two is needed to switch states.
 				this.xset(param, interpolationProxyNormalizerEntry);
 			});
-
 
 			//If prevProxy is not a NodeProxy, also run the unset command.
 			//The connection to prevProxy (if it was like, a number) has already been set anyway.

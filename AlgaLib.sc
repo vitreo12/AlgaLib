@@ -53,7 +53,7 @@ AlgaLib {
 		});
 
 		algaProxySpace = AlgaProxySpace.new.push(server);
-		algaProxySpace.makeMasterClock;
+		//algaProxySpace.makeMasterClock;
 
 		//Add to global dict
 		activeProxySpaces[algaProxySpace] = algaProxySpace;
