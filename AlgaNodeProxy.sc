@@ -22,6 +22,8 @@ AlgaNodeProxy : NodeProxy {
 
 	var <>instantiated = false;
 
+	var <>connectionTime_inner = 0;
+
 	var <>defaultControlNames;
 
 	var <>inProxies, <>outProxies;
@@ -259,6 +261,32 @@ AlgaNodeProxy : NodeProxy {
 		^this.fadeTime
 	}
 
+	setConnectionTime { |dur|
+		if(dur.isNil) { this.set(\connectionTime, 0) } { this.set(\connectionTime, dur) };
+		this.connectionTime_inner = dur;
+		interpolationProxies.do({
+			arg proxy;
+			proxy.setConnectionTime(dur);
+			proxy.fadeTime = dur;
+		});
+	}
+
+	ct_ { | dur |
+		this.setConnectionTime(dur);
+	}
+
+	ct {
+		^this.connectionTime_inner;
+	}
+
+	connectionTime_ { | dur |
+		this.setConnectionTime(dur);
+	}
+
+	connectionTime {
+		^this.connectionTime_inner;
+	}
+
 	params {
 		^this.interpolationProxies;
 	}
@@ -271,7 +299,7 @@ AlgaNodeProxy : NodeProxy {
 		if((this.source.class == Function).and(obj.source.class == Function), {
 			var thisFunDef = this.source.def;
 			var objFunDef = obj.source.def;
-			if(thisFunDef.code == objFunDef.code, {^this});
+			if(thisFunDef.sourceCode == objFunDef.sourceCode, {^this});
 		});
 
 
@@ -453,7 +481,7 @@ AlgaNodeProxy : NodeProxy {
 			if(isInterpProxy == false, {
 
 				//Then, reinstantiate connections that were in place, adapting ins/outs and rates.
-				//this.recoverConnections;
+				this.recoverConnections;
 
 				////////////////////////////////////////////////////////////////
 
@@ -480,8 +508,9 @@ AlgaNodeProxy : NodeProxy {
 
 					//found it! remake connection
 					if(inProxy == this, {
-						("Restoring connection of " ++ outProxy.asString ++ " with " ++ this.asString).postln;
-						outProxy.synth_setInterpProxy(this, paramName, reorderBlock:false);
+						//("Restoring connection of " ++ outProxy.asString ++ " with " ++ this.asString).postln;
+						//outProxy.synth_setInterpProxy(this, paramName, reorderBlock:false);
+						this.forwardConnectionInner(outProxy, paramName, useInputFadeTime:true);
 						break.(nil);
 					});
 				});
@@ -716,10 +745,11 @@ AlgaNodeProxy : NodeProxy {
 			interpolationProxy.reshaping = defaultReshaping;
 			interpolationProxyNormalizer.reshaping = defaultReshaping;
 
-			//Default fadeTime: use nextProxy's (the modulated one) fadeTime
-			//interpolationProxy.fadeTime = 0;
-			interpolationProxy.fadeTime = this.fadeTime;
+			//Default fadeTime: set according to connectionTime
+			interpolationProxy.fadeTime = this.connectionTime;
+			interpolationProxy.setConnectionTime(this.connectionTime);
 			interpolationProxyNormalizer.fadeTime = 0;
+			interpolationProxyNormalizer.setConnectionTime(0);
 
 			//Add the new interpolation NodeProxy to interpolationProxies dict
 			this.interpolationProxies.put(paramName, interpolationProxy);
@@ -772,6 +802,14 @@ AlgaNodeProxy : NodeProxy {
 				//interpolationProxyNormalizer.set(\args, interpolationProxy);
 
 				if(onCreation != nil, {
+
+					//Wait for instantiation of interpProxy
+					while(
+						{(interpolationProxy.instantiated.not)}, {
+							0.01.wait;
+							"Waiting for interp proxy instantiation".warn;
+							interpolationProxy.queryInstantiation;
+					});
 
 					server.sync;
 
@@ -851,7 +889,7 @@ AlgaNodeProxy : NodeProxy {
 	}
 
 	forwardConnectionInner {
-		arg nextProxy, param = \in, newlyCreatedInterpProxyNorm = false;
+		arg nextProxy, param = \in, newlyCreatedInterpProxyNorm = false, useInputFadeTime = false;
 
 		var isNextProxyAProxy, isThisProxyAnOp, isThisProxyAFunc, isThisProxyAnArray;
 
@@ -921,7 +959,10 @@ AlgaNodeProxy : NodeProxy {
 				(nextProxy.type == AlgaNodeProxySynth).and((this.type == AlgaNodeProxyScalar).or(this.type == AlgaNodeProxyArray))), {
 				//Create a new block if needed
 				this.createNewBlockIfNeeded(nextProxy);
-				nextProxy.synth_setInterpProxy(this, param, newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm);
+				nextProxy.synth_setInterpProxy(this, param,
+					newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm,
+					useInputFadeTime:useInputFadeTime
+				);
 			});
 
 		});
