@@ -291,10 +291,9 @@ AlgaProxyInterpSynthDef : SynthDef {
 }
 */
 
-
 + ProxySynthDef {
 
-	*new { | name, func, rates, prependArgs, makeFadeEnv = true, channelOffset = 0,
+	*new { | name, func, rates, prependArgs, makeFadeEnv = false, channelOffset = 0,
 		chanConstraint, rateConstraint |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var hasGateArg=false, hasOutArg=false;
@@ -419,6 +418,8 @@ AlgaProxyInterpSynthDef : SynthDef {
 			})
 		});
 
+		//def.func.def.argNames.postln;
+
 		UGen.buildSynthDef = outerBuildSynthDef;
 
 		// set the synthDefs instvars, so they can be used later
@@ -428,8 +429,30 @@ AlgaProxyInterpSynthDef : SynthDef {
 		def.canReleaseSynth = makeFadeEnv || hasOwnGate;
 		def.canFreeSynth = def.canReleaseSynth || canFree;
 		//[\defcanReleaseSynth, def.canReleaseSynth, \defcanFreeSynth, def.canFreeSynth].debug;
+
 		^def
 	}
-
-
 }
+
+/*
++ Object {
+	buildForProxy { | proxy, channelOffset = 0 |
+		var channelConstraint, rateConstraint;
+		var argNames = this.argNames;
+		if(proxy.fixedBus) {
+			channelConstraint = proxy.numChannels;
+			rateConstraint = proxy.rate;
+		};
+		^ProxySynthDef(
+			SystemSynthDefs.tempNamePrefix ++ proxy.generateUniqueName ++ UniqueID.next,
+			this.prepareForProxySynthDef(proxy, channelOffset),
+			proxy.nodeMap.ratesFor(argNames),
+			nil,
+			true,
+			channelOffset,
+			channelConstraint,
+			rateConstraint
+		);
+	}
+}
+*/

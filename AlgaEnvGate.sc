@@ -29,6 +29,7 @@ AlgaEnvGate {
 			Env.new([ i_level, 1.0, 0.0], #[1.0, 1.0], curve, 1),
 			synthGate, 1.0, 0.0, synthFadeTime, doneAction
 		)
+		//^DC.ar(1.0);
 	}
 
 	*kr {
@@ -40,6 +41,7 @@ AlgaEnvGate {
 			Env.new([ i_level, 1.0, 0.0], #[1.0, 1.0], curve, 1),
 			synthGate, 1.0, 0.0, synthFadeTime, doneAction
 		)
+		//^DC.kr(1.0);
 	}
 
 }
