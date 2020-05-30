@@ -2,6 +2,7 @@ AlgaNode {
 	var <>fadeTime = 0;
 	var <>synth;
 	var <>group, <>synthGroup, <>normGroup, <>interpGroup;
+	var <>toBeFreed=false;
 
 	*new { | obj, fadeTime = 0|
 		^super.new.init(obj, fadeTime)
@@ -18,21 +19,36 @@ AlgaNode {
 	}
 
 	createAllGroups {
-		//This order is to add everything to head
-		this.group = Group.new;
-		this.synthGroup = Group(group); //could be ParGroup here for supernova + patterns...
-		this.normGroup = Group(group);
-		this.interpGroup = Group(group);
+		if(this.group == nil, {
+			this.group = Group.new;
+			this.synthGroup = Group(group); //could be ParGroup here for supernova + patterns...
+			this.normGroup = Group(group);
+			this.interpGroup = Group(group);
+		});
 	}
 
+	//Groups (and state) will be reset only if they are nil AND they are set to be freed.
+	//the toBeFreed variable can be changed in real time, if AlgaNode.replace is called while
+	//clearing is happening!
 	freeAllGroups {
-		//Just delete top group (it will delete all chilren too)
-		this.group.free;
+		if((this.group != nil).and(this.toBeFreed), {
+			//Just delete top group (it will delete all chilren too)
+			this.group.free;
+
+			//Reset values. Don't reset fadeTime, as it can still be used!
+			this.group = nil;
+			this.synthGroup = nil;
+			this.normGroup = nil;
+			this.interpGroup = nil;
+		});
 	}
 
 	replace { | obj |
 		//Free previous one
 		this.freeSynth;
+
+		//In case it has been set to true when clearing, then replacing before clear ends!
+		this.toBeFreed = false;
 
 		//New one
 		this.dispatchNode(obj);
@@ -60,12 +76,17 @@ AlgaNode {
 			//Send fadeTime too again in case it has been changed by user
 			//fade time will eventually be put just to the interp proxies!
 			this.synth.set(\gate, 0, \fadeTime, this.fadeTime);
+
+			//Set to nil
+			this.synth = nil;
 		});
 	}
 
 	clear {
 		fork {
 			this.freeSynth;
+
+			this.toBeFreed = true;
 
 			this.fadeTime.wait;
 
