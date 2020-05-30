@@ -392,6 +392,7 @@ AlgaProxyInterpSynthDef : SynthDef {
 					}
 
 			});
+
 			//output = output * envgen;
 
 			//"passed in rate: % output rate: %\n".postf(rateConstraint, rate);

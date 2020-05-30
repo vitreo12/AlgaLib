@@ -70,7 +70,7 @@
 	}
 
 	synth_setInterpProxy {
-		arg prevProxy, param = \in, src = nil, reorderBlock = true, newlyCreatedInterpProxyNorm = false;
+		arg prevProxy, param = \in, src = nil, reorderBlock = true, newlyCreatedInterpProxyNorm = false, restoreConnection = false;
 
 		//Check if there already was an interpProxy for the parameter
 		var interpolationProxyEntry = this.interpolationProxies[param];
@@ -222,6 +222,7 @@
 					});
 				});
 
+
 				interpolationProxySymbol = ("proxyIn_" ++ prevProxyRateString ++ prevProxyNumberOfChannels
 					++ "_" ++ paramRateString ++ paramNumberOfChannels).asSymbol;
 
@@ -236,7 +237,9 @@
 				//Should .source be modified like this OR should a new interpolationProxy be created
 				//on a new group and freeing this one after fadeTime? This is done in createInterpProxy, check
 				//it there!
-				interpolationProxyEntry.source = interpolationProxySymbol;
+				if(interpolationProxySourceString.asSymbol != interpolationProxySymbol, {
+					interpolationProxyEntry.source = interpolationProxySymbol;
+				});
 
 				//Wait for instantiation of interpProxy
 				while(
@@ -275,36 +278,47 @@
 				});
 			});
 
-			//REVIEW!
-			//Make connection to the normalizer
-			if(newlyCreatedInterpProxyNorm.not, {
-				//This is executed with normal connections. It will set the parameter
-				//right now (the interpolation happens in the interpProxy, not interpProxyNorm).
-				//For successive connections, the same interpNorm will be utilized, effectively making
-				//this .set useless after the first stable connection.
-				this.set(param, interpolationProxyNormalizerEntry);
+			("restore connection" ++ restoreConnection).postln;
 
-				//Make connection to the interpolationProxy. Values are here interpolated using xset.
-				this.synth_connectToInterpProxy(param, interpolationProxyEntry, prevProxy);
-			}, {
-				//Make connection to the interpolationProxy. No need of interpolating as it's happening already
-				//between the two different interpNorms.
-				//This should not make much of a difference, as interpolation values are scaled in the interpNorm anyway.
-				this.synth_connectToInterpProxy(param, interpolationProxyEntry, prevProxy, useXSet:false);
+			("this ft: " ++ this.ft).postln;
+			("interp ft: " ++ interpolationProxyEntry.ft).postln;
+			("prevProxy ft: " ++ prevProxy.ft).postln;
 
-				//This means that the previous interpNorm has been replaced by re-instantiating.
-				//interpolation between the two is needed to switch states.
-				this.xset(param, interpolationProxyNormalizerEntry);
+			//Only make a new xset/set connection if not restoring a previous connection
+			if(restoreConnection.not, {
+				if(newlyCreatedInterpProxyNorm.not, {
+					//This is executed with normal connections. It will set the parameter
+					//right now (the interpolation happens in the interpProxy, not interpProxyNorm).
+					//For successive connections, the same interpNorm will be utilized, effectively making
+					//this .set useless after the first stable connection.
+					this.set(param, interpolationProxyNormalizerEntry);
+
+					//Make connection to the interpolationProxy. Values are here interpolated using xset.
+					this.synth_connectToInterpProxy(param, interpolationProxyEntry, prevProxy);
+
+					"my ass".postln;
+				}, {
+					//Make connection to the interpolationProxy. No need of interpolating as it's happening already
+					//between the two different interpNorms.
+					//This should not make much of a difference, as interpolation values are scaled in the interpNorm anyway.
+					this.synth_connectToInterpProxy(param, interpolationProxyEntry, prevProxy, useXSet:false);
+
+					//This means that the previous interpNorm has been replaced by re-instantiating.
+					//interpolation between the two is needed to switch states.
+					this.xset(param, interpolationProxyNormalizerEntry);
+				});
+
+				//If prevProxy is not a NodeProxy, also run the unset command.
+				//The connection to prevProxy (if it was like, a number) has already been set anyway.
+				//this just helps removing connectons that are actually not in place anymore
+				if(isPrevProxyAProxy.not, {
+					//"Unsetting param".postln;
+					this.unset(param);
+				});
 			});
 
-			//If prevProxy is not a NodeProxy, also run the unset command.
-			//The connection to prevProxy (if it was like, a number) has already been set anyway.
-			//this just helps removing connectons that are actually not in place anymore
-			if(isPrevProxyAProxy.not, {
-				//"Unsetting param".postln;
-				this.unset(param);
-			});
-
+			//Set prevProxy fade time to be the highest connection time
+			prevProxy.setConnectionFadeTime(interpolationProxyEntry.ct);
 
 			//Actually change the source
 			//if(changeInterpProxySymbol, {

@@ -262,12 +262,20 @@ AlgaNodeProxy : NodeProxy {
 	}
 
 	setConnectionTime { |dur|
-		if(dur.isNil) { this.set(\connectionTime, 0) } { this.set(\connectionTime, dur) };
+		if(this.isInterpProxy, {
+			if(dur.isNil) { this.set(\connectionTime, 0) } { this.set(\connectionTime, dur) };
+		});
 		this.connectionTime_inner = dur;
 		interpolationProxies.do({
 			arg proxy;
 			proxy.setConnectionTime(dur);
 			proxy.fadeTime = dur;
+
+			//Set connection time for proxies connected
+			proxy.inProxies.do({
+				arg connectedProxy;
+				connectedProxy.setConnectionFadeTime(dur);
+			});
 		});
 	}
 
@@ -287,6 +295,11 @@ AlgaNodeProxy : NodeProxy {
 		^this.connectionTime_inner;
 	}
 
+	setConnectionFadeTime {
+		arg dur;
+		if(dur > this.fadeTime, {this.fadeTime = dur});
+	}
+
 	params {
 		^this.interpolationProxies;
 	}
@@ -301,7 +314,6 @@ AlgaNodeProxy : NodeProxy {
 			var objFunDef = obj.source.def;
 			if(thisFunDef.sourceCode == objFunDef.sourceCode, {^this});
 		});
-
 
 		//Reset instantiation stage
 		this.instantiated = false;
@@ -509,8 +521,8 @@ AlgaNodeProxy : NodeProxy {
 					//found it! remake connection
 					if(inProxy == this, {
 						//("Restoring connection of " ++ outProxy.asString ++ " with " ++ this.asString).postln;
-						//outProxy.synth_setInterpProxy(this, paramName, reorderBlock:false);
-						this.forwardConnectionInner(outProxy, paramName);
+						outProxy.unset(paramName);
+						this.forwardConnectionInner(outProxy, paramName, restoreConnection:false);
 						break.(nil);
 					});
 				});
@@ -889,7 +901,7 @@ AlgaNodeProxy : NodeProxy {
 	}
 
 	forwardConnectionInner {
-		arg nextProxy, param = \in, newlyCreatedInterpProxyNorm = false;
+		arg nextProxy, param = \in, newlyCreatedInterpProxyNorm = false, restoreConnection = false;
 
 		var isNextProxyAProxy, isThisProxyAnOp, isThisProxyAFunc, isThisProxyAnArray;
 
@@ -960,7 +972,9 @@ AlgaNodeProxy : NodeProxy {
 				//Create a new block if needed
 				this.createNewBlockIfNeeded(nextProxy);
 				nextProxy.synth_setInterpProxy(this, param,
-					newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm);
+					newlyCreatedInterpProxyNorm:newlyCreatedInterpProxyNorm,
+					restoreConnection:restoreConnection
+				);
 			});
 
 		});
