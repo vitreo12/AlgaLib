@@ -2,7 +2,7 @@ AlgaNode {
 	var <>fadeTime = 0;
 	var <>synth;
 	var <>group, <>synthGroup, <>normGroup, <>interpGroup;
-	var <>toBeFreed=false;
+	var <>toBeCleared=false;
 
 	*new { | obj, fadeTime = 0|
 		^super.new.init(obj, fadeTime)
@@ -28,10 +28,10 @@ AlgaNode {
 	}
 
 	//Groups (and state) will be reset only if they are nil AND they are set to be freed.
-	//the toBeFreed variable can be changed in real time, if AlgaNode.replace is called while
+	//the toBeCleared variable can be changed in real time, if AlgaNode.replace is called while
 	//clearing is happening!
 	freeAllGroups {
-		if((this.group != nil).and(this.toBeFreed), {
+		if((this.group != nil).and(this.toBeCleared), {
 			//Just delete top group (it will delete all chilren too)
 			this.group.free;
 
@@ -48,7 +48,7 @@ AlgaNode {
 		this.freeSynth;
 
 		//In case it has been set to true when clearing, then replacing before clear ends!
-		this.toBeFreed = false;
+		this.toBeCleared = false;
 
 		//New one
 		this.dispatchNode(obj);
@@ -86,7 +86,7 @@ AlgaNode {
 		fork {
 			this.freeSynth;
 
-			this.toBeFreed = true;
+			this.toBeCleared = true;
 
 			this.fadeTime.wait;
 
