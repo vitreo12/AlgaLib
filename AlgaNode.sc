@@ -1,7 +1,3 @@
-AlgaSynth : Synth {
-
-}
-
 AlgaNode {
 	var <>fadeTime = 0;
 	var <>synth;
@@ -62,6 +58,7 @@ AlgaNode {
 	freeSynth {
 		if(this.synth != nil, {
 			//Send fadeTime too again in case it has been changed by user
+			//fade time will eventually be put just to the interp proxies!
 			this.synth.set(\gate, 0, \fadeTime, this.fadeTime);
 		});
 	}
@@ -75,8 +72,4 @@ AlgaNode {
 			this.freeAllGroups;
 		}
 	}
-}
-
-AlgaSynthDef : SynthDef {
-
 }
