@@ -77,7 +77,7 @@ AlgaNode {
 			//fade time will eventually be put just to the interp proxies!
 			this.synth.set(\gate, 0, \fadeTime, this.fadeTime);
 
-			//Set to nil
+			//Set to nil (should it fork?)
 			this.synth = nil;
 		});
 	}
