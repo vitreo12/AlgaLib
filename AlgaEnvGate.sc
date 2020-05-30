@@ -1,5 +1,5 @@
 AlgaEnvGate {
-	*ar { | i_level=1, gate, fadeTime, doneAction=2, curve='sin' |
+	*ar { | i_level=0, gate, fadeTime, doneAction=2, curve='sin' |
 		var synthGate = gate ?? { NamedControl.kr(\gate, 1.0) };
 		var synthFadeTime = fadeTime ?? { NamedControl.kr(\fadeTime, 0) };
 		^EnvGen.ar(
@@ -8,7 +8,7 @@ AlgaEnvGate {
 		)
 	}
 
-	*kr { | i_level=1, gate, fadeTime, doneAction=2, curve='sin' |
+	*kr { | i_level=0, gate, fadeTime, doneAction=2, curve='sin' |
 		var synthGate = gate ?? { NamedControl.kr(\gate, 1.0) };
 		var synthFadeTime = fadeTime ?? { NamedControl.kr(\fadeTime, 0) };
 		^EnvGen.kr(
