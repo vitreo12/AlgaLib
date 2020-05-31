@@ -5,11 +5,16 @@ s.waitForBoot({
 });
 )
 
-a = AlgaNode(\sine, fadeTime:1).play
+a = AlgaNode(\sine, fadeTime:1)
+
+b = AlgaNode({SinOsc.ar(\f.ar(330))})
+
+b.normBusses
 
 a.replace(\noise)
 a.replace(\sine)
-a.replace({SinOsc.ar(330)})
+
+a.replace({SinOsc.ar(\f.ar(330))})
 
 a.fadeTime = 5
 a.clear
@@ -32,3 +37,6 @@ fork {
 	Synth(\sine, [\freq, a.bus.asMap]);
 }
 )
+
+
+AlgaSynthDef(\sine, {SinOsc.ar(\freq.kr(440))}).add

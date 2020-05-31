@@ -8,8 +8,8 @@ AlgaNode {
 	var <>controlNames, <>numChannels, <>rate;
 
 	var <>group, <>synthGroup, <>normGroup, <>interpGroup;
-	var <>synth, <>normSynth, <>interpSynth;
-	var <>synthBus, <>normBus, <>interpBus;
+	var <>synth, <>normSynths, <>interpSynths;
+	var <>synthBus, <>normBusses, <>interpBusses;
 
 	var <>isPlaying = false;
 	var <>toBeCleared = false;
@@ -23,6 +23,11 @@ AlgaNode {
 		this.fadeTime = fadeTime;
 
 		if(server == nil, {this.server = Server.default}, {this.server = server});
+
+		this.normBusses   = Dictionary(10);
+		this.interpBusses = Dictionary(10);
+		this.normSynths   = Dictionary(10);
+		this.interpSynths = Dictionary(10);
 
 		//Dispatch node creation
 		this.dispatchNode(obj, true);
@@ -65,21 +70,58 @@ AlgaNode {
 	}
 
 	createAllBusses {
+		this.controlNames.do({ | controlName |
+			var argName = controlName.name;
+
+			//Ignore gate / fadeTime / out
+			if((argName != \out).and(argName != \fadeTime).and(argName != \gate), {
+				var argDefaultVal = controlName.defaultValue;
+				var argRate = controlName.rate;
+				var argNumChannels = controlName.numChannels;
+
+				this.normBusses[argName.asSymbol] = AlgaBus(this.server, argNumChannels, argRate);
+				this.interpBusses[argName.asSymbol] = AlgaBus(this.server, argNumChannels, argRate);
+			});
+		});
+
 		this.synthBus = AlgaBus(this.server, this.numChannels, this.rate);
-		if(this.isPlaying, {this.synthBus.play});
+
+		//if(this.isPlaying, {this.synthBus.play});
 	}
 
 	freeAllBusses { | now = false |
 		//if forking, this.synthBus could have changed, that's why this is needed
-		var previousBus = this.synthBus;
+		var previousSynthBus = this.synthBus;
+		var previousNormBusses = this.normBusses;
+		var previousInterpBusses = this.interpBusses;
 
 		if(now, {
-			if(previousBus != nil, { previousBus.free });
+			if(previousSynthBus != nil, { previousSynthBus.free });
+			if(previousNormBusses != nil, {
+				previousNormBusses.do({ | normBus |
+					if(normBus != nil, { normBus.free });
+				});
+			});
+			if(previousInterpBusses != nil, {
+				previousInterpBusses.do({ | interpBus |
+					if(interpBus != nil, { interpBus.free });
+				});
+			});
 		}, {
-			//Free previous bus after fadeTime
+			//Free previous busses after fadeTime
 			fork {
 				this.fadeTime.wait;
-				if(previousBus != nil, { previousBus.free });
+				if(previousSynthBus != nil, { previousSynthBus.free });
+				if(previousNormBusses != nil, {
+					previousNormBusses.do({ | normBus |
+						if(normBus != nil, { normBus.free });
+					});
+				});
+				if(previousInterpBusses != nil, {
+					previousInterpBusses.do({ | interpBus |
+						if(interpBus != nil, { interpBus.free });
+					});
+				});
 			}
 		});
 	}
@@ -93,6 +135,8 @@ AlgaNode {
 
 		//Free previous one
 		this.freeSynth;
+
+		this.freeInterpNormSynths(true, true);
 
 		//Is it really necessary to delete previous busses?
 		this.freeAllBusses;
@@ -139,7 +183,7 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		this.newSynthFromSymbol(this.synthDef.name);
+		this.createSynth(this.synthDef.name);
 	}
 
 	dispatchFunction { | obj, initGroups = false |
@@ -156,7 +200,7 @@ AlgaNode {
 			this.createAllBusses;
 
 			//Create actual synths
-			this.newSynthFromSymbol(this.synthDef.name);
+			this.createSynth(this.synthDef.name);
 		};
 	}
 
@@ -169,11 +213,24 @@ AlgaNode {
 		this.rate = nil;
 	}
 
-	newSynthFromSymbol { | defName |
+	resetInterpNormSynths {
+		this.intepSynths.clear;
+		this.normSynths.clear;
+	}
+
+	createSynth { | defName |
 		this.synth = AlgaSynth.new(defName,
 			[\out, this.synthBus.asUGenInput, \fadeTime, this.fadeTime],
 			this.synthGroup
 		);
+	}
+
+	createInterpSynths {
+
+	}
+
+	createNormSynths {
+
 	}
 
 	freeSynth {
@@ -186,6 +243,38 @@ AlgaNode {
 		});
 	}
 
+	freeInterpNormSynths { | useFadeTime = false, now = false |
+		var prevInterpSynths = interpSynths;
+		var prevNormSynths = normSynths;
+
+		if(now, {
+			prevInterpSynths.do({ | interpSynth |
+				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, {this.fadeTime}, {0}));
+			});
+
+			prevNormSynths.do({ | normSynth |
+				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, {this.fadeTime}, {0}));
+			});
+
+			//this.resetInterpNormSynths;
+
+		}, {
+			fork {
+				this.fadeTime.wait;
+
+				prevInterpSynths.do({ | interpSynth |
+					interpSynth.set(\gate, 0, \fadeTime, 0);
+				});
+
+				prevNormSynths.do({ | normSynth |
+					normSynth.set(\gate, 0, \fadeTime, 0);
+				});
+
+				//this.resetInterpNormSynths;
+			}
+		});
+	}
+
 	clear {
 		fork {
 			this.freeSynth;
@@ -194,6 +283,7 @@ AlgaNode {
 
 			//Wait time before clearing groups and busses
 			this.fadeTime.wait;
+			this.freeInterpNormSynths(false, true);
 			this.freeAllGroups(true);
 			this.freeAllBusses(true);
 		}
