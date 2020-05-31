@@ -2,6 +2,7 @@ AlgaNode {
 	var <>server;
 	var <>fadeTime = 0;
 	var <>objClass;
+
 	var <>synthDef;
 
 	var <>controlNames, <>numChannels, <>rate;
@@ -24,14 +25,7 @@ AlgaNode {
 		if(server == nil, {this.server = Server.default}, {this.server = server});
 
 		//Dispatch node creation
-		this.dispatchNode(obj);
-
-		//Create all utilities
-		this.createAllGroups;
-		this.createAllBusses;
-
-		//Create node
-		this.newNode;
+		this.dispatchNode(obj, true);
 	}
 
 	createAllGroups {
@@ -43,39 +37,56 @@ AlgaNode {
 		});
 	}
 
+	resetGroups {
+		//Reset values
+		this.group = nil;
+		this.synthGroup = nil;
+		this.normGroup = nil;
+		this.interpGroup = nil;
+	}
+
 	//Groups (and state) will be reset only if they are nil AND they are set to be freed.
 	//the toBeCleared variable can be changed in real time, if AlgaNode.replace is called while
 	//clearing is happening!
-	freeAllGroups {
+	freeAllGroups { | now = false |
 		if((this.group != nil).and(this.toBeCleared), {
-			//Just delete top group (it will delete all chilren too)
-			this.group.free;
-
-			//Reset values
-			this.group = nil;
-			this.synthGroup = nil;
-			this.normGroup = nil;
-			this.interpGroup = nil;
+			if(now, {
+				//Just delete top group (it will delete all children too)
+				this.group.free;
+				this.resetGroups;
+			}, {
+				fork {
+					this.fadeTime.wait;
+					this.group.free;
+					this.resetGroups;
+				};
+			});
 		});
 	}
 
-	//spinlock to wait for synth creation
 	createAllBusses {
 		this.synthBus = AlgaBus(this.server, this.numChannels, this.rate);
 		if(this.isPlaying, {this.synthBus.play});
 	}
 
-	freeAllBusses {
+	freeAllBusses { | now = false |
+		//if forking, this.synthBus could have changed, that's why this is needed
 		var previousBus = this.synthBus;
-		//Free previous bus after fadeTime
-		fork {
-			this.fadeTime.wait;
-			//("previous: " ++ previousBus.bus.index).postln;
-			previousBus.free;
-		}
+
+		if(now, {
+			if(previousBus != nil, { previousBus.free });
+		}, {
+			//Free previous bus after fadeTime
+			fork {
+				this.fadeTime.wait;
+				if(previousBus != nil, { previousBus.free });
+			}
+		});
 	}
 
 	replace { | obj |
+		//re-init groups if clear was used
+		var initGroups = if(this.group == nil, {true}, {false});
 
 		//In case it has been set to true when clearing, then replacing before clear ends!
 		this.toBeCleared = false;
@@ -85,51 +96,82 @@ AlgaNode {
 		this.freeAllBusses;
 
 		//New one
-		this.dispatchNode(obj);
-		this.createAllBusses;
-		this.newNode;
-
-		//("new one: " ++ this.synthBus.bus.index).postln;
+		this.dispatchNode(obj, initGroups);
 	}
 
 	//dispatches controlnames / numChannels / rate according to obj class
-	dispatchNode { | obj |
+	dispatchNode { | obj, initGroups = false |
 		this.objClass = obj.class;
+
+		//Symbol
 		if(this.objClass == Symbol, {
-			var synthDesc = SynthDescLib.global.at(obj);
-			this.synthDef = synthDesc.def;
+			this.dispatchSynthDef(obj, initGroups);
+		}, {
+			//Function
+			if(this.objClass == Function, {
+				this.dispatchFunction(obj, initGroups);
 
-			if(this.synthDef.class != AlgaSynthDef, {
-				("Invalid AlgaSynthDef: '" ++ obj.asString ++"'").error;
+			}, {
+				("AlgaNode: class '" ++ this.objClass ++ "' is invalid").error;
 				this.clear;
-				^nil;
 			});
+		});
+	}
 
-			this.controlNames = synthDesc.controlNames;
+	dispatchSynthDef { | obj, initGroups = false |
+		var synthDesc = SynthDescLib.global.at(obj);
+		this.synthDef = synthDesc.def;
+
+		if(this.synthDef.class != AlgaSynthDef, {
+			("Invalid AlgaSynthDef: '" ++ obj.asString ++"'").error;
+			this.clear;
+			^nil;
+		});
+
+		this.controlNames = synthDesc.controls;
+		this.numChannels = this.synthDef.numChannels;
+		this.rate = this.synthDef.rate;
+
+		//Create all utilities
+		if(initGroups, { this.createAllGroups });
+		this.createAllBusses;
+
+		//Create actual synths
+		this.newSynthFromSymbol(this.synthDef.name);
+	}
+
+	dispatchFunction { | obj, initGroups = false |
+		//Need to wait for server's receiving the sdef
+		fork {
+			this.synthDef = AlgaSynthDef(("alga_" ++ UniqueID.next).asSymbol, obj).send(this.server);
+			server.sync;
+			this.controlNames = this.synthDef.asSynthDesc.controls;
 			this.numChannels = this.synthDef.numChannels;
 			this.rate = this.synthDef.rate;
 
-			this.controlNames.postln;
-		}, {
-			"AlgaNode: class '" ++ objClass ++ "' is invalid".error;
-			this.clear;
-		});
+			//Create all utilities
+			if(initGroups, { this.createAllGroups });
+			this.createAllBusses;
+
+			//Create actual synths
+			this.newSynthFromSymbol(this.synthDef.name);
+		};
 	}
 
-	newNode {
-		//Dispatch creation
-		if(this.objClass == Symbol, {
-			//This should only allow SynthDefs defined with AlgaSynthDef to play...
-			this.newSynthFromSymbol(this.synthDef.name);
-		}, {
-			"AlgaNode: class '" ++ objClass ++ "' is invalid".error;
-			this.clear;
-		});
+	resetSynth {
+		//Set to nil (should it fork?)
+		this.synth = nil;
+		this.synthDef = nil;
+		this.controlNames = nil;
+		this.numChannels = 0;
+		this.rate = nil;
 	}
 
 	newSynthFromSymbol { | defName |
-		//asUgenInput doens't work with args set like this
-		this.synth = AlgaSynth.new(defName, [\out, this.synthBus.bus.index, \fadeTime, this.fadeTime], this.synthGroup);
+		this.synth = AlgaSynth.new(defName,
+			[\out, this.synthBus.asUGenInput, \fadeTime, this.fadeTime],
+			this.synthGroup
+		);
 	}
 
 	freeSynth {
@@ -138,11 +180,7 @@ AlgaNode {
 			//fade time will eventually be put just to the interp proxies!
 			this.synth.set(\gate, 0, \fadeTime, this.fadeTime);
 
-			//Set to nil (should it fork?)
-			this.synth = nil;
-			this.controlNames = nil;
-			this.numChannels = 0;
-			this.rate = nil;
+			this.resetSynth;
 		});
 	}
 
@@ -152,11 +190,10 @@ AlgaNode {
 
 			this.toBeCleared = true;
 
+			//Wait time before clearing groups and busses
 			this.fadeTime.wait;
-
-			this.freeAllGroups;
-
-			this.freeAllBusses;
+			this.freeAllGroups(true);
+			this.freeAllBusses(true);
 		}
 	}
 
@@ -166,6 +203,7 @@ AlgaNode {
 	}
 
 	instantiated {
+		if(this.synth == nil, { ^false });
 		^this.synth.instantiated;
 	}
 
