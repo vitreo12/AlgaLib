@@ -1,0 +1,4 @@
+AlgaBus {
+	var <>server, <>bus;
+
+}
