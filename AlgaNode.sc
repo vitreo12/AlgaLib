@@ -10,7 +10,8 @@ AlgaNode {
 	var <>synth, <>normSynth, <>interpSynth;
 	var <>synthBus, <>normBus, <>interpBus;
 
-	var <>toBeCleared=false;
+	var <>isPlaying = false;
+	var <>toBeCleared = false;
 
 	*new { | obj, server, fadeTime = 0 |
 		^super.new.init(obj, server, fadeTime)
@@ -42,11 +43,6 @@ AlgaNode {
 		});
 	}
 
-	//spinlock to wait for synth creation
-	createAllBusses {
-		this.synthBus = AlgaBus(this.server, this.numChannels, this.rate);
-	}
-
 	//Groups (and state) will be reset only if they are nil AND they are set to be freed.
 	//the toBeCleared variable can be changed in real time, if AlgaNode.replace is called while
 	//clearing is happening!
@@ -63,30 +59,37 @@ AlgaNode {
 		});
 	}
 
-	freeAllBusses {
-		if((this.synthBus != nil).and(this.toBeCleared), {
-			this.synthBus.freeBus;
-		});
+	//spinlock to wait for synth creation
+	createAllBusses {
+		this.synthBus = AlgaBus(this.server, this.numChannels, this.rate);
+		if(this.isPlaying, {this.synthBus.play});
 	}
 
-	replaceBusses {
-		this.freeAllBusses;
-		this.createAllBusses;
+	freeAllBusses {
+		var previousBus = this.synthBus;
+		//Free previous bus after fadeTime
+		fork {
+			this.fadeTime.wait;
+			//("previous: " ++ previousBus.bus.index).postln;
+			previousBus.free;
+		}
 	}
 
 	replace { | obj |
-		//Free previous one
-		this.freeSynth;
 
 		//In case it has been set to true when clearing, then replacing before clear ends!
 		this.toBeCleared = false;
 
+		//Free previous one
+		this.freeSynth;
+		this.freeAllBusses;
+
 		//New one
 		this.dispatchNode(obj);
-
-		this.replaceBusses;
-
+		this.createAllBusses;
 		this.newNode;
+
+		//("new one: " ++ this.synthBus.bus.index).postln;
 	}
 
 	//dispatches controlnames / numChannels / rate according to obj class
@@ -155,6 +158,11 @@ AlgaNode {
 
 			this.freeAllBusses;
 		}
+	}
+
+	play {
+		this.isPlaying = true;
+		this.synthBus.play;
 	}
 
 	instantiated {

@@ -13,17 +13,22 @@ AlgaBus {
 	}
 
 	newBus { | numChannels = 1, rate = \audio |
-		this.freeBus;
 		this.rate = rate;
 		this.numChannels = numChannels;
 		this.server.postln;
 		this.bus = Bus.alloc(rate, this.server, numChannels); //Should I wait on this alloc?
 	}
 
-	freeBus {
-		this.bus.free(true);
+	free {
+		if(this.bus != nil, {
+			this.bus.free(true);
+		});
 		this.rate = nil;
 		this.numChannels = 0;
+	}
+
+	play {
+		this.bus.play;
 	}
 
 	asUGenInput {
