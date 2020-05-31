@@ -77,20 +77,19 @@ AlgaSynthDef : SynthDef {
 				^nil
 			};
 
-
-			//"gate detection:".postln;
-			//[\makeFadeEnv, makeFadeEnv, \canFree, canFree, \hasOwnGate, hasOwnGate].debug;
-
-			// constrain the output to the right number of channels if supplied
-			// if control rate, no channel wrapping is applied
-			// and wrap it in a fade envelope
-			envgen = if(makeFadeEnv) {
-				if(rate === 'audio') {
-					AlgaEnvGate.ar(i_level: 0, doneAction:2);
-				} {
+			envgen = if(makeFadeEnv, {
+				if(isInterp.not, {
 					AlgaEnvGate.kr(i_level: 0, doneAction:2);
-				}
-			} { 1.0 };
+				}, {
+					if(rate === 'audio', {
+						AlgaEnvGate.ar(i_level: 0, doneAction:2);
+					}, {
+						AlgaEnvGate.kr(i_level: 0, doneAction:2);
+					});
+				});
+			}, {
+				1.0;
+			});
 
 			if(chanConstraint.notNil
 				and: { chanConstraint < numChannels }
@@ -108,6 +107,7 @@ AlgaSynthDef : SynthDef {
 
 			});
 
+			//Only multiply interp synths with the fade
 			if(isInterp, {
 				output = output * envgen;
 			});
