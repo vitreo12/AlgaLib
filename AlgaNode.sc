@@ -93,6 +93,8 @@ AlgaNode {
 
 		//Free previous one
 		this.freeSynth;
+
+		//Is it really necessary to delete previous busses?
 		this.freeAllBusses;
 
 		//New one
@@ -205,6 +207,18 @@ AlgaNode {
 	instantiated {
 		if(this.synth == nil, { ^false });
 		^this.synth.instantiated;
+	}
+
+	<< {
+
+	}
+
+	>> {
+
+	}
+
+	<| {
+
 	}
 
 }
