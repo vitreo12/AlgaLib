@@ -1,7 +1,7 @@
 (
 s.waitForBoot({
-	SynthDef(\sine, {Out.ar(0, {AlgaEnvGate.ar(0, \gate.kr(1), \fadeTime.kr(0)) * SinOsc.ar(\freq.kr(440))})}).add;
-	SynthDef(\noise, {Out.ar(0, {AlgaEnvGate.ar(0, \gate.kr(1), \fadeTime.kr(0)) * WhiteNoise.ar.dup * 0.2})}).add;
+	AlgaSynthDef(\sine, {SinOsc.ar(\freq.kr(440))}).add;
+	AlgaSynthDef(\noise, {WhiteNoise.ar.dup * 0.2}).add;
 });
 )
 
