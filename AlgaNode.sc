@@ -1,16 +1,20 @@
 AlgaNode {
+	var <>server;
 	var <>fadeTime = 0;
 	var <>synth;
+	var <>numChannels;
 	var <>group, <>synthGroup, <>normGroup, <>interpGroup;
 	var <>toBeCleared=false;
 
-	*new { | obj, fadeTime = 0|
-		^super.new.init(obj, fadeTime)
+	*new { | obj, server, fadeTime = 0 |
+		^super.new.init(obj, server, fadeTime)
 	}
 
-	init { | obj, fadeTime = 0 |
+	init { | obj, server, fadeTime = 0 |
 
 		this.fadeTime = fadeTime;
+
+		if(server == nil, {this.server = Server.default}, {this.server = server});
 
 		this.createAllGroups;
 
@@ -20,7 +24,7 @@ AlgaNode {
 
 	createAllGroups {
 		if(this.group == nil, {
-			this.group = Group.new;
+			this.group = Group(server);
 			this.synthGroup = Group(group); //could be ParGroup here for supernova + patterns...
 			this.normGroup = Group(group);
 			this.interpGroup = Group(group);
@@ -59,6 +63,7 @@ AlgaNode {
 
 		//Dispatch creation
 		if(objClass == Symbol, {
+			//This should only allow SynthDefs defined with AlgaSynthDef to play...
 			this.newSynthFromSymbol(obj);
 		}, {
 			"AlgaNode: class '" ++ objClass ++ "' is invalid".error;
@@ -69,6 +74,7 @@ AlgaNode {
 
 	newSynthFromSymbol { | defName |
 		this.synth = AlgaSynth.new(defName, [\fadeTime, this.fadeTime], this.synthGroup);
+		this.numChannels = this.synth.numChannels;
 	}
 
 	freeSynth {
@@ -79,6 +85,7 @@ AlgaNode {
 
 			//Set to nil (should it fork?)
 			this.synth = nil;
+			this.numChannels = 0;
 		});
 	}
 
