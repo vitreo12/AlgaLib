@@ -5,29 +5,30 @@ s.waitForBoot({
 });
 )
 
-s.plotTree;
-
-a = AlgaNode(\sine, fadeTime:1)
+a = AlgaNode(\sine, fadeTime:1).play
 
 a.replace(\noise)
 a.replace(\sine)
+a.replace({SinOsc.ar(330)})
 
 a.fadeTime = 5
-
 a.clear
 
 
+//Audio/Control rate mapping!
+(
+fork {
+	a = AlgaBus(s);
 
-p = AlgaBus(s)
+	AlgaSynthDef(\sine, { SinOsc.ar(\freq.ar(440)) }).add;
 
-a = {Out.ar(p, {SinOsc.ar})}.play
+	s.sync;
 
-p.play
+	AlgaSynthDef(\setbus, { Out.ar(a, SinOsc.ar.range(1, 100) * MouseX.kr(1, 100)) }).add;
 
-p.freeBus
+	s.sync;
 
-
-
-AlgaSynthDef(\sine, {SinOsc.ar(\freq.kr(440))}).
-
-SynthDef
+	Synth(\setbus);
+	Synth(\sine, [\freq, a.bus.asMap]);
+}
+)
