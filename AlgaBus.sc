@@ -15,7 +15,6 @@ AlgaBus {
 	newBus { | numChannels = 1, rate = \audio |
 		this.rate = rate;
 		this.numChannels = numChannels;
-		this.server.postln;
 		this.bus = Bus.alloc(rate, this.server, numChannels); //Should I wait on this alloc?
 	}
 
