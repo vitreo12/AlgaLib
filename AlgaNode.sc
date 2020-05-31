@@ -11,6 +11,8 @@ AlgaNode {
 	var <>synth, <>normSynths, <>interpSynths;
 	var <>synthBus, <>normBusses, <>interpBusses;
 
+	var <>inConnections, <>outConnections;
+
 	var <>isPlaying = false;
 	var <>toBeCleared = false;
 
@@ -24,10 +26,15 @@ AlgaNode {
 
 		if(server == nil, {this.server = Server.default}, {this.server = server});
 
+		//Per-argument dictionaries of interp/norm Busses and Synths belonging to this AlgaNode
 		this.normBusses   = Dictionary(10);
 		this.interpBusses = Dictionary(10);
 		this.normSynths   = Dictionary(10);
 		this.interpSynths = Dictionary(10);
+
+		//Per-argument connections to this AlgaNode
+		this.inConnections = Dictionary.new(10);
+		this.outConnections = Dictionary.new(10);
 
 		//Dispatch node creation
 		this.dispatchNode(obj, true);
@@ -73,15 +80,12 @@ AlgaNode {
 		this.controlNames.do({ | controlName |
 			var argName = controlName.name;
 
-			//Ignore gate / fadeTime / out
-			if((argName != \out).and(argName != \fadeTime).and(argName != \gate), {
-				var argDefaultVal = controlName.defaultValue;
-				var argRate = controlName.rate;
-				var argNumChannels = controlName.numChannels;
+			var argDefaultVal = controlName.defaultValue;
+			var argRate = controlName.rate;
+			var argNumChannels = controlName.numChannels;
 
-				this.normBusses[argName.asSymbol] = AlgaBus(this.server, argNumChannels, argRate);
-				this.interpBusses[argName.asSymbol] = AlgaBus(this.server, argNumChannels, argRate);
-			});
+			this.normBusses[argName] = AlgaBus(this.server, argNumChannels, argRate);
+			this.interpBusses[argName] = AlgaBus(this.server, argNumChannels, argRate);
 		});
 
 		this.synthBus = AlgaBus(this.server, this.numChannels, this.rate);
@@ -156,7 +160,6 @@ AlgaNode {
 			//Function
 			if(this.objClass == Function, {
 				this.dispatchFunction(obj, initGroups);
-
 			}, {
 				("AlgaNode: class '" ++ this.objClass ++ "' is invalid").error;
 				this.clear;
@@ -175,6 +178,7 @@ AlgaNode {
 		});
 
 		this.controlNames = synthDesc.controls;
+		this.sanitizeControlNames;
 		this.numChannels = this.synthDef.numChannels;
 		this.rate = this.synthDef.rate;
 
@@ -192,6 +196,7 @@ AlgaNode {
 			this.synthDef = AlgaSynthDef(("alga_" ++ UniqueID.next).asSymbol, obj).send(this.server);
 			server.sync;
 			this.controlNames = this.synthDef.asSynthDesc.controls;
+			this.sanitizeControlNames;
 			this.numChannels = this.synthDef.numChannels;
 			this.rate = this.synthDef.rate;
 
@@ -201,7 +206,17 @@ AlgaNode {
 
 			//Create actual synths
 			this.createSynth(this.synthDef.name);
+
+			this.controlNames.postln;
 		};
+	}
+
+	//Remove \fadeTime \out and \gate from controlNames
+	sanitizeControlNames {
+		this.controlNames.removeAllSuchThat({ | controlName |
+			var argName = controlName.name;
+			(controlName.name == \fadeTime).or(controlName.name == \out).or(controlName.name == \gate);
+		});
 	}
 
 	resetSynth {
@@ -299,11 +314,11 @@ AlgaNode {
 		^this.synth.instantiated;
 	}
 
-	<< {
-
+	>> {
+		//Should re-create interpSynth and interpBus for specific param
 	}
 
-	>> {
+	<< {
 
 	}
 

@@ -5,6 +5,10 @@ s.waitForBoot({
 });
 )
 
+AlgaLib.boot
+
+s.plotTree
+
 a = AlgaNode(\sine, fadeTime:1)
 
 b = AlgaNode({SinOsc.ar(\f.ar(330))})
@@ -40,3 +44,20 @@ fork {
 
 
 AlgaSynthDef(\sine, {SinOsc.ar(\freq.kr(440))}).add
+
+a = SynthDescLib.global.at(\sine).controls
+
+(
+t = 0;
+a.do({ | controlName, index |
+	var argName = controlName.name;
+	if((argName != \out).and(argName != \fadeTime).and(argName != \gate), {
+		argName.postln;
+	}, {
+		a.removeAt(index - t);
+		t = t + 1;
+	});
+});
+)
+
+a
