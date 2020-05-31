@@ -15,3 +15,19 @@ a.replace(\sine)
 a.fadeTime = 5
 
 a.clear
+
+
+
+p = AlgaBus(s)
+
+a = {Out.ar(p, {SinOsc.ar})}.play
+
+p.play
+
+p.freeBus
+
+
+
+AlgaSynthDef(\sine, {SinOsc.ar(\freq.kr(440))}).
+
+SynthDef

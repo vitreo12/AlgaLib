@@ -5,8 +5,7 @@ AlgaSynthDef : SynthDef {
 	var <>canReleaseSynth, <>canFreeSynth;
 	classvar <>sampleAccurate=false;
 
-
-	*new { | name, func, rates, prependArgs, makeFadeEnv = true, channelOffset = 0,
+	*new { | name, func, rates, prependArgs, makeFadeEnv = true, isInterp = false, channelOffset = 0,
 		chanConstraint, rateConstraint |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var hasGateArg=false, hasOutArg=false;
@@ -108,7 +107,10 @@ AlgaSynthDef : SynthDef {
 					}
 
 			});
-			output = output * envgen;
+
+			if(isInterp, {
+				output = output * envgen;
+			});
 
 			//"passed in rate: % output rate: %\n".postf(rateConstraint, rate);
 
