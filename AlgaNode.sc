@@ -88,14 +88,16 @@ AlgaNode {
 			var argRate = controlName.rate;
 			var argNumChannels = controlName.numChannels;
 
+			//interpBusses have 1 more channel for the envelope shape
+			this.interpBusses[argName] = AlgaBus(this.server, argNumChannels + 1, argRate);
 			this.normBusses[argName] = AlgaBus(this.server, argNumChannels, argRate);
-			this.interpBusses[argName] = AlgaBus(this.server, argNumChannels, argRate);
+
 			this.defaultBusses[argName] = AlgaBus(this.server, argNumChannels, argRate);
 		});
 
 		this.synthBus = AlgaBus(this.server, this.numChannels, this.rate);
 
-		//if(this.isPlaying, {this.synthBus.play});
+		if(this.isPlaying, {this.synthBus.play});
 	}
 
 	freeAllBusses { | now = false |
@@ -227,7 +229,7 @@ AlgaNode {
 			this.createAllBusses;
 
 			//Create actual synths
-			this.createAllSynths(this.synthDef.name, this.numChannels, this.rate);
+			this.createAllSynths(this.synthDef.name);
 		};
 	}
 
@@ -253,55 +255,79 @@ AlgaNode {
 		this.normSynths.clear;
 	}
 
-	createAllSynths { | defName, inChannels = 1, inRate = \audio |
+	createAllSynths { | defName |
 		this.createSynth(this.synthDef.name);
-		this.createInterpNormSynths(inChannels, inRate);
+		this.createInterpNormSynths;
 	}
 
 	//Synth writes to the synthBus
 	createSynth { | defName |
-		this.synth = AlgaSynth.new(defName,
+		this.synth = AlgaSynth.new(
+			defName,
 			[\out, this.synthBus.index, \fadeTime, this.fadeTime],
 			this.synthGroup
 		);
 	}
 
 	//This should take in account the nextNode's numChannels when making connections
-	createInterpNormSynths { | inChannels = 1, inRate = \audio |
+	createInterpNormSynths { | inChannels, inRate |
 
 		this.controlNames.do({ | controlName |
 			var interpBus, normBus, interpSynth, normSynth;
+
+			var interpSymbol, normSymbol;
+
+			var inputChannels, inputRate;
 
 			var argName = controlName.name;
 			var argChannels = controlName.numChannels.asString;
 			var argRate = controlName.rate.asString;
 			var argDefault = controlName.defaultValue;
 
-			var interpSymbol = ("algaInterp_" ++
-				inRate.asString ++
-				inChannels.asString ++
+			if(inChannels == nil, {inputChannels = argChannels}, {inputChannels = inChannels});
+			if(inRate == nil, {inputRate = argRate}, {inputRate = inRate});
+
+			interpSymbol = (
+				"algaInterp_" ++
+				inputRate.asString ++
+				inputChannels.asString ++
 				"_" ++
 				argRate ++
 				argChannels
 			).asSymbol;
 
-			var normSymbol = ("algaNorm_" ++ argRate ++ argChannels).asSymbol;
+			normSymbol = (
+				"algaNorm_" ++
+				argRate ++
+				argChannels
+			).asSymbol;
 
 			interpBus = this.interpBusses[argName];
 			normBus = this.normBusses[argName];
 
-			interpSynth = AlgaSynth.new(interpSymbol,
+			interpSymbol.postln;
+
+			interpSynth = AlgaSynth.new(
+				interpSymbol,
 				[\in, argDefault, \out, interpBus.index, \fadeTime, this.fadeTime],
 				this.interpGroup
 			);
 
-			normSynth = AlgaSynth.new(normSymbol,
-				[\args, interpBus.asMap, \out, normBus.index, \fadeTime, this.fadeTime],
+			normSynth = AlgaSynth.new(
+				normSymbol,
+				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, this.fadeTime],
 				this.normGroup
 			);
 
 			this.interpSynths[argName] = interpSynth;
 			this.normSynths[argName] = normSynth;
+
+			//Wait fade time then patch the synth's arguments to the normBusses
+			fork {
+				this.fadeTime.wait;
+				this.synth.set(argName, normBus.busArg);
+			}
+
 		});
 	}
 
@@ -366,10 +392,12 @@ AlgaNode {
 		this.synthBus.play;
 	}
 
+	/*
 	instantiated {
 		if(this.synth == nil, { ^false });
 		^this.synth.instantiated;
 	}
+	*/
 
 	>> { | nextNode, param = \in |
 		//Should re-create interpSynth and interpBus for specific param
