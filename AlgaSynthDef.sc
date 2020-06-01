@@ -5,7 +5,7 @@ AlgaSynthDef : SynthDef {
 	var <>canReleaseSynth, <>canFreeSynth;
 	classvar <>sampleAccurate=false;
 
-	*new { | name, func, rates, prependArgs, makeFadeEnv = true, isInterp = false, channelOffset = 0,
+	*new { | name, func, rates, prependArgs, makeFadeEnv = true, channelOffset = 0,
 		chanConstraint, rateConstraint |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var hasGateArg=false, hasOutArg=false;
@@ -77,6 +77,8 @@ AlgaSynthDef : SynthDef {
 				^nil
 			};
 
+			//the AlgaEnvGate will take care of freeing the synth, even if not used to multiply
+			//with output!
 			envgen = if(makeFadeEnv, {
 				AlgaEnvGate.kr(i_level: 0, doneAction:2);
 			}, {
@@ -98,11 +100,6 @@ AlgaSynthDef : SynthDef {
 					}
 
 			});
-
-			//Only multiply interp synths with the fade
-			//if(isInterp, {
-			//	output = output * envgen;
-			//});
 
 			//"passed in rate: % output rate: %\n".postf(rateConstraint, rate);
 

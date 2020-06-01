@@ -28,7 +28,6 @@ AlgaSynth : Synth {
 	//Would this be an overkill for Pattern based stuff??
 	waitForInstantiation { | nodeID |
 		var oscfunc = OSCFunc.newMatching({ | msg |
-			//"INSTANTIATED ALGASYNTH!".postln;
 			this.instantiated = true;
 		}, '/n_go', this.server.addr, argTemplate:[nodeID]).oneShot;
 

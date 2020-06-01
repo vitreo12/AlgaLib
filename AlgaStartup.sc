@@ -59,7 +59,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//kr -> kr
 							result_control_control = "
@@ -74,7 +74,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//ar -> kr
 							result_audio_control = "
@@ -89,7 +89,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//kr -> ar
 							result_control_audio = "
@@ -104,7 +104,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 						}, {
 							//ar -> ar
@@ -120,7 +120,7 @@ outs[i] = out[i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//kr -> kr
 							result_control_control = "
@@ -135,7 +135,7 @@ outs[i] = out[i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//ar -> kr
 							result_audio_control = "
@@ -150,7 +150,7 @@ outs[i] = out[i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//kr -> ar
 							result_control_audio = "
@@ -165,7 +165,7 @@ outs[i] = out[i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 						});
 
@@ -188,7 +188,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//kr -> kr
 							result_control_control = "
@@ -203,7 +203,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//ar -> kr
 							result_audio_control = "
@@ -218,7 +218,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//kr -> ar
 							result_control_audio = "
@@ -233,7 +233,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 						}, {
 
@@ -251,7 +251,7 @@ outs[i] = out[mod_i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//kr -> kr
 							result_control_control = "
@@ -267,7 +267,7 @@ outs[i] = out[mod_i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//ar -> kr
 							result_audio_control = "
@@ -283,7 +283,7 @@ outs[i] = out[mod_i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 							//kr -> ar
 							result_control_audio = "
@@ -299,7 +299,7 @@ outs[i] = out[mod_i];
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false, isInterp:true).add;";
+}, makeFadeEnv:false).add;";
 
 						});
 
@@ -334,7 +334,7 @@ outs;
 
 			if(counter == 1, {
 
-				result_audio = "SynthDef(\\algaNorm_audio1, {
+				result_audio = "AlgaSynthDef(\\algaNorm_audio1, {
 var args = \\args.ar([0, 0]);
 var val = args[0];
 var env = args[1];
