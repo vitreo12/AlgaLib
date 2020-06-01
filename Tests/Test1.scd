@@ -23,7 +23,6 @@ a.replace({SinOsc.ar(\f.ar(330))})
 a.fadeTime = 5
 a.clear
 
-
 //Audio/Control rate mapping!
 (
 fork {
@@ -42,22 +41,6 @@ fork {
 }
 )
 
-
 AlgaSynthDef(\sine, {SinOsc.ar(\freq.kr(440))}).add
 
 a = SynthDescLib.global.at(\sine).controls
-
-(
-t = 0;
-a.do({ | controlName, index |
-	var argName = controlName.name;
-	if((argName != \out).and(argName != \fadeTime).and(argName != \gate), {
-		argName.postln;
-	}, {
-		a.removeAt(index - t);
-		t = t + 1;
-	});
-});
-)
-
-a
