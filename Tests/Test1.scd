@@ -7,13 +7,19 @@ s.waitForBoot({
 
 AlgaLib.boot
 
+
 s.plotTree
 
 a = AlgaNode(\sine, fadeTime:1)
 
 b = AlgaNode({SinOsc.ar(\f.ar(330))})
 
+a << b
+
+
 b.normBusses
+b.normSynths
+b.interpSynths
 
 a.replace(\noise)
 a.replace(\sine)
@@ -37,7 +43,7 @@ fork {
 	s.sync;
 
 	Synth(\setbus);
-	Synth(\sine, [\freq, a.bus.asMap]);
+	Synth(\sine, [\freq, 200]);
 }
 )
 

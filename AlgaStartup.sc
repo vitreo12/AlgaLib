@@ -5,6 +5,8 @@ AlgaStartup {
 
 		var alreadyDonePairs = Dictionary.new;
 
+		//Using add is much faster than store/read...
+
 		16.do({
 			arg i;
 
