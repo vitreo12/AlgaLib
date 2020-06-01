@@ -187,7 +187,7 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		this.createSynth(this.synthDef.name);
+		this.createAllSynths(this.synthDef.name);
 	}
 
 	dispatchFunction { | obj, initGroups = false |
@@ -205,9 +205,7 @@ AlgaNode {
 			this.createAllBusses;
 
 			//Create actual synths
-			this.createSynth(this.synthDef.name);
-
-			this.controlNames.postln;
+			this.createAllSynths(this.synthDef.name);
 		};
 	}
 
@@ -233,6 +231,12 @@ AlgaNode {
 		this.normSynths.clear;
 	}
 
+	createAllSynths { | defName |
+		this.createSynth(this.synthDef.name);
+		this.createInterpNormSynths;
+	}
+
+	//Synth writes to the synthBus
 	createSynth { | defName |
 		this.synth = AlgaSynth.new(defName,
 			[\out, this.synthBus.asUGenInput, \fadeTime, this.fadeTime],
@@ -240,12 +244,11 @@ AlgaNode {
 		);
 	}
 
-	createInterpSynths {
+	//This should take in account the nextNode's numChannels when making connections
+	createInterpNormSynths {
+		this.controlNames.do({
 
-	}
-
-	createNormSynths {
-
+		});
 	}
 
 	freeSynth {
@@ -314,16 +317,15 @@ AlgaNode {
 		^this.synth.instantiated;
 	}
 
-	>> {
+	>> { | nextNode, param = \in |
 		//Should re-create interpSynth and interpBus for specific param
 	}
 
-	<< {
+	<< { | nextNode, param = \in |
 
 	}
 
-	<| {
+	<| { | param = \in |
 
 	}
-
 }
