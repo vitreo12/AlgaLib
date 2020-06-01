@@ -11,6 +11,8 @@ AlgaNode {
 	var <>synth, <>normSynths, <>interpSynths;
 	var <>synthBus, <>normBusses, <>interpBusses;
 
+	var <>defaultBusses;
+
 	var <>inConnections, <>outConnections;
 
 	var <>isPlaying = false;
@@ -29,6 +31,8 @@ AlgaNode {
 		//Per-argument dictionaries of interp/norm Busses and Synths belonging to this AlgaNode
 		this.normBusses   = Dictionary(10);
 		this.interpBusses = Dictionary(10);
+		this.defaultBusses = Dictionary(10);
+
 		this.normSynths   = Dictionary(10);
 		this.interpSynths = Dictionary(10);
 
@@ -86,6 +90,7 @@ AlgaNode {
 
 			this.normBusses[argName] = AlgaBus(this.server, argNumChannels, argRate);
 			this.interpBusses[argName] = AlgaBus(this.server, argNumChannels, argRate);
+			this.defaultBusses[argName] = AlgaBus(this.server, argNumChannels, argRate);
 		});
 
 		this.synthBus = AlgaBus(this.server, this.numChannels, this.rate);
@@ -98,6 +103,7 @@ AlgaNode {
 		var previousSynthBus = this.synthBus;
 		var previousNormBusses = this.normBusses;
 		var previousInterpBusses = this.interpBusses;
+		var previousDefaultBusses = this.defaultBusses;
 
 		if(now, {
 			if(previousSynthBus != nil, { previousSynthBus.free });
@@ -109,6 +115,11 @@ AlgaNode {
 			if(previousInterpBusses != nil, {
 				previousInterpBusses.do({ | interpBus |
 					if(interpBus != nil, { interpBus.free });
+				});
+			});
+			if(previousDefaultBusses != nil, {
+				previousDefaultBusses.do({ | defaultBus |
+					if(defaultBus != nil, { defaultBus.free });
 				});
 			});
 		}, {
@@ -126,6 +137,11 @@ AlgaNode {
 						if(interpBus != nil, { interpBus.free });
 					});
 				});
+				if(previousDefaultBusses != nil, {
+				previousDefaultBusses.do({ | defaultBus |
+					if(defaultBus != nil, { defaultBus.free });
+				});
+			});
 			}
 		});
 	}
@@ -139,7 +155,6 @@ AlgaNode {
 
 		//Free previous one
 		this.freeSynth;
-
 		this.freeInterpNormSynths(true, true);
 
 		//Is it really necessary to delete previous busses?
@@ -169,6 +184,13 @@ AlgaNode {
 
 	dispatchSynthDef { | obj, initGroups = false |
 		var synthDesc = SynthDescLib.global.at(obj);
+
+		if(synthDesc == nil, {
+			("Invalid AlgaSynthDef: '" ++ obj.asString ++"'").error;
+			this.clear;
+			^nil;
+		});
+
 		this.synthDef = synthDesc.def;
 
 		if(this.synthDef.class != AlgaSynthDef, {
@@ -187,7 +209,7 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		this.createAllSynths(this.synthDef.name);
+		this.createAllSynths(this.synthDef.name, this.numChannels);
 	}
 
 	dispatchFunction { | obj, initGroups = false |
@@ -205,7 +227,7 @@ AlgaNode {
 			this.createAllBusses;
 
 			//Create actual synths
-			this.createAllSynths(this.synthDef.name);
+			this.createAllSynths(this.synthDef.name, this.numChannels, this.rate);
 		};
 	}
 
@@ -231,23 +253,55 @@ AlgaNode {
 		this.normSynths.clear;
 	}
 
-	createAllSynths { | defName |
+	createAllSynths { | defName, inChannels = 1, inRate = \audio |
 		this.createSynth(this.synthDef.name);
-		this.createInterpNormSynths;
+		this.createInterpNormSynths(inChannels, inRate);
 	}
 
 	//Synth writes to the synthBus
 	createSynth { | defName |
 		this.synth = AlgaSynth.new(defName,
-			[\out, this.synthBus.asUGenInput, \fadeTime, this.fadeTime],
+			[\out, this.synthBus.index, \fadeTime, this.fadeTime],
 			this.synthGroup
 		);
 	}
 
 	//This should take in account the nextNode's numChannels when making connections
-	createInterpNormSynths {
-		this.controlNames.do({
+	createInterpNormSynths { | inChannels = 1, inRate = \audio |
 
+		this.controlNames.do({ | controlName |
+			var interpBus, normBus, interpSynth, normSynth;
+
+			var argName = controlName.name;
+			var argChannels = controlName.numChannels.asString;
+			var argRate = controlName.rate.asString;
+			var argDefault = controlName.defaultValue;
+
+			var interpSymbol = ("algaInterp_" ++
+				inRate.asString ++
+				inChannels.asString ++
+				"_" ++
+				argRate ++
+				argChannels
+			).asSymbol;
+
+			var normSymbol = ("algaNorm_" ++ argRate ++ argChannels).asSymbol;
+
+			interpBus = this.interpBusses[argName];
+			normBus = this.normBusses[argName];
+
+			interpSynth = AlgaSynth.new(interpSymbol,
+				[\in, argDefault, \out, interpBus.index, \fadeTime, this.fadeTime],
+				this.interpGroup
+			);
+
+			normSynth = AlgaSynth.new(normSymbol,
+				[\args, interpBus.asMap, \out, normBus.index, \fadeTime, this.fadeTime],
+				this.normGroup
+			);
+
+			this.interpSynths[argName] = interpSynth;
+			this.normSynths[argName] = normSynth;
 		});
 	}
 
