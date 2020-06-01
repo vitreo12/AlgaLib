@@ -30,7 +30,11 @@ AlgaBus {
 		this.bus.play;
 	}
 
-	asUGenInput {
+	asMap {
+		^this.bus.asMap;
+	}
+
+	index {
 		^this.bus.index;
 	}
 }

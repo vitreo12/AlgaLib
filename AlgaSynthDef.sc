@@ -78,15 +78,7 @@ AlgaSynthDef : SynthDef {
 			};
 
 			envgen = if(makeFadeEnv, {
-				if(isInterp.not, {
-					AlgaEnvGate.kr(i_level: 0, doneAction:2);
-				}, {
-					if(rate === 'audio', {
-						AlgaEnvGate.ar(i_level: 0, doneAction:2);
-					}, {
-						AlgaEnvGate.kr(i_level: 0, doneAction:2);
-					});
-				});
+				AlgaEnvGate.kr(i_level: 0, doneAction:2);
 			}, {
 				1.0;
 			});
@@ -108,9 +100,9 @@ AlgaSynthDef : SynthDef {
 			});
 
 			//Only multiply interp synths with the fade
-			if(isInterp, {
-				output = output * envgen;
-			});
+			//if(isInterp, {
+			//	output = output * envgen;
+			//});
 
 			//"passed in rate: % output rate: %\n".postf(rateConstraint, rate);
 
