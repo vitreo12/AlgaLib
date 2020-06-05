@@ -34,7 +34,7 @@ AlgaBus {
 
 	//This allows multichannel bus to be used when patching them with .busArg !
 	makeBusArg {
-		var index, numChannels, prefix;
+		var index, prefix;
 		if(bus.isNil) { ^busArg = "" }; // still neutral
 		prefix = if(rate == \audio) { "\a" } { "\c" };
 		index = bus.index;
