@@ -394,21 +394,34 @@ AlgaNode {
 		synthBus.play;
 	}
 
-	/*
+	//All synths must be instantiated (including interpolators and normalizers)
 	instantiated {
 		if(this.synth == nil, { ^false });
+
+		interpSynths.do({ | interpSynth |
+			if(interpSynth.instantiated == false, { ^false });
+		});
+
+		normSynths.do({ | normSynth |
+			if(normSynth.instantiated == false, { ^false });
+		});
+
+		//Lastly, the actual synth
 		^this.synth.instantiated;
 	}
-	*/
 
+	//nextNode is the receiver
 	>> { | nextNode, param = \in |
+		//Should re-create interpSynth and interpBus for specific param
+
+	}
+
+	//nextNode is the sender
+	<< { | nextNode, param = \in |
 		//Should re-create interpSynth and interpBus for specific param
 	}
 
-	<< { | nextNode, param = \in |
-
-	}
-
+	//resets to the default value
 	<| { | param = \in |
 
 	}
