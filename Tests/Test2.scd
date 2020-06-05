@@ -2,15 +2,15 @@
 Alga.boot({
 	AlgaSynthDef(\sine, {SinOsc.ar(\freq.kr(440))}).add;
 	AlgaSynthDef(\noise, {WhiteNoise.ar.dup * 0.2}).add;
+	s.plotTree;
 });
 )
 
-s.plotTree
-a = AlgaNode(\sine).play;
+a = AlgaNode(\sine).play
 b = AlgaNode({DC.kr(234)});
+c = AlgaNode({DC.kr(450)});
 
-a.ft = 3
+a.ft = 1
 
-b >>.freq a
-
-b.replace({DC.kr(330)});
+a <<.freq b
+c >>.freq b

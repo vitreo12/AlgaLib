@@ -40,7 +40,9 @@ AlgaNode {
 
 		//Per-argument connections to this AlgaNode
 		inConnections = Dictionary.new(10);
-		outConnections = Dictionary.new(10);
+		//outConnections are not indexed by param name, as they could be attached to multiple nodes with same param name.
+		//they are indexed by identity of the connected node (AlgaNode -> AlgaNode)
+		outConnections = IdentityDictionary.new(10);
 
 		//Dispatch node creation
 		this.dispatchNode(obj, true);
@@ -100,25 +102,21 @@ AlgaNode {
 
 	createInterpNormBusses {
 		controlNames.do({ | controlName |
-			var argName = controlName.name;
+			var paramName = controlName.name;
 
 			var argDefaultVal = controlName.defaultValue;
-			var argRate = controlName.rate;
-			var argNumChannels = controlName.numChannels;
+			var paramRate = controlName.rate;
+			var paramNumChannels = controlName.numChannels;
 
 			//interpBusses have 1 more channel for the envelope shape
-			interpBusses[argName] = AlgaBus(server, argNumChannels + 1, argRate);
-			normBusses[argName] = AlgaBus(server, argNumChannels, argRate);
+			interpBusses[paramName] = AlgaBus(server, paramNumChannels + 1, paramRate);
+			normBusses[paramName] = AlgaBus(server, paramNumChannels, paramRate);
 		});
 	}
 
 	createAllBusses {
 		this.createInterpNormBusses;
 		this.createSynthBus;
-	}
-
-	createInterpBusAtParam { | senderNode, param = \in |
-
 	}
 
 	freeSynthBus { | now = false |
@@ -256,7 +254,7 @@ AlgaNode {
 	//Remove \fadeTime \out and \gate and generate controlNames dict entries
 	createControlNames { | synthDescControlNames |
 		synthDescControlNames.do({ | controlName |
-			var argName = controlName.name;
+			var paramName = controlName.name;
 			if((controlName.name != \fadeTime).and(
 				controlName.name != \out).and(
 				controlName.name != \gate), {
@@ -295,30 +293,30 @@ AlgaNode {
 			var interpSymbol, normSymbol;
 			var interpBus, normBus, interpSynth, normSynth;
 
-			var argName = controlName.name;
-			var argChannels = controlName.numChannels.asString;
-			var argRate = controlName.rate.asString;
+			var paramName = controlName.name;
+			var paramNumChannels = controlName.numChannels.asString;
+			var paramRate = controlName.rate.asString;
 			var argDefault = controlName.defaultValue;
 
 			//e.g. \algaInterp_audio1_control1
 			interpSymbol = (
 				"algaInterp_" ++
-				argRate.asString ++
-				argChannels.asString ++
+				paramRate.asString ++
+				paramNumChannels.asString ++
 				"_" ++
-				argRate ++
-				argChannels
+				paramRate ++
+				paramNumChannels
 			).asSymbol;
 
 			//e.g. \algaNorm_audio1
 			normSymbol = (
 				"algaNorm_" ++
-				argRate ++
-				argChannels
+				paramRate ++
+				paramNumChannels
 			).asSymbol;
 
-			interpBus = interpBusses[argName];
-			normBus = normBusses[argName];
+			interpBus = interpBusses[paramName];
+			normBus = normBusses[paramName];
 
 			interpSynth = AlgaSynth.new(
 				interpSymbol,
@@ -332,14 +330,12 @@ AlgaNode {
 				normGroup
 			);
 
-			interpSynths[argName] = interpSynth;
-			normSynths[argName] = normSynth;
+			interpSynths[paramName] = interpSynth;
+			normSynths[paramName] = normSynth;
 
-			//Wait fade time then patch the synth's arguments to the normBusses
-			fork {
-				fadeTime.wait;
-				synth.set(argName, normBus.busArg);
-			}
+			//Connect right away, as th normSynth will normalize the fading in value of
+			//the interpSynth set to default, so no need to wait for fadeTime to make connection
+			synth.set(paramName, normBus.busArg);
 		});
 	}
 
@@ -348,8 +344,41 @@ AlgaNode {
 		this.createInterpNormSynths;
 	}
 
-	createInterpSynthAtParam { | senderNode, param = \in |
+	createInterpSynthAtParam { | sender, param = \in |
+		var controlName;
+		var paramNumChannels, paramRate;
+		var senderNumChannels, senderRate;
+		var interpSymbol;
 
+		var interpBus, interpSynth;
+
+		controlName = controlNames[param];
+
+		paramNumChannels = controlName.numChannels;
+		paramRate = controlName.rate;
+		senderNumChannels = sender.numChannels;
+		senderRate = sender.rate;
+
+		interpSymbol = (
+			"algaInterp_" ++
+			senderRate ++
+			senderNumChannels ++
+			"_" ++
+			paramRate ++
+			paramNumChannels
+		).asSymbol;
+
+		interpBus = interpBusses[param];
+
+		//new interp synth, with input connected to sender and output to the interpBus
+		interpSynth = AlgaSynth.new(
+			interpSymbol,
+			[\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, fadeTime],
+			interpGroup
+		);
+
+		//Add synth to interpSynths
+		interpSynths[param] = interpSynth;
 	}
 
 	//Default now and fadetime to true for synths
@@ -421,13 +450,6 @@ AlgaNode {
 		interpSynthAtParam.set(\gate, 0, \fadeTime, fadeTime);
 	}
 
-	resetConnections {
-		if(toBeCleared, {
-			inConnections.clear;
-			outConnections.clear;
-		});
-	}
-
 	replace { | obj |
 		//re-init groups if clear was used
 		var initGroups = if(group == nil, { true }, { false });
@@ -438,7 +460,7 @@ AlgaNode {
 		//Free previous ones
 		this.freeAllSynths;
 
-		//Should perhaps check for new numChannels / rate, instead of just deleting
+		//Should perhaps check for new numChannels / rate, instead of just deleting it all
 		this.freeAllBusses;
 
 		//New one
@@ -483,45 +505,56 @@ AlgaNode {
 		^synth.instantiated;
 	}
 
-	newInterpConnectionAtParam { | senderNode, param = \in |
+	resetConnections {
+		if(toBeCleared, {
+			inConnections.clear;
+			outConnections.clear;
+		});
+	}
+
+	//add entries to the inConnections / outConnections of the two AlgaNodes
+	addConnections { | sender, param = \in |
+		inConnections[param] = sender;
+		sender.outConnections[this] = this;
+	}
+
+	newInterpConnectionAtParam { | sender, param = \in |
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this;});
 
-		//Free prev interp synth
+		//Free prev interp synth (fades out)
 		this.freeInterpSynthAtParam(param);
 
-		//Create a new interpBus ONLY if numChannels / rate are different
-		this.createInterpBusAtParam(senderNode, param);
-
-		//Create new interp synth according to sender's numChannels / rate
-		this.createInterpSynthAtParam(senderNode, param);
+		//Spawn new interp synth (fades in)
+		this.createInterpSynthAtParam(sender, param);
 
 		//Add proper inConnections / outConnections
+		this.addConnections(sender, param);
 	}
 
 	//implements receiver <<.param sender
-	makeConnection { | senderNode, param = \in |
-		//Connect interpSynth to the senderNode's synthBus
-		AlgaSpinRoutine.waitFor( { (this.instantiated).and(senderNode.instantiated) }, {
-			this.newInterpConnectionAtParam(senderNode, param);
+	makeConnection { | sender, param = \in |
+		//Connect interpSynth to the sender's synthBus
+		AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
+			this.newInterpConnectionAtParam(sender, param);
 		});
 	}
 
 	//arg is the sender
-	<< { | senderNode, param = \in |
-		this.makeConnection(senderNode, param);
-	}
-
-	//arg is the receiver
-	>> { | receiverNode, param = \in |
-		if(receiverNode.class == AlgaNode, {
-			receiverNode.makeConnection(this, param);
+	<< { | sender, param = \in |
+		if(sender.class == AlgaNode, {
+			this.makeConnection(sender, param);
 		}, {
-			"Trying to make a connection to an invalid AlgaNode".error;
+			("Trying to make a connection with an invalid AlgaNode: " ++ sender).error;
 		});
 	}
 
-	//resets to the default value
+	//arg is the receiver
+	>> { | receiver, param = \in |
+		receiver.makeConnection(this, param);
+	}
+
+	//resets to the default value in controlNames
 	<| { | param = \in |
 
 	}
