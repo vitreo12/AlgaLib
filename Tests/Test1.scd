@@ -1,5 +1,5 @@
 (
-AlgaLib.boot({
+Alga.boot({
 	AlgaSynthDef(\sine, {SinOsc.ar(\freq.kr(440))}).add;
 	AlgaSynthDef(\noise, {WhiteNoise.ar.dup * 0.2}).add;
 });
@@ -13,7 +13,7 @@ a = AlgaNode(\sine, fadeTime:1)
 a.fadeTime = 3
 a.clear
 
-AlgaLib.boot
+Alga.boot;
 b = AlgaNode({SinOsc.ar(\f.ar(440)) * \a.kr(0.7)}).play
 
 b.interpSynths[\a].set(\in, 0.5)
