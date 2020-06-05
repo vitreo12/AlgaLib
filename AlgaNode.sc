@@ -5,7 +5,9 @@ AlgaNode {
 
 	var <synthDef;
 
-	var <controlNames, <numChannels, <rate;
+	var <controlNames;
+
+	var <numChannels, <rate;
 
 	var <group, <synthGroup, <normGroup, <interpGroup;
 	var <synth, <normSynths, <interpSynths;
@@ -28,6 +30,9 @@ AlgaNode {
 
 		if(argServer == nil, { server = Server.default }, { server = argServer });
 
+		//param -> ControlName
+		controlNames = Dictionary(10);
+
 		//Per-argument dictionaries of interp/norm Busses and Synths belonging to this AlgaNode
 		normBusses   = Dictionary(10);
 		interpBusses = Dictionary(10);
@@ -42,6 +47,14 @@ AlgaNode {
 
 		//Dispatch node creation
 		this.dispatchNode(obj, true);
+	}
+
+	ft {
+		^fadeTime;
+	}
+
+	ft_ { | val |
+		fadeTime = val;
 	}
 
 	createAllGroups {
@@ -187,6 +200,7 @@ AlgaNode {
 	}
 
 	dispatchSynthDef { | obj, initGroups = false |
+		var synthDescControlNames;
 		var synthDesc = SynthDescLib.global.at(obj);
 
 		if(synthDesc == nil, {
@@ -203,8 +217,9 @@ AlgaNode {
 			^nil;
 		});
 
-		controlNames = synthDesc.controls;
-		this.sanitizeControlNames;
+		synthDescControlNames = synthDesc.controls;
+		this.createControlNames(synthDescControlNames);
+
 		numChannels = synthDef.numChannels;
 		rate = synthDef.rate;
 
@@ -219,10 +234,14 @@ AlgaNode {
 	dispatchFunction { | obj, initGroups = false |
 		//Need to wait for server's receiving the sdef
 		fork {
+			var synthDescControlNames;
+
 			synthDef = AlgaSynthDef(("alga_" ++ UniqueID.next).asSymbol, obj).send(server);
 			server.sync;
-			controlNames = synthDef.asSynthDesc.controls;
-			this.sanitizeControlNames;
+
+			synthDescControlNames = synthDef.asSynthDesc.controls;
+			this.createControlNames(synthDescControlNames);
+
 			numChannels = synthDef.numChannels;
 			rate = synthDef.rate;
 
@@ -235,11 +254,13 @@ AlgaNode {
 		};
 	}
 
-	//Remove \fadeTime \out and \gate from controlNames
-	sanitizeControlNames {
-		controlNames.removeAllSuchThat({ | controlName |
+	//Remove \fadeTime \out and \gate and generate controlNames dict entries
+	createControlNames { | synthDescControlNames |
+		synthDescControlNames.do({ | controlName |
 			var argName = controlName.name;
-			(controlName.name == \fadeTime).or(controlName.name == \out).or(controlName.name == \gate);
+			if((controlName.name != \fadeTime).and(controlName.name != \out).and(controlName.name != \gate), {
+				controlNames[controlName.name] = controlName;
+			});
 		});
 	}
 
@@ -247,7 +268,7 @@ AlgaNode {
 		//Set to nil (should it fork?)
 		synth = nil;
 		synthDef = nil;
-		controlNames = nil;
+		controlNames.clear;
 		numChannels = 0;
 		rate = nil;
 	}
@@ -270,6 +291,10 @@ AlgaNode {
 			[\out, synthBus.index, \fadeTime,fadeTime],
 			synthGroup
 		);
+	}
+
+	createInterpSynthAtParam { | param = \in |
+
 	}
 
 	//This should take in account the nextNode's numChannels when making connections
@@ -377,6 +402,13 @@ AlgaNode {
 		});
 	}
 
+	//This is only used in connection situations
+	freeInterpSynthAtParam { | param = \in |
+		var interpSynthAtParam = interpSynths[param];
+		if(interpSynthAtParam == nil, { ("Invalid param: " ++ param).error; ^this });
+		interpSynthAtParam.set(\gate, 0, \fadeTime, fadeTime);
+	}
+
 	resetConnections {
 		if(toBeCleared, {
 			inConnections.clear;
@@ -422,17 +454,19 @@ AlgaNode {
 		^synth.instantiated;
 	}
 
+	newInterpConnectionAtParam { | param = \in |
+		//Free previous one over fade time
+		this.freeInterpSynthAtParam(param);
+
+		//Create new one
+		this
+	}
+
 	//implements receiver <<.param sender
 	makeConnection { | senderNode, param = \in |
-		//Should re-create interpSynth and interpBus for specific param
-
-		var interpSynthAtParam = interpSynths[param];
-
-		if(interpSynthAtParam == nil, { ("Invalid param: " ++ param).error; ^this });
-
 		//Connect interpSynth to the senderNode's synthBus
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(senderNode.instantiated) }, {
-			interpSynthAtParam.set(\in, senderNode.synthBus.busArg);
+			this.newInterpConnectionAtParam(param);
 		});
 	}
 

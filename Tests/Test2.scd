@@ -9,6 +9,8 @@ s.plotTree
 a = AlgaNode(\sine).play;
 b = AlgaNode({DC.kr(234)});
 
+a.ft = 3
+
 b >>.freq a
 
 b.replace({DC.kr(330)});
