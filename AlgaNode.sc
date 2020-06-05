@@ -431,7 +431,9 @@ AlgaNode {
 		if(interpSynthAtParam == nil, { ("Invalid param: " ++ param).error; ^this });
 
 		//Connect interpSynth to the senderNode's synthBus
-		interpSynthAtParam.set(\in, senderNode.synthBus.busArg);
+		AlgaSpinRoutine.waitFor( { (this.instantiated).and(senderNode.instantiated) }, {
+			interpSynthAtParam.set(\in, senderNode.synthBus.busArg);
+		});
 	}
 
 	//arg is the sender
