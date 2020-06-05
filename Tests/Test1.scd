@@ -7,11 +7,14 @@ Alga.boot({
 
 s.plotTree
 
-s.scope
-
 a = AlgaNode(\sine, fadeTime:1)
 a.fadeTime = 3
+a.play
 a.clear
+
+a.interpSynths[\freq].set(\in, 500)
+
+a.synthBus.free
 
 Alga.boot;
 b = AlgaNode({SinOsc.ar(\f.ar(440)) * \a.kr(0.7)}).play

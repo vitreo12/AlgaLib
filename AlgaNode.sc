@@ -13,8 +13,6 @@ AlgaNode {
 	var <synth, <normSynths, <interpSynths;
 	var <synthBus, <normBusses, <interpBusses;
 
-	var <defaultBusses;
-
 	var <inConnections, <outConnections;
 
 	var <isPlaying = false;
@@ -25,9 +23,10 @@ AlgaNode {
 	}
 
 	init { | obj, argServer, argFadeTime = 0 |
-
+		//starting fadeTime
 		fadeTime = argFadeTime;
 
+		//Default server if not specified otherwise
 		if(argServer == nil, { server = Server.default }, { server = argServer });
 
 		//param -> ControlName
@@ -36,8 +35,6 @@ AlgaNode {
 		//Per-argument dictionaries of interp/norm Busses and Synths belonging to this AlgaNode
 		normBusses   = Dictionary(10);
 		interpBusses = Dictionary(10);
-		defaultBusses = Dictionary(10);
-
 		normSynths   = Dictionary(10);
 		interpSynths = Dictionary(10);
 
@@ -82,19 +79,26 @@ AlgaNode {
 			if(now, {
 				//Free now
 				group.free;
-				this.resetGroups;
+
+				//this.resetGroups;
 			}, {
 				//Wait fadeTime, then free
 				fork {
 					fadeTime.wait;
 					group.free;
-					this.resetGroups;
+
+					//this.resetGroups;
 				};
 			});
 		});
 	}
 
-	createAllBusses {
+	createSynthBus {
+		synthBus = AlgaBus(server, numChannels, rate);
+		if(isPlaying, { synthBus.play });
+	}
+
+	createInterpNormBusses {
 		controlNames.do({ | controlName |
 			var argName = controlName.name;
 
@@ -105,80 +109,73 @@ AlgaNode {
 			//interpBusses have 1 more channel for the envelope shape
 			interpBusses[argName] = AlgaBus(server, argNumChannels + 1, argRate);
 			normBusses[argName] = AlgaBus(server, argNumChannels, argRate);
-
-			defaultBusses[argName] = AlgaBus(server, argNumChannels, argRate);
 		});
-
-		synthBus = AlgaBus(server, numChannels, rate);
-
-		if(isPlaying, { synthBus.play });
 	}
 
-	freeAllBusses { | now = false |
+	createAllBusses {
+		this.createInterpNormBusses;
+		this.createSynthBus;
+	}
+
+	createInterpBusAtParam { | senderNode, param = \in |
+
+	}
+
+	freeSynthBus { | now = false |
 		//if forking, this.synthBus could have changed, that's why this is needed
-		var previousSynthBus = synthBus;
-		var previousNormBusses = normBusses;
-		var previousInterpBusses = interpBusses;
-		var previousDefaultBusses = defaultBusses;
+		var prevSynthBus = synthBus;
 
 		if(now, {
-			//Free busses now
-			if(previousSynthBus != nil, { previousSynthBus.free });
-			if(previousNormBusses != nil, {
-				previousNormBusses.do({ | normBus |
-					if(normBus != nil, { normBus.free });
-				});
-			});
-			if(previousInterpBusses != nil, {
-				previousInterpBusses.do({ | interpBus |
-					if(interpBus != nil, { interpBus.free });
-				});
-			});
-			if(previousDefaultBusses != nil, {
-				previousDefaultBusses.do({ | defaultBus |
-					if(defaultBus != nil, { defaultBus.free });
-				});
-			});
+			if(prevSynthBus != nil, { prevSynthBus.free });
 		}, {
-			//Free previous busses after fadeTime
 			fork {
 				fadeTime.wait;
-				if(previousSynthBus != nil, { previousSynthBus.free });
-				if(previousNormBusses != nil, {
-					previousNormBusses.do({ | normBus |
-						if(normBus != nil, { normBus.free });
-					});
-				});
-				if(previousInterpBusses != nil, {
-					previousInterpBusses.do({ | interpBus |
-						if(interpBus != nil, { interpBus.free });
-					});
-				});
-				if(previousDefaultBusses != nil, {
-				previousDefaultBusses.do({ | defaultBus |
-					if(defaultBus != nil, { defaultBus.free });
-				});
-			});
+				if(prevSynthBus != nil, { prevSynthBus.free });
 			}
 		});
 	}
 
-	replace { | obj |
-		//re-init groups if clear was used
-		var initGroups = if(group == nil, { true }, { false });
+	freeInterpNormBusses { | now = false |
 
-		//In case it has been set to true when clearing, then replacing before clear ends!
-		toBeCleared = false;
+		if(now, {
+			//Free busses now
+			if(normBusses != nil, {
+				normBusses.do({ | normBus |
+					if(normBus != nil, { normBus.free });
+				});
+			});
 
-		//Free previous one
-		this.freeSynth;
-		this.freeInterpNormSynths(true, true);
+			if(normBusses != nil, {
+				normBusses.do({ | interpBus |
+					if(interpBus != nil, { interpBus.free });
+				});
+			});
+		}, {
+			//Dictionary need to be deepcopied
+			var prevNormBusses = normBusses.copy;
+			var prevInterpBusses = interpBusses.copy;
 
-		//Is it really necessary to delete previous busses?
-		this.freeAllBusses;
+			//Free prev busses after fadeTime
+			fork {
+				fadeTime.wait;
+				if(prevNormBusses != nil, {
+					prevNormBusses.do({ | normBus |
+						if(normBus != nil, { normBus.free });
+					});
+				});
 
-		//New one
-		this.dispatchNode(obj, initGroups);
+				if(prevInterpBusses != nil, {
+					prevInterpBusses.do({ | interpBus |
+						if(interpBus != nil, { interpBus.free });
+					});
+				});
+			}
+		});
+	}
+
+	freeAllBusses { | now = false |
+		this.freeSynthBus(now);
+		this.freeInterpNormBusses(now);
 	}
 
 	//dispatches controlnames / numChannels / rate according to obj class
@@ -199,6 +196,7 @@ AlgaNode {
 		});
 	}
 
+	//Dispatch a SynthDef
 	dispatchSynthDef { | obj, initGroups = false |
 		var synthDescControlNames;
 		var synthDesc = SynthDescLib.global.at(obj);
@@ -228,9 +226,10 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		this.createAllSynths(synthDef.name, numChannels);
+		this.createAllSynths(synthDef.name);
 	}
 
+	//Dispatch a Function
 	dispatchFunction { | obj, initGroups = false |
 		//Need to wait for server's receiving the sdef
 		fork {
@@ -258,7 +257,9 @@ AlgaNode {
 	createControlNames { | synthDescControlNames |
 		synthDescControlNames.do({ | controlName |
 			var argName = controlName.name;
-			if((controlName.name != \fadeTime).and(controlName.name != \out).and(controlName.name != \gate), {
+			if((controlName.name != \fadeTime).and(
+				controlName.name != \out).and(
+				controlName.name != \gate), {
 				controlNames[controlName.name] = controlName;
 			});
 		});
@@ -279,11 +280,6 @@ AlgaNode {
 		normSynths.clear;
 	}
 
-	createAllSynths { | defName |
-		this.createSynth(synthDef.name);
-		this.createInterpNormSynths;
-	}
-
 	//Synth writes to the synthBus
 	createSynth { | defName |
 		synth = AlgaSynth.new(
@@ -293,32 +289,22 @@ AlgaNode {
 		);
 	}
 
-	createInterpSynthAtParam { | param = \in |
-
-	}
-
 	//This should take in account the nextNode's numChannels when making connections
-	createInterpNormSynths { | inChannels, inRate |
+	createInterpNormSynths {
 		controlNames.do({ | controlName |
-			var interpBus, normBus, interpSynth, normSynth;
-
 			var interpSymbol, normSymbol;
-
-			var inputChannels, inputRate;
+			var interpBus, normBus, interpSynth, normSynth;
 
 			var argName = controlName.name;
 			var argChannels = controlName.numChannels.asString;
 			var argRate = controlName.rate.asString;
 			var argDefault = controlName.defaultValue;
 
-			if(inChannels == nil, { inputChannels = argChannels }, { inputChannels = inChannels });
-			if(inRate == nil, { inputRate = argRate }, { inputRate = inRate });
-
 			//e.g. \algaInterp_audio1_control1
 			interpSymbol = (
 				"algaInterp_" ++
-				inputRate.asString ++
-				inputChannels.asString ++
+				argRate.asString ++
+				argChannels.asString ++
 				"_" ++
 				argRate ++
 				argChannels
@@ -354,37 +340,58 @@ AlgaNode {
 				fadeTime.wait;
 				synth.set(argName, normBus.busArg);
 			}
-
 		});
 	}
 
-	freeSynth {
-		if(synth != nil, {
-			//Send fadeTime too again in case it has been changed by user
-			//fade time will eventually be put just to the interp proxies!
-			synth.set(\gate, 0, \fadeTime, fadeTime);
+	createAllSynths { | defName |
+		this.createSynth(defName);
+		this.createInterpNormSynths;
+	}
 
-			this.resetSynth;
+	createInterpSynthAtParam { | senderNode, param = \in |
+
+	}
+
+	//Default now and fadetime to true for synths
+	freeSynth { | useFadeTime = true, now = true |
+		if(now, {
+			if(synth != nil, {
+				synth.set(\gate, 0, \fadeTime,  if(useFadeTime, { fadeTime }, {0}));
+
+				//this.resetSynth;
+			});
+		}, {
+			fork {
+				fadeTime.wait;
+				if(synth != nil, {
+					synth.set(\gate, 0, \fadeTime,  0);
+
+					//this.resetSynth;
+				});
+			}
 		});
 	}
 
-	freeInterpNormSynths { | useFadeTime = false, now = false |
-		var prevInterpSynths = interpSynths;
-		var prevNormSynths = normSynths;
+	//Default now and fadetime to true for synths
+	freeInterpNormSynths { | useFadeTime = true, now = true |
 
 		if(now, {
 			//Free synths now
-			prevInterpSynths.do({ | interpSynth |
+			interpSynths.do({ | interpSynth |
 				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { fadeTime }, {0}));
 			});
 
-			prevNormSynths.do({ | normSynth |
+			normSynths.do({ | normSynth |
 				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { fadeTime }, {0}));
 			});
 
 			//this.resetInterpNormSynths;
 
 		}, {
+			//Dictionaries need to be deep copied
+			var prevInterpSynths = interpSynths.copy;
+			var prevNormSynths = normSynths.copy;
+
 			fork {
 				//Wait, then free synths
 				fadeTime.wait;
@@ -402,10 +409,15 @@ AlgaNode {
 		});
 	}
 
+	freeAllSynths { | useFadeTime = true, now = true |
+		this.freeSynth(useFadeTime, now);
+		this.freeInterpNormSynths(useFadeTime, now);
+	}
+
 	//This is only used in connection situations
 	freeInterpSynthAtParam { | param = \in |
 		var interpSynthAtParam = interpSynths[param];
-		if(interpSynthAtParam == nil, { ("Invalid param: " ++ param).error; ^this });
+		if(interpSynthAtParam == nil, { ("Invalid param for interp synth to free: " ++ param).error; ^this });
 		interpSynthAtParam.set(\gate, 0, \fadeTime, fadeTime);
 	}
 
@@ -414,6 +426,23 @@ AlgaNode {
 			inConnections.clear;
 			outConnections.clear;
 		});
+	}
+
+	replace { | obj |
+		//re-init groups if clear was used
+		var initGroups = if(group == nil, { true }, { false });
+
+		//In case it has been set to true when clearing, then replacing before clear ends!
+		toBeCleared = false;
+
+		//Free previous ones
+		this.freeAllSynths;
+
+		//Should perhaps check for new numChannels / rate, instead of just deleting
+		this.freeAllBusses;
+
+		//New one
+		this.dispatchNode(obj, initGroups);
 	}
 
 	clear {
@@ -428,7 +457,7 @@ AlgaNode {
 			this.freeAllGroups(true);
 			this.freeAllBusses(true);
 
-			//Reset connections dict
+			//Reset connection dicts
 			this.resetConnections;
 		}
 	}
@@ -454,19 +483,27 @@ AlgaNode {
 		^synth.instantiated;
 	}
 
-	newInterpConnectionAtParam { | param = \in |
-		//Free previous one over fade time
+	newInterpConnectionAtParam { | senderNode, param = \in |
+		var controlName = controlNames[param];
+		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this;});
+
+		//Free prev interp synth
 		this.freeInterpSynthAtParam(param);
 
-		//Create new one
-		this
+		//Create a new interpBus ONLY if numChannels / rate are different
+		this.createInterpBusAtParam(senderNode, param);
+
+		//Create new interp synth according to sender's numChannels / rate
+		this.createInterpSynthAtParam(senderNode, param);
+
+		//Add proper inConnections / outConnections
 	}
 
 	//implements receiver <<.param sender
 	makeConnection { | senderNode, param = \in |
 		//Connect interpSynth to the senderNode's synthBus
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(senderNode.instantiated) }, {
-			this.newInterpConnectionAtParam(param);
+			this.newInterpConnectionAtParam(senderNode, param);
 		});
 	}
 
