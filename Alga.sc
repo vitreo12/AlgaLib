@@ -24,7 +24,7 @@ AlgaServerOptions {
 	}
 }
 
-AlgaLib {
+Alga {
 
 	*boot { | onBoot, server, algaServerOptions |
 
