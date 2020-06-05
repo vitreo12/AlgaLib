@@ -339,7 +339,7 @@ var args = \\args.ar([0, 0]);
 var val = args[0];
 var env = args[1];
 var out = val / env;
-Out.ar(\\out.ir(0), out);
+out;
 }).add;";
 
 				result_control = "AlgaSynthDef(\\algaNorm_control1, {
@@ -347,7 +347,7 @@ var args = \\args.kr([0, 0]);
 var val = args[0];
 var env = args[1];
 var out = val / env;
-Out.kr(\\out.ir(0), out);
+out;
 }).add;";
 
 			}, {
@@ -365,7 +365,7 @@ var args = \\args.ar( " ++ arrayOfZeros ++ ");
 var val = args[0.." ++ (counter - 1).asString ++ "];
 var env = args[" ++ counter.asString ++ "];
 var out = val / env;
-Out.ar(\\out.ir(0), out);
+out;
 }).add;";
 
 				result_control = "AlgaSynthDef(\\algaNorm_control" ++ counter.asString ++ ", {
@@ -373,7 +373,7 @@ var args = \\args.kr( " ++ arrayOfZeros ++ ");
 var val = args[0.." ++ (counter - 1).asString ++ "];
 var env = args[" ++ counter.asString ++ "];
 var out = val / env;
-Out.kr(\\out.ir(0), out);
+out;
 }).add;";
 
 			});
