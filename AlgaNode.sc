@@ -408,7 +408,7 @@ AlgaNode {
 
 	//All synths must be instantiated (including interpolators and normalizers)
 	instantiated {
-		if(this.synth == nil, { ^false });
+		if(synth == nil, { ^false });
 
 		interpSynths.do({ | interpSynth |
 			if(interpSynth.instantiated == false, { ^false });
@@ -419,24 +419,33 @@ AlgaNode {
 		});
 
 		//Lastly, the actual synth
-		^this.synth.instantiated;
+		^synth.instantiated;
 	}
 
-	//nextNode is the receiver
-	>> { | nextNode, param = \in |
+	//implements receiver <<.param sender
+	makeConnection { | senderNode, param = \in |
 		//Should re-create interpSynth and interpBus for specific param
 
-		var nextNodeInterpSynth = nextNode.interpSynths[param];
+		var interpSynthAtParam = interpSynths[param];
 
-		if(nextNodeInterpSynth == nil, { ("Invalid param: " ++ param).error; ^this });
+		if(interpSynthAtParam == nil, { ("Invalid param: " ++ param).error; ^this });
 
-		//Connect nextNodes's interpProxy at correct param with this one's synth bus
-		nextNodeInterpSynth.set(\in, synthBus.busArg);
+		//Connect interpSynth to the senderNode's synthBus
+		interpSynthAtParam.set(\in, senderNode.synthBus.busArg);
 	}
 
-	//nextNode is the sender
-	<< { | nextNode, param = \in |
-		nextNode >>.param this;
+	//arg is the sender
+	<< { | senderNode, param = \in |
+		this.makeConnection(senderNode, param);
+	}
+
+	//arg is the receiver
+	>> { | receiverNode, param = \in |
+		if(receiverNode.class == AlgaNode, {
+			receiverNode.makeConnection(this, param);
+		}, {
+			"Trying to make a connection to an invalid AlgaNode".error;
+		});
 	}
 
 	//resets to the default value
