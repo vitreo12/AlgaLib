@@ -289,6 +289,7 @@ AlgaNode {
 			if(inChannels == nil, { inputChannels = argChannels }, { inputChannels = inChannels });
 			if(inRate == nil, { inputRate = argRate }, { inputRate = inRate });
 
+			//e.g. \algaInterp_audio1_control1
 			interpSymbol = (
 				"algaInterp_" ++
 				inputRate.asString ++
@@ -298,6 +299,7 @@ AlgaNode {
 				argChannels
 			).asSymbol;
 
+			//e.g. \algaNorm_audio1
 			normSymbol = (
 				"algaNorm_" ++
 				argRate ++
@@ -306,8 +308,6 @@ AlgaNode {
 
 			interpBus = interpBusses[argName];
 			normBus = normBusses[argName];
-
-			interpSymbol.postln;
 
 			interpSynth = AlgaSynth.new(
 				interpSymbol,
@@ -348,6 +348,7 @@ AlgaNode {
 		var prevNormSynths = normSynths;
 
 		if(now, {
+			//Free synths now
 			prevInterpSynths.do({ | interpSynth |
 				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { fadeTime }, {0}));
 			});
@@ -360,6 +361,7 @@ AlgaNode {
 
 		}, {
 			fork {
+				//Wait, then free synths
 				fadeTime.wait;
 
 				prevInterpSynths.do({ | interpSynth |
@@ -375,6 +377,13 @@ AlgaNode {
 		});
 	}
 
+	resetConnections {
+		if(toBeCleared, {
+			inConnections.clear;
+			outConnections.clear;
+		});
+	}
+
 	clear {
 		fork {
 			this.freeSynth;
@@ -386,6 +395,9 @@ AlgaNode {
 			this.freeInterpNormSynths(false, true);
 			this.freeAllGroups(true);
 			this.freeAllBusses(true);
+
+			//Reset connections dict
+			this.resetConnections;
 		}
 	}
 
@@ -414,11 +426,17 @@ AlgaNode {
 	>> { | nextNode, param = \in |
 		//Should re-create interpSynth and interpBus for specific param
 
+		var nextNodeInterpSynth = nextNode.interpSynths[param];
+
+		if(nextNodeInterpSynth == nil, { ("Invalid param: " ++ param).error; ^this });
+
+		//Connect nextNodes's interpProxy at correct param with this one's synth bus
+		nextNodeInterpSynth.set(\in, synthBus.busArg);
 	}
 
 	//nextNode is the sender
 	<< { | nextNode, param = \in |
-		//Should re-create interpSynth and interpBus for specific param
+		nextNode >>.param this;
 	}
 
 	//resets to the default value
