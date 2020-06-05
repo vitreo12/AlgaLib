@@ -1,79 +1,80 @@
 AlgaNode {
-	var <>server;
-	var <>fadeTime = 0;
-	var <>objClass;
+	var <server;
+	var <>fadeTime = 0; //Can be set from outside
+	var <objClass;
 
-	var <>synthDef;
+	var <synthDef;
 
-	var <>controlNames, <>numChannels, <>rate;
+	var <controlNames, <numChannels, <rate;
 
-	var <>group, <>synthGroup, <>normGroup, <>interpGroup;
-	var <>synth, <>normSynths, <>interpSynths;
-	var <>synthBus, <>normBusses, <>interpBusses;
+	var <group, <synthGroup, <normGroup, <interpGroup;
+	var <synth, <normSynths, <interpSynths;
+	var <synthBus, <normBusses, <interpBusses;
 
-	var <>defaultBusses;
+	var <defaultBusses;
 
-	var <>inConnections, <>outConnections;
+	var <inConnections, <outConnections;
 
-	var <>isPlaying = false;
-	var <>toBeCleared = false;
+	var <isPlaying = false;
+	var <toBeCleared = false;
 
 	*new { | obj, server, fadeTime = 0 |
 		^super.new.init(obj, server, fadeTime)
 	}
 
-	init { | obj, server, fadeTime = 0 |
+	init { | obj, argServer, argFadeTime = 0 |
 
-		this.fadeTime = fadeTime;
+		fadeTime = argFadeTime;
 
-		if(server == nil, {this.server = Server.default}, {this.server = server});
+		if(argServer == nil, { server = Server.default }, { server = argServer });
 
 		//Per-argument dictionaries of interp/norm Busses and Synths belonging to this AlgaNode
-		this.normBusses   = Dictionary(10);
-		this.interpBusses = Dictionary(10);
-		this.defaultBusses = Dictionary(10);
+		normBusses   = Dictionary(10);
+		interpBusses = Dictionary(10);
+		defaultBusses = Dictionary(10);
 
-		this.normSynths   = Dictionary(10);
-		this.interpSynths = Dictionary(10);
+		normSynths   = Dictionary(10);
+		interpSynths = Dictionary(10);
 
 		//Per-argument connections to this AlgaNode
-		this.inConnections = Dictionary.new(10);
-		this.outConnections = Dictionary.new(10);
+		inConnections = Dictionary.new(10);
+		outConnections = Dictionary.new(10);
 
 		//Dispatch node creation
 		this.dispatchNode(obj, true);
 	}
 
 	createAllGroups {
-		if(this.group == nil, {
-			this.group = Group(this.server);
-			this.synthGroup = Group(group); //could be ParGroup here for supernova + patterns...
-			this.normGroup = Group(group);
-			this.interpGroup = Group(group);
+		if(group == nil, {
+			group = Group(this.server);
+			synthGroup = Group(group); //could be ParGroup here for supernova + patterns...
+			normGroup = Group(group);
+			interpGroup = Group(group);
 		});
 	}
 
 	resetGroups {
 		//Reset values
-		this.group = nil;
-		this.synthGroup = nil;
-		this.normGroup = nil;
-		this.interpGroup = nil;
+		group = nil;
+		synthGroup = nil;
+		normGroup = nil;
+		interpGroup = nil;
 	}
 
 	//Groups (and state) will be reset only if they are nil AND they are set to be freed.
 	//the toBeCleared variable can be changed in real time, if AlgaNode.replace is called while
 	//clearing is happening!
 	freeAllGroups { | now = false |
-		if((this.group != nil).and(this.toBeCleared), {
+		if((group != nil).and(toBeCleared), {
 			if(now, {
-				//Just delete top group (it will delete all children too)
-				this.group.free;
+				//Free now
+				group.free;
 				this.resetGroups;
 			}, {
+				//Wait fadeTime, then free
 				fork {
-					this.fadeTime.wait;
-					this.group.free;
+					fadeTime.wait;
+					group.free;
 					this.resetGroups;
 				};
 			});
@@ -81,7 +82,7 @@ AlgaNode {
 	}
 
 	createAllBusses {
-		this.controlNames.do({ | controlName |
+		controlNames.do({ | controlName |
 			var argName = controlName.name;
 
 			var argDefaultVal = controlName.defaultValue;
@@ -89,25 +90,26 @@ AlgaNode {
 			var argNumChannels = controlName.numChannels;
 
 			//interpBusses have 1 more channel for the envelope shape
-			this.interpBusses[argName] = AlgaBus(this.server, argNumChannels + 1, argRate);
-			this.normBusses[argName] = AlgaBus(this.server, argNumChannels, argRate);
+			interpBusses[argName] = AlgaBus(server, argNumChannels + 1, argRate);
+			normBusses[argName] = AlgaBus(server, argNumChannels, argRate);
 
-			this.defaultBusses[argName] = AlgaBus(this.server, argNumChannels, argRate);
+			defaultBusses[argName] = AlgaBus(server, argNumChannels, argRate);
 		});
 
-		this.synthBus = AlgaBus(this.server, this.numChannels, this.rate);
+		synthBus = AlgaBus(server, numChannels, rate);
 
-		if(this.isPlaying, {this.synthBus.play});
+		if(isPlaying, { synthBus.play });
 	}
 
 	freeAllBusses { | now = false |
 		//if forking, this.synthBus could have changed, that's why this is needed
-		var previousSynthBus = this.synthBus;
-		var previousNormBusses = this.normBusses;
-		var previousInterpBusses = this.interpBusses;
-		var previousDefaultBusses = this.defaultBusses;
+		var previousSynthBus = synthBus;
+		var previousNormBusses = normBusses;
+		var previousInterpBusses = interpBusses;
+		var previousDefaultBusses = defaultBusses;
 
 		if(now, {
+			//Free busses now
 			if(previousSynthBus != nil, { previousSynthBus.free });
 			if(previousNormBusses != nil, {
 				previousNormBusses.do({ | normBus |
@@ -127,7 +129,7 @@ AlgaNode {
 		}, {
 			//Free previous busses after fadeTime
 			fork {
-				this.fadeTime.wait;
+				fadeTime.wait;
 				if(previousSynthBus != nil, { previousSynthBus.free });
 				if(previousNormBusses != nil, {
 					previousNormBusses.do({ | normBus |
@@ -150,10 +152,10 @@ AlgaNode {
 
 	replace { | obj |
 		//re-init groups if clear was used
-		var initGroups = if(this.group == nil, {true}, {false});
+		var initGroups = if(group == nil, { true }, { false });
 
 		//In case it has been set to true when clearing, then replacing before clear ends!
-		this.toBeCleared = false;
+		toBeCleared = false;
 
 		//Free previous one
 		this.freeSynth;
@@ -168,17 +170,17 @@ AlgaNode {
 
 	//dispatches controlnames / numChannels / rate according to obj class
 	dispatchNode { | obj, initGroups = false |
-		this.objClass = obj.class;
+		objClass = obj.class;
 
 		//Symbol
-		if(this.objClass == Symbol, {
+		if(objClass == Symbol, {
 			this.dispatchSynthDef(obj, initGroups);
 		}, {
 			//Function
-			if(this.objClass == Function, {
+			if(objClass == Function, {
 				this.dispatchFunction(obj, initGroups);
 			}, {
-				("AlgaNode: class '" ++ this.objClass ++ "' is invalid").error;
+				("AlgaNode: class '" ++ objClass ++ "' is invalid").error;
 				this.clear;
 			});
 		});
@@ -193,49 +195,49 @@ AlgaNode {
 			^nil;
 		});
 
-		this.synthDef = synthDesc.def;
+		synthDef = synthDesc.def;
 
-		if(this.synthDef.class != AlgaSynthDef, {
+		if(synthDef.class != AlgaSynthDef, {
 			("Invalid AlgaSynthDef: '" ++ obj.asString ++"'").error;
 			this.clear;
 			^nil;
 		});
 
-		this.controlNames = synthDesc.controls;
+		controlNames = synthDesc.controls;
 		this.sanitizeControlNames;
-		this.numChannels = this.synthDef.numChannels;
-		this.rate = this.synthDef.rate;
+		numChannels = synthDef.numChannels;
+		rate = synthDef.rate;
 
 		//Create all utilities
 		if(initGroups, { this.createAllGroups });
 		this.createAllBusses;
 
 		//Create actual synths
-		this.createAllSynths(this.synthDef.name, this.numChannels);
+		this.createAllSynths(synthDef.name, numChannels);
 	}
 
 	dispatchFunction { | obj, initGroups = false |
 		//Need to wait for server's receiving the sdef
 		fork {
-			this.synthDef = AlgaSynthDef(("alga_" ++ UniqueID.next).asSymbol, obj).send(this.server);
+			synthDef = AlgaSynthDef(("alga_" ++ UniqueID.next).asSymbol, obj).send(server);
 			server.sync;
-			this.controlNames = this.synthDef.asSynthDesc.controls;
+			controlNames = synthDef.asSynthDesc.controls;
 			this.sanitizeControlNames;
-			this.numChannels = this.synthDef.numChannels;
-			this.rate = this.synthDef.rate;
+			numChannels = synthDef.numChannels;
+			rate = synthDef.rate;
 
 			//Create all utilities
 			if(initGroups, { this.createAllGroups });
 			this.createAllBusses;
 
 			//Create actual synths
-			this.createAllSynths(this.synthDef.name);
+			this.createAllSynths(synthDef.name);
 		};
 	}
 
 	//Remove \fadeTime \out and \gate from controlNames
 	sanitizeControlNames {
-		this.controlNames.removeAllSuchThat({ | controlName |
+		controlNames.removeAllSuchThat({ | controlName |
 			var argName = controlName.name;
 			(controlName.name == \fadeTime).or(controlName.name == \out).or(controlName.name == \gate);
 		});
@@ -243,36 +245,36 @@ AlgaNode {
 
 	resetSynth {
 		//Set to nil (should it fork?)
-		this.synth = nil;
-		this.synthDef = nil;
-		this.controlNames = nil;
-		this.numChannels = 0;
-		this.rate = nil;
+		synth = nil;
+		synthDef = nil;
+		controlNames = nil;
+		numChannels = 0;
+		rate = nil;
 	}
 
 	resetInterpNormSynths {
-		this.intepSynths.clear;
-		this.normSynths.clear;
+		//Just reset the Dictionaries entries
+		interpSynths.clear;
+		normSynths.clear;
 	}
 
 	createAllSynths { | defName |
-		this.createSynth(this.synthDef.name);
+		this.createSynth(synthDef.name);
 		this.createInterpNormSynths;
 	}
 
 	//Synth writes to the synthBus
 	createSynth { | defName |
-		this.synth = AlgaSynth.new(
+		synth = AlgaSynth.new(
 			defName,
-			[\out, this.synthBus.index, \fadeTime, this.fadeTime],
-			this.synthGroup
+			[\out, synthBus.index, \fadeTime,fadeTime],
+			synthGroup
 		);
 	}
 
 	//This should take in account the nextNode's numChannels when making connections
 	createInterpNormSynths { | inChannels, inRate |
-
-		this.controlNames.do({ | controlName |
+		controlNames.do({ | controlName |
 			var interpBus, normBus, interpSynth, normSynth;
 
 			var interpSymbol, normSymbol;
@@ -284,8 +286,8 @@ AlgaNode {
 			var argRate = controlName.rate.asString;
 			var argDefault = controlName.defaultValue;
 
-			if(inChannels == nil, {inputChannels = argChannels}, {inputChannels = inChannels});
-			if(inRate == nil, {inputRate = argRate}, {inputRate = inRate});
+			if(inChannels == nil, { inputChannels = argChannels }, { inputChannels = inChannels });
+			if(inRate == nil, { inputRate = argRate }, { inputRate = inRate });
 
 			interpSymbol = (
 				"algaInterp_" ++
@@ -302,40 +304,40 @@ AlgaNode {
 				argChannels
 			).asSymbol;
 
-			interpBus = this.interpBusses[argName];
-			normBus = this.normBusses[argName];
+			interpBus = interpBusses[argName];
+			normBus = normBusses[argName];
 
 			interpSymbol.postln;
 
 			interpSynth = AlgaSynth.new(
 				interpSymbol,
-				[\in, argDefault, \out, interpBus.index, \fadeTime, this.fadeTime],
-				this.interpGroup
+				[\in, argDefault, \out, interpBus.index, \fadeTime, fadeTime],
+				interpGroup
 			);
 
 			normSynth = AlgaSynth.new(
 				normSymbol,
-				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, this.fadeTime],
-				this.normGroup
+				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, fadeTime],
+				normGroup
 			);
 
-			this.interpSynths[argName] = interpSynth;
-			this.normSynths[argName] = normSynth;
+			interpSynths[argName] = interpSynth;
+			normSynths[argName] = normSynth;
 
 			//Wait fade time then patch the synth's arguments to the normBusses
 			fork {
-				this.fadeTime.wait;
-				this.synth.set(argName, normBus.busArg);
+				fadeTime.wait;
+				synth.set(argName, normBus.busArg);
 			}
 
 		});
 	}
 
 	freeSynth {
-		if(this.synth != nil, {
+		if(synth != nil, {
 			//Send fadeTime too again in case it has been changed by user
 			//fade time will eventually be put just to the interp proxies!
-			this.synth.set(\gate, 0, \fadeTime, this.fadeTime);
+			synth.set(\gate, 0, \fadeTime, fadeTime);
 
 			this.resetSynth;
 		});
@@ -347,18 +349,18 @@ AlgaNode {
 
 		if(now, {
 			prevInterpSynths.do({ | interpSynth |
-				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, {this.fadeTime}, {0}));
+				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { fadeTime }, {0}));
 			});
 
 			prevNormSynths.do({ | normSynth |
-				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, {this.fadeTime}, {0}));
+				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { fadeTime }, {0}));
 			});
 
 			//this.resetInterpNormSynths;
 
 		}, {
 			fork {
-				this.fadeTime.wait;
+				fadeTime.wait;
 
 				prevInterpSynths.do({ | interpSynth |
 					interpSynth.set(\gate, 0, \fadeTime, 0);
@@ -377,10 +379,10 @@ AlgaNode {
 		fork {
 			this.freeSynth;
 
-			this.toBeCleared = true;
+			toBeCleared = true;
 
 			//Wait time before clearing groups and busses
-			this.fadeTime.wait;
+			fadeTime.wait;
 			this.freeInterpNormSynths(false, true);
 			this.freeAllGroups(true);
 			this.freeAllBusses(true);
@@ -388,8 +390,8 @@ AlgaNode {
 	}
 
 	play {
-		this.isPlaying = true;
-		this.synthBus.play;
+		isPlaying = true;
+		synthBus.play;
 	}
 
 	/*

@@ -1,43 +1,43 @@
 AlgaBus {
-	var <>server;
-	var <>bus;
+	var <server;
+	var <bus;
 	var busArg; // cache for "/s_new" bus arg
-	var <>rate = nil, <>numChannels = 0;
+	var <rate = nil, <numChannels = 0;
 
 	*new { | server, numChannels = 1, rate = \audio |
 		^super.new.init(server, numChannels, rate);
 	}
 
-	init { | server, numChannels = 1, rate = \audio |
-		this.server = server;
-		this.newBus(numChannels, rate);
+	init { | argServer, argNumChannels = 1, argRate = \audio |
+		server = argServer;
+		this.newBus(argNumChannels, argRate);
 	}
 
-	newBus { | numChannels = 1, rate = \audio |
-		this.rate = rate;
-		this.numChannels = numChannels;
-		this.bus = Bus.alloc(rate, this.server, numChannels); //Should I wait on this alloc?
+	newBus { | argNumChannels = 1, argRate = \audio |
+		rate = argRate;
+		numChannels = argNumChannels;
+		bus = Bus.alloc(rate, server, numChannels); //Should I wait on this alloc?
 		this.makeBusArg;
 	}
 
 	free {
-		if(this.bus != nil, {
-			this.bus.free(true);
+		if(bus != nil, {
+			bus.free(true);
 		});
-		this.rate = nil;
-		this.numChannels = 0;
+		rate = nil;
+		numChannels = 0;
 		busArg = nil;
 	}
 
+	//Define getter
 	busArg { ^busArg ?? { this.makeBusArg } }
 
 	//This allows multichannel bus to be used when patching them with .busArg !
 	makeBusArg {
 		var index, numChannels, prefix;
-		if(this.bus.isNil) { ^busArg = "" }; // still neutral
-		prefix = if(this.rate == \audio) { "\a" } { "\c" };
-		index = this.index;
-		numChannels = this.numChannels;
+		if(bus.isNil) { ^busArg = "" }; // still neutral
+		prefix = if(rate == \audio) { "\a" } { "\c" };
+		index = bus.index;
 		^busArg = if(numChannels == 1) {
 			prefix ++ index
 		} {
@@ -46,18 +46,18 @@ AlgaBus {
 	}
 
 	asMap {
-		^this.busArg;
+		^busArg;
 	}
 
 	asUGenInput {
-		^this.bus.index;
+		^bus.index;
 	}
 
 	index {
-		^this.bus.index;
+		^bus.index;
 	}
 
 	play {
-		this.bus.play;
+		bus.play;
 	}
 }

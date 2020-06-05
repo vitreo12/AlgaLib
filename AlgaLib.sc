@@ -1,14 +1,12 @@
 AlgaServerOptions {
 	var <>sampleRate, <>blockSize, <>memSize, <>numBuffers, <>numAudioBusChannels, <>numControlBusChannels, <>maxSynthDefs, <>numWireBufs, <>numInputBusChannels, <>numOutputBusChannels, <>supernova, <>threads, <>latency;
 
-	*new {
-		arg sampleRate=48000, blockSize=256, memSize=8192*256, numBuffers=1024*8, numAudioBusChannels=1024*8, numControlBusChannels=1024*8,  maxSynthDefs=16384, numWireBufs=1024, numInputBusChannels=2, numOutputBusChannels=2, supernova=false, threads=12, latency=0.1;
+	*new { | sampleRate=48000, blockSize=256, memSize=(8192*256), numBuffers=(1024*8), numAudioBusChannels=(1024*8), numControlBusChannels=(1024*8),  maxSynthDefs=16384, numWireBufs=1024, numInputBusChannels=2, numOutputBusChannels=2, supernova=false, threads=12, latency=0.1 |
 
 		^super.new.init(sampleRate, blockSize, memSize, numBuffers, numAudioBusChannels, numControlBusChannels,  maxSynthDefs, numWireBufs, numInputBusChannels, numOutputBusChannels, supernova, threads, latency);
 	}
 
-	init {
-		arg sampleRate=48000, blockSize=256, memSize=8192*256, numBuffers=1024*8, numAudioBusChannels=1024*8, numControlBusChannels=1024*8,  maxSynthDefs=16384, numWireBufs=1024, numInputBusChannels=2, numOutputBusChannels=2, supernova=false, threads=12, latency=0.1;
+	init { |sampleRate=48000, blockSize=256, memSize=(8192*256), numBuffers=(1024*8), numAudioBusChannels=(1024*8), numControlBusChannels=(1024*8),  maxSynthDefs=16384, numWireBufs=1024, numInputBusChannels=2, numOutputBusChannels=2, supernova=false, threads=12, latency=0.1 |
 
 		this.sampleRate = sampleRate;
 		this.blockSize = blockSize;
@@ -28,9 +26,15 @@ AlgaServerOptions {
 
 AlgaLib {
 
-	*boot {
-		arg server = Server.default, algaServerOptions = AlgaServerOptions();
+	*boot { | onBoot, server, algaServerOptions |
 
+		if(server == nil, { server = Server.default });
+		if(algaServerOptions == nil, { algaServerOptions = AlgaServerOptions() });
+
+		//quit server if it was on
+		server.quit;
+
+		//set options
 		server.options.sampleRate = algaServerOptions.sampleRate;
 		server.options.blockSize = algaServerOptions.blockSize;
 		server.options.memSize = algaServerOptions.memSize;
@@ -45,13 +49,13 @@ AlgaLib {
 		server.options.threads = algaServerOptions.threads;
 		server.latency = algaServerOptions.latency;
 
-		server.quit;
-
 		//Add to SynthDescLib in order for .add to work... Find a leaner solution.
 		SynthDescLib.global.addServer(server);
 
+		//Boot
 		server.waitForBoot({
 			AlgaStartup.initSynthDefs(server);
+			onBoot.value;
 		});
 	}
 }

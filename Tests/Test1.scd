@@ -1,17 +1,17 @@
 (
-s.waitForBoot({
+AlgaLib.boot({
 	AlgaSynthDef(\sine, {SinOsc.ar(\freq.kr(440))}).add;
 	AlgaSynthDef(\noise, {WhiteNoise.ar.dup * 0.2}).add;
 });
 )
-
-AlgaLib.boot
 
 s.plotTree
 
 s.scope
 
 a = AlgaNode(\sine, fadeTime:1)
+a.fadeTime = 3
+a.clear
 
 AlgaLib.boot
 b = AlgaNode({SinOsc.ar(\f.ar(440)) * \a.kr(0.7)}).play
@@ -21,7 +21,6 @@ b.interpSynths[\f].set(\in, 440)
 
 b.fadeTime = 4
 b.clear
-
 
 
 a << b

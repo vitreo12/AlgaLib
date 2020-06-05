@@ -1,4 +1,4 @@
-//Same as ProxySynthDef, but with AlgaEnvGate
+//Same as ProxySynthDef, but with AlgaEnvGate only used to free the synth, not multiplying output.
 AlgaSynthDef : SynthDef {
 
 	var <>rate, <>numChannels;
@@ -10,8 +10,9 @@ AlgaSynthDef : SynthDef {
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var hasGateArg=false, hasOutArg=false;
 		var outerBuildSynthDef = UGen.buildSynthDef;
+
 		def = super.new(name, {
-			var  out, outCtl;
+			var out, outCtl;
 
 			// build the controls from args
 			output = SynthDef.wrap(func, rates, prependArgs);
@@ -133,6 +134,7 @@ AlgaSynthDef : SynthDef {
 		def.numChannels = numChannels;
 		def.canReleaseSynth = makeFadeEnv || hasOwnGate;
 		def.canFreeSynth = def.canReleaseSynth || canFree;
+
 		//[\defcanReleaseSynth, def.canReleaseSynth, \defcanFreeSynth, def.canFreeSynth].debug;
 		^def
 	}
