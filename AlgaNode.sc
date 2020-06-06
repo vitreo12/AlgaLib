@@ -578,8 +578,14 @@ AlgaNode {
 		^synth.instantiated;
 	}
 
-	//Loop over the outConnections and re-enstablish connections with the receiver
+	//Remake both inConnections and outConnections
 	replaceConnections {
+		//inConnections
+		inConnections.keysValuesDo({ | param, sender |
+			this.makeConnection(sender, param);
+		});
+
+		//outConnections
 		outConnections.keysValuesDo({ | receiver, paramSet |
 			paramSet.do({ | param |
 				receiver.makeConnection(this, param);
