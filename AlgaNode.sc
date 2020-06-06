@@ -352,12 +352,14 @@ AlgaNode {
 			interpBus = interpBusses[paramName];
 			normBus = normBusses[paramName];
 
+			//USES fadeTime!!
 			interpSynth = AlgaSynth.new(
 				interpSymbol,
 				[\in, argDefault, \out, interpBus.index, \fadeTime, fadeTime],
 				interpGroup
 			);
 
+			//USES fadeTime!!
 			normSynth = AlgaSynth.new(
 				normSymbol,
 				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, fadeTime],
@@ -405,6 +407,7 @@ AlgaNode {
 		interpBus = interpBusses[param];
 
 		//new interp synth, with input connected to sender and output to the interpBus
+		//USES fadeTime!!
 		interpSynth = AlgaSynth.new(
 			interpSymbol,
 			[\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, fadeTime],
