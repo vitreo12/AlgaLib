@@ -492,7 +492,7 @@ AlgaNode {
 		interpSynthAtParam.set(\gate, 0, \fadeTime, fadeTime);
 	}
 
-	resetConnections {
+	resetConnectionDicts {
 		if(toBeCleared, {
 			inConnections.clear;
 			outConnections.clear;
@@ -596,6 +596,7 @@ AlgaNode {
 		});
 	}
 
+	//replace content of the node, re-making all the connections
 	replace { | obj |
 		//re-init groups if clear was used
 		var initGroups = if(group == nil, { true }, { false });
@@ -616,6 +617,7 @@ AlgaNode {
 		this.replaceConnections;
 	}
 
+	//Clears it all
 	clear {
 		fork {
 			this.freeSynth;
@@ -629,7 +631,7 @@ AlgaNode {
 			this.freeAllBusses(true);
 
 			//Reset connection dicts
-			this.resetConnections;
+			this.resetConnectionDicts;
 		}
 	}
 

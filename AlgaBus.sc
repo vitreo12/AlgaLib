@@ -57,6 +57,7 @@ AlgaBus {
 		^bus.index;
 	}
 
+	//Create an output synth and output sound to it
 	play {
 		bus.play;
 	}
