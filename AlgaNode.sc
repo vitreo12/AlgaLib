@@ -1,8 +1,15 @@
 AlgaNode {
 	var <server;
-	var <>fadeTime = 0; //Can be set from outside
-	var <objClass;
 
+	//This is the time when making a new connection to this proxy
+	var <fadeTime = 0;
+
+	//This is the longestFadeTime between all the outConnections.
+	//it's used when .replacing a node connected to something, in order for it to be kept alive
+	//for all the connected nodes to run their interpolator on it
+	var <fadeTimeConnections, <longestFadeTime = 0;
+
+	var <objClass;
 	var <synthDef;
 
 	var <controlNames;
@@ -23,8 +30,8 @@ AlgaNode {
 	}
 
 	init { | obj, argServer, argFadeTime = 0 |
-		//starting fadeTime
-		fadeTime = argFadeTime;
+		//starting fadeTime (using the setter so it also sets longestFadeTime)
+		this.fadeTime_(argFadeTime);
 
 		//Default server if not specified otherwise
 		if(argServer == nil, { server = Server.default }, { server = argServer });
@@ -40,12 +47,22 @@ AlgaNode {
 
 		//Per-argument connections to this AlgaNode
 		inConnections = Dictionary.new(10);
+
 		//outConnections are not indexed by param name, as they could be attached to multiple nodes with same param name.
-		//they are indexed by identity of the connected node (AlgaNode -> AlgaNode)
-		outConnections = IdentityDictionary.new(10);
+		//they are indexed by identity of the connected node, and then it contains a Set of all parameters
+		//that it controls in that node (AlgaNode -> Set[\freq, \amp ...])
+		outConnections = Dictionary.new(10);
+
+		//Keeps all the fadeTimes of the connected nodes
+		fadeTimeConnections = Dictionary.new(10);
 
 		//Dispatch node creation
 		this.dispatchNode(obj, true);
+	}
+
+	fadeTime_ { | val |
+		fadeTime = val;
+		this.calculateLongestFadeTime;
 	}
 
 	ft {
@@ -53,7 +70,14 @@ AlgaNode {
 	}
 
 	ft_ { | val |
-		fadeTime = val;
+		this.fadeTime_(val);
+	}
+
+	calculateLongestFadeTime {
+		longestFadeTime = fadeTime;
+		fadeTimeConnections.do({ | val |
+			if(val > longestFadeTime, { longestFadeTime = val });
+		});
 	}
 
 	createAllGroups {
@@ -86,7 +110,8 @@ AlgaNode {
 			}, {
 				//Wait fadeTime, then free
 				fork {
-					fadeTime.wait;
+					longestFadeTime.wait;
+
 					group.free;
 
 					//this.resetGroups;
@@ -120,14 +145,14 @@ AlgaNode {
 	}
 
 	freeSynthBus { | now = false |
-		//if forking, this.synthBus could have changed, that's why this is needed
-		var prevSynthBus = synthBus;
-
 		if(now, {
-			if(prevSynthBus != nil, { prevSynthBus.free });
+			if(synthBus != nil, { synthBus.free });
 		}, {
+			//if forking, this.synthBus could have changed, that's why this is needed
+			var prevSynthBus = synthBus.copy;
 			fork {
-				fadeTime.wait;
+				longestFadeTime.wait;
+
 				if(prevSynthBus != nil, { prevSynthBus.free });
 			}
 		});
@@ -155,7 +180,8 @@ AlgaNode {
 
 			//Free prev busses after fadeTime
 			fork {
-				fadeTime.wait;
+				longestFadeTime.wait;
+
 				if(prevNormBusses != nil, {
 					prevNormBusses.do({ | normBus |
 						if(normBus != nil, { normBus.free });
@@ -179,6 +205,11 @@ AlgaNode {
 	//dispatches controlnames / numChannels / rate according to obj class
 	dispatchNode { | obj, initGroups = false |
 		objClass = obj.class;
+
+		//If there is a synth playing, set its instantiated status to false:
+		//this is mostly needed for .replace to work properly and wait for the new synth
+		//to be instantiated!
+		if(synth != nil, { synth.instantiated = false });
 
 		//Symbol
 		if(objClass == Symbol, {
@@ -279,10 +310,13 @@ AlgaNode {
 	}
 
 	//Synth writes to the synthBus
+	//Synth always uses longestFadeTime, in order to make sure that everything connected to it
+	//will have time to run fade ins and outs
 	createSynth { | defName |
+		//synth's fadeTime is longestFadeTime!
 		synth = AlgaSynth.new(
 			defName,
-			[\out, synthBus.index, \fadeTime,fadeTime],
+			[\out, synthBus.index, \fadeTime, longestFadeTime],
 			synthGroup
 		);
 	}
@@ -381,17 +415,22 @@ AlgaNode {
 		interpSynths[param] = interpSynth;
 	}
 
-	//Default now and fadetime to true for synths
+	//Default now and fadetime to true for synths.
+	//Synth always uses longestFadeTime, in order to make sure that everything connected to it
+	//will have time to run fade ins and outs
 	freeSynth { | useFadeTime = true, now = true |
 		if(now, {
 			if(synth != nil, {
-				synth.set(\gate, 0, \fadeTime,  if(useFadeTime, { fadeTime }, {0}));
+				//synth's fadeTime is longestFadeTime!
+				synth.set(\gate, 0, \fadeTime,  if(useFadeTime, { longestFadeTime }, {0}));
 
 				//this.resetSynth;
 			});
 		}, {
 			fork {
-				fadeTime.wait;
+				//longestFadeTime?
+				longestFadeTime.wait;
+
 				if(synth != nil, {
 					synth.set(\gate, 0, \fadeTime,  0);
 
@@ -407,11 +446,11 @@ AlgaNode {
 		if(now, {
 			//Free synths now
 			interpSynths.do({ | interpSynth |
-				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { fadeTime }, {0}));
+				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
 			});
 
 			normSynths.do({ | normSynth |
-				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { fadeTime }, {0}));
+				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
 			});
 
 			//this.resetInterpNormSynths;
@@ -423,7 +462,7 @@ AlgaNode {
 
 			fork {
 				//Wait, then free synths
-				fadeTime.wait;
+				longestFadeTime.wait;
 
 				prevInterpSynths.do({ | interpSynth |
 					interpSynth.set(\gate, 0, \fadeTime, 0);
@@ -450,61 +489,6 @@ AlgaNode {
 		interpSynthAtParam.set(\gate, 0, \fadeTime, fadeTime);
 	}
 
-	replace { | obj |
-		//re-init groups if clear was used
-		var initGroups = if(group == nil, { true }, { false });
-
-		//In case it has been set to true when clearing, then replacing before clear ends!
-		toBeCleared = false;
-
-		//Free previous ones
-		this.freeAllSynths;
-
-		//Should perhaps check for new numChannels / rate, instead of just deleting it all
-		this.freeAllBusses;
-
-		//New one
-		this.dispatchNode(obj, initGroups);
-	}
-
-	clear {
-		fork {
-			this.freeSynth;
-
-			toBeCleared = true;
-
-			//Wait time before clearing groups and busses
-			fadeTime.wait;
-			this.freeInterpNormSynths(false, true);
-			this.freeAllGroups(true);
-			this.freeAllBusses(true);
-
-			//Reset connection dicts
-			this.resetConnections;
-		}
-	}
-
-	play {
-		isPlaying = true;
-		synthBus.play;
-	}
-
-	//All synths must be instantiated (including interpolators and normalizers)
-	instantiated {
-		if(synth == nil, { ^false });
-
-		interpSynths.do({ | interpSynth |
-			if(interpSynth.instantiated == false, { ^false });
-		});
-
-		normSynths.do({ | normSynth |
-			if(normSynth.instantiated == false, { ^false });
-		});
-
-		//Lastly, the actual synth
-		^synth.instantiated;
-	}
-
 	resetConnections {
 		if(toBeCleared, {
 			inConnections.clear;
@@ -512,10 +496,29 @@ AlgaNode {
 		});
 	}
 
+	//param -> AlgaNode
+	addInConnection { | sender, param = \in |
+		inConnections[param] = sender;
+	}
+
+	//AlgaNode -> Set[params]
+	addOutConnection { | receiver, param = \in |
+		if(outConnections[receiver] == nil, {
+			outConnections[receiver] = Set[param];
+		}, {
+			outConnections[receiver].add(param);
+		});
+	}
+
 	//add entries to the inConnections / outConnections of the two AlgaNodes
 	addConnections { | sender, param = \in |
-		inConnections[param] = sender;
-		sender.outConnections[this] = this;
+		//This will replace the entries on new connection
+		this.addInConnection(sender, param);
+		sender.addOutConnection(this, param);
+
+		//Add to fadeTimeConnections and recalculate longestFadeTime
+		sender.fadeTimeConnections[this] = this.fadeTime;
+		sender.calculateLongestFadeTime;
 	}
 
 	newInterpConnectionAtParam { | sender, param = \in |
@@ -557,5 +560,72 @@ AlgaNode {
 	//resets to the default value in controlNames
 	<| { | param = \in |
 
+	}
+
+	//All synths must be instantiated (including interpolators and normalizers)
+	instantiated {
+		if(synth == nil, { ^false });
+
+		interpSynths.do({ | interpSynth |
+			if(interpSynth.instantiated == false, { ^false });
+		});
+
+		normSynths.do({ | normSynth |
+			if(normSynth.instantiated == false, { ^false });
+		});
+
+		//Lastly, the actual synth
+		^synth.instantiated;
+	}
+
+	//Loop over the outConnections and re-enstablish connections with the receiver
+	replaceConnections {
+		outConnections.keysValuesDo({ | receiver, paramSet |
+			paramSet.do({ | param |
+				receiver.makeConnection(this, param);
+			});
+		});
+	}
+
+	replace { | obj |
+		//re-init groups if clear was used
+		var initGroups = if(group == nil, { true }, { false });
+
+		//In case it has been set to true when clearing, then replacing before clear ends!
+		toBeCleared = false;
+
+		//Free previous ones
+		this.freeAllSynths;
+
+		//Should perhaps check for new numChannels / rate, instead of just deleting it all
+		this.freeAllBusses;
+
+		//New one
+		this.dispatchNode(obj, initGroups);
+
+		//Re-enstablish connections that were already in place
+		this.replaceConnections;
+	}
+
+	clear {
+		fork {
+			this.freeSynth;
+
+			toBeCleared = true;
+
+			//Wait time before clearing groups and busses
+			longestFadeTime.wait;
+			this.freeInterpNormSynths(false, true);
+			this.freeAllGroups(true);
+			this.freeAllBusses(true);
+
+			//Reset connection dicts
+			this.resetConnections;
+		}
+	}
+
+	play {
+		isPlaying = true;
+		synthBus.play;
 	}
 }
