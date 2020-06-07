@@ -1,7 +1,10 @@
+AN : AlgaNode {}
+
 AlgaNode {
 	var <server;
 
-	//This is the time when making a new connection to this proxy
+	//This is the time when making a new connection to this proxy.
+	//Could be just named interpolationTime OR connectionTime
 	var <fadeTime = 0;
 
 	//This is the longestFadeTime between all the outConnections.
@@ -288,7 +291,8 @@ AlgaNode {
 			var paramName = controlName.name;
 			if((controlName.name != \fadeTime).and(
 				controlName.name != \out).and(
-				controlName.name != \gate), {
+				controlName.name != \gate).and(
+				controlName.name != '?'), {
 				controlNames[controlName.name] = controlName;
 			});
 		});
@@ -540,6 +544,9 @@ AlgaNode {
 
 	//implements receiver <<.param sender
 	makeConnection { | sender, param = \in |
+		//Can't connect AlgaNode to itsels
+		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this});
+
 		//Connect interpSynth to the sender's synthBus
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
 			this.newInterpConnectionAtParam(sender, param);
@@ -558,6 +565,16 @@ AlgaNode {
 	//arg is the receiver
 	>> { | receiver, param = \in |
 		receiver.makeConnection(this, param);
+	}
+
+	//add to already running nodes (mix)
+	<<+ { | sender, param = \in |
+
+	}
+
+	//add to already running nodes (mix)
+	>>+ { | receiver, param = \in |
+
 	}
 
 	//resets to the default value in controlNames
@@ -581,7 +598,8 @@ AlgaNode {
 		^synth.instantiated;
 	}
 
-	//Remake both inConnections and outConnections
+	//Remake both inConnections and outConnections...
+	//Look for feedback!
 	replaceConnections {
 		//inConnections
 		inConnections.keysValuesDo({ | param, sender |
@@ -617,7 +635,7 @@ AlgaNode {
 		this.replaceConnections;
 	}
 
-	//Clears it all
+	//Clears it all.. It should do some sort of fading
 	clear {
 		fork {
 			this.freeSynth;
