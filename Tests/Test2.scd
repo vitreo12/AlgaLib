@@ -30,7 +30,7 @@ Alga.boot({
 a = AlgaNode(\sine, fadeTime:1).play
 b = AlgaNode({DC.kr(290)});
 a <<.freq b
-b.replace({DC.ar(440)});
+b.replace({DC.ar(350)});
 
 
 a.replace({Saw.ar(\freq.kr(440))});

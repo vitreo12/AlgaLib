@@ -29,16 +29,13 @@ AlgaNode {
 	var <toBeCleared = false;
 
   //This is used in feedback situations when using .replace
-  var beingReplaced = false;
+  var <beingReplaced = false;
 
 	*new { | obj, server, fadeTime = 0 |
 		^super.new.init(obj, server, fadeTime)
 	}
 
 	init { | obj, argServer, argFadeTime = 0 |
-		//starting fadeTime (using the setter so it also sets longestFadeTime)
-		this.fadeTime_(argFadeTime);
-
 		//Default server if not specified otherwise
 		if(argServer == nil, { server = Server.default }, { server = argServer });
 
@@ -64,13 +61,16 @@ AlgaNode {
 		//Keeps all the fadeTimes of the connected nodes
 		fadeTimeConnections = Dictionary.new(10);
 
-		//Dispatch node creation
+		//starting fadeTime (using the setter so it also sets longestFadeTime)
+		this.fadeTime_(argFadeTime);
+		
+    //Dispatch node creation
 		this.dispatchNode(obj, true);
 	}
 
 	fadeTime_ { | val |
 		fadeTime = val;
-		this.calculateLongestFadeTime;
+		this.calculateLongestFadeTime(val);
 	}
 
 	ft {
@@ -81,11 +81,19 @@ AlgaNode {
 		this.fadeTime_(val);
 	}
 
-	calculateLongestFadeTime {
-		longestFadeTime = fadeTime;
-		fadeTimeConnections.do({ | val |
+  //Also sets for inConnections.. outConnections would create endless loop?
+	calculateLongestFadeTime { | argFadeTime |
+		longestFadeTime = argFadeTime;
+		
+    fadeTimeConnections.do({ | val |
 			if(val > longestFadeTime, { longestFadeTime = val });
 		});
+
+    inConnections.do({ | sendersSet |
+      sendersSet.do({ | sender |
+        sender.calculateLongestFadeTime(argFadeTime);
+      });
+    });
 	}
 
 	createAllGroups {
@@ -511,7 +519,7 @@ AlgaNode {
 	//param -> Set[AlgaNode, AlgaNode, ...]
 	addInConnection { | sender, param = \in, mix = false |
     //Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
-    if((inConnections[param] == nil).or(mix.not)), {
+    if((inConnections[param] == nil).or(mix.not), {
       inConnections[param] = Set[sender];
     }, {
       inConnections[param].add(sender);
@@ -538,7 +546,7 @@ AlgaNode {
 
 		//Add to fadeTimeConnections and recalculate longestFadeTime
 		sender.fadeTimeConnections[this] = this.fadeTime;
-		sender.calculateLongestFadeTime;
+		sender.calculateLongestFadeTime(this.fadeTime);
 	}
 
 	newInterpConnectionAtParam { | sender, param = \in |
@@ -593,7 +601,7 @@ AlgaNode {
 	//resets to the default value in controlNames
   //OR, if provided, to the value of the original args that were used to create the node
 	<| { | param = \in |
-
+    //Also remove inConnections / outConnections / fadeTimeConnections
 	}
 
 	//All synths must be instantiated (including interpolators and normalizers)
@@ -618,6 +626,10 @@ AlgaNode {
 		//inConnections
 		inConnections.keysValuesDo({ | param, sendersSet |
       sendersSet.do({ | sender |
+        if(sender.beingReplaced, {
+          "Sender is being already replaced".postln;
+        });
+        
         this.makeConnection(sender, param);
       })
 		});
