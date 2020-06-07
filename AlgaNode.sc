@@ -28,6 +28,9 @@ AlgaNode {
 	var <isPlaying = false;
 	var <toBeCleared = false;
 
+  //This is used in feedback situations when using .replace
+  var beingReplaced = false;
+
 	*new { | obj, server, fadeTime = 0 |
 		^super.new.init(obj, server, fadeTime)
 	}
@@ -48,7 +51,9 @@ AlgaNode {
 		normSynths   = Dictionary(10);
 		interpSynths = Dictionary(10);
 
-		//Per-argument connections to this AlgaNode
+		//Per-argument connections to this AlgaNode. These are in the form:
+    //(param -> Set[AlgaNode, AlgaNode...]). Multiple AlgaNodes are used when
+    //using the mixing <<+ / >>+
 		inConnections = Dictionary.new(10);
 
 		//outConnections are not indexed by param name, as they could be attached to multiple nodes with same param name.
@@ -503,13 +508,19 @@ AlgaNode {
 		});
 	}
 
-	//param -> AlgaNode
-	addInConnection { | sender, param = \in |
-		inConnections[param] = sender;
+	//param -> Set[AlgaNode, AlgaNode, ...]
+	addInConnection { | sender, param = \in, mix = false |
+    //Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
+    if((inConnections[param] == nil).or(mix.not)), {
+      inConnections[param] = Set[sender];
+    }, {
+      inConnections[param].add(sender);
+    })
 	}
 
-	//AlgaNode -> Set[params]
+	//AlgaNode -> Set[param, param, ...]
 	addOutConnection { | receiver, param = \in |
+    //Empty entry, create Set. Otherwise, add to existing
 		if(outConnections[receiver] == nil, {
 			outConnections[receiver] = Set[param];
 		}, {
@@ -519,8 +530,10 @@ AlgaNode {
 
 	//add entries to the inConnections / outConnections of the two AlgaNodes
 	addConnections { | sender, param = \in |
-		//This will replace the entries on new connection
+		//This will replace the entries on new connection (as mix == false)
 		this.addInConnection(sender, param);
+
+    //This will add the entries to the existing Set, or create a new one
 		sender.addOutConnection(this, param);
 
 		//Add to fadeTimeConnections and recalculate longestFadeTime
@@ -569,15 +582,16 @@ AlgaNode {
 
 	//add to already running nodes (mix)
 	<<+ { | sender, param = \in |
-
+    //Would this require to have also inConnections to be some kind of Set?
 	}
 
 	//add to already running nodes (mix)
 	>>+ { | receiver, param = \in |
-
+    //Would this require to have also inConnections to be some kind of Set?
 	}
 
 	//resets to the default value in controlNames
+  //OR, if provided, to the value of the original args that were used to create the node
 	<| { | param = \in |
 
 	}
@@ -602,16 +616,23 @@ AlgaNode {
 	//Look for feedback!
 	replaceConnections {
 		//inConnections
-		inConnections.keysValuesDo({ | param, sender |
-			this.makeConnection(sender, param);
+		inConnections.keysValuesDo({ | param, sendersSet |
+      sendersSet.do({ | sender |
+        this.makeConnection(sender, param);
+      })
 		});
 
 		//outConnections
-		outConnections.keysValuesDo({ | receiver, paramSet |
-			paramSet.do({ | param |
+		outConnections.keysValuesDo({ | receiver, paramsSet |
+			paramsSet.do({ | param |
 				receiver.makeConnection(this, param);
 			});
 		});
+
+    //Also set beingReplaced to false when done instantiating this
+    AlgaSpinRoutine.waitFor({ this.instantiated }, {
+      beingReplaced = false;
+    });
 	}
 
 	//replace content of the node, re-making all the connections
@@ -621,6 +642,9 @@ AlgaNode {
 
 		//In case it has been set to true when clearing, then replacing before clear ends!
 		toBeCleared = false;
+
+    //Current node is being replaced.
+    beingReplaced = true;
 
 		//Free previous ones
 		this.freeAllSynths;
