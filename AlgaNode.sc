@@ -329,12 +329,23 @@ AlgaNode {
 
 	//Synth writes to the synthBus
 	//Synth always uses longestFadeTime, in order to make sure that everything connected to it
-	//will have time to run fade ins and outs
+	//will have time to run fade ins and outs when running .replace!
 	createSynth { | defName |
 		//synth's fadeTime is longestFadeTime!
+    var synthArgs = [\out, synthBus.index, \fadeTime, longestFadeTime];
+
+    //Add the param busses (which have already been allocated)
+    //Should this connect here or in createInterpNormSynths
+    /*
+    normBusses.keysValuesDo({ | param, normBus |
+      synthArgs = synthArgs.add(param);
+      synthArgs = synthArgs.add(normBus.busArg);
+    });
+    */
+
 		synth = AlgaSynth.new(
 			defName,
-			[\out, synthBus.index, \fadeTime, longestFadeTime],
+      synthArgs,
 			synthGroup
 		);
 	}
@@ -370,28 +381,36 @@ AlgaNode {
 			interpBus = interpBusses[paramName];
 			normBus = normBusses[paramName];
 
-			//USES fadeTime!!
-			interpSynth = AlgaSynth.new(
-				interpSymbol,
-				[\in, argDefault, \out, interpBus.index, \fadeTime, fadeTime],
-				interpGroup
-			);
+      //Make sure interpSynth / normSynth are created before synth.set
+      //Does this introduce latency though? Is it necessary? (looks like it's not)
+      //server.bind({
+      
+      //Instantiated right away, with no fadeTime, as it will directly be connected to
+      //synth's parameter
+      interpSynth = AlgaSynth.new(
+        interpSymbol,
+        [\in, argDefault, \out, interpBus.index, \fadeTime, 0],
+        interpGroup
+      );
 
-			//USES fadeTime!!
-			normSynth = AlgaSynth.new(
-				normSymbol,
-				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, fadeTime],
-				normGroup
-			);
+      //Instantiated right away, with no fadeTime, as it will directly be connected to
+      //synth's parameter (synth is already reading from all the normBusses)
+      normSynth = AlgaSynth.new(
+        normSymbol,
+        [\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
+        normGroup
+      );
 
-			interpSynths[paramName] = interpSynth;
-			normSynths[paramName] = normSynth;
+      interpSynths[paramName] = interpSynth;
+      normSynths[paramName] = normSynth;
 
-			//Connect right away, as th normSynth will normalize the fading in value of
-			//the interpSynth set to default, so no need to wait for fadeTime to make connection
-			synth.set(paramName, normBus.busArg);
-		});
-	}
+      //server.sync;
+
+      //Connect synth's parameter to the normBus
+      synth.set(paramName, normBus.busArg);
+      //});
+    });
+  }
 
 	createAllSynths { | defName |
 		this.createSynth(defName);
@@ -425,7 +444,7 @@ AlgaNode {
 		interpBus = interpBusses[param];
 
 		//new interp synth, with input connected to sender and output to the interpBus
-		//USES fadeTime!!
+		//USES fadeTime!! This is the whole core of the interpolation behaviour!
 		interpSynth = AlgaSynth.new(
 			interpSymbol,
 			[\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, fadeTime],
@@ -443,7 +462,7 @@ AlgaNode {
 		if(now, {
 			if(synth != nil, {
 				//synth's fadeTime is longestFadeTime!
-				synth.set(\gate, 0, \fadeTime,  if(useFadeTime, { longestFadeTime }, {0}));
+				synth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
 
 				//this.resetSynth;
 			});
@@ -453,7 +472,7 @@ AlgaNode {
 				longestFadeTime.wait;
 
 				if(synth != nil, {
-					synth.set(\gate, 0, \fadeTime,  0);
+					synth.set(\gate, 0, \fadeTime, 0);
 
 					//this.resetSynth;
 				});
@@ -504,6 +523,7 @@ AlgaNode {
 	}
 
 	//This is only used in connection situations
+  //This, together with createInterpSynthAtParam, is the whole core of the interpolation behaviour!
 	freeInterpSynthAtParam { | param = \in |
 		var interpSynthAtParam = interpSynths[param];
 		if(interpSynthAtParam == nil, { ("Invalid param for interp synth to free: " ++ param).error; ^this });

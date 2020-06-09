@@ -1,5 +1,4 @@
 AlgaSpinRoutine {
-
 	*waitFor { | condition, onComplete, time = 0.01 |
 		/*
 		if(condition.class != Function, {
@@ -22,5 +21,4 @@ AlgaSpinRoutine {
 			onComplete.value;
 		}
 	}
-
 }
