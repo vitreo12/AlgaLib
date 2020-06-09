@@ -10,7 +10,8 @@ AlgaNode {
 	//This is the longestFadeTime between all the outConnections.
 	//it's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
-	var <fadeTimeConnections, <longestFadeTime = 0;
+	//longestFadeTime will be moved to AlgaBlock and applied per-block!
+  var <fadeTimeConnections, <longestFadeTime = 0;
 
 	var <objClass;
 	var <synthDef;
