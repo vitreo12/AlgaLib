@@ -417,7 +417,7 @@ AlgaNode {
 		this.createInterpNormSynths;
 	}
 
-  //Used at every << / >>
+  //Used at every << / >> / <|
 	createInterpSynthAtParam { | sender, param = \in |
 		var controlName;
 		var paramNumChannels, paramRate;
@@ -430,8 +430,16 @@ AlgaNode {
 
 		paramNumChannels = controlName.numChannels;
 		paramRate = controlName.rate;
-		senderNumChannels = sender.numChannels;
-		senderRate = sender.rate;
+    
+    if(sender != nil, {
+      // Used in << / >>
+      senderNumChannels = sender.numChannels;
+      senderRate = sender.rate;
+    }, {
+      //Used in <|
+      senderNumChannels = paramNumChannels;
+      senderRate = paramRate;
+    });
 
 		interpSymbol = (
 			"algaInterp_" ++
@@ -446,54 +454,28 @@ AlgaNode {
 
 		//new interp synth, with input connected to sender and output to the interpBus
 		//USES fadeTime!! This is the whole core of the interpolation behaviour!
-		interpSynth = AlgaSynth.new(
-			interpSymbol,
-			[\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, fadeTime],
-			interpGroup
-		);
+    if(sender != nil, {
+      //Used in << / >>
+      //Read \in from the sender's synthBus
+      interpSynth = AlgaSynth.new(
+        interpSymbol,
+        [\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, fadeTime],
+        interpGroup
+      );
+    }, {
+      //Used in <|
+      //if sender is nil, restore the original default value. This is used in <|
+      var paramDefault = controlName.defaultValue;
+      interpSynth = AlgaSynth.new(
+        interpSymbol,
+        [\in, paramDefault, \out, interpBus.index, \fadeTime, fadeTime],
+        interpGroup
+      );
+    });
 
 		//Add synth to interpSynths
 		interpSynths[param] = interpSynth;
 	}
-
-  //This is used when <| a param
-  restoreInterpSynthAtParam { | param = \in |
-		var controlName;
-		var paramNumChannels, paramRate;
-    var paramDefault;
-		var interpSymbol;
-
-		var interpBus, interpSynth;
-
-		controlName = controlNames[param];
-
-		paramNumChannels = controlName.numChannels;
-		paramRate = controlName.rate;
-    paramDefault = controlName.defaultValue;
-
-		interpSymbol = (
-			"algaInterp_" ++
-			paramRate ++
-			paramNumChannels ++
-			"_" ++
-			paramRate ++
-			paramNumChannels
-		).asSymbol;
-
-		interpBus = interpBusses[param];
-
-		//new interp synth, with input connected to sender and output to the interpBus
-		//USES fadeTime!! This is the whole core of the interpolation behaviour!
-		interpSynth = AlgaSynth.new(
-			interpSymbol,
-			[\in, paramDefault, \out, interpBus.index, \fadeTime, fadeTime],
-			interpGroup
-		);
-
-		//Add synth to interpSynths
-		interpSynths[param] = interpSynth;
-
-  }
 
 	//Default now and fadetime to true for synths.
 	//Synth always uses longestFadeTime, in order to make sure that everything connected to it
@@ -570,13 +552,6 @@ AlgaNode {
 		interpSynthAtParam.set(\gate, 0, \fadeTime, fadeTime);
 	}
 
-	resetConnectionDicts {
-		if(toBeCleared, {
-			inConnections.clear;
-			outConnections.clear;
-		});
-	}
-
 	//param -> Set[AlgaNode, AlgaNode, ...]
 	addInConnection { | sender, param = \in, mix = false |
     //Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
@@ -598,7 +573,7 @@ AlgaNode {
 	}
 
 	//add entries to the inConnections / outConnections / fadeTimeConnections of the two AlgaNodes
-	addConnections { | sender, param = \in |
+	addConnectionsDict { | sender, param = \in |
 		//This will replace the entries on new connection (as mix == false)
 		this.addInConnection(sender, param);
 
@@ -620,7 +595,7 @@ AlgaNode {
   }
 
   //Remove entries from inConnections / outConnections / fadeTimeConnections for all involved nodes
-  removeConnections { | param = \in, previousSender = nil |
+  removeConnectionsDict { | previousSender = nil, param = \in |
     var previousSenders = inConnections[param];
     if(previousSenders == nil, { ("No previous connection enstablished at param:" ++ param).error; ^this; });
 
@@ -655,6 +630,13 @@ AlgaNode {
     })
   }
 
+	resetConnectionsDicts {
+		if(toBeCleared, {
+			inConnections.clear;
+			outConnections.clear;
+		});
+	}
+
 	newInterpConnectionAtParam { | sender, param = \in |
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this; });
@@ -666,10 +648,10 @@ AlgaNode {
 		this.createInterpSynthAtParam(sender, param);
 
 		//Add proper inConnections / outConnections / fadeTimeConnections
-		this.addConnections(sender, param);
+		this.addConnectionsDict(sender, param);
 	}
 
-  restoreInterpConnectionAtParam { | param = \in, previousSender = nil |
+  restoreInterpConnectionAtParam { | previousSender = nil, param = \in  |
     var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to reset: " ++ param).error; ^this; });
     
@@ -677,16 +659,16 @@ AlgaNode {
 		this.freeInterpSynthAtParam(param);
 
     //Create new interp synth with default value (or the one supplied with args at start) (fades in)
-    this.restoreInterpSynthAtParam(param); 
+    this.createInterpSynthAtParam(nil, param); 
 
     //Remove inConnections / outConnections / fadeTimeConnections
-    this.removeConnections(param, previousSender);
+    this.removeConnectionsDict(previousSender, param);
   }
 
 	//implements receiver <<.param sender
 	makeConnection { | sender, param = \in |
 		//Can't connect AlgaNode to itsels
-		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this});
+		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
 		//Connect interpSynth to the sender's synthBus
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
@@ -726,14 +708,14 @@ AlgaNode {
     if(previousSender != nil, {
       if(previousSender.class == AlgaNode, {
         AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
-          this.restoreInterpConnectionAtParam(param, previousSender);
+          this.restoreInterpConnectionAtParam(previousSender, param);
         });
       }, {
         ("Trying to remove a connection to an invalid AlgaNode: " ++ previousSender).error;
       })
     }, {
       AlgaSpinRoutine.waitFor( { this.instantiated }, {
-        this.restoreInterpConnectionAtParam(param);
+        this.restoreInterpConnectionAtParam(nil, param);
       });
     })
 	}
@@ -819,7 +801,7 @@ AlgaNode {
 			this.freeAllBusses(true);
 
 			//Reset connection dicts
-			this.resetConnectionDicts;
+			this.resetConnectionsDicts;
 		}
 	}
 
