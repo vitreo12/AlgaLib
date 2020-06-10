@@ -557,7 +557,7 @@ AlgaNode {
 		});
 	}
 
-	//add entries to the inConnections / outConnections of the two AlgaNodes
+	//add entries to the inConnections / outConnections / fadeTimeConnections of the two AlgaNodes
 	addConnections { | sender, param = \in |
 		//This will replace the entries on new connection (as mix == false)
 		this.addInConnection(sender, param);
@@ -570,9 +570,42 @@ AlgaNode {
 		sender.calculateLongestFadeTime(this.fadeTime);
 	}
 
+  //Remove entries from inConnections / outConnections / fadeTimeConnections for all involved nodes
+  removeConnections { | param = \in, previousSender = nil |
+    var previousSenders = inConnections[param];
+    if(previousSenders == nil, { ("No previous connection enstablished at param:" ++ param).error; ^this; });
+
+    previousSenders.do({ | sender |
+      var sendersParamsSet = sender.outConnections[this];
+      if(sendersParamsSet != nil, {
+        if(sendersParamsSet.size > 1, {
+          //no previousSender specified: remove them all!
+          if(previousSender == nil, {
+            sender.outConnections[this].remove(param);
+            inConnections[param].remove(sender);
+          }, {
+            //Specify previousSender, only remove that one
+            if(sender == previousSender, {
+              sender.outConnections[this].remove(param);
+              inConnections[param].remove(sender);
+            })
+          })
+        }, {
+          //if single set, remove it entirely
+          sender.outConnections.removeAt(this);
+        })
+      }) 
+    });
+
+    //If single set, remove it entirely
+    if(previousSenders.size == 1, {
+      inConnections.removeAt(param);
+    })
+  }
+
 	newInterpConnectionAtParam { | sender, param = \in |
 		var controlName = controlNames[param];
-		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this;});
+		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this; });
 
 		//Free prev interp synth (fades out)
 		this.freeInterpSynthAtParam(param);
@@ -580,9 +613,22 @@ AlgaNode {
 		//Spawn new interp synth (fades in)
 		this.createInterpSynthAtParam(sender, param);
 
-		//Add proper inConnections / outConnections
+		//Add proper inConnections / outConnections / fadeTimeConnections
 		this.addConnections(sender, param);
 	}
+
+  removeInterpConnectionAtParam { | param = \in, previousSender = nil |
+    var controlName = controlNames[param];
+		if(controlName == nil, { ("Invalid param to reset: " ++ param).error; ^this; });
+    
+    //Free prev interp synth (fades out)
+		//this.freeInterpSynthAtParam(param);
+
+    //Create new interp synth with default value (or the one supplied with args at start) (fades in)
+
+    //Remove inConnections / outConnections / fadeTimeConnections
+    this.removeConnections(param, previousSender);
+  }
 
 	//implements receiver <<.param sender
 	makeConnection { | sender, param = \in |
@@ -621,8 +667,18 @@ AlgaNode {
 
 	//resets to the default value in controlNames
   //OR, if provided, to the value of the original args that were used to create the node
-	<| { | param = \in |
+  //THIS SHOULD ALSO ALLOW REMOVING ONE SENDER IF MIXING!
+	<| { | param = \in, previousSender = nil |
     //Also remove inConnections / outConnections / fadeTimeConnections
+    if(previousSender != nil, {
+      AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
+        this.removeInterpConnectionAtParam(param, previousSender);
+      });
+    }, {
+      AlgaSpinRoutine.waitFor( { this.instantiated }, {
+        this.removeInterpConnectionAtParam(param);
+      });
+    })
 	}
 
 	//All synths must be instantiated (including interpolators and normalizers)
