@@ -54,6 +54,7 @@ Alga {
 
 		//Boot
 		server.waitForBoot({
+      server.initTree;
 			AlgaStartup.initSynthDefs(server);
 			onBoot.value;
 		});
