@@ -681,13 +681,17 @@ AlgaNode {
 		if(sender.class == AlgaNode, {
 			this.makeConnection(sender, param);
 		}, {
-			("Trying to make a connection with an invalid AlgaNode: " ++ sender).error;
+			("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
 		});
 	}
 
 	//arg is the receiver
 	>> { | receiver, param = \in |
-		receiver.makeConnection(this, param);
+        if(receiver.class == AlgaNode, {
+            receiver.makeConnection(this, param);
+        }, {
+			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
+        });
 	}
 
 	//add to already running nodes (mix)
