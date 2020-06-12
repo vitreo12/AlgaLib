@@ -11,7 +11,7 @@ AlgaNode {
 	//it's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
 	//longestFadeTime will be moved to AlgaBlock and applied per-block!
-  var <fadeTimeConnections, <longestFadeTime = 0;
+	var <fadeTimeConnections, <longestFadeTime = 0;
 
 	var <objClass;
 	var <synthDef;
@@ -29,14 +29,14 @@ AlgaNode {
 	var <isPlaying = false;
 	var <toBeCleared = false;
 
-  //This is used in feedback situations when using .replace
-  var <beingReplaced = false;
+	//This is used in feedback situations when using .replace
+	var <beingReplaced = false;
 
 	*new { | obj, server, fadeTime = 0 |
 		^super.new.init(obj, server, fadeTime)
 	}
 
-	init { | obj, argServer, argFadeTime = 0 |
+    init { | obj, argServer, argFadeTime = 0 |
 		//Default server if not specified otherwise
 		if(argServer == nil, { server = Server.default }, { server = argServer });
 
@@ -50,8 +50,8 @@ AlgaNode {
 		interpSynths = Dictionary(10);
 
 		//Per-argument connections to this AlgaNode. These are in the form:
-    //(param -> Set[AlgaNode, AlgaNode...]). Multiple AlgaNodes are used when
-    //using the mixing <<+ / >>+
+		//(param -> Set[AlgaNode, AlgaNode...]). Multiple AlgaNodes are used when
+		//using the mixing <<+ / >>+
 		inConnections = Dictionary.new(10);
 
 		//outConnections are not indexed by param name, as they could be attached to multiple nodes with same param name.
@@ -64,8 +64,8 @@ AlgaNode {
 
 		//starting fadeTime (using the setter so it also sets longestFadeTime)
 		this.fadeTime_(argFadeTime);
-		
-    //Dispatch node creation
+
+		//Dispatch node creation
 		this.dispatchNode(obj, true);
 	}
 
@@ -82,19 +82,19 @@ AlgaNode {
 		this.fadeTime_(val);
 	}
 
-  //Also sets for inConnections.. outConnections would create endless loop?
+	//Also sets for inConnections.. outConnections would create endless loop?
 	calculateLongestFadeTime { | argFadeTime |
 		longestFadeTime = if(fadeTime > argFadeTime, { fadeTime }, { argFadeTime });
-		
-    fadeTimeConnections.do({ | val |
+
+		fadeTimeConnections.do({ | val |
 			if(val > longestFadeTime, { longestFadeTime = val });
 		});
 
-    inConnections.do({ | sendersSet |
-      sendersSet.do({ | sender |
-        sender.calculateLongestFadeTime(argFadeTime);
-      });
-    });
+		inConnections.do({ | sendersSet |
+			sendersSet.do({ | sender |
+				sender.calculateLongestFadeTime(argFadeTime);
+			});
+		});
 	}
 
 	createAllGroups {
@@ -332,20 +332,20 @@ AlgaNode {
 	//will have time to run fade ins and outs when running .replace!
 	createSynth { | defName |
 		//synth's fadeTime is longestFadeTime!
-    var synthArgs = [\out, synthBus.index, \fadeTime, longestFadeTime];
+		var synthArgs = [\out, synthBus.index, \fadeTime, longestFadeTime];
 
-    //Add the param busses (which have already been allocated)
-    //Should this connect here or in createInterpNormSynths
-    /*
-    normBusses.keysValuesDo({ | param, normBus |
-      synthArgs = synthArgs.add(param);
-      synthArgs = synthArgs.add(normBus.busArg);
-    });
-    */
+		//Add the param busses (which have already been allocated)
+		//Should this connect here or in createInterpNormSynths
+		/*
+		normBusses.keysValuesDo({ | param, normBus |
+		synthArgs = synthArgs.add(param);
+		synthArgs = synthArgs.add(normBus.busArg);
+		});
+		*/
 
 		synth = AlgaSynth.new(
 			defName,
-      synthArgs,
+			synthArgs,
 			synthGroup
 		);
 	}
@@ -381,43 +381,43 @@ AlgaNode {
 			interpBus = interpBusses[paramName];
 			normBus = normBusses[paramName];
 
-      //Make sure interpSynth / normSynth are created before synth.set
-      //Does this introduce latency though? Is it necessary? (looks like it's not)
-      //server.bind({
-      
-      //Instantiated right away, with no fadeTime, as it will directly be connected to
-      //synth's parameter
-      interpSynth = AlgaSynth.new(
-        interpSymbol,
-        [\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
-        interpGroup
-      );
+			//Make sure interpSynth / normSynth are created before synth.set
+			//Does this introduce latency though? Is it necessary? (looks like it's not)
+			//server.bind({
 
-      //Instantiated right away, with no fadeTime, as it will directly be connected to
-      //synth's parameter (synth is already reading from all the normBusses)
-      normSynth = AlgaSynth.new(
-        normSymbol,
-        [\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-        normGroup
-      );
+			//Instantiated right away, with no fadeTime, as it will directly be connected to
+			//synth's parameter
+			interpSynth = AlgaSynth.new(
+				interpSymbol,
+				[\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
+				interpGroup
+			);
 
-      interpSynths[paramName] = interpSynth;
-      normSynths[paramName] = normSynth;
+			//Instantiated right away, with no fadeTime, as it will directly be connected to
+			//synth's parameter (synth is already reading from all the normBusses)
+			normSynth = AlgaSynth.new(
+				normSymbol,
+				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
+				normGroup
+			);
 
-      //server.sync;
+			interpSynths[paramName] = interpSynth;
+			normSynths[paramName] = normSynth;
 
-      //Connect synth's parameter to the normBus
-      synth.set(paramName, normBus.busArg);
-      //});
-    });
-  }
+			//server.sync;
+
+			//Connect synth's parameter to the normBus
+			synth.set(paramName, normBus.busArg);
+			//});
+		});
+	}
 
 	createAllSynths { | defName |
 		this.createSynth(defName);
 		this.createInterpNormSynths;
 	}
 
-  //Used at every << / >> / <|
+	//Used at every << / >> / <|
 	createInterpSynthAtParam { | sender, param = \in |
 		var controlName;
 		var paramNumChannels, paramRate;
@@ -430,16 +430,16 @@ AlgaNode {
 
 		paramNumChannels = controlName.numChannels;
 		paramRate = controlName.rate;
-    
-    if(sender != nil, {
-      // Used in << / >>
-      senderNumChannels = sender.numChannels;
-      senderRate = sender.rate;
-    }, {
-      //Used in <|
-      senderNumChannels = paramNumChannels;
-      senderRate = paramRate;
-    });
+
+		if(sender != nil, {
+			// Used in << / >>
+			senderNumChannels = sender.numChannels;
+			senderRate = sender.rate;
+		}, {
+			//Used in <|
+			senderNumChannels = paramNumChannels;
+			senderRate = paramRate;
+		});
 
 		interpSymbol = (
 			"algaInterp_" ++
@@ -454,24 +454,24 @@ AlgaNode {
 
 		//new interp synth, with input connected to sender and output to the interpBus
 		//USES fadeTime!! This is the whole core of the interpolation behaviour!
-    if(sender != nil, {
-      //Used in << / >>
-      //Read \in from the sender's synthBus
-      interpSynth = AlgaSynth.new(
-        interpSymbol,
-        [\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, fadeTime],
-        interpGroup
-      );
-    }, {
-      //Used in <|
-      //if sender is nil, restore the original default value. This is used in <|
-      var paramDefault = controlName.defaultValue;
-      interpSynth = AlgaSynth.new(
-        interpSymbol,
-        [\in, paramDefault, \out, interpBus.index, \fadeTime, fadeTime],
-        interpGroup
-      );
-    });
+		if(sender != nil, {
+			//Used in << / >>
+			//Read \in from the sender's synthBus
+			interpSynth = AlgaSynth.new(
+				interpSymbol,
+				[\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, fadeTime],
+				interpGroup
+			);
+		}, {
+			//Used in <|
+			//if sender is nil, restore the original default value. This is used in <|
+			var paramDefault = controlName.defaultValue;
+			interpSynth = AlgaSynth.new(
+				interpSymbol,
+				[\in, paramDefault, \out, interpBus.index, \fadeTime, fadeTime],
+				interpGroup
+			);
+		});
 
 		//Add synth to interpSynths
 		interpSynths[param] = interpSynth;
@@ -545,7 +545,7 @@ AlgaNode {
 	}
 
 	//This is only used in connection situations
-  //This, together with createInterpSynthAtParam, is the whole core of the interpolation behaviour!
+	//This, together with createInterpSynthAtParam, is the whole core of the interpolation behaviour!
 	freeInterpSynthAtParam { | param = \in |
 		var interpSynthAtParam = interpSynths[param];
 		if(interpSynthAtParam == nil, { ("Invalid param for interp synth to free: " ++ param).error; ^this });
@@ -554,17 +554,17 @@ AlgaNode {
 
 	//param -> Set[AlgaNode, AlgaNode, ...]
 	addInConnection { | sender, param = \in, mix = false |
-    //Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
-    if((inConnections[param] == nil).or(mix.not), {
-      inConnections[param] = Set[sender];
-    }, {
-      inConnections[param].add(sender);
-    })
+		//Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
+		if((inConnections[param] == nil).or(mix.not), {
+			inConnections[param] = Set[sender];
+		}, {
+			inConnections[param].add(sender);
+		})
 	}
 
 	//AlgaNode -> Set[param, param, ...]
 	addOutConnection { | receiver, param = \in |
-    //Empty entry, create Set. Otherwise, add to existing
+		//Empty entry, create Set. Otherwise, add to existing
 		if(outConnections[receiver] == nil, {
 			outConnections[receiver] = Set[param];
 		}, {
@@ -577,58 +577,58 @@ AlgaNode {
 		//This will replace the entries on new connection (as mix == false)
 		this.addInConnection(sender, param);
 
-    //This will add the entries to the existing Set, or create a new one
+		//This will add the entries to the existing Set, or create a new one
 		sender.addOutConnection(this, param);
-		
-    //Add to fadeTimeConnections and recalculate longestFadeTime
+
+		//Add to fadeTimeConnections and recalculate longestFadeTime
 		sender.fadeTimeConnections[this] = this.fadeTime;
 		sender.calculateLongestFadeTime(this.fadeTime);
 	}
 
-  removeInOutConnection { | sender, param = \in |
-    sender.outConnections[this].remove(param);
-    inConnections[param].remove(sender);
-    
-    //Recalculate longestFadeTime too
-    sender.fadeTimeConnections[this] = 0;
-    sender.calculateLongestFadeTime(0);
-  }
+	removeInOutConnection { | sender, param = \in |
+		sender.outConnections[this].remove(param);
+		inConnections[param].remove(sender);
 
-  //Remove entries from inConnections / outConnections / fadeTimeConnections for all involved nodes
-  removeConnectionsDict { | previousSender = nil, param = \in |
-    var previousSenders = inConnections[param];
-    if(previousSenders == nil, { ("No previous connection enstablished at param:" ++ param).error; ^this; });
+		//Recalculate longestFadeTime too
+		sender.fadeTimeConnections[this] = 0;
+		sender.calculateLongestFadeTime(0);
+	}
 
-    previousSenders.do({ | sender |
-      var sendersParamsSet = sender.outConnections[this];
-      if(sendersParamsSet != nil, {
-        //Multiple entries in the set
-        if(sendersParamsSet.size > 1, {
-          //no previousSender specified: remove them all!
-          if(previousSender == nil, {
-            this.removeInOutConnection(sender, param);
-          }, {
-            //If specified previousSender, only remove that one (in mixing scenarios)
-            if(sender == previousSender, {
-              this.removeInOutConnection(sender, param);
-            })
-          })
-        }, {
-          //If Set with just one entry, remove the entire Set
-          sender.outConnections.removeAt(this);
-          
-          //Recalculate longestFadeTime too
-          sender.fadeTimeConnections[this] = 0;
-          sender.calculateLongestFadeTime(0);
-        })
-      }) 
-    });
+	//Remove entries from inConnections / outConnections / fadeTimeConnections for all involved nodes
+	removeConnectionsDict { | previousSender = nil, param = \in |
+		var previousSenders = inConnections[param];
+		if(previousSenders == nil, { ("No previous connection enstablished at param:" ++ param).error; ^this; });
 
-    //If Set with just one entry, remove the entire Set
-    if(previousSenders.size == 1, {
-      inConnections.removeAt(param);
-    })
-  }
+		previousSenders.do({ | sender |
+			var sendersParamsSet = sender.outConnections[this];
+			if(sendersParamsSet != nil, {
+				//Multiple entries in the set
+				if(sendersParamsSet.size > 1, {
+					//no previousSender specified: remove them all!
+					if(previousSender == nil, {
+						this.removeInOutConnection(sender, param);
+					}, {
+						//If specified previousSender, only remove that one (in mixing scenarios)
+						if(sender == previousSender, {
+							this.removeInOutConnection(sender, param);
+						})
+					})
+				}, {
+					//If Set with just one entry, remove the entire Set
+					sender.outConnections.removeAt(this);
+
+					//Recalculate longestFadeTime too
+					sender.fadeTimeConnections[this] = 0;
+					sender.calculateLongestFadeTime(0);
+				})
+			})
+		});
+
+		//If Set with just one entry, remove the entire Set
+		if(previousSenders.size == 1, {
+			inConnections.removeAt(param);
+		})
+	}
 
 	resetConnectionsDicts {
 		if(toBeCleared, {
@@ -651,19 +651,19 @@ AlgaNode {
 		this.addConnectionsDict(sender, param);
 	}
 
-  restoreInterpConnectionAtParam { | previousSender = nil, param = \in  |
-    var controlName = controlNames[param];
+	restoreInterpConnectionAtParam { | previousSender = nil, param = \in  |
+		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to reset: " ++ param).error; ^this; });
-    
-    //Free prev interp synth (fades out)
+
+		//Free prev interp synth (fades out)
 		this.freeInterpSynthAtParam(param);
 
-    //Create new interp synth with default value (or the one supplied with args at start) (fades in)
-    this.createInterpSynthAtParam(nil, param); 
+		//Create new interp synth with default value (or the one supplied with args at start) (fades in)
+		this.createInterpSynthAtParam(nil, param);
 
-    //Remove inConnections / outConnections / fadeTimeConnections
-    this.removeConnectionsDict(previousSender, param);
-  }
+		//Remove inConnections / outConnections / fadeTimeConnections
+		this.removeConnectionsDict(previousSender, param);
+	}
 
 	//implements receiver <<.param sender
 	makeConnection { | sender, param = \in |
@@ -692,32 +692,32 @@ AlgaNode {
 
 	//add to already running nodes (mix)
 	<<+ { | sender, param = \in |
-    //Would this require to have also inConnections to be some kind of Set?
+		//Would this require to have also inConnections to be some kind of Set?
 	}
 
 	//add to already running nodes (mix)
 	>>+ { | receiver, param = \in |
-    //Would this require to have also inConnections to be some kind of Set?
+		//Would this require to have also inConnections to be some kind of Set?
 	}
 
 	//resets to the default value in controlNames
-  //OR, if provided, to the value of the original args that were used to create the node
+	//OR, if provided, to the value of the original args that were used to create the node
 	//previousSender is used in case of mixing, to only remove that one
-  <| { | param = \in, previousSender = nil |
-    //Also remove inConnections / outConnections / fadeTimeConnections
-    if(previousSender != nil, {
-      if(previousSender.class == AlgaNode, {
-        AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
-          this.restoreInterpConnectionAtParam(previousSender, param);
-        });
-      }, {
-        ("Trying to remove a connection to an invalid AlgaNode: " ++ previousSender).error;
-      })
-    }, {
-      AlgaSpinRoutine.waitFor( { this.instantiated }, {
-        this.restoreInterpConnectionAtParam(nil, param);
-      });
-    })
+	<| { | param = \in, previousSender = nil |
+		//Also remove inConnections / outConnections / fadeTimeConnections
+		if(previousSender != nil, {
+			if(previousSender.class == AlgaNode, {
+				AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
+					this.restoreInterpConnectionAtParam(previousSender, param);
+				});
+			}, {
+				("Trying to remove a connection to an invalid AlgaNode: " ++ previousSender).error;
+			})
+		}, {
+			AlgaSpinRoutine.waitFor( { this.instantiated }, {
+				this.restoreInterpConnectionAtParam(nil, param);
+			});
+		})
 	}
 
 	//All synths must be instantiated (including interpolators and normalizers)
@@ -741,13 +741,13 @@ AlgaNode {
 	replaceConnections {
 		//inConnections
 		inConnections.keysValuesDo({ | param, sendersSet |
-      sendersSet.do({ | sender |
-        if(sender.beingReplaced, {
-          "Sender is being already replaced".postln;
-        });
-        
-        this.makeConnection(sender, param);
-      })
+			sendersSet.do({ | sender |
+				if(sender.beingReplaced, {
+					"Sender is being already replaced".postln;
+				});
+
+				this.makeConnection(sender, param);
+			})
 		});
 
 		//outConnections
@@ -757,10 +757,10 @@ AlgaNode {
 			});
 		});
 
-    //Also set beingReplaced to false when done instantiating this
-    AlgaSpinRoutine.waitFor({ this.instantiated }, {
-      beingReplaced = false;
-    });
+		//Also set beingReplaced to false when done instantiating this
+		AlgaSpinRoutine.waitFor({ this.instantiated }, {
+			beingReplaced = false;
+		});
 	}
 
 	//replace content of the node, re-making all the connections
@@ -771,8 +771,8 @@ AlgaNode {
 		//In case it has been set to true when clearing, then replacing before clear ends!
 		toBeCleared = false;
 
-    //Current node is being replaced.
-    beingReplaced = true;
+		//Current node is being replaced.
+		beingReplaced = true;
 
 		//Free previous ones
 		this.freeAllSynths;
