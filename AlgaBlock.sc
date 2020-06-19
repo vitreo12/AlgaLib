@@ -40,8 +40,7 @@ AlgaBlock {
 		nodesDict.put(node, node);
 
 		if(node.blockIndex != blockIndex, {
-
-			("blockIndex mismatch detected. Using " ++ blockIndex).warn;
+			//("blockIndex mismatch detected. Using " ++ blockIndex).warn;
 			node.blockIndex = blockIndex;
 
 			//Also update statesDict and add one more entry to ordered array
@@ -49,7 +48,6 @@ AlgaBlock {
 				statesDict.put(node, false);
 				orderedArray.add(nil);
 			});
-
 		});
 
 		//this.changed = true;
@@ -87,7 +85,7 @@ AlgaBlock {
 
 		//Store the rearranging results in this.orderedArray
 		bottomOutNodes.do({ | node |
-			this.rearrangeBlockLoop(node);
+			this.rearrangeBlockLoop(node, node);
 		});
 
 		this.sanitizeArray;
@@ -173,24 +171,22 @@ AlgaBlock {
 	}
 
 	//Have something to automatically remove Nodes that haven't been touched from the dict
-	rearrangeBlockLoop { | node |
+	rearrangeBlockLoop { | node, topNode |
 		if(node != nil, {
 
-			var currentState;
+			var nodeState = statesDict[node];
 
 			//If for any reason the node wasn't already in the nodesDict, add it
 			this.addNode(node, true);
 
-			currentState = statesDict[node];
-
-			//If this node has never been touched, avoids repetition
-			if(currentState == false, {
+			//If this node has never been touched, avoid repetitions
+			if(nodeState == false, {
 
 				//("inNodes to " ++  node.asString ++ " : ").postln;
 
 				node.inNodes.nodesLoop ({ | inNode |
 					//rearrangeInputs to this, this will add the inNodes
-					this.rearrangeBlockLoop(inNode);
+					this.rearrangeBlockLoop(inNode, topNode);
 				});
 
 				//Add this
