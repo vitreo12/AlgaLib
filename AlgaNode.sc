@@ -3,11 +3,13 @@ AN : AlgaNode {}
 AlgaNode {
 	var <server;
 
+	var <>blockIndex = -1;
+
 	//This is the time when making a new connection to this proxy.
 	//Could be just named interpolationTime OR connectionTime
 	var <fadeTime = 0;
 
-	//This is the longestFadeTime between all the outConnections.
+	//This is the longestFadeTime between all the outNodes.
 	//it's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
 	//longestFadeTime will be moved to AlgaBlock and applied per-block!
@@ -24,7 +26,7 @@ AlgaNode {
 	var <synth, <normSynths, <interpSynths;
 	var <synthBus, <normBusses, <interpBusses;
 
-	var <inConnections, <outConnections;
+	var <inNodes, <outNodes;
 
 	var <isPlaying = false;
 	var <toBeCleared = false;
@@ -52,12 +54,12 @@ AlgaNode {
 		//Per-argument connections to this AlgaNode. These are in the form:
 		//(param -> Set[AlgaNode, AlgaNode...]). Multiple AlgaNodes are used when
 		//using the mixing <<+ / >>+
-		inConnections = Dictionary.new(10);
+		inNodes = Dictionary.new(10);
 
-		//outConnections are not indexed by param name, as they could be attached to multiple nodes with same param name.
+		//outNodes are not indexed by param name, as they could be attached to multiple nodes with same param name.
 		//they are indexed by identity of the connected node, and then it contains a Set of all parameters
 		//that it controls in that node (AlgaNode -> Set[\freq, \amp ...])
-		outConnections = Dictionary.new(10);
+		outNodes = Dictionary.new(10);
 
 		//Keeps all the fadeTimes of the connected nodes
 		fadeTimeConnections = Dictionary.new(10);
@@ -82,7 +84,7 @@ AlgaNode {
 		this.fadeTime_(val);
 	}
 
-	//Also sets for inConnections.. outConnections would create endless loop?
+	//Also sets for inNodes.. outNodes would create endless loop?
 	calculateLongestFadeTime { | argFadeTime |
 		longestFadeTime = if(fadeTime > argFadeTime, { fadeTime }, { argFadeTime });
 
@@ -90,7 +92,7 @@ AlgaNode {
 			if(val > longestFadeTime, { longestFadeTime = val });
 		});
 
-		inConnections.do({ | sendersSet |
+		inNodes.do({ | sendersSet |
 			sendersSet.do({ | sender |
 				sender.calculateLongestFadeTime(argFadeTime);
 			});
@@ -553,69 +555,69 @@ AlgaNode {
 	}
 
 	//param -> Set[AlgaNode, AlgaNode, ...]
-	addInConnection { | sender, param = \in, mix = false |
+	addInNode { | sender, param = \in, mix = false |
 		//Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
-		if((inConnections[param] == nil).or(mix.not), {
-			inConnections[param] = Set[sender];
+		if((inNodes[param] == nil).or(mix.not), {
+			inNodes[param] = Set[sender];
 		}, {
-			inConnections[param].add(sender);
+			inNodes[param].add(sender);
 		})
 	}
 
 	//AlgaNode -> Set[param, param, ...]
-	addOutConnection { | receiver, param = \in |
+	addOutNode { | receiver, param = \in |
 		//Empty entry, create Set. Otherwise, add to existing
-		if(outConnections[receiver] == nil, {
-			outConnections[receiver] = Set[param];
+		if(outNodes[receiver] == nil, {
+			outNodes[receiver] = Set[param];
 		}, {
-			outConnections[receiver].add(param);
+			outNodes[receiver].add(param);
 		});
 	}
 
-	//add entries to the inConnections / outConnections / fadeTimeConnections of the two AlgaNodes
-	addConnectionsDict { | sender, param = \in |
+	//add entries to the inNodes / outNodes / fadeTimeConnections of the two AlgaNodes
+	addInOutNodesDict { | sender, param = \in |
 		//This will replace the entries on new connection (as mix == false)
-		this.addInConnection(sender, param);
+		this.addInNode(sender, param);
 
 		//This will add the entries to the existing Set, or create a new one
-		sender.addOutConnection(this, param);
+		sender.addOutNode(this, param);
 
 		//Add to fadeTimeConnections and recalculate longestFadeTime
 		sender.fadeTimeConnections[this] = this.fadeTime;
 		sender.calculateLongestFadeTime(this.fadeTime);
 	}
 
-	removeInOutConnection { | sender, param = \in |
-		sender.outConnections[this].remove(param);
-		inConnections[param].remove(sender);
+	removeInOutNode { | sender, param = \in |
+		sender.outNodes[this].remove(param);
+		inNodes[param].remove(sender);
 
 		//Recalculate longestFadeTime too
 		sender.fadeTimeConnections[this] = 0;
 		sender.calculateLongestFadeTime(0);
 	}
 
-	//Remove entries from inConnections / outConnections / fadeTimeConnections for all involved nodes
-	removeConnectionsDict { | previousSender = nil, param = \in |
-		var previousSenders = inConnections[param];
+	//Remove entries from inNodes / outNodes / fadeTimeConnections for all involved nodes
+	removeInOutNodesDict { | previousSender = nil, param = \in |
+		var previousSenders = inNodes[param];
 		if(previousSenders == nil, { ("No previous connection enstablished at param:" ++ param).error; ^this; });
 
 		previousSenders.do({ | sender |
-			var sendersParamsSet = sender.outConnections[this];
+			var sendersParamsSet = sender.outNodes[this];
 			if(sendersParamsSet != nil, {
 				//Multiple entries in the set
 				if(sendersParamsSet.size > 1, {
 					//no previousSender specified: remove them all!
 					if(previousSender == nil, {
-						this.removeInOutConnection(sender, param);
+						this.removeInOutNode(sender, param);
 					}, {
 						//If specified previousSender, only remove that one (in mixing scenarios)
 						if(sender == previousSender, {
-							this.removeInOutConnection(sender, param);
+							this.removeInOutNode(sender, param);
 						})
 					})
 				}, {
 					//If Set with just one entry, remove the entire Set
-					sender.outConnections.removeAt(this);
+					sender.outNodes.removeAt(this);
 
 					//Recalculate longestFadeTime too
 					sender.fadeTimeConnections[this] = 0;
@@ -626,17 +628,19 @@ AlgaNode {
 
 		//If Set with just one entry, remove the entire Set
 		if(previousSenders.size == 1, {
-			inConnections.removeAt(param);
+			inNodes.removeAt(param);
 		})
 	}
 
-	resetConnectionsDicts {
+	//Clear the dicts
+	resetInOutNodesDicts {
 		if(toBeCleared, {
-			inConnections.clear;
-			outConnections.clear;
+			inNodes.clear;
+			outNodes.clear;
 		});
 	}
 
+	//New interp connection at specific parameter
 	newInterpConnectionAtParam { | sender, param = \in |
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this; });
@@ -647,10 +651,11 @@ AlgaNode {
 		//Spawn new interp synth (fades in)
 		this.createInterpSynthAtParam(sender, param);
 
-		//Add proper inConnections / outConnections / fadeTimeConnections
-		this.addConnectionsDict(sender, param);
+		//Add proper inNodes / outNodes / fadeTimeConnections
+		this.addInOutNodesDict(sender, param);
 	}
 
+	//Restore a connection when using .replace()
 	restoreInterpConnectionAtParam { | previousSender = nil, param = \in  |
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to reset: " ++ param).error; ^this; });
@@ -661,8 +666,8 @@ AlgaNode {
 		//Create new interp synth with default value (or the one supplied with args at start) (fades in)
 		this.createInterpSynthAtParam(nil, param);
 
-		//Remove inConnections / outConnections / fadeTimeConnections
-		this.removeConnectionsDict(previousSender, param);
+		//Remove inNodes / outNodes / fadeTimeConnections
+		this.removeInOutNodesDict(previousSender, param);
 	}
 
 	//implements receiver <<.param sender
@@ -679,6 +684,10 @@ AlgaNode {
 	//arg is the sender
 	<< { | sender, param = \in |
 		if(sender.class == AlgaNode, {
+			if(this.server != sender.sender, {
+				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				^this;
+			});
 			this.makeConnection(sender, param);
 		}, {
 			("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
@@ -688,6 +697,10 @@ AlgaNode {
 	//arg is the receiver
 	>> { | receiver, param = \in |
         if(receiver.class == AlgaNode, {
+			if(this.server != receiver.sender, {
+				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				^this;
+			});
             receiver.makeConnection(this, param);
         }, {
 			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
@@ -696,19 +709,19 @@ AlgaNode {
 
 	//add to already running nodes (mix)
 	<<+ { | sender, param = \in |
-		//Would this require to have also inConnections to be some kind of Set?
+
 	}
 
 	//add to already running nodes (mix)
 	>>+ { | receiver, param = \in |
-		//Would this require to have also inConnections to be some kind of Set?
+
 	}
 
 	//resets to the default value in controlNames
 	//OR, if provided, to the value of the original args that were used to create the node
 	//previousSender is used in case of mixing, to only remove that one
 	<| { | param = \in, previousSender = nil |
-		//Also remove inConnections / outConnections / fadeTimeConnections
+		//Also remove inNodes / outNodes / fadeTimeConnections
 		if(previousSender != nil, {
 			if(previousSender.class == AlgaNode, {
 				AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
@@ -740,11 +753,11 @@ AlgaNode {
 		^synth.instantiated;
 	}
 
-	//Remake both inConnections and outConnections...
+	//Remake both inNodes and outNodes...
 	//Look for feedback!
 	replaceConnections {
-		//inConnections
-		inConnections.keysValuesDo({ | param, sendersSet |
+		//inNodes
+		inNodes.keysValuesDo({ | param, sendersSet |
 			sendersSet.do({ | sender |
 				if(sender.beingReplaced, {
 					"Sender is being already replaced".postln;
@@ -754,8 +767,8 @@ AlgaNode {
 			})
 		});
 
-		//outConnections
-		outConnections.keysValuesDo({ | receiver, paramsSet |
+		//outNodes
+		outNodes.keysValuesDo({ | receiver, paramsSet |
 			paramsSet.do({ | param |
 				receiver.makeConnection(this, param);
 			});
@@ -791,7 +804,7 @@ AlgaNode {
 		this.replaceConnections;
 	}
 
-	//Clears it all.. It should do some sort of fading
+	//Clears it all... It should do some sort of fading
 	clear {
 		fork {
 			this.freeSynth;
@@ -805,8 +818,18 @@ AlgaNode {
 			this.freeAllBusses(true);
 
 			//Reset connection dicts
-			this.resetConnectionsDicts;
+			this.resetInOutNodesDicts;
 		}
+	}
+
+	//Move this node's group before another node's one
+	moveBefore { | node |
+		group.before(node.group);
+	}
+
+	//Move this node's group after another node's one
+	moveAfter { | node |
+		group.after(node.group);
 	}
 
 	play {
