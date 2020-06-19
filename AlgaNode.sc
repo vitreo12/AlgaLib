@@ -73,7 +73,7 @@ AlgaNode {
 
 	fadeTime_ { | val |
 		fadeTime = val;
-		this.calculateLongestFadeTime(val);
+		this.calculateLongestFadeTime(val, this);
 	}
 
 	ft {
@@ -85,7 +85,7 @@ AlgaNode {
 	}
 
 	//Also sets for inNodes.. outNodes would create endless loop?
-	calculateLongestFadeTime { | argFadeTime |
+	calculateLongestFadeTime { | argFadeTime, originalNode |
 		longestFadeTime = if(fadeTime > argFadeTime, { fadeTime }, { argFadeTime });
 
 		fadeTimeConnections.do({ | val |
@@ -94,7 +94,12 @@ AlgaNode {
 
 		inNodes.do({ | sendersSet |
 			sendersSet.do({ | sender |
-				sender.calculateLongestFadeTime(argFadeTime);
+				//Detect feedbacks
+				if(sender != originalNode, {
+					sender.calculateLongestFadeTime(argFadeTime, originalNode);
+				},{
+					"Feedback detected".warn;
+				});
 			});
 		});
 	}
@@ -542,8 +547,12 @@ AlgaNode {
 	}
 
 	freeAllSynths { | useFadeTime = true, now = true |
-		this.freeSynth(useFadeTime, now);
 		this.freeInterpNormSynths(useFadeTime, now);
+		this.freeSynth(useFadeTime, now);
+	}
+
+	freeAllSynthOnNewInstantiation { | useFadeTime = true, now = true |
+		this.freeAllSynths(useFadeTime, now);
 	}
 
 	//This is only used in connection situations
@@ -584,7 +593,7 @@ AlgaNode {
 
 		//Add to fadeTimeConnections and recalculate longestFadeTime
 		sender.fadeTimeConnections[this] = this.fadeTime;
-		sender.calculateLongestFadeTime(this.fadeTime);
+		sender.calculateLongestFadeTime(this.fadeTime, sender);
 	}
 
 	removeInOutNode { | sender, param = \in |
@@ -595,7 +604,7 @@ AlgaNode {
 		//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
 		//(Right now, this happens before creating new synths)
 		sender.fadeTimeConnections[this] = 0;
-		sender.calculateLongestFadeTime(0);
+		sender.calculateLongestFadeTime(0, sender);
 	}
 
 	//Remove entries from inNodes / outNodes / fadeTimeConnections for all involved nodes
@@ -625,7 +634,7 @@ AlgaNode {
 					//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
 					//(Right now, this happens before creating new synths)
 					sender.fadeTimeConnections[this] = 0;
-					sender.calculateLongestFadeTime(0);
+					sender.calculateLongestFadeTime(0, sender);
 				})
 			})
 		});
@@ -763,8 +772,7 @@ AlgaNode {
 		^synth.instantiated;
 	}
 
-	//Remake both inNodes and outNodes...
-	//Look for feedback!
+	//Remake both inNodes and outNodes
 	replaceConnections {
 		//inNodes
 		inNodes.keysValuesDo({ | param, sendersSet |
@@ -801,10 +809,11 @@ AlgaNode {
 		//Current node is being replaced.
 		beingReplaced = true;
 
-		//Free previous ones
+		//Free previous ones.
+		//This doesn't work with feedbacks, as synths would be freed slightly before
+		//The new ones finish the rise, generating click. These should be freed
+		//When the new synths/busses are surely instantiated in the server!
 		this.freeAllSynths;
-
-		//Should perhaps check for new numChannels / rate, instead of just deleting it all
 		this.freeAllBusses;
 
 		//New one
