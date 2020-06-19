@@ -679,8 +679,7 @@ AlgaNode {
 		//Remove inNodes / outNodes / fadeTimeConnections
 		this.removeInOutNodesDict(previousSender, param);
 
-		//Re-order groups ??
-		//AlgaBlocksDict.createNewBlockIfNeeded(this, previousSender); //Here it would be error: previousSender == nil
+		//Re-order groups shouldn't be needed when removing connections
 
 		//Free prev interp synth (fades out)... This will use the new longestFadeTime... Is it correct?
 		this.freeInterpSynthAtParam(param);
