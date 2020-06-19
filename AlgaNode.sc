@@ -591,7 +591,9 @@ AlgaNode {
 		sender.outNodes[this].remove(param);
 		inNodes[param].remove(sender);
 
-		//Recalculate longestFadeTime too
+		//Recalculate longestFadeTime too...
+		//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
+		//(Right now, this happens before creating new synths)
 		sender.fadeTimeConnections[this] = 0;
 		sender.calculateLongestFadeTime(0);
 	}
@@ -619,7 +621,9 @@ AlgaNode {
 					//If Set with just one entry, remove the entire Set
 					sender.outNodes.removeAt(this);
 
-					//Recalculate longestFadeTime too
+					//Recalculate longestFadeTime too...
+					//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
+					//(Right now, this happens before creating new synths)
 					sender.fadeTimeConnections[this] = 0;
 					sender.calculateLongestFadeTime(0);
 				})
@@ -645,29 +649,35 @@ AlgaNode {
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this; });
 
-		//Free prev interp synth (fades out)
+		//Add proper inNodes / outNodes / fadeTimeConnections
+		this.addInOutNodesDict(sender, param);
+
+		//Re-order groups
+		AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+
+		//Free prev interp synth (fades out)... This will use the new longestFadeTime... Is it correct?
 		this.freeInterpSynthAtParam(param);
 
 		//Spawn new interp synth (fades in)
 		this.createInterpSynthAtParam(sender, param);
-
-		//Add proper inNodes / outNodes / fadeTimeConnections
-		this.addInOutNodesDict(sender, param);
 	}
 
-	//Restore a connection when using .replace()
-	restoreInterpConnectionAtParam { | previousSender = nil, param = \in  |
+	//Used in <|
+	removeInterpConnectionAtParam { | previousSender = nil, param = \in  |
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to reset: " ++ param).error; ^this; });
 
-		//Free prev interp synth (fades out)
+		//Remove inNodes / outNodes / fadeTimeConnections
+		this.removeInOutNodesDict(previousSender, param);
+
+		//Re-order groups ??
+		//AlgaBlocksDict.createNewBlockIfNeeded(this, previousSender); //Here it would be error: previousSender == nil
+
+		//Free prev interp synth (fades out)... This will use the new longestFadeTime... Is it correct?
 		this.freeInterpSynthAtParam(param);
 
 		//Create new interp synth with default value (or the one supplied with args at start) (fades in)
 		this.createInterpSynthAtParam(nil, param);
-
-		//Remove inNodes / outNodes / fadeTimeConnections
-		this.removeInOutNodesDict(previousSender, param);
 	}
 
 	//implements receiver <<.param sender
@@ -684,7 +694,7 @@ AlgaNode {
 	//arg is the sender
 	<< { | sender, param = \in |
 		if(sender.class == AlgaNode, {
-			if(this.server != sender.sender, {
+			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
@@ -697,7 +707,7 @@ AlgaNode {
 	//arg is the receiver
 	>> { | receiver, param = \in |
         if(receiver.class == AlgaNode, {
-			if(this.server != receiver.sender, {
+			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
@@ -725,14 +735,14 @@ AlgaNode {
 		if(previousSender != nil, {
 			if(previousSender.class == AlgaNode, {
 				AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
-					this.restoreInterpConnectionAtParam(previousSender, param);
+					this.removeInterpConnectionAtParam(previousSender, param);
 				});
 			}, {
 				("Trying to remove a connection to an invalid AlgaNode: " ++ previousSender).error;
 			})
 		}, {
 			AlgaSpinRoutine.waitFor( { this.instantiated }, {
-				this.restoreInterpConnectionAtParam(nil, param);
+				this.removeInterpConnectionAtParam(nil, param);
 			});
 		})
 	}
@@ -824,16 +834,33 @@ AlgaNode {
 
 	//Move this node's group before another node's one
 	moveBefore { | node |
-		group.before(node.group);
+		group.moveBefore(node.group);
 	}
 
 	//Move this node's group after another node's one
 	moveAfter { | node |
-		group.after(node.group);
+		group.moveAfter(node.group);
 	}
 
 	play {
 		isPlaying = true;
 		synthBus.play;
+	}
+}
+
++Dictionary {
+	//Loop over a Dict, unpacking Set. It's used in AlgaBlock
+	//to unpack inNodes of an AlgaNode
+	nodesLoop { | function |
+		this.keysValuesDo({
+			arg key, value, i;
+			if(value.class == Set, {
+				value.do({ | entry |
+					function.value(entry, i);
+				});
+			}, {
+				function.value(value, i);
+			});
+		});
 	}
 }

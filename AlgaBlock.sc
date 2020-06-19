@@ -1,25 +1,25 @@
 AlgaBlock {
 
 	//all the nodes for this block
-	var <>dictOfNodes;
+	var <nodesDict;
 
 	//the ordered array of nodes for the block
-	var <>orderedArray;
+	var <orderedArray;
 
 	//A dict storing node -> (true or false) to state if all inputs have been checked or not
-	var <>statesDict;
+	var <statesDict;
 
 	//Counter for correct ordering of entries in orderedArray
-	var <>runningIndex;
+	var <runningIndex;
 
 	//bottom most and top most nodes in this block
-	var <>bottomOutNodes, <>topInNodes;
+	var <bottomOutNodes, <topInNodes;
 
 	//if the block has changed form (new nodes added, etc...)
 	var <>changed = true;
 
 	//the index for this block in the AlgaBlocksDict global dict
-	var <>blockIndex;
+	var <blockIndex;
 
 	*new { | inBlockIndex |
 		^super.new.init(inBlockIndex);
@@ -27,9 +27,9 @@ AlgaBlock {
 
 	init { | inBlockIndex |
 
-		this.blockIndex = inBlockIndex;
+		blockIndex = inBlockIndex;
 
-		dictOfNodes    = IdentityDictionary.new(20);
+		nodesDict      = IdentityDictionary.new(20);
 		statesDict     = Dictionary.new(20);
 		bottomOutNodes = IdentityDictionary.new;
 		topInNodes     = IdentityDictionary.new;
@@ -37,18 +37,17 @@ AlgaBlock {
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
 
-		this.dictOfNodes.put(node, node);
+		nodesDict.put(node, node);
 
-		if(node.blockIndex != this.blockIndex, {
+		if(node.blockIndex != blockIndex, {
 
-			("blockIndex mismatch detected. Using " ++ this.blockIndex).warn;
-			node.blockIndex = this.blockIndex;
+			("blockIndex mismatch detected. Using " ++ blockIndex).warn;
+			node.blockIndex = blockIndex;
 
 			//Also update statesDict and add one more entry to ordered array
 			if(addingInRearrangeBlockLoop, {
-				this.statesDict.put(node, false);
-
-				this.orderedArray.add(nil);
+				statesDict.put(node, false);
+				orderedArray.add(nil);
 			});
 
 		});
@@ -60,63 +59,61 @@ AlgaBlock {
 
 		var nodeBlockIndex = node.blockIndex;
 
-		if(nodeBlockIndex != this.blockIndex, {
+		if(nodeBlockIndex != blockIndex, {
 			"Trying to remove a node from a block that did not contain it!".warn;
 			^nil;
 		});
 
-		this.dictOfNodes.removeAt(node);
+		nodesDict.removeAt(node);
 
 		//Remove this block from AlgaBlocksDict if it's empty!
-		if(this.dictOfNodes.size == 0, {
+		if(nodesDict.size == 0, {
 			AlgaBlocksDict.blocksDict.removeAt(nodeBlockIndex);
 		});
 
 		//this.changed = true;
 	}
 
-	rearrangeBlock { | server |
+	rearrangeBlock {
 
 		//ordered collection
-		this.orderedArray = Array.newClear(dictOfNodes.size);
+		orderedArray = Array.newClear(nodesDict.size);
 
 		//Find the nodes with no outNodes (so, the last ones in the chain!), and init the statesDict
 		this.findBottomMostOutNodesAndInitStatesDict;
 
 		//init runningIndex
-		this.runningIndex = 0;
+		runningIndex = 0;
 
 		//Store the rearranging results in this.orderedArray
-		this.bottomOutNodes.do({ | node |
-			this.rearrangeBlockLoop(node); //start from index 0
+		bottomOutNodes.do({ | node |
+			this.rearrangeBlockLoop(node);
 		});
 
 		this.sanitizeArray;
 
 		if(orderedArray.size > 0, {
 			//server.bind({
+			var sizeMinusOne = orderedArray.size - 1;
 
-				var sizeMinusOne = orderedArray.size - 1;
+			//First one here is the last in the chain.
+			var firstNode = orderedArray[0];
 
-				//First one here is the last in the chain.. I think this should actually be done for each
-				//bottomOutNode...
-				var firstNode = orderedArray[0];
+			//Must loop reverse to correct order stuff
+			sizeMinusOne.reverseDo({ | index |
 
-				//Must loop reverse to correct order stuff
-				sizeMinusOne.reverseDo({ | index |
+				var count = index + 1;
 
-					var count = index + 1;
+				var thisEntry = orderedArray[count];
+				var prevEntry = orderedArray[count - 1];
 
-					var thisEntry = orderedArray[count];
-					var prevEntry = orderedArray[count - 1];
+				prevEntry.moveBefore(thisEntry);
+			});
 
-					prevEntry.moveBefore(thisEntry);
-				});
-
-				//Also move first one (so that its interpolationNodes are correct)
-				//if(firstNode != nil, {
-				//	firstNode.moveBefore(firstNode);
-				//});
+			//Also move first one (so that its interpolationNodes are correct)
+			//if(firstNode != nil, {
+			//	firstNode.moveBefore(firstNode);
+			//});
 			//});
 		});
 
@@ -124,8 +121,9 @@ AlgaBlock {
 		this.sanitizeDict;
 	}
 
+	//Remove nil entries or ones that do not have any in our out connections
 	sanitizeArray {
-		this.orderedArray.removeAllSuchThat({ | item |
+		orderedArray.removeAllSuchThat({ | item |
 			var removeCondition;
 
 			//If nil, remove entry anyway. Otherwise, look for the other cases.
@@ -141,13 +139,13 @@ AlgaBlock {
 
 	//Remove non-used entries and set their blockIndex back to -1
 	sanitizeDict {
-		if(this.orderedArray.size > 0, {
-			this.dictOfNodes = this.dictOfNodes.select({ | node |
+		if(orderedArray.size > 0, {
+			nodesDict = nodesDict.select({ | node |
 				var result;
 
 				block ({ | break |
-					this.orderedArray.do({ | nodeInArray |
-						result = node == nodeInArray;
+					orderedArray.do({ | nodeInArray |
+						result = (node == nodeInArray);
 
 						//Break on true, otherwise keep searching.
 						if(result, {
@@ -158,33 +156,29 @@ AlgaBlock {
 
 				//Reset blockIndex too
 				if(result.not, {
-					("Removing node: " ++ node.asString ++ " from block number " ++ this.blockIndex).warn;
+					("Removing node: " ++ node.asString ++ " from block number " ++ blockIndex).warn;
 					node.blockIndex = -1;
 				});
 
 				result;
-
 			});
 		}, {
-
 			//Ordered array has size 0. Free all
-
-			this.dictOfNodes.do({ | node |
+			nodesDict.do({ | node |
 				node.blockIndex = -1;
 			});
 
-			this.dictOfNodes.clear;
+			nodesDict.clear;
 		});
 	}
 
 	//Have something to automatically remove Nodes that haven't been touched from the dict
 	rearrangeBlockLoop { | node |
-
 		if(node != nil, {
 
 			var currentState;
 
-			//If for any reason the node wasn't already in the dictOfNodes, add it
+			//If for any reason the node wasn't already in the nodesDict, add it
 			this.addNode(node, true);
 
 			currentState = statesDict[node];
@@ -194,45 +188,42 @@ AlgaBlock {
 
 				//("inNodes to " ++  node.asString ++ " : ").postln;
 
-				node.inNodes.doNodesLoop ({ | inNode |
-
+				node.inNodes.nodesLoop ({ | inNode |
 					//rearrangeInputs to this, this will add the inNodes
 					this.rearrangeBlockLoop(inNode);
 				});
 
 				//Add this
-				this.orderedArray[runningIndex] = node;
+				orderedArray[runningIndex] = node;
 
 				//Completed: put it to true so it's not added again
 				statesDict[node] = true;
 
 				//Advance counter
-				this.runningIndex = this.runningIndex + 1;
+				runningIndex = runningIndex + 1;
 			});
 		});
 	}
 
 	findBottomMostOutNodesAndInitStatesDict {
-		this.bottomOutNodes.clear;
-		this.statesDict.clear;
+		bottomOutNodes.clear;
+		statesDict.clear;
 
 		//If only one node, just add that one.
-		if(dictOfNodes.size == 1, {
-			this.dictOfNodes.do({ | node |
-				this.bottomOutNodes.put(node, node);
-				this.statesDict.put(node, false);
+		if(nodesDict.size == 1, {
+			nodesDict.do({ | node |
+				bottomOutNodes.put(node, node);
+				statesDict.put(node, false);
 			});
 		}, {
-
-			this.dictOfNodes.do({ | node |
+			nodesDict.do({ | node |
 				//Find the ones with no outNodes but at least one inNode
 				if((node.outNodes.size == 0).and(node.inNodes.size > 0), {
-					this.bottomOutNodes.put(node, node);
+					bottomOutNodes.put(node, node);
 				});
 
 				//init statesDict for all nodes to false
-				this.statesDict.put(node, false);
-
+				statesDict.put(node, false);
 			});
 		});
 	}
@@ -276,7 +267,7 @@ AlgaBlocksDict {
 		//Create new block if both connections didn't have any
 		if((receiverBlockIndex == -1).and(senderBlockIndex == -1), {
 			newBlockIndex = UniqueID.next;
-			newBlock = AlgaNodeBlock.new(newBlockIndex);
+			newBlock = AlgaBlock.new(newBlockIndex);
 
 			receiver.blockIndex = newBlockIndex;
 			sender.blockIndex = newBlockIndex;
@@ -316,10 +307,10 @@ AlgaBlocksDict {
 
 					//Else, it means both nodes are already in blocks. Merge them into a new one!
 					newBlockIndex = UniqueID.next;
-					newBlock = AlgaProxyBlock.new(newBlockIndex);
+					newBlock = AlgaBlock.new(newBlockIndex);
 
 					//Change all proxies' group to the new one and add then to new block
-					blocksDict[receiverBlockIndex].dictOfNodes.do({ | node |
+					blocksDict[receiverBlockIndex].nodesDict.do({ | node |
 						node.blockIndex = newBlockIndex;
 						newBlock.addNode(node);
 					});
@@ -346,7 +337,11 @@ AlgaBlocksDict {
 		//If the function passes through, pass receiver's block instead
 		if(newBlockIndex == nil, { newBlockIndex = receiver.blockIndex; });
 
-		//A new connection happened in any case! Some things might have changed in the block
-		blocksDict[newBlockIndex].changed = true;
+		//Actually reorder the block's nodes
+		newBlock = blocksDict[newBlockIndex];
+		if(newBlock != nil, {
+			newBlock.changed = true;
+			newBlock.rearrangeBlock();
+		});
 	}
 }
