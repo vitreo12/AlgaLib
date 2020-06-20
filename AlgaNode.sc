@@ -7,7 +7,7 @@ AlgaNode {
 
 	//This is the time when making a new connection to this proxy.
 	//Could be just named interpolationTime OR connectionTime
-	var <fadeTime = 0;
+	var <fadeTime = 0.01;
 
 	//This is the longestFadeTime between all the outNodes.
 	//it's used when .replacing a node connected to something, in order for it to be kept alive
@@ -30,9 +30,6 @@ AlgaNode {
 
 	var <isPlaying = false;
 	var <toBeCleared = false;
-
-	//This is used in feedback situations when using .replace
-	var <beingReplaced = false;
 
 	*new { | obj, server, fadeTime = 0 |
 		^super.new.init(obj, server, fadeTime)
@@ -227,7 +224,7 @@ AlgaNode {
 	}
 
 	//dispatches controlnames / numChannels / rate according to obj class
-	dispatchNode { | obj, initGroups = false |
+	dispatchNode { | obj, initGroups = false, replace = false |
 		objClass = obj.class;
 
 		//If there is a synth playing, set its instantiated status to false:
@@ -237,11 +234,11 @@ AlgaNode {
 
 		//Symbol
 		if(objClass == Symbol, {
-			this.dispatchSynthDef(obj, initGroups);
+			this.dispatchSynthDef(obj, initGroups, replace);
 		}, {
 			//Function
 			if(objClass == Function, {
-				this.dispatchFunction(obj, initGroups);
+				this.dispatchFunction(obj, initGroups, replace);
 			}, {
 				("AlgaNode: class '" ++ objClass ++ "' is invalid").error;
 				this.clear;
@@ -250,7 +247,7 @@ AlgaNode {
 	}
 
 	//Dispatch a SynthDef
-	dispatchSynthDef { | obj, initGroups = false |
+	dispatchSynthDef { | obj, initGroups = false, replace = false |
 		var synthDescControlNames;
 		var synthDesc = SynthDescLib.global.at(obj);
 
@@ -279,11 +276,11 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		this.createAllSynths(synthDef.name);
+		this.createAllSynths(synthDef.name, replace);
 	}
 
 	//Dispatch a Function
-	dispatchFunction { | obj, initGroups = false |
+	dispatchFunction { | obj, initGroups = false, replace = false |
 		//Need to wait for server's receiving the sdef
 		fork {
 			var synthDescControlNames;
@@ -302,7 +299,7 @@ AlgaNode {
 			this.createAllBusses;
 
 			//Create actual synths
-			this.createAllSynths(synthDef.name);
+			this.createAllSynths(synthDef.name, replace);
 		};
 	}
 
@@ -358,7 +355,7 @@ AlgaNode {
 	}
 
 	//This should take in account the nextNode's numChannels when making connections
-	createInterpNormSynths {
+	createInterpNormSynths { | replace = false |
 		controlNames.do({ | controlName |
 			var interpSymbol, normSymbol;
 			var interpBus, normBus, interpSynth, normSynth;
@@ -388,17 +385,44 @@ AlgaNode {
 			interpBus = interpBusses[paramName];
 			normBus = normBusses[paramName];
 
-			//Make sure interpSynth / normSynth are created before synth.set
-			//Does this introduce latency though? Is it necessary? (looks like it's not)
-			//server.bind({
 
-			//Instantiated right away, with no fadeTime, as it will directly be connected to
-			//synth's parameter
-			interpSynth = AlgaSynth.new(
-				interpSymbol,
-				[\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
-				interpGroup
-			);
+            //If replace, connect to the pervious bus, not default
+            //This wouldn't work with mixing for now...
+            if(replace, {
+                var sendersSet = inNodes[paramName];
+                if(sendersSet.size > 1, { "Restoring mixing parameters is not implemented yet"; ^nil; });
+                if(sendersSet != nil, {
+                    if(sendersSet.size == 1, {
+                        var prevSender;
+                        sendersSet.do({ | sender | prevSender = sender }); //Sets can't be indexed, need to loop over
+
+                        //It would be cool if I could keep the same interpSynth as before if it has same number
+                        //of channels as the new one, so that it could continue the interpolation of the previous node,
+                        //if one was taking place...
+                        interpSynth = AlgaSynth.new(
+                            interpSymbol,
+                            [\in, prevSender.synthBus.busArg, \out, interpBus.index, \fadeTime, 0],
+                            interpGroup
+                        )
+                    })
+                }, {
+                    //sendersSet is nil, run the normal one
+                    interpSynth = AlgaSynth.new(
+                        interpSymbol,
+                        [\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
+                        interpGroup
+                    );
+                })
+            }, {
+                //No previous nodes connected: create a new interpSynth with the paramDefault value
+                //Instantiated right away, with no fadeTime, as it will directly be connected to
+                //synth's parameter
+                interpSynth = AlgaSynth.new(
+                    interpSymbol,
+                    [\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
+                    interpGroup
+                );
+            });
 
 			//Instantiated right away, with no fadeTime, as it will directly be connected to
 			//synth's parameter (synth is already reading from all the normBusses)
@@ -411,17 +435,14 @@ AlgaNode {
 			interpSynths[paramName] = interpSynth;
 			normSynths[paramName] = normSynth;
 
-			//server.sync;
-
 			//Connect synth's parameter to the normBus
 			synth.set(paramName, normBus.busArg);
-			//});
 		});
 	}
 
-	createAllSynths { | defName |
+	createAllSynths { | defName, replace = false |
 		this.createSynth(defName);
-		this.createInterpNormSynths;
+		this.createInterpNormSynths(replace);
 	}
 
 	//Used at every << / >> / <|
@@ -464,11 +485,11 @@ AlgaNode {
 		if(sender != nil, {
 			//Used in << / >>
 			//Read \in from the sender's synthBus
-			interpSynth = AlgaSynth.new(
-				interpSymbol,
-				[\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, fadeTime],
-				interpGroup
-			);
+            interpSynth = AlgaSynth.new(
+                interpSymbol,
+                [\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, fadeTime],
+                interpGroup
+            );
 		}, {
 			//Used in <|
 			//if sender is nil, restore the original default value. This is used in <|
@@ -560,7 +581,7 @@ AlgaNode {
 	freeInterpSynthAtParam { | param = \in |
 		var interpSynthAtParam = interpSynths[param];
 		if(interpSynthAtParam == nil, { ("Invalid param for interp synth to free: " ++ param).error; ^this });
-		interpSynthAtParam.set(\gate, 0, \fadeTime, fadeTime);
+        interpSynthAtParam.set(\gate, 0, \fadeTime, fadeTime);
 	}
 
 	//param -> Set[AlgaNode, AlgaNode, ...]
@@ -654,7 +675,7 @@ AlgaNode {
 	}
 
 	//New interp connection at specific parameter
-	newInterpConnectionAtParam { | sender, param = \in |
+	newInterpConnectionAtParam { | sender, param = \in, replace = false |
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this; });
 
@@ -662,13 +683,19 @@ AlgaNode {
 		this.addInOutNodesDict(sender, param);
 
 		//Re-order groups
-		AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+		//Actually reorder the block's nodes ONLY if not running .replace
+		//(no need there, they are already ordered, and it also avoids a lot of problems
+		//with feedback connections)
+		if(replace.not, {
+			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+		});
 
-		//Free prev interp synth (fades out)... This will use the new longestFadeTime... Is it correct?
-		this.freeInterpSynthAtParam(param);
+        //If not running replace (where synths have already been replaced in dispatchNode), run the interpolation algorithm
+        //Free prev interp synth (fades out)... This will use the new longestFadeTime... Is it correct?
+        this.freeInterpSynthAtParam(param);
 
-		//Spawn new interp synth (fades in)
-		this.createInterpSynthAtParam(sender, param);
+        //Spawn new interp synth (fades in)
+        this.createInterpSynthAtParam(sender, param);
 	}
 
 	//Used in <|
@@ -689,13 +716,13 @@ AlgaNode {
 	}
 
 	//implements receiver <<.param sender
-	makeConnection { | sender, param = \in |
+	makeConnection { | sender, param = \in, replace = false |
 		//Can't connect AlgaNode to itsels
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
 		//Connect interpSynth to the sender's synthBus
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
-			this.newInterpConnectionAtParam(sender, param);
+			this.newInterpConnectionAtParam(sender, param, replace);
 		});
 	}
 
@@ -773,27 +800,20 @@ AlgaNode {
 
 	//Remake both inNodes and outNodes
 	replaceConnections {
-		//inNodes
+        /*
+		//inNodes are actually already handled in dispatchNode(replace:true)
 		inNodes.keysValuesDo({ | param, sendersSet |
 			sendersSet.do({ | sender |
-				if(sender.beingReplaced, {
-					"Sender is being already replaced".postln;
-				});
-
 				this.makeConnection(sender, param);
 			})
 		});
+        */
 
 		//outNodes
 		outNodes.keysValuesDo({ | receiver, paramsSet |
 			paramsSet.do({ | param |
-				receiver.makeConnection(this, param);
+				receiver.makeConnection(this, param, true);
 			});
-		});
-
-		//Also set beingReplaced to false when done instantiating this
-		AlgaSpinRoutine.waitFor({ this.instantiated }, {
-			beingReplaced = false;
 		});
 	}
 
@@ -805,10 +825,6 @@ AlgaNode {
 		//In case it has been set to true when clearing, then replacing before clear ends!
 		toBeCleared = false;
 
-		//Current node is being replaced.
-		beingReplaced = true;
-
-		//Free previous ones.
 		//This doesn't work with feedbacks, as synths would be freed slightly before
 		//The new ones finish the rise, generating click. These should be freed
 		//When the new synths/busses are surely instantiated in the server!
@@ -816,7 +832,7 @@ AlgaNode {
 		this.freeAllBusses;
 
 		//New one
-		this.dispatchNode(obj, initGroups);
+		this.dispatchNode(obj, initGroups, true);
 
 		//Re-enstablish connections that were already in place
 		this.replaceConnections;
