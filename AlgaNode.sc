@@ -397,7 +397,7 @@ AlgaNode {
                         sendersSet.do({ | sender | prevSender = sender }); //Sets can't be indexed, need to loop over
 
                         //It would be cool if I could keep the same interpSynth as before if it has same number
-                        //of channels as the new one, so that it could continue the interpolation of the previous node, 
+                        //of channels as the new one, so that it could continue the interpolation of the previous node,
                         //if one was taking place...
                         interpSynth = AlgaSynth.new(
                             interpSymbol,
@@ -675,7 +675,7 @@ AlgaNode {
 	}
 
 	//New interp connection at specific parameter
-	newInterpConnectionAtParam { | sender, param = \in |
+	newInterpConnectionAtParam { | sender, param = \in, replace = false |
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this; });
 
@@ -683,7 +683,12 @@ AlgaNode {
 		this.addInOutNodesDict(sender, param);
 
 		//Re-order groups
-		AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+		//Actually reorder the block's nodes ONLY if not running .replace
+		//(no need there, they are already ordered, and it also avoids a lot of problems
+		//with feedback connections)
+		if(replace.not, {
+			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+		});
 
         //If not running replace (where synths have already been replaced in dispatchNode), run the interpolation algorithm
         //Free prev interp synth (fades out)... This will use the new longestFadeTime... Is it correct?
@@ -711,13 +716,13 @@ AlgaNode {
 	}
 
 	//implements receiver <<.param sender
-	makeConnection { | sender, param = \in |
+	makeConnection { | sender, param = \in, replace = false |
 		//Can't connect AlgaNode to itsels
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
 		//Connect interpSynth to the sender's synthBus
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
-			this.newInterpConnectionAtParam(sender, param);
+			this.newInterpConnectionAtParam(sender, param, replace);
 		});
 	}
 
@@ -795,11 +800,10 @@ AlgaNode {
 
 	//Remake both inNodes and outNodes
 	replaceConnections {
-		//inNodes
         /*
+		//inNodes are actually already handled in dispatchNode(replace:true)
 		inNodes.keysValuesDo({ | param, sendersSet |
 			sendersSet.do({ | sender |
-                //The replace = true here means to do the connection right away, with no fading
 				this.makeConnection(sender, param);
 			})
 		});
@@ -808,7 +812,7 @@ AlgaNode {
 		//outNodes
 		outNodes.keysValuesDo({ | receiver, paramsSet |
 			paramsSet.do({ | param |
-				receiver.makeConnection(this, param);
+				receiver.makeConnection(this, param, true);
 			});
 		});
 	}
