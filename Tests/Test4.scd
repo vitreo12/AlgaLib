@@ -1,4 +1,4 @@
-Alga.boot({ s.plotTree });
+Alga.boot;
 
 (
 b = AlgaNode({SinOsc.ar(134 + \fm.ar(0))}, fadeTime:1);
@@ -17,13 +17,18 @@ b <<.fm d;
 a >> o;
 )
 
-d.replace({\in.ar(0).range(-10.12312, 102.23)})
+b.ft = 7
+a.ft = 4
 
-b.replace({SinOsc.ar(10 + \fm.ar(0))})
+d.replace({\in.ar(0).range(-1.12312, 10.23)})
 
-a.replace({SinOsc.ar(220 + \fm.ar(0))})
+c.replace({\in.ar(0).range(-100, 200)})
 
-b.replace({Saw.ar(\f.ar(222) + \fm.ar(0))})
+b.replace({SinOsc.ar(1 + \fm.ar(0))})
+
+a.replace({SinOsc.ar(1 + \fm.ar(0))})
+
+b.replace({Saw.ar(1 + \fm.ar(0))})
 
 s.plotTree
 
@@ -34,3 +39,7 @@ b.group.postln;
 c.group.postln;
 d.group.postln;
 )
+
+
+s.scope
+a

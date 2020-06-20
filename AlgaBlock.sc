@@ -49,8 +49,6 @@ AlgaBlock {
 				orderedArray.add(nil);
 			});
 		});
-
-		//this.changed = true;
 	}
 
 	removeNode { | node |
@@ -62,18 +60,20 @@ AlgaBlock {
 			^nil;
 		});
 
+		//Remove from dict
 		nodesDict.removeAt(node);
+
+		//Set node's index to -1
+		node.blockIndex = -1;
 
 		//Remove this block from AlgaBlocksDict if it's empty!
 		if(nodesDict.size == 0, {
+			("Deleting empty block: " ++ blockIndex).warn;
 			AlgaBlocksDict.blocksDict.removeAt(nodeBlockIndex);
 		});
-
-		//this.changed = true;
 	}
 
 	rearrangeBlock {
-
 		//ordered collection
 		orderedArray = Array.newClear(nodesDict.size);
 
@@ -91,7 +91,6 @@ AlgaBlock {
 		this.sanitizeArray;
 
 		if(orderedArray.size > 0, {
-			//server.bind({
 			var sizeMinusOne = orderedArray.size - 1;
 
 			//First one here is the last in the chain.
@@ -107,12 +106,6 @@ AlgaBlock {
 
 				prevEntry.moveBefore(thisEntry);
 			});
-
-			//Also move first one (so that its interpolationNodes are correct)
-			//if(firstNode != nil, {
-			//	firstNode.moveBefore(firstNode);
-			//});
-			//});
 		});
 
 		//Remove all the nodes that were not used in the connections
@@ -152,10 +145,10 @@ AlgaBlock {
 					});
 				});
 
-				//Reset blockIndex too
+				//Remove node from block
 				if(result.not, {
 					("Removing node: " ++ node.asString ++ " from block number " ++ blockIndex).warn;
-					node.blockIndex = -1;
+					this.removeNode(node);
 				});
 
 				result;
@@ -171,22 +164,20 @@ AlgaBlock {
 	}
 
 	//Have something to automatically remove Nodes that haven't been touched from the dict
-	rearrangeBlockLoop { | node, topNode |
+	rearrangeBlockLoop { | node |
 		if(node != nil, {
-
 			var nodeState = statesDict[node];
 
 			//If for any reason the node wasn't already in the nodesDict, add it
 			this.addNode(node, true);
 
+			("rearrange group: " ++ node.group).postln;
+
 			//If this node has never been touched, avoid repetitions
 			if(nodeState == false, {
-
-				//("inNodes to " ++  node.asString ++ " : ").postln;
-
 				node.inNodes.nodesLoop ({ | inNode |
 					//rearrangeInputs to this, this will add the inNodes
-					this.rearrangeBlockLoop(inNode, topNode);
+					this.rearrangeBlockLoop(inNode);
 				});
 
 				//Add this
