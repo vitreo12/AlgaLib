@@ -180,7 +180,7 @@ AlgaNode {
 
 				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
 				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME THIS WAIT ENDS!
-				(longestFadeTime + 0.5).wait;
+				(longestFadeTime + 1).wait;
 
 				if(prevSynthBus != nil, { prevSynthBus.free });
 			}
@@ -210,7 +210,7 @@ AlgaNode {
 			fork {
 				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
 				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME THIS WAIT ENDS!
-				(longestFadeTime + 0.5).wait;
+				(longestFadeTime + 1).wait;
 
 				if(prevNormBusses != nil, {
 					prevNormBusses.do({ | normBus |
@@ -551,13 +551,13 @@ AlgaNode {
 			interpSynths.do({ | interpSynth |
 				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
 				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME INTERP ENDS!
-				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime + 0.5 }, {0}));
+				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime + 1 }, {0}));
 			});
 
 			normSynths.do({ | normSynth |
 				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
 				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME INTERP ENDS!
-				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime + 0.5 }, {0}));
+				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime + 1 }, {0}));
 			});
 
 			//this.resetInterpNormSynths;
@@ -570,7 +570,7 @@ AlgaNode {
 			fork {
 				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
 				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME THIS WAIT ENDS!
-				(longestFadeTime + 0.5).wait;
+				(longestFadeTime + 1).wait;
 
 				prevInterpSynths.do({ | interpSynth |
 					interpSynth.set(\gate, 0, \fadeTime, 0);
