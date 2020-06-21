@@ -20,6 +20,9 @@ a >> i;
 i >> o;
 )
 
+//FIX THIS! THE 5 NODES ARE NOT ALL IN THE SAME GROUP!
+AlgaBlocksDict.blocksDict
+
 //Changes FT when replacing c / d
 b.ft = 3
 a.ft = 5
@@ -51,4 +54,3 @@ c.group.postln;
 d.group.postln;
 )
 
-AlgaBlocksDict.blocksDict[1022].nodesDict

@@ -89,7 +89,8 @@ AlgaNode {
 			if(val > longestFadeTime, { longestFadeTime = val });
 		});
 
-		//Only run this on the topNode, not all successive ones
+		//Only run this on the nodes that are strictly connected to the one
+		//which calculateLongestFadeTime was called on
 		if(topNode, {
 			inNodes.do({ | sendersSet |
 				sendersSet.do({ | sender |
@@ -856,19 +857,30 @@ AlgaNode {
 		this.replaceConnections;
 	}
 
+	//Execute <| on all outNodes' parameters that are connected to this
+	removeConnectionFromReceivers {
+		outNodes.keysValuesDo({ | receiver, paramsSet |
+			paramsSet.do({ | param |
+				param.postln;
+				receiver.perform('<|', param);
+			});
+		});
+	}
+
 	//Clears it all... It should do some sort of fading
 	clear {
+		//If synth had connections, run <| on the receivers (so it resets to defaults)
+		this.removeConnectionFromReceivers;
+
+		//This could be overwritten if .replace is called
+		toBeCleared = true;
+
 		fork {
-			//Ok. first, free synth
-			this.freeSynth;
-
-			//This could be overwritten if .replace is called
-			toBeCleared = true;
-
-			//Wait time before clearing groups and busses
+			//Wait time before clearing groups and busses...
 			longestFadeTime.wait;
-			this.freeInterpNormSynths(false, true);
-			this.freeAllGroups(true);
+
+			//this.freeInterpNormSynths(false, true);
+			this.freeAllGroups(true); //I can just remove the groups, as they contain the synths
 			this.freeAllBusses(true);
 
 			//Reset all instance variables
