@@ -604,6 +604,17 @@ AlgaNode {
 
 	//param -> Set[AlgaNode, AlgaNode, ...]
 	addInNode { | sender, param = \in, mix = false |
+		//First of all, remove the outNodes that the previous connection to the
+		//param had, if there was any (if mix == false)
+		if(mix == false, {
+			var previousSenderSet = inNodes[param];
+			if(previousSenderSet != nil, {
+				previousSenderSet.do({ | previousSender |
+					previousSender.outNodes.removeAt(this);
+				});
+			});
+		});
+
 		//Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
 		if((inNodes[param] == nil).or(mix.not), {
 			inNodes[param] = Set[sender];
@@ -815,18 +826,11 @@ AlgaNode {
 		^synth.instantiated;
 	}
 
-	//Remake both inNodes and outNodes
+	//replace connections FROM this
 	replaceConnections {
-        /*
-		//inNodes are actually already handled in dispatchNode(replace:true)
-		inNodes.keysValuesDo({ | param, sendersSet |
-			sendersSet.do({ | sender |
-				this.makeConnection(sender, param);
-			})
-		});
-        */
+        //inNodes are already handled in dispatchNode(replace:true)
 
-		//outNodes
+		//outNodes. Remake connections that were in place with receivers
 		outNodes.keysValuesDo({ | receiver, paramsSet |
 			paramsSet.do({ | param |
 				receiver.makeConnection(this, param, true);
