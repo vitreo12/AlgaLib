@@ -604,8 +604,8 @@ AlgaNode {
 
 	//param -> Set[AlgaNode, AlgaNode, ...]
 	addInNode { | sender, param = \in, mix = false |
-		//First of all, remove the outNodes that the previous connection to the
-		//param had, if there was any (if mix == false)
+		//First of all, remove the outNodes that the previous sender had with the
+		//param of this node, if there was any. Only apply if mix==false (no <<+ / >>+)
 		if(mix == false, {
 			var previousSenderSet = inNodes[param];
 			if(previousSenderSet != nil, {
