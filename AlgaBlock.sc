@@ -36,9 +36,10 @@ AlgaBlock {
 	}
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
-
+		//Add to dict
 		nodesDict.put(node, node);
 
+		//Check mismatch
 		if(node.blockIndex != blockIndex, {
 			//("blockIndex mismatch detected. Using " ++ blockIndex).warn;
 			node.blockIndex = blockIndex;
@@ -52,7 +53,6 @@ AlgaBlock {
 	}
 
 	removeNode { | node |
-
 		var nodeBlockIndex = node.blockIndex;
 
 		if(nodeBlockIndex != blockIndex, {
@@ -124,6 +124,8 @@ AlgaBlock {
 				removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0);
 			});
 
+			//removeCondition.postln;
+
 			removeCondition;
 		});
 	}
@@ -147,7 +149,7 @@ AlgaBlock {
 
 				//Remove node from block
 				if(result.not, {
-					("Removing node: " ++ node.asString ++ " from block number " ++ blockIndex).warn;
+					("Removing node at group " ++ node.group ++ " from block number " ++ blockIndex).warn;
 					this.removeNode(node);
 				});
 
@@ -171,10 +173,15 @@ AlgaBlock {
 			//If for any reason the node wasn't already in the nodesDict, add it
 			this.addNode(node, true);
 
-			("rearrange group: " ++ node.group).postln;
+			//("adding group " ++ node.group ++ " to block " ++ blockIndex).postln;
 
 			//If this node has never been touched, avoid repetitions
 			if(nodeState == false, {
+				//put it to true so it's not added again
+				//This is essential to make feedback work!
+				//it's also essential for this to be before the next loop
+				statesDict[node] = true;
+
 				node.inNodes.nodesLoop ({ | inNode |
 					//rearrangeInputs to this, this will add the inNodes
 					this.rearrangeBlockLoop(inNode);
@@ -182,9 +189,6 @@ AlgaBlock {
 
 				//Add this
 				orderedArray[runningIndex] = node;
-
-				//Completed: put it to true so it's not added again
-				statesDict[node] = true;
 
 				//Advance counter
 				runningIndex = runningIndex + 1;
@@ -225,7 +229,6 @@ AlgaBlocksDict {
 	}
 
 	*reorderBlock { | blockIndex, server |
-
 		var entryInBlocksDict = blocksDict[blockIndex];
 
 		if(entryInBlocksDict != nil, {
@@ -245,6 +248,8 @@ AlgaBlocksDict {
 
 		var receiverBlockIndex = receiver.blockIndex;
 		var senderBlockIndex = sender.blockIndex;
+		var receiverBlock = blocksDict[receiverBlockIndex];
+		var senderBlock = blocksDict[senderBlockIndex];
 
 		if(receiver.server != sender.server, {
 			("Trying to create a block between two AlgaNodes on different servers").error;
@@ -253,75 +258,101 @@ AlgaBlocksDict {
 
 		//Create new block if both connections didn't have any
 		if((receiverBlockIndex == -1).and(senderBlockIndex == -1), {
+
+			//"No block inidices. Create new".warn;
+
 			newBlockIndex = UniqueID.next;
 			newBlock = AlgaBlock.new(newBlockIndex);
 
 			receiver.blockIndex = newBlockIndex;
 			sender.blockIndex = newBlockIndex;
 
+			//Add nodes to the block
+			newBlock.addNode(receiver);
+			newBlock.addNode(sender);
+
 			//Add block to blocksDict
 			blocksDict.put(newBlockIndex, newBlock);
-
-			//Add nodes to the block
-			blocksDict[newBlockIndex].addNode(receiver);
-			blocksDict[newBlockIndex].addNode(sender);
-
 		}, {
 			//If they are not already in same block
 			if(receiverBlockIndex != senderBlockIndex, {
 				//Merge receiver with sender if receiver is not in a block yet
 				if(receiverBlockIndex == -1, {
-					receiver.blockIndex = senderBlockIndex;
+
+					//"No receiver block index. Set to sender".warn;
+
+					//Check block validity
+					if(senderBlock == nil, {
+						("Invalid block with index " ++ senderBlockIndex).error;
+						^nil;
+					});
 
 					//Add proxy to the block
-					blocksDict[senderBlockIndex].addNode(receiver);
+					receiver.blockIndex = senderBlockIndex;
+					senderBlock.addNode(receiver);
 
 					//This is for the changed at the end of function...
 					newBlockIndex = senderBlockIndex;
 				}, {
 					//Merge sender with receiver if sender is not in a block yet
 					if(senderBlockIndex == -1, {
-						//"add nextProxy to this' block".postln;
-						sender.blockIndex = receiverBlockIndex;
+
+						//"No sender block index. Set to receiver".warn;
+
+						if(receiverBlock == nil, {
+							("Invalid block with index " ++ receiverBlockIndex).error;
+							^nil;
+						});
 
 						//Add proxy to the block
-						blocksDict[receiverBlockIndex].addNode(sender);
+						sender.blockIndex = receiverBlockIndex;
+						receiverBlock.addNode(sender);
 
 						//This is for the changed at the end of function...
 						newBlockIndex = receiverBlockIndex;
+					}, {
+						//Else, it means both nodes are already in blocks.
+						//Create a new one and merge them into a new one (including relative ins/outs)
+
+						//"Different block indices. Merge into new one.".warn;
+
+						newBlockIndex = UniqueID.next;
+						newBlock = AlgaBlock.new(newBlockIndex);
+
+						//Change group of all nodes in the receiver's previous block
+						if(receiverBlock != nil, {
+							blocksDict[receiverBlockIndex].nodesDict.do({ | node |
+								node.blockIndex = newBlockIndex;
+								newBlock.addNode(node);
+							});
+						});
+
+						//Change group of all nodes in the sender's previous block
+						if(senderBlock != nil,  {
+							blocksDict[senderBlockIndex].nodesDict.do({ | node |
+								node.blockIndex = newBlockIndex;
+								newBlock.addNode(node);
+							});
+						});
+
+						//Remove previous groups
+						blocksDict.removeAt(receiverBlockIndex);
+						blocksDict.removeAt(senderBlockIndex);
+
+						//Add the two nodes to this new group
+						receiver.blockIndex = newBlockIndex;
+						sender.blockIndex = newBlockIndex;
+						newBlock.addNode(receiver);
+						newBlock.addNode(sender);
+
+						//Finally, add the actual block to the dict
+						blocksDict.put(newBlockIndex, newBlock);
 					});
-				}, {
-
-					//Else, it means both nodes are already in blocks. Merge them into a new one!
-					newBlockIndex = UniqueID.next;
-					newBlock = AlgaBlock.new(newBlockIndex);
-
-					//Change all proxies' group to the new one and add then to new block
-					blocksDict[receiverBlockIndex].nodesDict.do({ | node |
-						node.blockIndex = newBlockIndex;
-						newBlock.addNode(node);
-					});
-
-					blocksDict[senderBlockIndex].dictOfProxies.do({ | node |
-						node.blockIndex = newBlockIndex;
-						newBlock.addNode(node);
-					});
-
-					//Remove previous' groups
-					blocksDict.removeAt(receiverBlockIndex);
-					blocksDict.removeAt(senderBlockIndex);
-
-					//Also add the two connected proxies to this new group
-					receiver.blockIndex = newBlockIndex;
-					sender.blockIndex = newBlockIndex;
-
-					//Finally, add the actual block to the dict
-					blocksDict.put(newBlockIndex, newBlock);
 				});
 			});
 		});
 
-		//If the function passes through, pass receiver's block instead
+		//If the function passes through (no actions taken), pass receiver's block instead
 		if(newBlockIndex == nil, { newBlockIndex = receiver.blockIndex; });
 
 		//Actually reorder the block's nodes
