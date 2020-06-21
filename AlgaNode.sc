@@ -70,7 +70,7 @@ AlgaNode {
 
 	fadeTime_ { | val |
 		fadeTime = val;
-		this.calculateLongestFadeTime(val, this);
+		this.calculateLongestFadeTime(val);
 	}
 
 	ft {
@@ -82,20 +82,23 @@ AlgaNode {
 	}
 
 	//Also sets for inNodes.. outNodes would create endless loop?
-	calculateLongestFadeTime { | argFadeTime, originalNode |
+	calculateLongestFadeTime { | argFadeTime, topNode = true |
 		longestFadeTime = if(fadeTime > argFadeTime, { fadeTime }, { argFadeTime });
 
 		fadeTimeConnections.do({ | val |
 			if(val > longestFadeTime, { longestFadeTime = val });
 		});
 
-		inNodes.do({ | sendersSet |
-			sendersSet.do({ | sender |
-				//Detect feedbacks
-				if(sender != originalNode, {
-					sender.calculateLongestFadeTime(argFadeTime, originalNode);
-				},{
-					"Feedback detected".warn;
+		//Only run this on the topNode, not all successive ones
+		if(topNode, {
+			inNodes.do({ | sendersSet |
+				sendersSet.do({ | sender |
+					//Detect feedbacks
+					//if(sender != originalNode, {
+						sender.calculateLongestFadeTime(argFadeTime, false);
+					//},{
+						//"Feedback detected".warn;
+					//});
 				});
 			});
 		});
@@ -111,11 +114,12 @@ AlgaNode {
 	}
 
 	resetGroups {
-		//Reset values
-		group = nil;
-		synthGroup = nil;
-		normGroup = nil;
-		interpGroup = nil;
+		if(toBeCleared, {
+			group = nil;
+			synthGroup = nil;
+			normGroup = nil;
+			interpGroup = nil;
+		});
 	}
 
 	//Groups (and state) will be reset only if they are nil AND they are set to be freed.
@@ -183,7 +187,6 @@ AlgaNode {
 	}
 
 	freeInterpNormBusses { | now = false |
-
 		if(now, {
 			//Free busses now
 			if(normBusses != nil, {
@@ -322,18 +325,22 @@ AlgaNode {
 	}
 
 	resetSynth {
-		//Set to nil (should it fork?)
-		synth = nil;
-		synthDef = nil;
-		controlNames.clear;
-		numChannels = 0;
-		rate = nil;
+		if(toBeCleared, {
+			//Set to nil (should it fork?)
+			synth = nil;
+			synthDef = nil;
+			controlNames.clear;
+			numChannels = 0;
+			rate = nil;
+		});
 	}
 
 	resetInterpNormSynths {
-		//Just reset the Dictionaries entries
-		interpSynths.clear;
-		normSynths.clear;
+		if(toBeCleared, {
+			//Just reset the Dictionaries entries
+			interpSynths.clear;
+			normSynths.clear;
+		});
 	}
 
 	//Synth writes to the synthBus
@@ -624,7 +631,7 @@ AlgaNode {
 
 		//Add to fadeTimeConnections and recalculate longestFadeTime
 		sender.fadeTimeConnections[this] = this.fadeTime;
-		sender.calculateLongestFadeTime(this.fadeTime, sender);
+		sender.calculateLongestFadeTime(this.fadeTime);
 	}
 
 	removeInOutNode { | sender, param = \in |
@@ -635,7 +642,7 @@ AlgaNode {
 		//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
 		//(Right now, this happens before creating new synths)
 		sender.fadeTimeConnections[this] = 0;
-		sender.calculateLongestFadeTime(0, sender);
+		sender.calculateLongestFadeTime(0);
 	}
 
 	//Remove entries from inNodes / outNodes / fadeTimeConnections for all involved nodes
@@ -665,7 +672,7 @@ AlgaNode {
 					//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
 					//(Right now, this happens before creating new synths)
 					sender.fadeTimeConnections[this] = 0;
-					sender.calculateLongestFadeTime(0, sender);
+					sender.calculateLongestFadeTime(0);
 				})
 			})
 		});
@@ -852,8 +859,10 @@ AlgaNode {
 	//Clears it all... It should do some sort of fading
 	clear {
 		fork {
+			//Ok. first, free synth
 			this.freeSynth;
 
+			//This could be overwritten if .replace is called
 			toBeCleared = true;
 
 			//Wait time before clearing groups and busses
@@ -862,7 +871,10 @@ AlgaNode {
 			this.freeAllGroups(true);
 			this.freeAllBusses(true);
 
-			//Reset connection dicts
+			//Reset all instance variables
+			this.resetSynth;
+			this.resetInterpNormSynths;
+			this.resetGroups;
 			this.resetInOutNodesDicts;
 		}
 	}

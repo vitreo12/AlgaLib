@@ -20,25 +20,28 @@ a >> i;
 i >> o;
 )
 
-a.ft = 10
-c.ft = 7
+//Changes FT when replacing c / d
+b.ft = 3
+a.ft = 5
+
+//Changes FT when replacing a / b
+c.ft = 3
 d.ft = 4
 
-d.replace({\in.ar(0).range(-1.12312, 100.23)})
+//Changes a FT in terms of output
+i.ft = 4
 
-c.replace({\in.ar(0).range(-100, 100)})
+d.replace({\in.ar(0).range(-1.12312, 10.23)})
+
+c.replace({\in.ar(0).range(-100, 10)})
 
 b.replace({SinOsc.ar(1 + \fm.ar(0))})
 
-a.replace({SinOsc.ar(10 + \fm.ar(0))})
+a.replace({SinOsc.ar(220 + \fm.ar(0))})
 
-b.replace({Saw.ar(10 + \fm.ar(0))})
+b.replace({Saw.ar(1 + \fm.ar(0))})
 
 s.plotTree
-
-o.ft = 5
-
-a
 
 (
 o.group.postln;
@@ -48,8 +51,4 @@ c.group.postln;
 d.group.postln;
 )
 
-b.longestFadeTime
-
-
-s.scope
-a
+AlgaBlocksDict.blocksDict[1022].nodesDict
