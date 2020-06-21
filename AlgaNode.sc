@@ -861,7 +861,6 @@ AlgaNode {
 	removeConnectionFromReceivers {
 		outNodes.keysValuesDo({ | receiver, paramsSet |
 			paramsSet.do({ | param |
-				param.postln;
 				receiver.perform('<|', param);
 			});
 		});
