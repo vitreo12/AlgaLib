@@ -59,6 +59,7 @@ AlgaBus {
 
 	//Create an output synth and output sound to it
 	play {
-		bus.play;
+		//Play on default group... Not so great TBH
+		bus.play(server.defaultGroup);
 	}
 }
