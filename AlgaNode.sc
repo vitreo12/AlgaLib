@@ -172,7 +172,10 @@ AlgaNode {
 			//if forking, this.synthBus could have changed, that's why this is needed
 			var prevSynthBus = synthBus.copy;
 			fork {
-				longestFadeTime.wait;
+
+				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
+				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME THIS WAIT ENDS!
+				(longestFadeTime + 0.5).wait;
 
 				if(prevSynthBus != nil, { prevSynthBus.free });
 			}
@@ -201,7 +204,9 @@ AlgaNode {
 
 			//Free prev busses after fadeTime
 			fork {
-				longestFadeTime.wait;
+				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
+				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME THIS WAIT ENDS!
+				(longestFadeTime + 0.5).wait;
 
 				if(prevNormBusses != nil, {
 					prevNormBusses.do({ | normBus |
@@ -512,14 +517,14 @@ AlgaNode {
 		if(now, {
 			if(synth != nil, {
 				//synth's fadeTime is longestFadeTime!
-				synth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
+				synth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime + 1 }, {0}));
 
 				//this.resetSynth;
 			});
 		}, {
 			fork {
 				//longestFadeTime?
-				longestFadeTime.wait;
+				(longestFadeTime + 1).wait;
 
 				if(synth != nil, {
 					synth.set(\gate, 0, \fadeTime, 0);
@@ -536,11 +541,15 @@ AlgaNode {
 		if(now, {
 			//Free synths now
 			interpSynths.do({ | interpSynth |
-				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
+				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
+				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME INTERP ENDS!
+				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime + 0.5 }, {0}));
 			});
 
 			normSynths.do({ | normSynth |
-				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
+				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
+				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME INTERP ENDS!
+				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime + 0.5 }, {0}));
 			});
 
 			//this.resetInterpNormSynths;
@@ -551,8 +560,9 @@ AlgaNode {
 			var prevNormSynths = normSynths.copy;
 
 			fork {
-				//Wait, then free synths
-				longestFadeTime.wait;
+				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
+				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME THIS WAIT ENDS!
+				(longestFadeTime + 0.5).wait;
 
 				prevInterpSynths.do({ | interpSynth |
 					interpSynth.set(\gate, 0, \fadeTime, 0);
@@ -690,8 +700,7 @@ AlgaNode {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 		});
 
-        //If not running replace (where synths have already been replaced in dispatchNode), run the interpolation algorithm
-        //Free prev interp synth (fades out)... This will use the new longestFadeTime... Is it correct?
+		//Free previous interp synth (fades out)
         this.freeInterpSynthAtParam(param);
 
         //Spawn new interp synth (fades in)
@@ -708,7 +717,7 @@ AlgaNode {
 
 		//Re-order groups shouldn't be needed when removing connections
 
-		//Free prev interp synth (fades out)... This will use the new longestFadeTime... Is it correct?
+		//Free previous interp synth (fades out)
 		this.freeInterpSynthAtParam(param);
 
 		//Create new interp synth with default value (or the one supplied with args at start) (fades in)
@@ -828,6 +837,8 @@ AlgaNode {
 		//This doesn't work with feedbacks, as synths would be freed slightly before
 		//The new ones finish the rise, generating click. These should be freed
 		//When the new synths/busses are surely instantiated in the server!
+		//The cheap solution that it's in place now is to wait 0.5 longer than longestFadeTime...
+		//Work out a better solution!
 		this.freeAllSynths;
 		this.freeAllBusses;
 
