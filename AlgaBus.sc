@@ -58,8 +58,7 @@ AlgaBus {
 	}
 
 	//Create an output synth and output sound to it
-	play {
-		//Play on default group... Not so great TBH
-		bus.play(server.defaultGroup);
+	play { | target=0, outbus, fadeTime, addAction=\addToTail |
+		bus.play(target, outbus, fadeTime, addAction);
 	}
 }

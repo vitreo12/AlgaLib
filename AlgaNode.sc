@@ -904,9 +904,12 @@ AlgaNode {
 		group.moveAfter(node.group);
 	}
 
+	//Play at the bottom of the group
 	play {
-		isPlaying = true;
-		synthBus.play;
+		AlgaSpinRoutine.waitFor({ this.instantiated }, {
+			isPlaying = true;
+			synthBus.play(group);
+		});
 	}
 }
 
