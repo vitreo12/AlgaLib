@@ -1,3 +1,1 @@
 1) Mixing <<+ / >>+
-2) Feedback (restore only what's needed)
-3) Blocks (review AlgaBlock and re-implement it with AlgaNodes)
