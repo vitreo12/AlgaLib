@@ -1,6 +1,5 @@
+Alga.boot({ s.plotTree });
 Alga.boot;
-
-s.plotTree;
 
 (
 b = AlgaNode({SinOsc.ar(134 + \fm.ar(0))}, fadeTime:1);
@@ -39,18 +38,22 @@ c.ft = 20
 
 s.plotTree
 
-d.replace({\in.ar(0).range(-13.12312, 50.23)})
+d.replace({\in.ar(0).range(-100.12312, 10.23)})
 
-c.replace({\in.ar(0).range(-30, rrand(10, 230))});
+c.replace({\in.ar(0).range(-30, rrand(10, 10))});
 
+
+//Sometimes it clicks here... Just sometimes
 (
 fork {
 	loop {
 		c.replace({\in.ar(0).range(-30, rrand(10, 100))});
-		4.wait;
+		3.wait;
 	}
 }
 )
+
+s.plotTree
 
 b.replace({SinOsc.ar(1 + \fm.ar(0))})
 
@@ -59,10 +62,16 @@ a.replace({SinOsc.ar(1 + \fm.ar(0))})
 b.replace({Saw.ar(1 + \fm.ar(0))})
 
 
+s.queryAllNodes
+s.scope;
+
+a.clear
+
 a >> i
 b >> i
 a >> i
 
-b.outNodes //b.outNodes @[i] should've been removed...
+
+b.outNodes
 a.outNodes
 i.inNodes

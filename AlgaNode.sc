@@ -176,11 +176,12 @@ AlgaNode {
 		}, {
 			//if forking, this.synthBus could have changed, that's why this is needed
 			var prevSynthBus = synthBus.copy;
-			fork {
 
-				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
-				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME THIS WAIT ENDS!
-				(longestFadeTime + 1).wait;
+			fork {
+				//Cheap solution when having to replacing a synth that had other interp stuff
+				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
+				//node will take to interpolate to the previous receivers) and then free all the previous stuff
+				(longestFadeTime + 1.0).wait;
 
 				if(prevSynthBus != nil, { prevSynthBus.free });
 			}
@@ -208,9 +209,10 @@ AlgaNode {
 
 			//Free prev busses after fadeTime
 			fork {
-				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
-				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME THIS WAIT ENDS!
-				(longestFadeTime + 1).wait;
+				//Cheap solution when having to replacing a synth that had other interp stuff
+				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
+				//node will take to interpolate to the previous receivers) and then free all the previous stuff
+				(longestFadeTime + 1.0).wait;
 
 				if(prevNormBusses != nil, {
 					prevNormBusses.do({ | normBus |
@@ -525,19 +527,21 @@ AlgaNode {
 		if(now, {
 			if(synth != nil, {
 				//synth's fadeTime is longestFadeTime!
-				synth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime + 1 }, {0}));
+				synth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
 
 				//this.resetSynth;
 			});
 		}, {
+			var prevSynth = synth.copy;
+
 			fork {
-				//longestFadeTime?
-				(longestFadeTime + 1).wait;
+				//Cheap solution when having to replacing a synth that had other interp stuff
+				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
+				//node will take to interpolate to the previous receivers) and then free all the previous stuff
+				(longestFadeTime + 1.0).wait;
 
-				if(synth != nil, {
-					synth.set(\gate, 0, \fadeTime, 0);
-
-					//this.resetSynth;
+				if(prevSynth != nil, {
+					prevSynth.set(\gate, 0, \fadeTime, 0);
 				});
 			}
 		});
@@ -545,19 +549,14 @@ AlgaNode {
 
 	//Default now and fadetime to true for synths
 	freeInterpNormSynths { | useFadeTime = true, now = true |
-
 		if(now, {
 			//Free synths now
 			interpSynths.do({ | interpSynth |
-				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
-				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME INTERP ENDS!
-				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime + 1 }, {0}));
+				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
 			});
 
 			normSynths.do({ | normSynth |
-				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
-				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME INTERP ENDS!
-				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime + 1 }, {0}));
+				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
 			});
 
 			//this.resetInterpNormSynths;
@@ -568,9 +567,10 @@ AlgaNode {
 			var prevNormSynths = normSynths.copy;
 
 			fork {
-				//CHEAP SOLUTION TO FEEDBACK, WAIT FOR A LITTLE BIT MORE, HOPING THAT
-				//THE NEW SYNTHS AND BUSSES ARE ALLOCATED BY THE TIME THIS WAIT ENDS!
-				(longestFadeTime + 1).wait;
+				//Cheap solution when having to replacing a synth that had other interp stuff
+				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
+				//node will take to interpolate to the previous receivers) and then free all the previous stuff
+				(longestFadeTime + 1.0).wait;
 
 				prevInterpSynths.do({ | interpSynth |
 					interpSynth.set(\gate, 0, \fadeTime, 0);
@@ -579,8 +579,6 @@ AlgaNode {
 				prevNormSynths.do({ | normSynth |
 					normSynth.set(\gate, 0, \fadeTime, 0);
 				});
-
-				//this.resetInterpNormSynths;
 			}
 		});
 	}
@@ -717,6 +715,7 @@ AlgaNode {
 		//with feedback connections)
 		if(replace.not, {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+			//this.freeInterpSynthAtParam(param);
 		});
 
 		//Free previous interp synth (fades out)
@@ -745,7 +744,7 @@ AlgaNode {
 
 	//implements receiver <<.param sender
 	makeConnection { | sender, param = \in, replace = false |
-		//Can't connect AlgaNode to itsels
+		//Can't connect AlgaNode to itself
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
 		//Connect interpSynth to the sender's synthBus
@@ -810,27 +809,12 @@ AlgaNode {
 		})
 	}
 
-	//All synths must be instantiated (including interpolators and normalizers)
-	instantiated {
-		if(synth == nil, { ^false });
-
-		interpSynths.do({ | interpSynth |
-			if(interpSynth.instantiated == false, { ^false });
-		});
-
-		normSynths.do({ | normSynth |
-			if(normSynth.instantiated == false, { ^false });
-		});
-
-		//Lastly, the actual synth
-		^synth.instantiated;
-	}
-
 	//replace connections FROM this
 	replaceConnections {
         //inNodes are already handled in dispatchNode(replace:true)
 
-		//outNodes. Remake connections that were in place with receivers
+		//outNodes. Remake connections that were in place with receivers.
+		//This will effectively trigger interpolation process.
 		outNodes.keysValuesDo({ | receiver, paramsSet |
 			paramsSet.do({ | param |
 				receiver.makeConnection(this, param, true);
@@ -848,10 +832,10 @@ AlgaNode {
 
 		//This doesn't work with feedbacks, as synths would be freed slightly before
 		//The new ones finish the rise, generating click. These should be freed
-		//When the new synths/busses are surely instantiated in the server!
+		//When the new synths/busses are surely instantiated on the server!
 		//The cheap solution that it's in place now is to wait 0.5 longer than longestFadeTime...
 		//Work out a better solution!
-		this.freeAllSynths;
+		this.freeAllSynths(false, false);
 		this.freeAllBusses;
 
 		//New one
@@ -892,6 +876,22 @@ AlgaNode {
 			this.resetGroups;
 			this.resetInOutNodesDicts;
 		}
+	}
+
+	//All synths must be instantiated (including interpolators and normalizers)
+	instantiated {
+		if(synth == nil, { ^false });
+
+		interpSynths.do({ | interpSynth |
+			if(interpSynth.instantiated == false, { ^false });
+		});
+
+		normSynths.do({ | normSynth |
+			if(normSynth.instantiated == false, { ^false });
+		});
+
+		//Lastly, the actual synth
+		^synth.instantiated;
 	}
 
 	//Move this node's group before another node's one
