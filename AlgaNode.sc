@@ -9,11 +9,18 @@ AlgaNode {
 	//Could be just named interpolationTime OR connectionTime
 	var <fadeTime = 0.01;
 
+    //This controls the fade in and out when .play / .stop
+    var <>playTime = 0;
+
 	//This is the longestFadeTime between all the outNodes.
 	//it's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
 	//longestFadeTime will be moved to AlgaBlock and applied per-block!
-	var <fadeTimeConnections, <longestFadeTime = 0;
+	var <fadeTimeConnections;
+    var <longestFadeTime = 0;
+    
+    //The max between longestFadeTime and playTime
+    var <longestTime = 0;
 
 	var <objClass;
 	var <synthDef;
@@ -22,14 +29,15 @@ AlgaNode {
 
 	var <numChannels, <rate;
 
-	var <group, <synthGroup, <normGroup, <interpGroup;
-	var <synth, <normSynths, <interpSynths;
+	var <group, <playGroup, <synthGroup, <normGroup, <interpGroup;
+	var <playSynth, <synth, <normSynths, <interpSynths;
 	var <synthBus, <normBusses, <interpBusses;
 
 	var <inNodes, <outNodes;
 
 	var <isPlaying = false;
 	var <toBeCleared = false;
+    var <beingStopped = false;
 
 	*new { | obj, server, fadeTime = 0 |
 		^super.new.init(obj, server, fadeTime)
@@ -81,6 +89,19 @@ AlgaNode {
 		this.fadeTime_(val);
 	}
 
+    pt { 
+        ^playTime;
+    }
+
+    pt_ { | val |
+        playTime = val;
+        this.calculateLongestTime;
+    }
+
+    calculateLongestTime {
+        longestTime = max(longestFadeTime, playTime);
+    }
+
 	//Also sets for inNodes.. outNodes would create endless loop?
 	calculateLongestFadeTime { | argFadeTime, topNode = true |
 		longestFadeTime = if(fadeTime > argFadeTime, { fadeTime }, { argFadeTime });
@@ -88,6 +109,8 @@ AlgaNode {
 		fadeTimeConnections.do({ | val |
 			if(val > longestFadeTime, { longestFadeTime = val });
 		});
+
+        this.calculateLongestTime;
 
 		//Only run this on the nodes that are strictly connected to the one
 		//which calculateLongestFadeTime was called on
@@ -108,6 +131,7 @@ AlgaNode {
 	createAllGroups {
 		if(group == nil, {
 			group = Group(this.server);
+            playGroup = Group(group);
 			synthGroup = Group(group); //could be ParGroup here for supernova + patterns...
 			normGroup = Group(group);
 			interpGroup = Group(group);
@@ -116,6 +140,7 @@ AlgaNode {
 
 	resetGroups {
 		if(toBeCleared, {
+            playGroup = nil;
 			group = nil;
 			synthGroup = nil;
 			normGroup = nil;
@@ -136,7 +161,7 @@ AlgaNode {
 			}, {
 				//Wait fadeTime, then free
 				fork {
-					longestFadeTime.wait;
+					longestTime.wait;
 
 					group.free;
 
@@ -148,7 +173,6 @@ AlgaNode {
 
 	createSynthBus {
 		synthBus = AlgaBus(server, numChannels, rate);
-		if(isPlaying, { synthBus.play });
 	}
 
 	createInterpNormBusses {
@@ -181,7 +205,7 @@ AlgaNode {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestFadeTime + 1.0).wait;
+				(longestTime + 1.0).wait;
 
 				if(prevSynthBus != nil, { prevSynthBus.free });
 			}
@@ -212,7 +236,7 @@ AlgaNode {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestFadeTime + 1.0).wait;
+				(longestTime + 1.0).wait;
 
 				if(prevNormBusses != nil, {
 					prevNormBusses.do({ | normBus |
@@ -351,7 +375,7 @@ AlgaNode {
 	//will have time to run fade ins and outs when running .replace!
 	createSynth { | defName |
 		//synth's fadeTime is longestFadeTime!
-		var synthArgs = [\out, synthBus.index, \fadeTime, longestFadeTime];
+		var synthArgs = [\out, synthBus.index, \fadeTime, longestTime];
 
 		//Add the param busses (which have already been allocated)
 		//Should this connect here or in createInterpNormSynths
@@ -520,6 +544,7 @@ AlgaNode {
 		interpSynths[param] = interpSynth;
 	}
 
+
 	//Default now and fadetime to true for synths.
 	//Synth always uses longestFadeTime, in order to make sure that everything connected to it
 	//will have time to run fade ins and outs
@@ -527,7 +552,7 @@ AlgaNode {
 		if(now, {
 			if(synth != nil, {
 				//synth's fadeTime is longestFadeTime!
-				synth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
+				synth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestTime }, {0}));
 
 				//this.resetSynth;
 			});
@@ -538,7 +563,7 @@ AlgaNode {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestFadeTime + 1.0).wait;
+				(longestTime + 1.0).wait;
 
 				if(prevSynth != nil, {
 					prevSynth.set(\gate, 0, \fadeTime, 0);
@@ -552,11 +577,11 @@ AlgaNode {
 		if(now, {
 			//Free synths now
 			interpSynths.do({ | interpSynth |
-				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
+				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestTime }, {0}));
 			});
 
 			normSynths.do({ | normSynth |
-				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestFadeTime }, {0}));
+				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestTime }, {0}));
 			});
 
 			//this.resetInterpNormSynths;
@@ -570,7 +595,7 @@ AlgaNode {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestFadeTime + 1.0).wait;
+				(longestTime + 1.0).wait;
 
 				prevInterpSynths.do({ | interpSynth |
 					interpSynth.set(\gate, 0, \fadeTime, 0);
@@ -805,6 +830,11 @@ AlgaNode {
         });
 	}
 
+    //Replace a mix entry ???
+    <<! { | sender, previousSender, param = \in |
+
+    }
+
 	//resets to the default value in controlNames
 	//OR, if provided, to the value of the original args that were used to create the node
 	//previousSender is used in case of mixing, to only remove that one
@@ -840,11 +870,18 @@ AlgaNode {
 
 	//replace content of the node, re-making all the connections
 	replace { | obj |
+        var wasPlaying = false;
 		//re-init groups if clear was used
 		var initGroups = if(group == nil, { true }, { false });
 
 		//In case it has been set to true when clearing, then replacing before clear ends!
 		toBeCleared = false;
+
+        //If it was playing, free previous playSynth
+        if(isPlaying, {
+            this.stop;
+            wasPlaying = true;
+        });
 
 		//This doesn't work with feedbacks, as synths would be freed slightly before
 		//The new ones finish the rise, generating click. These should be freed
@@ -859,6 +896,11 @@ AlgaNode {
 
 		//Re-enstablish connections that were already in place
 		this.replaceConnections;
+
+        //If node was playing, or .replace has been called while .stop / .clear, play again
+        if(wasPlaying.or(beingStopped), {
+            this.play;
+        })
 	}
 
 	//Execute <| on all outNodes' parameters that are connected to this
@@ -878,9 +920,12 @@ AlgaNode {
 		//This could be overwritten if .replace is called
 		toBeCleared = true;
 
+        //Stop playing (if it was playing at all)
+        this.freePlaySynth();
+
 		fork {
 			//Wait time before clearing groups and busses...
-			longestFadeTime.wait;
+			longestTime.wait;
 
 			//this.freeInterpNormSynths(false, true);
 			this.freeAllGroups(true); //I can just remove the groups, as they contain the synths
@@ -920,13 +965,43 @@ AlgaNode {
 		group.moveAfter(node.group);
 	}
 
-	//Play at the bottom of the group
+    createPlaySynth { 
+        if((isPlaying.not).or(beingStopped), {
+            var playSynthSymbol;
+
+            if(rate == \control, { "Cannot play a kr AlgaNode".error; ^nil; });
+
+            playSynthSymbol = ("alga_play_" ++ numChannels).asSymbol;
+
+            playSynth = Synth(
+                playSynthSymbol,
+                [\in, synthBus.busArg, \gate, 1, \fadeTime, playTime],
+                playGroup
+            );
+            isPlaying = true;
+            beingStopped = false;
+        })
+    }
+
+    freePlaySynth { 
+        if(isPlaying, {
+            playSynth.set(\gate, 0, \fadeTime, playTime);
+            isPlaying = false;
+            beingStopped = true;
+        })
+    }
+
 	play {
 		AlgaSpinRoutine.waitFor({ this.instantiated }, {
-			isPlaying = true;
-			synthBus.play(group);
+            this.createPlaySynth;
 		});
 	}
+
+    stop {
+		AlgaSpinRoutine.waitFor({ this.instantiated }, {
+            this.freePlaySynth;
+		});
+    }
 }
 
 +Dictionary {
