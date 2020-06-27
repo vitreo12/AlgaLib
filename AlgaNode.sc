@@ -749,7 +749,7 @@ AlgaNode {
 
 		//Connect interpSynth to the sender's synthBus
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
-			this.newInterpConnectionAtParam(sender, param, replace);
+			this.newInterpConnectionAtParam(sender, param, replace:replace);
 		});
 	}
 
@@ -781,12 +781,28 @@ AlgaNode {
 
 	//add to already running nodes (mix)
 	<<+ { | sender, param = \in |
-
+		if(sender.class == AlgaNode, {
+			if(this.server != sender.server, {
+				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				^this;
+			});
+			this.makeConnection(sender, param);
+		}, {
+			("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
+		});
 	}
 
 	//add to already running nodes (mix)
 	>>+ { | receiver, param = \in |
-
+        if(receiver.class == AlgaNode, {
+			if(this.server != receiver.server, {
+				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				^this;
+			});
+            receiver.makeConnection(this, param);
+        }, {
+			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
+        });
 	}
 
 	//resets to the default value in controlNames
@@ -817,7 +833,7 @@ AlgaNode {
 		//This will effectively trigger interpolation process.
 		outNodes.keysValuesDo({ | receiver, paramsSet |
 			paramsSet.do({ | param |
-				receiver.makeConnection(this, param, true);
+				receiver.makeConnection(this, param, replace:true);
 			});
 		});
 	}
