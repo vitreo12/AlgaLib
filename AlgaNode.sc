@@ -700,7 +700,7 @@ AlgaNode {
 	//Remove entries from inNodes / outNodes / fadeTimeConnections for all involved nodes
 	removeInOutNodesDict { | previousSender = nil, param = \in |
 		var previousSenders = inNodes[param];
-		if(previousSenders == nil, { (/* "No previous connection enstablished at param:" ++ param).error;*/ ^this; });
+		if(previousSenders == nil, { /*( "No previous connection enstablished at param:" ++ param).error;*/ ^this; });
 
 		previousSenders.do({ | sender |
 			var sendersParamsSet = sender.outNodes[this];
