@@ -1,5 +1,3 @@
-AN : AlgaNode {}
-
 AlgaNode {
 	var <server;
 
@@ -1005,6 +1003,9 @@ AlgaNode {
 
 	isAlgaNode { ^true }
 }
+
+//Alias
+AN : AlgaNode {}
 
 +Dictionary {
 	//Loop over a Dict, unpacking Set. It's used in AlgaBlock
