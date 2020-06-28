@@ -20,6 +20,10 @@ AlgaNode {
     //The max between longestFadeTime and playTime
     var <longestTime = 0;
 
+	//This will be added: args passed in at creation to overwrite SynthDef's one,
+	//When using <|, then, these are the ones that will be restored!
+	var <objArgs;
+
 	var <objClass;
 	var <synthDef;
 
@@ -37,11 +41,11 @@ AlgaNode {
 	var <toBeCleared = false;
     var <beingStopped = false;
 
-	*new { | obj, server, fadeTime = 0 |
-		^super.new.init(obj, server, fadeTime)
+	*new { | obj, args, fadeTime = 0, server |
+		^super.new.init(obj, fadeTime, server)
 	}
 
-    init { | obj, argServer, argFadeTime = 0 |
+    init { | argObj, argArgs, argFadeTime = 0, argServer |
 		//Default server if not specified otherwise
 		if(argServer == nil, { server = Server.default }, { server = argServer });
 
@@ -71,7 +75,7 @@ AlgaNode {
 		this.fadeTime_(argFadeTime);
 
 		//Dispatch node creation
-		this.dispatchNode(obj, true);
+		this.dispatchNode(argObj, args, true);
 	}
 
 	fadeTime_ { | val |
@@ -257,7 +261,7 @@ AlgaNode {
 	}
 
 	//dispatches controlnames / numChannels / rate according to obj class
-	dispatchNode { | obj, initGroups = false, replace = false |
+	dispatchNode { | obj, args, initGroups = false, replace = false |
 		objClass = obj.class;
 
 		//If there is a synth playing, set its instantiated status to false:
@@ -267,11 +271,11 @@ AlgaNode {
 
 		//Symbol
 		if(objClass == Symbol, {
-			this.dispatchSynthDef(obj, initGroups, replace);
+			this.dispatchSynthDef(obj, args, initGroups, replace);
 		}, {
 			//Function
 			if(objClass == Function, {
-				this.dispatchFunction(obj, initGroups, replace);
+				this.dispatchFunction(obj, args, initGroups, replace);
 			}, {
 				("AlgaNode: class '" ++ objClass ++ "' is invalid").error;
 				this.clear;
@@ -280,7 +284,7 @@ AlgaNode {
 	}
 
 	//Dispatch a SynthDef
-	dispatchSynthDef { | obj, initGroups = false, replace = false |
+	dispatchSynthDef { | obj, args, initGroups = false, replace = false |
 		var synthDescControlNames;
 		var synthDesc = SynthDescLib.global.at(obj);
 
@@ -313,7 +317,7 @@ AlgaNode {
 	}
 
 	//Dispatch a Function
-	dispatchFunction { | obj, initGroups = false, replace = false |
+	dispatchFunction { | obj, args, initGroups = false, replace = false |
 		//Need to wait for server's receiving the sdef
 		fork {
 			var synthDescControlNames;
