@@ -42,7 +42,7 @@ AlgaNode {
     var <beingStopped = false;
 
 	*new { | obj, args, fadeTime = 0, server |
-		^super.new.init(obj, fadeTime, server)
+		^super.new.init(obj, args, fadeTime, server)
 	}
 
     init { | argObj, argArgs, argFadeTime = 0, argServer |
@@ -75,7 +75,7 @@ AlgaNode {
 		this.fadeTime_(argFadeTime);
 
 		//Dispatch node creation
-		this.dispatchNode(argObj, args, true);
+		this.dispatchNode(argObj, argArgs, true);
 	}
 
 	fadeTime_ { | val |
@@ -500,12 +500,12 @@ AlgaNode {
 		paramNumChannels = controlName.numChannels;
 		paramRate = controlName.rate;
 
-		if(sender != nil, {
+		if(sender.isAlgaNode, {
 			// Used in << / >>
 			senderNumChannels = sender.numChannels;
 			senderRate = sender.rate;
 		}, {
-			//Used in <|
+			//Used in <| AND << with number/array
 			senderNumChannels = paramNumChannels;
 			senderRate = paramRate;
 		});
@@ -523,7 +523,7 @@ AlgaNode {
 
 		//new interp synth, with input connected to sender and output to the interpBus
 		//USES fadeTime!! This is the whole core of the interpolation behaviour!
-		if(sender != nil, {
+		if(sender.isAlgaNode, {
 			//Used in << / >>
 			//Read \in from the sender's synthBus
             interpSynth = AlgaSynth.new(
@@ -532,12 +532,23 @@ AlgaNode {
                 interpGroup
             );
 		}, {
-			//Used in <|
+			//Used in <| AND << with number / array
 			//if sender is nil, restore the original default value. This is used in <|
-			var paramDefault = controlName.defaultValue;
+			var paramVal;
+			if(sender == nil, {
+				paramVal = controlName.defaultValue;
+			}, {
+				if(sender.isNumberOrArray,  {
+					paramVal = sender
+				}, {
+					"Invalid paramVal for AlgaNode".error;
+					^nil;
+				});
+			});
+
 			interpSynth = AlgaSynth.new(
 				interpSymbol,
-				[\in, paramDefault, \out, interpBus.index, \fadeTime, fadeTime],
+				[\in, paramVal, \out, interpBus.index, \fadeTime, fadeTime],
 				interpGroup
 			);
 		});
@@ -640,12 +651,14 @@ AlgaNode {
 			});
 		});
 
-		//Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
-		if((inNodes[param] == nil).or(mix.not), {
-			inNodes[param] = Set[sender];
-		}, {
-			inNodes[param].add(sender);
-		})
+		if(sender.isAlgaNode, {
+			//Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
+			if((inNodes[param] == nil).or(mix.not), {
+				inNodes[param] = Set[sender];
+			}, {
+				inNodes[param].add(sender);
+			})
+		});
 	}
 
 	//AlgaNode -> Set[param, param, ...]
@@ -664,11 +677,13 @@ AlgaNode {
 		this.addInNode(sender, param);
 
 		//This will add the entries to the existing Set, or create a new one
-		sender.addOutNode(this, param);
+		if(sender.isAlgaNode, {
+			sender.addOutNode(this, param);
 
-		//Add to fadeTimeConnections and recalculate longestFadeTime
-		sender.fadeTimeConnections[this] = this.fadeTime;
-		sender.calculateLongestFadeTime(this.fadeTime);
+			//Add to fadeTimeConnections and recalculate longestFadeTime
+			sender.fadeTimeConnections[this] = this.fadeTime;
+			sender.calculateLongestFadeTime(this.fadeTime);
+		});
 	}
 
 	removeInOutNode { | sender, param = \in |
@@ -685,7 +700,7 @@ AlgaNode {
 	//Remove entries from inNodes / outNodes / fadeTimeConnections for all involved nodes
 	removeInOutNodesDict { | previousSender = nil, param = \in |
 		var previousSenders = inNodes[param];
-		if(previousSenders == nil, { ("No previous connection enstablished at param:" ++ param).error; ^this; });
+		if(previousSenders == nil, { (/* "No previous connection enstablished at param:" ++ param).error;*/ ^this; });
 
 		previousSenders.do({ | sender |
 			var sendersParamsSet = sender.outNodes[this];
@@ -780,7 +795,7 @@ AlgaNode {
 		});
 	}
 
-	//arg is the sender
+	//arg is the sender. it can also be a number / array to set individual values
 	<< { | sender, param = \in |
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
@@ -789,7 +804,11 @@ AlgaNode {
 			});
 			this.makeConnection(sender, param);
 		}, {
-			("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
+			if(sender.isNumberOrArray, {
+				this.makeConnection(sender, param);
+			}, {
+				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
+			});
 		});
 	}
 
@@ -870,8 +889,9 @@ AlgaNode {
 		});
 	}
 
-	//replace content of the node, re-making all the connections
-	replace { | obj |
+	//replace content of the node, re-making all the connections.
+	//If this was connected to a number / array, should I restore that value too or keep the new one?
+	replace { | obj, args |
         var wasPlaying = false;
 		//re-init groups if clear was used
 		var initGroups = if(group == nil, { true }, { false });
@@ -894,7 +914,7 @@ AlgaNode {
 		this.freeAllBusses;
 
 		//New one
-		this.dispatchNode(obj, initGroups, true);
+		this.dispatchNode(obj, args, initGroups, true);
 
 		//Re-enstablish connections that were already in place
 		this.replaceConnections;
@@ -1030,4 +1050,6 @@ AN : AlgaNode {}
 
 +Object {
 	isAlgaNode { ^false }
+	instantiated { ^true }
+	isNumberOrArray { ^((this.isNumber).or(this.isArray)) }
 }

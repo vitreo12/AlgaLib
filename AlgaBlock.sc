@@ -246,10 +246,18 @@ AlgaBlocksDict {
 		var newBlockIndex;
 		var newBlock;
 
-		var receiverBlockIndex = receiver.blockIndex;
-		var senderBlockIndex = sender.blockIndex;
-		var receiverBlock = blocksDict[receiverBlockIndex];
-		var senderBlock = blocksDict[senderBlockIndex];
+		var receiverBlockIndex;
+		var senderBlockIndex;
+		var receiverBlock;
+		var senderBlock;
+
+		//This happens when patching a simple number or array in to set a param
+		if((receiver.isAlgaNode.not).or(sender.isAlgaNode.not), { ^nil });
+
+		receiverBlockIndex = receiver.blockIndex;
+		senderBlockIndex = sender.blockIndex;
+		receiverBlock = blocksDict[receiverBlockIndex];
+		senderBlock = blocksDict[senderBlockIndex];
 
 		if(receiver.server != sender.server, {
 			("Trying to create a block between two AlgaNodes on different servers").error;
