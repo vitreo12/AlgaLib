@@ -18,7 +18,7 @@ AlgaNode {
 	//longestFadeTime will be moved to AlgaBlock and applied per-block!
 	var <fadeTimeConnections;
     var <longestFadeTime = 0;
-    
+
     //The max between longestFadeTime and playTime
     var <longestTime = 0;
 
@@ -89,7 +89,7 @@ AlgaNode {
 		this.fadeTime_(val);
 	}
 
-    pt { 
+    pt {
         ^playTime;
     }
 
@@ -780,7 +780,7 @@ AlgaNode {
 
 	//arg is the sender
 	<< { | sender, param = \in |
-		if(sender.class == AlgaNode, {
+		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
@@ -793,7 +793,7 @@ AlgaNode {
 
 	//arg is the receiver
 	>> { | receiver, param = \in |
-        if(receiver.class == AlgaNode, {
+        if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
@@ -806,7 +806,7 @@ AlgaNode {
 
 	//add to already running nodes (mix)
 	<<+ { | sender, param = \in |
-		if(sender.class == AlgaNode, {
+		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
@@ -819,7 +819,7 @@ AlgaNode {
 
 	//add to already running nodes (mix)
 	>>+ { | receiver, param = \in |
-        if(receiver.class == AlgaNode, {
+        if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
@@ -841,7 +841,7 @@ AlgaNode {
 	<| { | param = \in, previousSender = nil |
 		//Also remove inNodes / outNodes / fadeTimeConnections
 		if(previousSender != nil, {
-			if(previousSender.class == AlgaNode, {
+			if(previousSender.isAlgaNode, {
 				AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
 					this.removeInterpConnectionAtParam(previousSender, param);
 				});
@@ -965,7 +965,7 @@ AlgaNode {
 		group.moveAfter(node.group);
 	}
 
-    createPlaySynth { 
+    createPlaySynth {
         if((isPlaying.not).or(beingStopped), {
             var playSynthSymbol;
 
@@ -983,7 +983,7 @@ AlgaNode {
         })
     }
 
-    freePlaySynth { 
+    freePlaySynth {
         if(isPlaying, {
             playSynth.set(\gate, 0, \fadeTime, playTime);
             isPlaying = false;
@@ -1002,6 +1002,8 @@ AlgaNode {
             this.freePlaySynth;
 		});
     }
+
+	isAlgaNode { ^true }
 }
 
 +Dictionary {
@@ -1019,4 +1021,8 @@ AlgaNode {
 			});
 		});
 	}
+}
+
++Object {
+	isAlgaNode { ^false }
 }
