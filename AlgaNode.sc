@@ -1,24 +1,24 @@
 AlgaNode {
 	var <server;
 
+	//Index of the corresponding AlgaBlock in the AlgaBlocksDict
 	var <>blockIndex = -1;
 
-	//This is the time when making a new connection to this proxy.
-	//Could be just named interpolationTime OR connectionTime
-	var <fadeTime = 0.01;
+	//This is the time when making a new connection to this node
+	var <connectionTime = 0;
 
     //This controls the fade in and out when .play / .stop
-    var <>playTime = 0;
+    var <playTime = 0;
 
-	//This is the longestFadeTime between all the outNodes.
+	//This is the longestConnectionTime between all the outNodes.
 	//it's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
-	//longestFadeTime will be moved to AlgaBlock and applied per-block!
-	var <fadeTimeConnections;
-    var <longestFadeTime = 0;
+	//longestConnectionTime will be moved to AlgaBlock and applied per-block!
+	var <connectionTimeOutNodes;
+    var <longestConnectionTime = 0;
 
-    //The max between longestFadeTime and playTime
-    var <longestTime = 0;
+    //The max between longestConnectionTime and playTime
+    var <longestWaitTime = 0;
 
 	//This will be added: args passed in at creation to overwrite SynthDef's one,
 	//When using <|, then, these are the ones that will be restored!
@@ -41,11 +41,11 @@ AlgaNode {
 	var <toBeCleared = false;
     var <beingStopped = false;
 
-	*new { | obj, args, fadeTime = 0, server |
-		^super.new.init(obj, args, fadeTime, server)
+	*new { | obj, args, connectionTime = 0, playTime = 0, server |
+		^super.new.init(obj, args, connectionTime, playTime, server)
 	}
 
-    init { | argObj, argArgs, argFadeTime = 0, argServer |
+    init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, argServer |
 		//Default server if not specified otherwise
 		if(argServer == nil, { server = Server.default }, { server = argServer });
 
@@ -68,63 +68,74 @@ AlgaNode {
 		//that it controls in that node (AlgaNode -> Set[\freq, \amp ...])
 		outNodes = Dictionary.new(10);
 
-		//Keeps all the fadeTimes of the connected nodes
-		fadeTimeConnections = Dictionary.new(10);
+		//Keeps all the connectionTimes of the connected nodes
+		connectionTimeOutNodes = Dictionary.new(10);
 
-		//starting fadeTime (using the setter so it also sets longestFadeTime)
-		this.fadeTime_(argFadeTime);
+		//starting connectionTime (using the setter so it also sets longestConnectionTime)
+		this.connectionTime_(argConnectionTime);
+        this.playTime_(argPlayTime);
 
 		//Dispatch node creation
 		this.dispatchNode(argObj, argArgs, true);
 	}
 
-	fadeTime_ { | val |
-		fadeTime = val;
-		this.calculateLongestFadeTime(val);
+	//connectionTime / connectTime / ct / interpolationTime / interpTime / it
+	connectionTime_ { | val |
+		connectionTime = val;
+		this.calculateLongestConnectionTime(val);
 	}
 
-	ft {
-		^fadeTime;
-	}
+    connectTime_ { | val | this.connectionTime_(val) }
 
-	ft_ { | val |
-		this.fadeTime_(val);
-	}
+    connectTime { ^connectionTime }
 
-    pt {
-        ^playTime;
-    }
+	ct_ { | val | this.connectionTime_(val) }
 
-    pt_ { | val |
+	ct { ^connectionTime }
+
+    interpolationTime_ { | val | this.connectionTime_(val) }
+
+    interpolationTime { ^connectionTime }
+
+	interpTime_ { | val | this.connectionTime_(val) }
+
+	interpTime { ^connectionTime }
+
+	it_ { | val | this.connectionTime_(val) }
+
+	it { ^connectionTime }
+
+	//playTime
+    playTime_ { | val |
         playTime = val;
-        this.calculateLongestTime;
+        this.calculateLongestWaitTime;
     }
 
-    calculateLongestTime {
-        longestTime = max(longestFadeTime, playTime);
+    pt { ^playTime }
+
+    pt_ { | val | this.playTime_(val) }
+
+    //maximum between longestConnectionTime and playTime
+    calculateLongestWaitTime {
+        longestWaitTime = max(longestConnectionTime, playTime);
     }
 
-	//Also sets for inNodes.. outNodes would create endless loop?
-	calculateLongestFadeTime { | argFadeTime, topNode = true |
-		longestFadeTime = if(fadeTime > argFadeTime, { fadeTime }, { argFadeTime });
+	//calculate longestConnectionTime
+	calculateLongestConnectionTime { | argConnectionTime, topNode = true |
+		longestConnectionTime = if(connectionTime > argConnectionTime, { connectionTime }, { argConnectionTime });
 
-		fadeTimeConnections.do({ | val |
-			if(val > longestFadeTime, { longestFadeTime = val });
+		connectionTimeOutNodes.do({ | val |
+			if(val > longestConnectionTime, { longestConnectionTime = val });
 		});
 
-        this.calculateLongestTime;
+        this.calculateLongestWaitTime;
 
 		//Only run this on the nodes that are strictly connected to the one
-		//which calculateLongestFadeTime was called on
+		//which calculateLongestConnectionTime was called on (topNode = true)
 		if(topNode, {
 			inNodes.do({ | sendersSet |
 				sendersSet.do({ | sender |
-					//Detect feedbacks
-					//if(sender != originalNode, {
-						sender.calculateLongestFadeTime(argFadeTime, false);
-					//},{
-						//"Feedback detected".warn;
-					//});
+                    sender.calculateLongestConnectionTime(argConnectionTime, false);
 				});
 			});
 		});
@@ -134,7 +145,7 @@ AlgaNode {
 		if(group == nil, {
 			group = Group(this.server);
             playGroup = Group(group);
-			synthGroup = Group(group); //could be ParGroup here for supernova + patterns...
+			synthGroup = Group(group); //It could be ParGroup here for supernova
 			normGroup = Group(group);
 			interpGroup = Group(group);
 		});
@@ -161,9 +172,9 @@ AlgaNode {
 
 				//this.resetGroups;
 			}, {
-				//Wait fadeTime, then free
+				//Wait longestWaitTime, then free
 				fork {
-					longestTime.wait;
+					longestWaitTime.wait;
 
 					group.free;
 
@@ -205,9 +216,9 @@ AlgaNode {
 
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
-				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
+				//going on. Simply wait longer than longestConnectionTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestTime + 1.0).wait;
+				(longestWaitTime + 1.0).wait;
 
 				if(prevSynthBus != nil, { prevSynthBus.free });
 			}
@@ -233,12 +244,12 @@ AlgaNode {
 			var prevNormBusses = normBusses.copy;
 			var prevInterpBusses = interpBusses.copy;
 
-			//Free prev busses after fadeTime
+			//Free prev busses after longestWaitTime
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
-				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
+				//going on. Simply wait longer than longestConnectionTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestTime + 1.0).wait;
+				(longestWaitTime + 1.0).wait;
 
 				if(prevNormBusses != nil, {
 					prevNormBusses.do({ | normBus |
@@ -373,15 +384,15 @@ AlgaNode {
 	}
 
 	//Synth writes to the synthBus
-	//Synth always uses longestFadeTime, in order to make sure that everything connected to it
+	//Synth always uses longestConnectionTime, in order to make sure that everything connected to it
 	//will have time to run fade ins and outs when running .replace!
 	createSynth { | defName |
-		//synth's fadeTime is longestFadeTime!
-		var synthArgs = [\out, synthBus.index, \fadeTime, longestTime];
+		//synth's \fadeTime is longestWaitTime...It could probably be removed here
+		var synthArgs = [\out, synthBus.index, \fadeTime, longestWaitTime];
 
+        /*
 		//Add the param busses (which have already been allocated)
 		//Should this connect here or in createInterpNormSynths
-		/*
 		normBusses.keysValuesDo({ | param, normBus |
 		synthArgs = synthArgs.add(param);
 		synthArgs = synthArgs.add(normBus.busArg);
@@ -456,7 +467,7 @@ AlgaNode {
                 })
             }, {
                 //No previous nodes connected: create a new interpSynth with the paramDefault value
-                //Instantiated right away, with no fadeTime, as it will directly be connected to
+                //Instantiated right away, with no \fadeTime, as it will directly be connected to
                 //synth's parameter
                 interpSynth = AlgaSynth.new(
                     interpSymbol,
@@ -465,7 +476,7 @@ AlgaNode {
                 );
             });
 
-			//Instantiated right away, with no fadeTime, as it will directly be connected to
+			//Instantiated right away, with no \fadeTime, as it will directly be connected to
 			//synth's parameter (synth is already reading from all the normBusses)
 			normSynth = AlgaSynth.new(
 				normSymbol,
@@ -522,13 +533,14 @@ AlgaNode {
 		interpBus = interpBusses[param];
 
 		//new interp synth, with input connected to sender and output to the interpBus
-		//USES fadeTime!! This is the whole core of the interpolation behaviour!
+		//THIS USES connectionTime!!
+        //THIS, together with freeInterpSynthAtParam, IS THE WHOLE CORE OF THE INTERPOLATION BEHAVIOUR!!!
 		if(sender.isAlgaNode, {
 			//Used in << / >>
 			//Read \in from the sender's synthBus
             interpSynth = AlgaSynth.new(
                 interpSymbol,
-                [\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, fadeTime],
+                [\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, connectionTime],
                 interpGroup
             );
 		}, {
@@ -538,6 +550,7 @@ AlgaNode {
 			if(sender == nil, {
 				paramVal = controlName.defaultValue;
 			}, {
+                //If not nil, check if it's a number or array. Use it if that's the case
 				if(sender.isNumberOrArray,  {
 					paramVal = sender
 				}, {
@@ -548,7 +561,7 @@ AlgaNode {
 
 			interpSynth = AlgaSynth.new(
 				interpSymbol,
-				[\in, paramVal, \out, interpBus.index, \fadeTime, fadeTime],
+				[\in, paramVal, \out, interpBus.index, \fadeTime, connectionTime],
 				interpGroup
 			);
 		});
@@ -558,25 +571,26 @@ AlgaNode {
 	}
 
 
-	//Default now and fadetime to true for synths.
-	//Synth always uses longestFadeTime, in order to make sure that everything connected to it
+	//Default now and useConnectionTime to true for synths.
+	//Synth always uses longestConnectionTime, in order to make sure that everything connected to it
 	//will have time to run fade ins and outs
-	freeSynth { | useFadeTime = true, now = true |
+	freeSynth { | useConnectionTime = true, now = true |
 		if(now, {
 			if(synth != nil, {
-				//synth's fadeTime is longestFadeTime!
-				synth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestTime }, {0}));
+				//synth's fadeTime is longestWaitTime!
+				synth.set(\gate, 0, \fadeTime, if(useConnectionTime, { longestWaitTime }, { 0 }));
 
 				//this.resetSynth;
 			});
 		}, {
+            //Needs to be deep copied (a new synth could be instantiated meanwhile)
 			var prevSynth = synth.copy;
 
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
-				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
+				//going on. Simply wait longer than longestWaitTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestTime + 1.0).wait;
+				(longestWaitTime + 1.0).wait;
 
 				if(prevSynth != nil, {
 					prevSynth.set(\gate, 0, \fadeTime, 0);
@@ -585,20 +599,19 @@ AlgaNode {
 		});
 	}
 
-	//Default now and fadetime to true for synths
-	freeInterpNormSynths { | useFadeTime = true, now = true |
+	//Default now and useConnectionTime to true for synths
+	freeInterpNormSynths { | useConnectionTime = true, now = true |
 		if(now, {
 			//Free synths now
 			interpSynths.do({ | interpSynth |
-				interpSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestTime }, {0}));
+				interpSynth.set(\gate, 0, \fadeTime, if(useConnectionTime, { longestWaitTime }, {0}));
 			});
 
 			normSynths.do({ | normSynth |
-				normSynth.set(\gate, 0, \fadeTime, if(useFadeTime, { longestTime }, {0}));
+				normSynth.set(\gate, 0, \fadeTime, if(useConnectionTime, { longestWaitTime }, {0}));
 			});
 
 			//this.resetInterpNormSynths;
-
 		}, {
 			//Dictionaries need to be deep copied
 			var prevInterpSynths = interpSynths.copy;
@@ -606,9 +619,9 @@ AlgaNode {
 
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
-				//going on. Simply wait longer than longestFadeTime (which will be the time the replaced
+				//going on. Simply wait longer than longestWaitTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestTime + 1.0).wait;
+				(longestWaitTime + 1.0).wait;
 
 				prevInterpSynths.do({ | interpSynth |
 					interpSynth.set(\gate, 0, \fadeTime, 0);
@@ -621,21 +634,22 @@ AlgaNode {
 		});
 	}
 
-	freeAllSynths { | useFadeTime = true, now = true |
-		this.freeInterpNormSynths(useFadeTime, now);
-		this.freeSynth(useFadeTime, now);
+	freeAllSynths { | useConnectionTime = true, now = true |
+		this.freeInterpNormSynths(useConnectionTime, now);
+		this.freeSynth(useConnectionTime, now);
 	}
 
-	freeAllSynthOnNewInstantiation { | useFadeTime = true, now = true |
-		this.freeAllSynths(useFadeTime, now);
+	freeAllSynthOnNewInstantiation { | useConnectionTime = true, now = true |
+		this.freeAllSynths(useConnectionTime, now);
 	}
 
 	//This is only used in connection situations
-	//This, together with createInterpSynthAtParam, is the whole core of the interpolation behaviour!
+	//THIS USES connectionTime!!
+    //THIS, TOGETHER WITH createInterpSynthAtParam, IS THE WHOLE CORE OF THE INTERPOLATION BEHAVIOUR!!!
 	freeInterpSynthAtParam { | param = \in |
 		var interpSynthAtParam = interpSynths[param];
 		if(interpSynthAtParam == nil, { ("Invalid param for interp synth to free: " ++ param).error; ^this });
-        interpSynthAtParam.set(\gate, 0, \fadeTime, fadeTime);
+        interpSynthAtParam.set(\gate, 0, \fadeTime, connectionTime);
 	}
 
 	//param -> Set[AlgaNode, AlgaNode, ...]
@@ -671,7 +685,7 @@ AlgaNode {
 		});
 	}
 
-	//add entries to the inNodes / outNodes / fadeTimeConnections of the two AlgaNodes
+	//add entries to the inNodes / outNodes / connectionTimeOutNodes of the two AlgaNodes
 	addInOutNodesDict { | sender, param = \in |
 		//This will replace the entries on new connection (as mix == false)
 		this.addInNode(sender, param);
@@ -680,9 +694,9 @@ AlgaNode {
 		if(sender.isAlgaNode, {
 			sender.addOutNode(this, param);
 
-			//Add to fadeTimeConnections and recalculate longestFadeTime
-			sender.fadeTimeConnections[this] = this.fadeTime;
-			sender.calculateLongestFadeTime(this.fadeTime);
+			//Add to connectionTimeOutNodes and recalculate longestConnectionTime
+			sender.connectionTimeOutNodes[this] = this.connectionTime;
+			sender.calculateLongestConnectionTime(this.connectionTime);
 		});
 	}
 
@@ -690,14 +704,14 @@ AlgaNode {
 		sender.outNodes[this].remove(param);
 		inNodes[param].remove(sender);
 
-		//Recalculate longestFadeTime too...
+		//Recalculate longestConnectionTime too...
 		//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
 		//(Right now, this happens before creating new synths)
-		sender.fadeTimeConnections[this] = 0;
-		sender.calculateLongestFadeTime(0);
+		sender.connectionTimeOutNodes[this] = 0;
+		sender.calculateLongestConnectionTime(0);
 	}
 
-	//Remove entries from inNodes / outNodes / fadeTimeConnections for all involved nodes
+	//Remove entries from inNodes / outNodes / connectionTimeOutNodes for all involved nodes
 	removeInOutNodesDict { | previousSender = nil, param = \in |
 		var previousSenders = inNodes[param];
 		if(previousSenders == nil, { /*( "No previous connection enstablished at param:" ++ param).error;*/ ^this; });
@@ -720,11 +734,11 @@ AlgaNode {
 					//If Set with just one entry, remove the entire Set
 					sender.outNodes.removeAt(this);
 
-					//Recalculate longestFadeTime too...
+					//Recalculate longestConnectionTime too...
 					//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
 					//(Right now, this happens before creating new synths)
-					sender.fadeTimeConnections[this] = 0;
-					sender.calculateLongestFadeTime(0);
+					sender.connectionTimeOutNodes[this] = 0;
+					sender.calculateLongestConnectionTime(0);
 				})
 			})
 		});
@@ -748,7 +762,7 @@ AlgaNode {
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this; });
 
-		//Add proper inNodes / outNodes / fadeTimeConnections
+		//Add proper inNodes / outNodes / connectionTimeOutNodes
 		this.addInOutNodesDict(sender, param);
 
 		//Re-order groups
@@ -772,7 +786,7 @@ AlgaNode {
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to reset: " ++ param).error; ^this; });
 
-		//Remove inNodes / outNodes / fadeTimeConnections
+		//Remove inNodes / outNodes / connectionTimeOutNodes
 		this.removeInOutNodesDict(previousSender, param);
 
 		//Re-order groups shouldn't be needed when removing connections
@@ -860,7 +874,7 @@ AlgaNode {
 	//OR, if provided, to the value of the original args that were used to create the node
 	//previousSender is used in case of mixing, to only remove that one
 	<| { | param = \in, previousSender = nil |
-		//Also remove inNodes / outNodes / fadeTimeConnections
+		//Also remove inNodes / outNodes / connectionTimeOutNodes
 		if(previousSender != nil, {
 			if(previousSender.isAlgaNode, {
 				AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
@@ -908,7 +922,7 @@ AlgaNode {
 		//This doesn't work with feedbacks, as synths would be freed slightly before
 		//The new ones finish the rise, generating click. These should be freed
 		//When the new synths/busses are surely instantiated on the server!
-		//The cheap solution that it's in place now is to wait 0.5 longer than longestFadeTime...
+		//The cheap solution that it's in place now is to wait 0.5 longer than longestConnectionTime...
 		//Work out a better solution!
 		this.freeAllSynths(false, false);
 		this.freeAllBusses;
@@ -947,7 +961,7 @@ AlgaNode {
 
 		fork {
 			//Wait time before clearing groups and busses...
-			longestTime.wait;
+			longestWaitTime.wait;
 
 			//this.freeInterpNormSynths(false, true);
 			this.freeAllGroups(true); //I can just remove the groups, as they contain the synths
