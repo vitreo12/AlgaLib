@@ -122,8 +122,9 @@ AlgaNode {
 
 	//calculate longestConnectionTime
 	calculateLongestConnectionTime { | argConnectionTime, topNode = true |
-		longestConnectionTime = if(connectionTime > argConnectionTime, { connectionTime }, { argConnectionTime });
+		longestConnectionTime = max(connectionTime, argConnectionTime);
 
+		//Doing the check instead of .max cause it's faster, imagine there are a lot of entries.
 		connectionTimeOutNodes.do({ | val |
 			if(val > longestConnectionTime, { longestConnectionTime = val });
 		});
@@ -135,7 +136,9 @@ AlgaNode {
 		if(topNode, {
 			inNodes.do({ | sendersSet |
 				sendersSet.do({ | sender |
-                    sender.calculateLongestConnectionTime(argConnectionTime, false);
+					//Update sender's connectionTimeOutNodes and run same function on it
+					sender.connectionTimeOutNodes[this] = longestConnectionTime;
+                    sender.calculateLongestConnectionTime(longestConnectionTime, false);
 				});
 			});
 		});
@@ -771,7 +774,6 @@ AlgaNode {
 		//with feedback connections)
 		if(replace.not, {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
-			//this.freeInterpSynthAtParam(param);
 		});
 
 		//Free previous interp synth (fades out)

@@ -1,4 +1,4 @@
-Alga.boot({ s.plotTree });
+Alga.boot({ s.plotTree }, s, AlgaServerOptions(numOutputBusChannels:3));
 Alga.boot;
 
 (
@@ -7,7 +7,7 @@ a = AlgaNode({SinOsc.ar(220 + \fm.ar(0))}, connectionTime:3);
 c = AlgaNode({\in.ar(0).range(-100, 100)}, connectionTime:2);
 d = AlgaNode({\in.ar(0).range(-50, 50)}, connectionTime:4);
 
-o = AlgaNode({\in.ar(0).dup}, connectionTime:3, playTime:3).play;
+o = AlgaNode({\in.ar(0).tanh.dup}, connectionTime:3, playTime:3).play;
 
 c << b;
 a <<.fm c;
@@ -28,7 +28,18 @@ c.ct = 3;
 d.ct = 4;
 )
 
-d.replace({\in.ar(0).range(-10.12312, 10.23)})
+d.replace({\in.ar(0).range(-100.12312, 120.23)})
+
+c.ct = 3;
+
+c.connectionTimeOutNodes
+
+a.ct = 5
+
+c.longestWaitTime
+a.longestWaitTime
+d.longestWaitTime
+b.longestWaitTime
 
 c.replace({\in.ar(0).range(-30, rrand(10, 100))});
 
@@ -41,10 +52,10 @@ fork {
 }
 )
 
-s.plotTree
-
-b.replace({SinOsc.ar(1 + \fm.ar(0))})
+b.ct_(1).replace({SinOsc.ar(1 + \fm.ar(0))})
 
 a.replace({SinOsc.ar(1 + \fm.ar(0))})
 
 b.replace({Saw.ar(1 + \fm.ar(0))})
+
+b.replace({Gendy1.ar(minfreq: 100 - \fm.ar(0), maxfreq: 100)})
