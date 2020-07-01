@@ -345,7 +345,7 @@ AlgaNode {
 		var synthDesc = SynthDescLib.global.at(obj);
 
 		if(synthDesc == nil, {
-			("Invalid AlgaSynthDef: '" ++ obj.asString ++"'").error;
+			("Invalid AlgaSynthDef: '" ++ obj.asString ++ "'").error;
 			this.clear;
 			^nil;
 		});
@@ -621,7 +621,7 @@ AlgaNode {
 
 			interpSynth = AlgaSynth.new(
 				interpSymbol,
-				[\in, paramVal, \out, interpBus.index, \fadeTime, connectionTime],
+				[\in, paramVal, \out, interpBus.index, \fadeTime, paramConnectionTime],
 				interpGroup
 			);
 		});
