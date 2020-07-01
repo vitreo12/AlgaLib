@@ -123,6 +123,47 @@ AlgaNode {
 		this.calculateLongestConnectionTime(val);
 	}
 
+	//Convenience wrappers
+	setAllConnectionTime { | val |
+		this.connectionTime_(val, true);
+	}
+
+	allct { | val |
+		this.connectionTime_(val, true);
+	}
+
+	allit { | val |
+		this.connectionTime_(val, true);
+	}
+
+	act { | val |
+		this.connectionTime_(val, true);
+	}
+
+	ait { | val |
+		this.connectionTime_(val, true);
+	}
+
+	setParamConnectionTime { | param, val |
+		this.connectionTime_(val, false, param);
+	}
+
+	paramct { | param, val |
+		this.connectionTime_(val, false, param);
+	}
+
+	pct { | param, val |
+		this.connectionTime_(val, false, param);
+	}
+
+	paramit { | param, val |
+		this.connectionTime_(val, false, param);
+	}
+
+	pit { | param, val |
+		this.connectionTime_(val, false, param);
+	}
+
     connectTime_ { | val, all = false, param | this.connectionTime_(val, all, param) }
 
     connectTime { ^connectionTime }
