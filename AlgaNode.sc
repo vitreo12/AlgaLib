@@ -115,7 +115,10 @@ AlgaNode {
 
     pt_ { | val | this.playTime_(val) }
 
-    //maximum between longestConnectionTime and playTime
+    //maximum between longestConnectionTime and playTime...
+	//is this necessary? Yes it is, cause if running .clear on the receiver,
+	//I need to be sure that if .replace or .clear is set to a sender, they will be longer
+	//than the .playTime of the receiver being cleared.
     calculateLongestWaitTime {
         longestWaitTime = max(longestConnectionTime, playTime);
     }
