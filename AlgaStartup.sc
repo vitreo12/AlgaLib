@@ -7,6 +7,32 @@ AlgaStartup {
 
 		//Using add is much faster than store/read...
 
+        16.do({ | i |
+            var sdef, arrayOfZeros_in;
+            i = i + 1;
+            if(i == 1, {
+                arrayOfZeros_in = "0";
+            }, {
+                arrayOfZeros_in = "[";
+
+                    //[0, 0, 0...
+                    i.do({
+                        arrayOfZeros_in = arrayOfZeros_in ++ "0,";
+                    });
+
+                    //remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
+                    arrayOfZeros_in = arrayOfZeros_in[0..(arrayOfZeros_in.size - 2)] ++ "]";
+            });
+
+            sdef = "
+            AlgaSynthDef(\\alga_play_" ++ i ++ ", {
+                Out.ar(\\out.ir(0), \\in.ar(" ++ arrayOfZeros_in ++ ") * AlgaEnvGate.ar)
+            }).add;
+            ";
+
+            sdef.interpret;
+        });
+
 		16.do({
 			arg i;
 

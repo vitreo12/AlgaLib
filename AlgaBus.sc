@@ -58,7 +58,7 @@ AlgaBus {
 	}
 
 	//Create an output synth and output sound to it
-	play {
-		bus.play;
+	play { | target=0, outbus, fadeTime, addAction=\addToTail |
+		bus.play(target, outbus, fadeTime, addAction);
 	}
 }
