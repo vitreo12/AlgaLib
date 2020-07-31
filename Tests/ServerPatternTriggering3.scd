@@ -12,8 +12,10 @@ SynthDef(\defaultP, { arg out=0, freq=440, amp=0.1, pan=0, time = 2;
 (
 ~numSynths = 10;
 
+//Create a control Bus with ~numSynths channels
 ~freqBusses = Bus.control(s, ~numSynths);
 
+//Create synths and connect \freq to the specific channels of the Bus
 ~synths = ~numSynths.collect({ | index |
 	Synth.newPaused(\defaultP, [\freq, ~freqBusses.subBus(index, 1).asMap])
 });
