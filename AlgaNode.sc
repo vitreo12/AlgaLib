@@ -1120,8 +1120,6 @@ AlgaNode {
 
             playSynthSymbol = ("alga_play_" ++ actualNumChannels).asSymbol;
 
-			playSynthSymbol.postln;
-
             playSynth = Synth(
                 playSynthSymbol,
                 [\in, synthBus.busArg, \gate, 1, \fadeTime, playTime],
