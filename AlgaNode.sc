@@ -1110,19 +1110,24 @@ AlgaNode {
 		group.moveAfter(node.group);
 	}
 
-    createPlaySynth {
+    createPlaySynth { | numChannelsToPlay |
         if((isPlaying.not).or(beingStopped), {
             var playSynthSymbol;
 
+			var actualNumChannels = numChannelsToPlay ? numChannels;
+
             if(rate == \control, { "Cannot play a kr AlgaNode".error; ^nil; });
 
-            playSynthSymbol = ("alga_play_" ++ numChannels).asSymbol;
+            playSynthSymbol = ("alga_play_" ++ actualNumChannels).asSymbol;
+
+			playSynthSymbol.postln;
 
             playSynth = Synth(
                 playSynthSymbol,
                 [\in, synthBus.busArg, \gate, 1, \fadeTime, playTime],
                 playGroup
             );
+
             isPlaying = true;
             beingStopped = false;
         })
@@ -1136,9 +1141,9 @@ AlgaNode {
         })
     }
 
-	play {
+	play { | numChannelsToPlay |
 		AlgaSpinRoutine.waitFor({ this.instantiated }, {
-            this.createPlaySynth;
+			this.createPlaySynth(numChannelsToPlay);
 		});
 	}
 
