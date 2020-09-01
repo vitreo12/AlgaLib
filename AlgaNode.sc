@@ -1110,21 +1110,51 @@ AlgaNode {
 		group.moveAfter(node.group);
 	}
 
-    createPlaySynth { | numChannelsToPlay |
+	//Number plays those number of channels sequentially
+	//Array selects specific output
+    createPlaySynth { | channelsToPlay |
         if((isPlaying.not).or(beingStopped), {
-            var playSynthSymbol;
+            var actualNumChannels, playSynthSymbol;
 
-			var actualNumChannels = numChannelsToPlay ? numChannels;
+			if(rate == \control, { "Cannot play a kr AlgaNode".error; ^nil; });
 
-            if(rate == \control, { "Cannot play a kr AlgaNode".error; ^nil; });
+			if(channelsToPlay != nil, {
+				if(channelsToPlay.class == Array, {
+					var channelsToPlaySize = channelsToPlay.size;
+					if(channelsToPlaySize < numChannels, {
+						actualNumChannels = channelsToPlaySize;
+					}, {
+						actualNumChannels = numChannels;
+					});
+				}, {
+					if(channelsToPlay < numChannels, {
+						actualNumChannels = channelsToPlay;
+					}, {
+						actualNumChannels = numChannels;
+					});
+				})
+			}, {
+				actualNumChannels = numChannels
+			});
 
-            playSynthSymbol = ("alga_play_" ++ actualNumChannels).asSymbol;
+			playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
 
-            playSynth = Synth(
-                playSynthSymbol,
-                [\in, synthBus.busArg, \gate, 1, \fadeTime, playTime],
-                playGroup
-            );
+			if(channelsToPlay.class == Array, {
+				//Wrap around indices (or delete out of bounds???)
+				channelsToPlay = channelsToPlay % numChannels;
+
+				playSynth = Synth(
+					playSynthSymbol,
+					[\in, synthBus.busArg, \indices, channelsToPlay, \gate, 1, \fadeTime, playTime],
+					playGroup
+				);
+			}, {
+				playSynth = Synth(
+					playSynthSymbol,
+					[\in, synthBus.busArg, \gate, 1, \fadeTime, playTime],
+					playGroup
+				);
+			});
 
             isPlaying = true;
             beingStopped = false;
@@ -1139,9 +1169,9 @@ AlgaNode {
         })
     }
 
-	play { | numChannelsToPlay |
+	play { | channelsToPlay |
 		AlgaSpinRoutine.waitFor({ this.instantiated }, {
-			this.createPlaySynth(numChannelsToPlay);
+			this.createPlaySynth(channelsToPlay);
 		});
 	}
 
