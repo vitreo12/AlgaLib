@@ -918,8 +918,7 @@ AlgaNode {
 		});
 	}
 
-	//arg is the sender. it can also be a number / array to set individual values
-	<< { | sender, param = \in |
+	from { | sender, param = \in |
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
@@ -935,8 +934,12 @@ AlgaNode {
 		});
 	}
 
-	//arg is the receiver
-	>> { | receiver, param = \in |
+	//arg is the sender. it can also be a number / array to set individual values
+	<< { | sender, param = \in |
+		this.from(sender: sender, param: param);
+	}
+
+	to { | receiver, param = \in |
         if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
@@ -948,8 +951,12 @@ AlgaNode {
         });
 	}
 
-	//add to already running nodes (mix)
-	<<+ { | sender, param = \in |
+	//arg is the receiver
+	>> { | receiver, param = \in |
+		this.to(receiver: receiver, param: param);
+	}
+
+	mixFrom { | sender, param = \in |
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
@@ -962,7 +969,11 @@ AlgaNode {
 	}
 
 	//add to already running nodes (mix)
-	>>+ { | receiver, param = \in |
+	<<+ { | sender, param = \in |
+		this.mixFrom(sender: sender, param: param);
+	}
+
+	mixTo { | receiver, param = \in |
         if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
@@ -972,6 +983,11 @@ AlgaNode {
         }, {
 			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
         });
+	}
+
+	//add to already running nodes (mix)
+	>>+ { | receiver, param = \in |
+		this.mixTo(receiver: receiver, param: param);
 	}
 
     //Replace a mix entry ???
@@ -1140,7 +1156,7 @@ AlgaNode {
 			playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
 
 			if(channelsToPlay.class == Array, {
-				//Wrap around indices (or delete out of bounds???)
+				//Wrap around the indices entries (or delete out of bounds???)
 				channelsToPlay = channelsToPlay % numChannels;
 
 				playSynth = Synth(
