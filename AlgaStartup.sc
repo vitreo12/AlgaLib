@@ -69,7 +69,7 @@ Out.ar(\\out.ir(0), input * AlgaEnvGate.ar)
 
 		var alreadyDonePairs = Dictionary.new;
 
-		var file = File("~/test.txt".standardizePath,"w");
+		//var file = File("~/test.txt".standardizePath,"w");
 
 		algaMaxIO.do({ | i |
 
@@ -400,10 +400,12 @@ outs;
 					result_audio_control.interpret;
 					result_control_audio.interpret;
 
+					/*
 					file.write(result_audio_audio ++ "\n");
 					file.write(result_control_control ++ "\n");
 					file.write(result_audio_control ++ "\n");
 					file.write(result_control_audio ++ "\n");
+					*/
 
 					/*
 					result_audio_audio.postln;
@@ -418,7 +420,7 @@ outs;
 
 		});
 
-		file.close;
+		//file.close;
 	}
 
 	*initAlgaNorm { | server |
