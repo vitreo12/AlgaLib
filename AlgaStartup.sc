@@ -1,6 +1,6 @@
 AlgaStartup {
 
-	classvar algaMaxIO = 16;
+	classvar <algaMaxIO = 16;
 
 	*initAlgaPlay { | server |
 

@@ -591,12 +591,17 @@ AlgaNode {
 
 	calculateSenderChansArray { | senderNumChans, paramNumChans, senderChans |
 		//Standard case (perhaps, overkill. This is default of the \indices param anyway)
-		if(senderChans == nil, { ^Array.series(paramNumChans) });
+		if(senderChans == nil, { ^(Array.series(paramNumChans)) });
 
 		if(senderChans.class == Array, {
-
+			^((senderChans % senderNumChans).reshape(paramNumChans));
 		}, {
-
+			if(senderChans.isNumber, {
+				^(Array.fill(paramNumChans, { senderChans }));
+			}, {
+				"senderChans must be a number or an array. Using default one.".error;
+				^(Array.series(paramNumChans));
+			});
 		});
 	}
 
@@ -647,7 +652,11 @@ AlgaNode {
 
 		interpBus = interpBusses[param];
 
-		senderChansToUse = this.calculateSenderChansArray(senderNumChannels, paramNumChannels, senderChans);
+		senderChansToUse = this.calculateSenderChansArray(
+			senderNumChannels,
+			paramNumChannels,
+			senderChans
+		);
 
 		senderChansToUse.postln;
 
@@ -1172,6 +1181,8 @@ AlgaNode {
 					});
 				}, {
 					if(channelsToPlay < numChannels, {
+						if(channelsToPlay < 1, { channelsToPlay = 1 });
+						if(channelsToPlay > AlgaStartup.algaMaxIO, { channelsToPlay = AlgaStartup.algaMaxIO });
 						actualNumChannels = channelsToPlay;
 					}, {
 						actualNumChannels = numChannels;
@@ -1213,12 +1224,14 @@ AlgaNode {
         })
     }
 
+	//Add option for fade time here!
 	play { | channelsToPlay |
 		AlgaSpinRoutine.waitFor({ this.instantiated }, {
 			this.createPlaySynth(channelsToPlay);
 		});
 	}
 
+	//Add option for fade time here!
     stop {
 		AlgaSpinRoutine.waitFor({ this.instantiated }, {
             this.freePlaySynth;
