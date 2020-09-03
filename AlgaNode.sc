@@ -589,11 +589,25 @@ AlgaNode {
 		this.createInterpNormSynths(replace);
 	}
 
+	calculateSenderChansArray { | senderNumChans, paramNumChans, senderChans |
+		//Standard case (perhaps, overkill. This is default of the \indices param anyway)
+		if(senderChans == nil, { ^Array.series(paramNumChans) });
+
+		if(senderChans.class == Array, {
+
+		}, {
+
+		});
+	}
+
 	//Used at every << / >> / <|
-	createInterpSynthAtParam { | sender, param = \in |
+	createInterpSynthAtParam { | sender, param = \in, senderChans |
 		var controlName, paramConnectionTime;
 		var paramNumChannels, paramRate;
 		var senderNumChannels, senderRate;
+
+		var senderChansToUse;
+
 		var interpSymbol;
 
 		var interpBus, interpSynth;
@@ -633,6 +647,10 @@ AlgaNode {
 
 		interpBus = interpBusses[param];
 
+		senderChansToUse = this.calculateSenderChansArray(senderNumChannels, paramNumChannels, senderChans);
+
+		senderChansToUse.postln;
+
 		//new interp synth, with input connected to sender and output to the interpBus
 		//THIS USES connectionTime!!
         //THIS, together with freeInterpSynthAtParam, IS THE WHOLE CORE OF THE INTERPOLATION BEHAVIOUR!!!
@@ -641,7 +659,12 @@ AlgaNode {
 			//Read \in from the sender's synthBus
             interpSynth = AlgaSynth.new(
                 interpSymbol,
-                [\in, sender.synthBus.busArg, \out, interpBus.index, \fadeTime, paramConnectionTime],
+                [
+					\in, sender.synthBus.busArg,
+					\out, interpBus.index,
+					\indices, senderChansToUse,
+					\fadeTime, paramConnectionTime
+				],
                 interpGroup
             );
 		}, {
@@ -662,7 +685,12 @@ AlgaNode {
 
 			interpSynth = AlgaSynth.new(
 				interpSymbol,
-				[\in, paramVal, \out, interpBus.index, \fadeTime, paramConnectionTime],
+				[
+					\in, paramVal,
+					\out, interpBus.index,
+					\indices, senderChansToUse,
+					\fadeTime, paramConnectionTime
+				],
 				interpGroup
 			);
 		});
@@ -868,7 +896,7 @@ AlgaNode {
 	}
 
 	//New interp connection at specific parameter
-	newInterpConnectionAtParam { | sender, param = \in, replace = false |
+	newInterpConnectionAtParam { | sender, param = \in, replace = false, senderChans |
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this; });
 
@@ -887,7 +915,7 @@ AlgaNode {
         this.freeInterpSynthAtParam(param);
 
         //Spawn new interp synth (fades in)
-        this.createInterpSynthAtParam(sender, param);
+        this.createInterpSynthAtParam(sender, param, senderChans);
 	}
 
 	//Used in <|
@@ -908,26 +936,26 @@ AlgaNode {
 	}
 
 	//implements receiver <<.param sender
-	makeConnection { | sender, param = \in, replace = false |
+	makeConnection { | sender, param = \in, replace = false, senderChans |
 		//Can't connect AlgaNode to itself
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
 		//Connect interpSynth to the sender's synthBus
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
-			this.newInterpConnectionAtParam(sender, param, replace:replace);
+			this.newInterpConnectionAtParam(sender, param, replace:replace, senderChans:senderChans);
 		});
 	}
 
-	from { | sender, param = \in |
+	from { | sender, param = \in, inChans |
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param);
+			this.makeConnection(sender, param, senderChans:inChans);
 		}, {
 			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param);
+				this.makeConnection(sender, param, senderChans:inChans);
 			}, {
 				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
 			});
@@ -939,13 +967,13 @@ AlgaNode {
 		this.from(sender: sender, param: param);
 	}
 
-	to { | receiver, param = \in |
+	to { | receiver, param = \in, outChans |
         if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-            receiver.makeConnection(this, param);
+            receiver.makeConnection(this, param, senderChans:outChans);
         }, {
 			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
         });
