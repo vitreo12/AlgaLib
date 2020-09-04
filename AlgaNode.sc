@@ -658,7 +658,7 @@ AlgaNode {
 			senderChans
 		);
 
-		senderChansToUse.postln;
+		//senderChansToUse.postln;
 
 		//new interp synth, with input connected to sender and output to the interpBus
 		//THIS USES connectionTime!!
