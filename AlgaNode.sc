@@ -34,6 +34,8 @@ AlgaNode {
 
 	var <numChannels, <rate;
 
+	var <outs;
+
 	var <group, <playGroup, <synthGroup, <normGroup, <interpGroup;
 	var <playSynth, <synth, <normSynths, <interpSynths;
 	var <synthBus, <normBusses, <interpBusses;
@@ -46,11 +48,11 @@ AlgaNode {
 	var <toBeCleared = false;
     var <beingStopped = false;
 
-	*new { | obj, args, connectionTime = 0, playTime = 0, server |
-		^super.new.init(obj, args, connectionTime, playTime, server)
+	*new { | obj, args, connectionTime = 0, playTime = 0, outsMapping, server |
+		^super.new.init(obj, args, connectionTime, playTime, outsMapping, server)
 	}
 
-    init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, argServer |
+    init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, outsMapping, argServer |
 		//Default server if not specified otherwise
 		if(argServer == nil, { server = Server.default }, { server = argServer });
 
@@ -86,7 +88,7 @@ AlgaNode {
         this.playTime_(argPlayTime);
 
 		//Dispatch node creation
-		this.dispatchNode(argObj, argArgs, true);
+		this.dispatchNode(argObj, argArgs, true, outsMapping:outsMapping);
 	}
 
 	setParamsConnectionTime { | val, all = false, param |
@@ -231,6 +233,10 @@ AlgaNode {
 		});
 	}
 
+	outsMapping {
+		^outs
+	}
+
 	createAllGroups {
 		if(group == nil, {
 			group = Group(this.server);
@@ -362,7 +368,7 @@ AlgaNode {
 	}
 
 	//dispatches controlnames / numChannels / rate according to obj class
-	dispatchNode { | obj, args, initGroups = false, replace = false, keepChannelsMapping = false |
+	dispatchNode { | obj, args, initGroups = false, replace = false, keepChannelsMapping = false, outsMapping |
 		objClass = obj.class;
 
 		//If there is a synth playing, set its instantiated status to false:
@@ -376,7 +382,7 @@ AlgaNode {
 		}, {
 			//Function
 			if(objClass == Function, {
-				this.dispatchFunction(obj, args, initGroups, replace, keepChannelsMapping:keepChannelsMapping);
+				this.dispatchFunction(obj, args, initGroups, replace, keepChannelsMapping:keepChannelsMapping, outsMapping:outsMapping);
 			}, {
 				("AlgaNode: class '" ++ objClass ++ "' is invalid").error;
 				this.clear;
@@ -418,12 +424,12 @@ AlgaNode {
 	}
 
 	//Dispatch a Function
-	dispatchFunction { | obj, args, initGroups = false, replace = false, keepChannelsMapping = false |
+	dispatchFunction { | obj, args, initGroups = false, replace = false, keepChannelsMapping = false, outsMapping |
 		//Need to wait for server's receiving the sdef
 		fork {
 			var synthDescControlNames;
 
-			synthDef = AlgaSynthDef(("alga_" ++ UniqueID.next).asSymbol, obj).send(server);
+			synthDef = AlgaSynthDef(("alga_" ++ UniqueID.next).asSymbol, obj, outsMapping:outsMapping).send(server);
 			server.sync;
 
 			synthDescControlNames = synthDef.asSynthDesc.controls;
@@ -431,6 +437,25 @@ AlgaNode {
 
 			numChannels = synthDef.numChannels;
 			rate = synthDef.rate;
+
+			//Accumulate across .replace calls.
+			if(replace.and(keepChannelsMapping), {
+				var new_outs = Dictionary.new(10);
+				outs.keysValuesDo({ | key, value |
+					//Delete out of bounds entries? Or keep it for future .replaces?
+					//if(value < numChannels, {
+						new_outs[key] = value;
+					//});
+				});
+				synthDef.outsMapping.keysValuesDo({ | key, value |
+					//if(value < numChannels, {
+						new_outs[key] = value;
+					//});
+				});
+				outs = new_outs;
+			}, {
+				outs = synthDef.outsMapping;
+			});
 
 			//Create all utilities
 			if(initGroups, { this.createAllGroups });
@@ -1132,7 +1157,7 @@ AlgaNode {
 
 	//replace content of the node, re-making all the connections.
 	//If this was connected to a number / array, should I restore that value too or keep the new one?
-	replace { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true |
+	replace { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true, outsMapping |
         var wasPlaying = false;
 		//re-init groups if clear was used
 		var initGroups = if(group == nil, { true }, { false });
@@ -1159,7 +1184,7 @@ AlgaNode {
 
 		//New one
 		//Just pass the entry, not the whole thingy
-		this.dispatchNode(obj, args, initGroups, true, keepChannelsMapping:keepChannelsMappingIn);
+		this.dispatchNode(obj, args, initGroups, true, keepChannelsMapping:keepChannelsMappingIn, outsMapping:outsMapping);
 
 		//Re-enstablish connections that were already in place
 		this.replaceConnections(keepChannelsMapping:keepChannelsMappingOut);
