@@ -610,6 +610,7 @@ AlgaNode {
 						//Calculate the array for channelsMapping
 						channelsMapping = this.calculateSenderChansMappingArray(
 							paramName,
+							prevSender,
 							oldParamChansMapping,
 							prevSender.numChannels,
 							paramNumChannels,
@@ -667,21 +668,36 @@ AlgaNode {
 		this.createInterpNormSynths(replace, keepChannelsMapping:keepChannelsMapping);
 	}
 
-	calculateSenderChansMappingArray { | param, senderChansMapping, senderNumChans, paramNumChans, updateParamChansMapping = true |
+	calculateSenderChansMappingArray { | param, sender, senderChansMapping, senderNumChans, paramNumChans, updateParamChansMapping = true |
+
+		var actualSenderChansMapping = senderChansMapping;
+
+		//Connect with outMapping symbols
+		if(actualSenderChansMapping.class == Symbol, {
+			actualSenderChansMapping = sender.outsMapping[actualSenderChansMapping];
+		});
 
 		//Update entry in Dict with the non-modified one (used in .replace then)
 		if(updateParamChansMapping, {
-			paramChansMapping[param] = senderChansMapping;
+			paramChansMapping[param] = actualSenderChansMapping;
 		});
 
 		//Standard case (perhaps, overkill. This is default of the \indices param anyway)
-		if(senderChansMapping == nil, { ^(Array.series(paramNumChans)) });
+		if(actualSenderChansMapping == nil, { ^(Array.series(paramNumChans)) });
 
-		if(senderChansMapping.class == Array, {
-			^((senderChansMapping % senderNumChans).reshape(paramNumChans));
+		if(actualSenderChansMapping.class == Array, {
+			//Also allow [\out1, \out2] here.
+			actualSenderChansMapping.do({ | entry, index |
+				if(entry.class == Symbol, {
+					actualSenderChansMapping[index] = sender.outsMapping[entry];
+				});
+			});
+
+			//flatten the array, modulo around the max number of channels and reshape according to param num chans
+			^((actualSenderChansMapping.flat % senderNumChans).reshape(paramNumChans));
 		}, {
-			if(senderChansMapping.isNumber, {
-				^(Array.fill(paramNumChans, { senderChansMapping }));
+			if(actualSenderChansMapping.isNumber, {
+				^(Array.fill(paramNumChans, { actualSenderChansMapping }));
 			}, {
 				"senderChansMapping must be a number or an array. Using default one.".error;
 				^(Array.series(paramNumChans));
@@ -738,6 +754,7 @@ AlgaNode {
 
 		senderChansMappingToUse = this.calculateSenderChansMappingArray(
 			param,
+			sender,
 			senderChansMapping,
 			senderNumChannels,
 			paramNumChannels,
