@@ -1110,19 +1110,52 @@ AlgaNode {
 		group.moveAfter(node.group);
 	}
 
-    createPlaySynth {
+	//Number plays those number of channels sequentially
+	//Array selects specific output
+    createPlaySynth { | channelsToPlay |
         if((isPlaying.not).or(beingStopped), {
-            var playSynthSymbol;
+            var actualNumChannels, playSynthSymbol;
 
-            if(rate == \control, { "Cannot play a kr AlgaNode".error; ^nil; });
+			if(rate == \control, { "Cannot play a kr AlgaNode".error; ^nil; });
 
-            playSynthSymbol = ("alga_play_" ++ numChannels).asSymbol;
+			if(channelsToPlay != nil, {
+				if(channelsToPlay.class == Array, {
+					var channelsToPlaySize = channelsToPlay.size;
+					if(channelsToPlaySize < numChannels, {
+						actualNumChannels = channelsToPlaySize;
+					}, {
+						actualNumChannels = numChannels;
+					});
+				}, {
+					if(channelsToPlay < numChannels, {
+						actualNumChannels = channelsToPlay;
+					}, {
+						actualNumChannels = numChannels;
+					});
+				})
+			}, {
+				actualNumChannels = numChannels
+			});
 
-            playSynth = Synth(
-                playSynthSymbol,
-                [\in, synthBus.busArg, \gate, 1, \fadeTime, playTime],
-                playGroup
-            );
+			playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
+
+			if(channelsToPlay.class == Array, {
+				//Wrap around indices (or delete out of bounds???)
+				channelsToPlay = channelsToPlay % numChannels;
+
+				playSynth = Synth(
+					playSynthSymbol,
+					[\in, synthBus.busArg, \indices, channelsToPlay, \gate, 1, \fadeTime, playTime],
+					playGroup
+				);
+			}, {
+				playSynth = Synth(
+					playSynthSymbol,
+					[\in, synthBus.busArg, \gate, 1, \fadeTime, playTime],
+					playGroup
+				);
+			});
+
             isPlaying = true;
             beingStopped = false;
         })
@@ -1136,9 +1169,9 @@ AlgaNode {
         })
     }
 
-	play {
+	play { | channelsToPlay |
 		AlgaSpinRoutine.waitFor({ this.instantiated }, {
-            this.createPlaySynth;
+			this.createPlaySynth(channelsToPlay);
 		});
 	}
 

@@ -28,7 +28,7 @@ c.ct = 3;
 d.ct = 4;
 )
 
-d.replace({\in.ar(0).range(-100.12312, 120.23)})
+d.replace({\in.ar(0).range(-100.12312, 10.23)})
 
 c.ct = 3;
 
@@ -36,12 +36,7 @@ c.connectionTimeOutNodes
 
 a.ct = 5
 
-c.longestWaitTime
-a.longestWaitTime
-d.longestWaitTime
-b.longestWaitTime
-
-c.replace({\in.ar(0).range(-30, rrand(10, 100))});
+c.replace({\in.ar(0).range(-30, rrand(10, 10))});
 
 (
 fork {
@@ -59,3 +54,25 @@ a.replace({SinOsc.ar(1 + \fm.ar(0))})
 b.replace({Saw.ar(1 + \fm.ar(0))})
 
 b.replace({Gendy1.ar(minfreq: 100 - \fm.ar(0), maxfreq: 100)})
+
+
+~delay = AlgaNode({OmniDelay2.ar(\in.ar, \dt.ar(0.3), \fb.kr(0.9), \dp.kr(0.8), 1).dup * 0.3})
+
+~delay.play
+
+a >> ~delay
+
+~delay.ct = 4
+
+~delay <<.dt 0.1
+
+~delay <<.dp 0.8
+
+~dt = AlgaNode({DC.ar(0.1)})
+
+~dt.replace({LFNoise0.ar(1).range(0.001, 1).lag(0.1)})
+
+~delay <<.dt ~dt
+
+
+c << b

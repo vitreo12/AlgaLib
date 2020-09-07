@@ -1,40 +1,73 @@
 AlgaStartup {
 
-	*initSynthDefs {
-		arg server = Server.local;
+	*initAlgaPlay { | server |
 
 		var alreadyDonePairs = Dictionary.new;
 
-		//Using add is much faster than store/read...
+		16.do({ | i |
+			var arrayOfZeros_in, arrayOfIndices;
 
-        16.do({ | i |
-            var sdef, arrayOfZeros_in;
-            i = i + 1;
-            if(i == 1, {
-                arrayOfZeros_in = "0";
-            }, {
-                arrayOfZeros_in = "[";
+			i = i + 1;
 
-                    //[0, 0, 0...
-                    i.do({
-                        arrayOfZeros_in = arrayOfZeros_in ++ "0,";
-                    });
+			if(i == 1, {
+				arrayOfZeros_in = "0";
 
-                    //remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
-                    arrayOfZeros_in = arrayOfZeros_in[0..(arrayOfZeros_in.size - 2)] ++ "]";
-            });
+			}, {
+				arrayOfZeros_in = "[";
 
-            sdef = "
-            AlgaSynthDef(\\alga_play_" ++ i ++ ", {
-                Out.ar(\\out.ir(0), \\in.ar(" ++ arrayOfZeros_in ++ ") * AlgaEnvGate.ar)
-            }).add;
-            ";
+				//[0, 0, 0...
+				i.do({ | num |
+					arrayOfZeros_in = arrayOfZeros_in ++ "0,";
 
-            sdef.interpret;
-        });
+				});
 
-		16.do({
-			arg i;
+				//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
+				arrayOfZeros_in = arrayOfZeros_in[0..(arrayOfZeros_in.size - 2)] ++ "]";
+			});
+
+			16.do({ | y |
+
+				var sdef, arrayOfIndices, currentPair, isAlreadyDone;
+
+				y = y + 1;
+
+				if(y <= i, { //only y <= i
+					currentPair = [i, y];
+					isAlreadyDone = alreadyDonePairs[currentPair];
+
+					if(isAlreadyDone != true , {
+						if(y == 1, {
+							arrayOfIndices = "0";
+						}, {
+							arrayOfIndices = "[";
+
+							y.do({ | num |
+								arrayOfIndices = arrayOfIndices ++ num.asString ++ ",";
+							});
+
+							arrayOfIndices = arrayOfIndices[0..(arrayOfIndices.size - 2)] ++ "]";
+						});
+
+						sdef = "
+AlgaSynthDef(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
+var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
+input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
+Out.ar(\\out.ir(0), input * AlgaEnvGate.ar)
+}).add;
+";
+
+						sdef.interpret;
+					});
+				});
+			});
+		});
+	}
+
+	*initAlgaInterp { | server |
+
+		var alreadyDonePairs = Dictionary.new;
+
+		16.do({ | i |
 
 			var arrayOfZeros_in;
 
@@ -54,8 +87,7 @@ AlgaStartup {
 				arrayOfZeros_in = arrayOfZeros_in[0..(arrayOfZeros_in.size - 2)] ++ "]";
 			});
 
-			16.do({
-				arg y;
+			16.do({ | y |
 
 				var currentPair, isAlreadyDone;
 
@@ -348,10 +380,10 @@ outs;
 			});
 
 		});
+	}
 
-		//interpolationProxyNormalizer
-		16.do({
-			arg counter;
+	*initAlgaNorm { | server |
+		16.do({ | counter |
 
 			var result_audio, result_control;
 			var arrayOfZeros = "[";
@@ -412,6 +444,12 @@ out;
 			//result_control.postln;
 
 		});
+	}
+
+	*initSynthDefs { | server |
+		this.initAlgaPlay(server);
+		this.initAlgaInterp(server);
+		this.initAlgaNorm(server);
 	}
 
 }
