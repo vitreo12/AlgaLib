@@ -3,10 +3,18 @@ AlgaSynthDef : SynthDef {
 
 	var <>rate, <>numChannels;
 	var <>canReleaseSynth, <>canFreeSynth;
+
+	var <>outs;
+
 	classvar <>sampleAccurate=false;
 
+	outsMapping {
+		^outs
+	}
+
 	*new { | name, func, rates, prependArgs, makeFadeEnv = true, channelOffset = 0,
-		chanConstraint, rateConstraint |
+		chanConstraint, rateConstraint, outsMapping |
+
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var hasGateArg=false, hasOutArg=false;
 		var outerBuildSynthDef = UGen.buildSynthDef;
@@ -134,6 +142,50 @@ AlgaSynthDef : SynthDef {
 		def.numChannels = numChannels;
 		def.canReleaseSynth = makeFadeEnv || hasOwnGate;
 		def.canFreeSynth = def.canReleaseSynth || canFree;
+
+		//Set outsMapping as \out1 -> 0, etc...
+		def.outs = Dictionary.new(numChannels);
+		numChannels.do({ | i |
+			var out = ("out" ++ (i + 1)).asSymbol;
+			def.outs[out] = i;
+		});
+
+		//Must be array.
+		if(outsMapping.class == Array, {
+			var chanCount = 0;
+			outsMapping.do({ | entry, i |
+				if(entry.class == Symbol, {
+					var name = outsMapping[i];
+					var val  = outsMapping[i+1];
+
+					if((val.class != Symbol).and(val != nil), {
+
+						chanCount = chanCount + 1;
+
+						if(val.class == Array, {
+							val.do({ | arrayEntry, arrayIndex |
+								if(arrayEntry < numChannels, {
+									def.outs[name] = val;
+								}, {
+									(name ++ " accesses out of bound channels: " ++ val).error;
+								});
+							});
+						}, {
+							if(val < numChannels, {
+								def.outs[name] = val;
+							}, {
+								(name ++ " accesses an out of bound channel: " ++ val).error;
+							});
+						});
+					}, {
+
+						def.outs[name] = chanCount;
+
+						chanCount = chanCount + 1;
+					});
+				});
+			});
+		});
 
 		//[\defcanReleaseSynth, def.canReleaseSynth, \defcanFreeSynth, def.canFreeSynth].debug;
 		^def
