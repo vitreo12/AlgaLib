@@ -441,13 +441,16 @@ AlgaNode {
 			//Accumulate across .replace calls ???
 			if(replace.and(keepChannelsMapping), {
 				var new_outs = Dictionary.new(10);
+				//old ones
 				outs.keysValuesDo({ | key, value |
 					//Delete out of bounds entries? Or keep it for future .replaces?
 					//if(value < numChannels, {
 						new_outs[key] = value;
 					//});
 				});
+				//new ones
 				synthDef.outsMapping.keysValuesDo({ | key, value |
+					//Delete out of bounds entries? Or keep it for future .replaces?
 					//if(value < numChannels, {
 						new_outs[key] = value;
 					//});
