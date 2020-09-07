@@ -438,7 +438,7 @@ AlgaNode {
 			numChannels = synthDef.numChannels;
 			rate = synthDef.rate;
 
-			//Accumulate across .replace calls.
+			//Accumulate across .replace calls ???
 			if(replace.and(keepChannelsMapping), {
 				var new_outs = Dictionary.new(10);
 				outs.keysValuesDo({ | key, value |
@@ -672,7 +672,7 @@ AlgaNode {
 
 		var actualSenderChansMapping = senderChansMapping;
 
-		//Connect with outMapping symbols
+		//Connect with outMapping symbols. Retrieve it from the sender
 		if(actualSenderChansMapping.class == Symbol, {
 			actualSenderChansMapping = sender.outsMapping[actualSenderChansMapping];
 		});
@@ -1164,7 +1164,7 @@ AlgaNode {
 			paramsSet.do({ | param |
 				var oldParamChansMapping = nil;
 
-				//Restore old channels mapping
+				//Restore old channels mapping! It can either be a symbol, number or array here
 				if(keepChannelsMapping, { oldParamChansMapping = receiver.paramChansMapping[param]; });
 
 				receiver.makeConnection(this, param, replace:true, senderChansMapping:oldParamChansMapping);
