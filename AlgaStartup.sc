@@ -4,7 +4,7 @@ AlgaStartup {
 
 	*initAlgaPlay { | server |
 
-		var alreadyDonePairs = Dictionary.new;
+		var alreadyDonePairs = IdentityDictionary.new;
 
 		algaMaxIO.do({ | i |
 			var arrayOfZeros_in, arrayOfIndices;
@@ -67,7 +67,7 @@ Out.ar(\\out.ir(0), input * AlgaEnvGate.ar)
 
 	*initAlgaInterp { | server |
 
-		var alreadyDonePairs = Dictionary.new;
+		var alreadyDonePairs = IdentityDictionary.new;
 
 		//var file = File("~/test.txt".standardizePath,"w");
 

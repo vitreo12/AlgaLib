@@ -57,31 +57,32 @@ AlgaNode {
 		if(argServer == nil, { server = Server.default }, { server = argServer });
 
 		//param -> ControlName
-		controlNames = Dictionary(10);
+		controlNames = IdentityDictionary(10);
 
 		//param -> connectionTime
-		paramsConnectionTime = Dictionary(10);
+		paramsConnectionTime = IdentityDictionary(10);
 
 		//Per-argument dictionaries of interp/norm Busses and Synths belonging to this AlgaNode
-		normBusses   = Dictionary(10);
-		interpBusses = Dictionary(10);
-		normSynths   = Dictionary(10);
-		interpSynths = Dictionary(10);
+		normBusses   = IdentityDictionary(10);
+		interpBusses = IdentityDictionary(10);
+		normSynths   = IdentityDictionary(10);
+		interpSynths = IdentityDictionary(10);
 
 		//Per-argument connections to this AlgaNode. These are in the form:
 		//(param -> Set[AlgaNode, AlgaNode...]). Multiple AlgaNodes are used when
 		//using the mixing <<+ / >>+
-		inNodes = Dictionary.new(10);
+		inNodes = IdentityDictionary(10);
 
 		//outNodes are not indexed by param name, as they could be attached to multiple nodes with same param name.
 		//they are indexed by identity of the connected node, and then it contains a Set of all parameters
 		//that it controls in that node (AlgaNode -> Set[\freq, \amp ...])
-		outNodes = Dictionary.new(10);
+		outNodes = IdentityDictionary(10);
 
 		//Keeps all the connectionTimes of the connected nodes
-		connectionTimeOutNodes = Dictionary.new(10);
+		connectionTimeOutNodes = IdentityDictionary(10);
 
-		paramChansMapping = Dictionary.new(10);
+		//Chans mapping from inNodes... How to support <<+ / >>+ ???
+		paramChansMapping = IdentityDictionary(10);
 
 		//starting connectionTime (using the setter so it also sets longestConnectionTime)
 		this.connectionTime_(argConnectionTime, true);
@@ -440,7 +441,7 @@ AlgaNode {
 
 			//Accumulate across .replace calls ???
 			if(replace.and(keepChannelsMapping), {
-				var new_outs = Dictionary.new(10);
+				var new_outs = IdentityDictionary(10);
 				//old ones
 				outs.keysValuesDo({ | key, value |
 					//Delete out of bounds entries? Or keep it for future .replaces?
