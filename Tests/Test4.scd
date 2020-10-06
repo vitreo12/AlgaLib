@@ -28,7 +28,7 @@ c.ct = 3;
 d.ct = 4;
 )
 
-d.replace({\in.ar(0).range(-1.12312, 10000.23)})
+d.replace({\in.ar(0).range(-100.12312, 1000.23)})
 
 c.ct = 3;
 
@@ -69,7 +69,7 @@ a >> ~delay
 
 ~delay <<.dp 0.9
 
-~delay <<.fb 0.4
+~delay <<.fb 0.3
 
 ~dt = AlgaNode({DC.ar(0.1)})
 
