@@ -62,3 +62,18 @@ AlgaBus {
 		bus.play(target, outbus, fadeTime, addAction);
 	}
 }
+
++ Bus {
+	busArg {
+		^mapSymbol ?? {
+			if(index.isNil) { MethodError("bus not allocated.", this).throw };
+			mapSymbol = if(rate == \control) { "c" } { "a" };
+			if(numChannels == 1) {
+				mapSymbol = (mapSymbol ++ index).asSymbol;
+			} {
+				{ |i| mapSymbol ++ (index + i) }.dup(numChannels)
+			}
+		}
+	}
+
+}
