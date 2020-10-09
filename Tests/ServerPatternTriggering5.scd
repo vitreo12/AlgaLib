@@ -9,11 +9,16 @@ s.waitForBoot({
 	//Writes to the correct busses... This allows for interplation to work correctly even when switching modes,
 	//as the interpolation will correctly happen at the right busses
 	SynthDef(\sinePerc_writer, {
+		//\trig comes in as a random number. This generates a 1 for length of dur. It won't reset until dur it's over.
 		var trig = Trig.kr(Changed.kr(\trig.kr(0)), \dur.kr(2));
 
 		//Always latch dur, in order to maintain same dur value as the trig throughout the execution!
 		var dur = Latch.kr(\dur.kr, trig);
 
+		var freq = Latch.kr(\freq.kr([440, 441]), trig);
+		var amp = Latch.kr(\amp.kr(0.1), trig);
+
+		/*
 		//Either free going (mapping) or sample and hold according to trigger
 		var freq = Select.kr(\freq_mapOrLatch.kr(1), [
 			\freq.kr([440, 441]),
@@ -25,6 +30,7 @@ s.waitForBoot({
 			\amp.kr(0.1),
 			Latch.kr(\amp.kr, trig)
 		]);
+		*/
 
 		Out.kr(\trigBusIndex.ir(-1), trig);
 		Out.kr(\durBusIndex.ir(-1), dur);
