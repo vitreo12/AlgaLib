@@ -24,6 +24,7 @@ SynthDef(\sinePerc, {
 )
 
 (
+//This doesn't work with arrays [440, 660] yet (needs to trigger 2 synths). Check \note: in Event.sc
 Event.addEventType(\algaNote, { | server |
 	var bus, setter, sine;
 
@@ -66,7 +67,6 @@ Pbind(
 
 ~interp.(\freq, Pseq([220, 880], inf), 4);
 ~interp.(\freq, Pwhite(220, 1000, inf), 3);
-
 
 
 
@@ -122,9 +122,7 @@ d = Pbindef(
 //It works!!!
 ~interp.(\freq, Pseq([220, 440, 880], inf), 4);
 ~interp.(\freq, Pwhite(220, 880, inf), 3);
-~interp.(\freq, ~sineOut2, 2);
-
-Pbus
+~interp.(\freq, Pseq([220, [220, 440, 660], 880], inf), 4); //Even with multiples!!
 
 ~interp.(\dur, Pkr(~sineOut), 3);
 ~interp.(\dur, 0.3, 3);
