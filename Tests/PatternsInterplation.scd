@@ -24,7 +24,9 @@ SynthDef(\sinePerc, {
 )
 
 (
-//This doesn't work with arrays [440, 660] yet (needs to trigger 2 synths). Check \note: in Event.sc
+//This doesn't work with arrays [440, 660] yet (needs to trigger 2 synths). Check eventTypes -> note in Event.sc
+//This doesn't work with scheduling, as it's not calling ~schedBundleArray (as \note does).
+//All of this will be possible by turningall the below code into bundle messages, and send those.
 Event.addEventType(\algaNote, { | server |
 	var bus, setter, sine;
 
