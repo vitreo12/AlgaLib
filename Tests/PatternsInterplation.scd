@@ -28,24 +28,31 @@ SynthDef(\sinePerc, {
 //This doesn't work with scheduling, as it's not calling ~schedBundleArray (as \note does).
 //All of this will be possible by turningall the below code into bundle messages, and send those.
 Event.addEventType(\algaNote, { | server |
-	var bus, setter, sine;
-
 	//Create a temp AlgaNode, make connection between ~param (that comes from Pbind) and the AlgaNodes...
 	//Perhaps, simply, the AlgaNode stuff, to make interp with other AlgaNodes, can be dynamically set.
 	//No need to create it for every triggered synth, but just when new connections will be set with other AlgaNodes!
-	server.bind({
-		bus = Bus.control(s, 1);
-		setter = Synth(\sinePerc_freq, [\out, bus.index, \in, ~freq]);
-		sine = Synth.after(setter, \sinePerc, [\freq, bus.asMap, \amp, ~amp]);
+
+	var bundle = server.makeBundle(false, {
+		var bus = Bus.control(s, 1);
+		var setter = Synth(\sinePerc_freq, [\out, bus.index, \in, ~freq]);
+		var sine = Synth.after(setter, \sinePerc, [\freq, bus.asMap, \amp, ~amp]);
+
+		//Free the bus on Synth's end
+		var instantiated = OSCFunc.newMatching({ | msg |
+			if(bus != nil, {
+				bus.free;
+			});
+		}, '/n_end', server.addr, argTemplate:[sine.nodeID]).oneShot;
 	});
 
-	//Free the bus after some time
-	fork {
-		(~dur + 1).wait;
-		if(bus != nil, {
-			bus.free;
-		});
-	}
+	//Syncs to the thisThread.clock. It will be Pbind's clock
+	~schedBundleArray.(
+		~lag,
+		~timingOffset,
+		server,
+		bundle,
+		~latency
+	);
 });
 )
 
@@ -71,6 +78,12 @@ Pbind(
 ~interp.(\freq, Pwhite(220, 1000, inf), 3);
 
 
+
+//To trace lang's incoming OSC messages
+OSCFunc.trace;
+
+//To trace server's incoming OSC messages
+s.dumpOSC(1);
 
 
 
