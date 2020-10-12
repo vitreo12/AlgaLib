@@ -1099,15 +1099,19 @@ AlgaNode {
 		this.to(receiver: receiver, param: param);
 	}
 
-	mixFrom { | sender, param = \in |
+	mixFrom { | sender, param = \in, inChans |
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param);
+			this.makeConnection(sender, param, senderChansMapping:inChans);
 		}, {
-			("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
+			if(sender.isNumberOrArray, {
+				this.makeConnection(sender, param, senderChansMapping:inChans);
+			}, {
+				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
+			});
 		});
 	}
 
@@ -1116,13 +1120,13 @@ AlgaNode {
 		this.mixFrom(sender: sender, param: param);
 	}
 
-	mixTo { | receiver, param = \in |
+	mixTo { | receiver, param = \in, outChans |
         if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-            receiver.makeConnection(this, param);
+            receiver.makeConnection(this, param, senderChansMapping:outChans);
         }, {
 			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
         });
