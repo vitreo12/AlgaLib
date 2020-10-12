@@ -1,26 +1,33 @@
 Alga.boot;
 
 (
-a = AlgaNode({SinOsc.ar(\f.kr(440))});
+s.plotTree;
+a = AlgaNode({SinOsc.ar(\f.kr(440)) * 0.2}).play;
 b = AlgaNode({DC.kr(220)});
+c = AlgaNode({LFNoise1.kr(1).range(200, 1000)});
 )
 
-a <<+.f b
+a <<.f b //a <<+.f b would be the same: i don't wanna keep the default when stacking!
+
+a <<+.f c
 
 b.replace({DC.kr(441)})
 
 a.replace({Saw.ar(\f.kr(440)) * 0.3})
 
-c = AlgaNode({LFNoise1.kr(1).range(200, 1000)});
+c.replace({LFNoise0.kr(1).range(300, 1000)});
 
-a <<+.f c
-
+//Disconnect individual parameters
 a.disconnect(\f, c);
 a.disconnect(\f, b);
 
 (
+//Reconnect
 a <<+.f b;
 a <<+.f c;
 )
 
+//Remove all
 a <| \f;
+
+a.inNodes;

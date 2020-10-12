@@ -945,9 +945,9 @@ AlgaNode {
 	}
 
 	//add entries to the inNodes / outNodes / connectionTimeOutNodes of the two AlgaNodes
-	addInOutNodesDict { | sender, param = \in |
+	addInOutNodesDict { | sender, param = \in, mix = false |
 		//This will replace the entries on new connection (as mix == false)
-		this.addInNode(sender, param);
+		this.addInNode(sender, param, mix);
 
 		//This will add the entries to the existing Set, or create a new one
 		if(sender.isAlgaNode, {
@@ -1017,12 +1017,12 @@ AlgaNode {
 	}
 
 	//New interp connection at specific parameter
-	newInterpConnectionAtParam { | sender, param = \in, replace = false, senderChansMapping |
+	newInterpConnectionAtParam { | sender, param = \in, replace = false, mix = false, senderChansMapping |
 		var controlName = controlNames[param];
 		if(controlName == nil, { ("Invalid param to create a new interp synth for: " ++ param).error; ^this; });
 
 		//Add proper inNodes / outNodes / connectionTimeOutNodes
-		this.addInOutNodesDict(sender, param);
+		this.addInOutNodesDict(sender, param, mix);
 
 		//Re-order groups
 		//Actually reorder the block's nodes ONLY if not running .replace
@@ -1032,8 +1032,11 @@ AlgaNode {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 		});
 
-		//Free previous interp synth (fades out)
-        this.freeInterpSynthAtParam(param);
+		//If mix == false, free all previous interpSynths
+		if(mix == false, {
+			//Free previous interp synths (fades out)
+			this.freeInterpSynthAtParam(param);
+		});
 
         //Spawn new interp synth (fades in)
         this.createInterpSynthAtParam(sender, param, senderChansMapping);
@@ -1057,13 +1060,15 @@ AlgaNode {
 	}
 
 	//implements receiver <<.param sender
-	makeConnection { | sender, param = \in, replace = false, senderChansMapping |
+	makeConnection { | sender, param = \in, replace = false, mix = false, senderChansMapping |
 		//Can't connect AlgaNode to itself
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
 		//Connect interpSynth to the sender's synthBus
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
-			this.newInterpConnectionAtParam(sender, param, replace:replace, senderChansMapping:senderChansMapping);
+			this.newInterpConnectionAtParam(sender, param,
+				replace:replace, mix:mix, senderChansMapping:senderChansMapping
+			);
 		});
 	}
 
@@ -1111,10 +1116,10 @@ AlgaNode {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param, senderChansMapping:inChans);
+			this.makeConnection(sender, param, mix:true, senderChansMapping:inChans);
 		}, {
 			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param, senderChansMapping:inChans);
+				this.makeConnection(sender, param, mix:true, senderChansMapping:inChans);
 			}, {
 				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
 			});
@@ -1132,7 +1137,7 @@ AlgaNode {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-            receiver.makeConnection(this, param, senderChansMapping:outChans);
+            receiver.makeConnection(this, param, mix:true, senderChansMapping:outChans);
         }, {
 			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
         });
@@ -1215,7 +1220,9 @@ AlgaNode {
 
 		//New one
 		//Just pass the entry, not the whole thingy
-		this.dispatchNode(obj, args, initGroups, true, keepChannelsMapping:keepChannelsMappingIn, outsMapping:outsMapping);
+		this.dispatchNode(obj, args, initGroups, true,
+			keepChannelsMapping:keepChannelsMappingIn, outsMapping:outsMapping
+		);
 
 		//Re-enstablish connections that were already in place
 		this.replaceConnections(keepChannelsMapping:keepChannelsMappingOut);
@@ -1224,6 +1231,11 @@ AlgaNode {
         if(wasPlaying.or(beingStopped), {
             this.play;
         })
+	}
+
+	//Remove individual connection when mixers
+	disconnect { | param = \in, sender |
+
 	}
 
 	//Execute <| on all outNodes' parameters that are connected to this
