@@ -439,24 +439,30 @@ AlgaNode {
 			numChannels = synthDef.numChannels;
 			rate = synthDef.rate;
 
-			//Accumulate across .replace calls ???
+			//Accumulate across .replace calls? This would be weird though:
+			//this way, some params mapping set 5 replace ago would be kept and eventually set.
+			//As of now, only the previous ones are kept.
 			if(replace.and(keepChannelsMapping), {
 				var new_outs = IdentityDictionary(10);
-				//old ones
+
+				//copy previous ones
 				outs.keysValuesDo({ | key, value |
 					//Delete out of bounds entries? Or keep it for future .replaces?
 					//if(value < numChannels, {
 						new_outs[key] = value;
 					//});
 				});
-				//new ones
+
+				//new ones from the synthDef
 				synthDef.outsMapping.keysValuesDo({ | key, value |
 					//Delete out of bounds entries? Or keep it for future .replaces?
 					//if(value < numChannels, {
 						new_outs[key] = value;
 					//});
 				});
+
 				outs = new_outs;
+
 			}, {
 				outs = synthDef.outsMapping;
 			});
@@ -520,15 +526,15 @@ AlgaNode {
 	//Synth always uses longestConnectionTime, in order to make sure that everything connected to it
 	//will have time to run fade ins and outs when running .replace!
 	createSynth { | defName |
-		//synth's \fadeTime is longestWaitTime...It could probably be removed here
+		//synth's \fadeTime is longestWaitTime... It could probably be removed here
 		var synthArgs = [\out, synthBus.index, \fadeTime, longestWaitTime];
 
         /*
 		//Add the param busses (which have already been allocated)
-		//Should this connect here or in createInterpNormSynths
+		//Should this connect here or in createInterpNormSynths? (now it's done in createInterpNormSynths)
 		normBusses.keysValuesDo({ | param, normBus |
-		synthArgs = synthArgs.add(param);
-		synthArgs = synthArgs.add(normBus.busArg);
+		    synthArgs = synthArgs.add(param);
+		    synthArgs = synthArgs.add(normBus.busArg);
 		});
 		*/
 
