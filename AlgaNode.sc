@@ -62,10 +62,22 @@ AlgaNode {
 		//param -> connectionTime
 		paramsConnectionTime = IdentityDictionary(10);
 
-		//Per-argument dictionaries of interp/norm Busses and Synths belonging to this AlgaNode
+		//Per-argument dictionaries of interp/norm Busses belonging to this AlgaNode.
+
+		//These are only one per param. All the mixing normalizers will be summed at the bus anyway.
+		//\param -> normBus
 		normBusses   = IdentityDictionary(10);
+
+		//IdentityDictionary of IdentityDictonaries: (needed for mixing)
+		//\param -> IdentityDictionary(sender -> interpBus)
 		interpBusses = IdentityDictionary(10);
+
+		//IdentityDictionary of IdentityDictonaries: (needed for mixing)
+		//\param -> IdentityDictionary(sender -> normSynth)
 		normSynths   = IdentityDictionary(10);
+
+		//IdentityDictionary of IdentityDictonaries: (needed for mixing)
+		//\param -> IdentityDictionary(sender -> interpSynth)
 		interpSynths = IdentityDictionary(10);
 
 		//Per-argument connections to this AlgaNode. These are in the form:
@@ -78,11 +90,13 @@ AlgaNode {
 		//that it controls in that node (AlgaNode -> Set[\freq, \amp ...])
 		outNodes = IdentityDictionary(10);
 
+		//Chans mapping from inNodes... How to support <<+ / >>+ ???
+		//IdentityDictionary of IdentityDictionaries:
+		//\param -> IdentityDictionary(sender -> paramChanMapping)
+		paramChansMapping = IdentityDictionary(10);
+
 		//Keeps all the connectionTimes of the connected nodes
 		connectionTimeOutNodes = IdentityDictionary(10);
-
-		//Chans mapping from inNodes... How to support <<+ / >>+ ???
-		paramChansMapping = IdentityDictionary(10);
 
 		//starting connectionTime (using the setter so it also sets longestConnectionTime)
 		this.connectionTime_(argConnectionTime, true);
