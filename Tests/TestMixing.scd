@@ -1,7 +1,9 @@
 Alga.boot;
 
+(
 a = AlgaNode({SinOsc.ar(\f.kr(440))});
 b = AlgaNode({DC.kr(220)});
+)
 
 a <<+.f b
 
@@ -15,3 +17,10 @@ a <<+.f c
 
 a.disconnect(\f, c);
 a.disconnect(\f, b);
+
+(
+a <<+.f b;
+a <<+.f c;
+)
+
+a <| \f;
