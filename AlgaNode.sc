@@ -42,6 +42,9 @@ AlgaNode {
 
 	var <inNodes, <outNodes;
 
+	//keep track of current \default nodes
+	var <currentDefaults;
+
 	var <paramChansMapping;
 
 	var <isPlaying = false;
@@ -89,6 +92,8 @@ AlgaNode {
 		//they are indexed by identity of the connected node, and then it contains a Set of all parameters
 		//that it controls in that node (AlgaNode -> Set[\freq, \amp ...])
 		outNodes = IdentityDictionary(10);
+
+		currentDefaults = IdentityDictionary(10);
 
 		//Chans mapping from inNodes... How to support <<+ / >>+ ???
 		//IdentityDictionary of IdentityDictionaries:
@@ -308,7 +313,8 @@ AlgaNode {
 			var paramNumChannels = controlName.numChannels;
 
 			//interpBusses have 1 more channel for the envelope shape
-			interpBusses[paramName] = AlgaBus(server, paramNumChannels + 1, paramRate);
+			//interpBusses[paramName] = AlgaBus(server, paramNumChannels + 1, paramRate);
+			interpBusses[paramName][\default] = AlgaBus(server, paramNumChannels + 1, paramRate);
 			normBusses[paramName] = AlgaBus(server, paramNumChannels, paramRate);
 		});
 	}
@@ -512,6 +518,11 @@ AlgaNode {
 				if(paramsConnectionTime[paramName] == nil, {
 					paramsConnectionTime[paramName] = connectionTime;
 				});
+
+				//Create IdentityDictionaries for each interpNode
+				interpBusses[paramName] = IdentityDictionary();
+				normSynths[paramName] = IdentityDictionary();
+				interpSynths[paramName] = IdentityDictionary();
 			});
 		});
 	}
@@ -566,7 +577,7 @@ AlgaNode {
 		normBusses.clear;
 	}
 
-	//This should take in account the nextNode's numChannels when making connections
+	//First creation: use defaults
 	createInterpNormSynths { | replace = false, keepChannelsMapping = false |
 		controlNames.do({ | controlName |
 			var interpSymbol, normSymbol;
@@ -594,7 +605,7 @@ AlgaNode {
 				paramNumChannels
 			).asSymbol;
 
-			interpBus = interpBusses[paramName];
+			interpBus = interpBusses[paramName][\default];
 			normBus = normBusses[paramName];
 
             //If replace, connect to the pervious bus, not default
@@ -679,8 +690,9 @@ AlgaNode {
 				normGroup
 			);
 
-			interpSynths[paramName] = interpSynth;
-			normSynths[paramName] = normSynth;
+			//interpSynths and normSynths are a IdentityDict of IdentityDicts
+			interpSynths[paramName][\default] = interpSynth;
+			normSynths[paramName][\default] = normSynth;
 
 			//Connect synth's parameter to the normBus
 			synth.set(paramName, normBus.busArg);
@@ -729,8 +741,48 @@ AlgaNode {
 		});
 	}
 
+	createMixInterpBusAndNormSynthAtParam { | sender, param = \in, senderChansMapping |
+		var controlName;
+		var paramNumChannels, paramRate;
+		var normSymbol, normBus;
+		var interpBus, normSynth;
+
+		controlName = controlNames[param];
+		normBus = normBusses[param];
+
+		if((controlName.isNil).or(normBus.isNil), {
+			("Invalid param for interp synth to free: " ++ param).error;
+			^this
+		});
+
+		paramNumChannels = controlName.numChannels;
+		paramRate = controlName.rate;
+
+		normSymbol = (
+			"algaNorm_" ++
+			paramRate ++
+			paramNumChannels
+		).asSymbol;
+
+		//interpBus has always one more channel for the envelope
+		interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+
+		normSynth = AlgaSynth.new(
+			normSymbol,
+			[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
+			normGroup
+		);
+
+		interpBusses[param][sender] = interpBus;
+		normSynths[param][sender] = normSynth;
+
+		//Create a fictional interpSynthAtParam with defaultvalue = 0 it will be freed but needed for interp
+		//this.createInterpSynthAtParam(sender, param, fictional_fadein:true);
+		this.createInterpSynthAtParam(sender, param, true, senderChansMapping:senderChansMapping);
+	}
+
 	//Used at every << / >> / <|
-	createInterpSynthAtParam { | sender, param = \in, senderChansMapping |
+	createInterpSynthAtParam { | sender, param = \in, mix = false, senderChansMapping |
 		var controlName, paramConnectionTime;
 		var paramNumChannels, paramRate;
 		var senderNumChannels, senderRate;
@@ -739,7 +791,25 @@ AlgaNode {
 
 		var interpSymbol;
 
+		var interpBusAtParam;
 		var interpBus, interpSynth;
+
+		var senderSym = sender;
+
+		if(mix == true, {
+			if(sender == nil, {
+				senderSym = \default;
+			}, {
+				//create an ad-hoc entry
+				if(sender.isNumberOrArray, {
+					senderSym = (sender.asString ++ "_" ++ UniqueID.next.asString).asSymbol;
+				});
+			});
+		}, {
+			//if((sender == nil).or(sender.isNumberOrArray), {
+				senderSym = \default;
+			//});
+		});
 
 		controlName = controlNames[param];
 		paramConnectionTime = paramsConnectionTime[param];
@@ -774,7 +844,21 @@ AlgaNode {
 			paramNumChannels
 		).asSymbol;
 
-		interpBus = interpBusses[param];
+		//get interp bus ident dict at specific param
+		interpBusAtParam = interpBusses[param];
+		if(interpBusAtParam == nil, { ("Invalid interp bus at param " ++ param).error; ^this });
+
+		//Try to get sender one.
+		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
+		interpBus = interpBusAtParam[senderSym];
+		if(interpBus == nil, {
+			interpBus = interpBusAtParam[\default];
+			if(interpBus == nil, { ("Invalid interp bus at param " ++ param ++ " and node " ++ senderSym.asString).error; ^this });
+			interpBusAtParam[senderSym] = interpBus;
+		});
+
+		//Check if normSynth at param needs to be updated with the default one (on first connection!)
+		this.checkDefaultNormSynthConnectionAtParam(senderSym, param);
 
 		senderChansMappingToUse = this.calculateSenderChansMappingArray(
 			param,
@@ -783,8 +867,6 @@ AlgaNode {
 			senderNumChannels,
 			paramNumChannels,
 		);
-
-		//senderChansMappingToUse.postln;
 
 		//new interp synth, with input connected to sender and output to the interpBus
 		//THIS USES connectionTime!!
@@ -806,12 +888,13 @@ AlgaNode {
 			//Used in <| AND << with number / array
 			//if sender is nil, restore the original default value. This is used in <|
 			var paramVal;
+
 			if(sender == nil, {
 				paramVal = controlName.defaultValue;
 			}, {
                 //If not nil, check if it's a number or array. Use it if that's the case
 				if(sender.isNumberOrArray,  {
-					paramVal = sender
+					paramVal = sender;
 				}, {
 					"Invalid paramVal for AlgaNode".error;
 					^nil;
@@ -830,10 +913,47 @@ AlgaNode {
 			);
 		});
 
-		//Add synth to interpSynths
-		interpSynths[param] = interpSynth;
+		//Add to interpSynths for the param
+		interpSynths[param][senderSym] = interpSynth;
+
+		//If present, remove the \default stuff from interpSynths
+		if(senderSym != \default, {
+			this.removeDefaultInterpSynthAtParam(param);
+			this.removeDefaultInterpBusNormSynthAtParam(param);
+		}, {
+			//Store current \default (needed when mix==true)
+			currentDefaults[param] = sender;
+		});
 	}
 
+	//On first connection, reassign the default normSynth to the sender
+	checkDefaultNormSynthConnectionAtParam { | sender, param |
+		var normSynthAtParam = normSynths[param];
+		if(normSynthAtParam != nil, {
+			var normSynth = normSynthAtParam[sender];
+			if(normSynth == nil, {
+				normSynth = normSynthAtParam[\default];
+				if(normSynth != nil, {
+					normSynthAtParam[sender] = normSynth;
+				});
+			});
+		});
+	}
+
+	//Remove default interpBusses and normSynths at param (if present)
+	removeDefaultInterpBusNormSynthAtParam { | param |
+		if(interpBusses[param][\default] != nil, {
+			normSynths[param].removeAt(\default);
+			interpBusses[param].removeAt(\default);
+		});
+	}
+
+	//If present, remove the \default stuff from interpBusses and interpSynths
+	removeDefaultInterpSynthAtParam { | param |
+		if(interpSynths[param][\default] != nil, {
+			interpSynths[param].removeAt(\default);
+		});
+	}
 
 	//Default now and useConnectionTime to true for synths.
 	//Synth always uses longestConnectionTime, in order to make sure that everything connected to it
@@ -867,12 +987,16 @@ AlgaNode {
 	freeInterpNormSynths { | useConnectionTime = true, now = true |
 		if(now, {
 			//Free synths now
-			interpSynths.do({ | interpSynth |
-				interpSynth.set(\gate, 0, \fadeTime, if(useConnectionTime, { longestWaitTime }, {0}));
+			interpSynths.do({ | interpSynthsAtParam |
+				interpSynthsAtParam.do({ | interpSynth |
+					interpSynth.set(\gate, 0, \fadeTime, 0);
+				});
 			});
 
-			normSynths.do({ | normSynth |
-				normSynth.set(\gate, 0, \fadeTime, if(useConnectionTime, { longestWaitTime }, {0}));
+			normSynths.do({ | normSynthsAtParam |
+				normSynthsAtParam.do({ | normSynth |
+					normSynth.set(\gate, 0, \fadeTime, 0);
+				});
 			});
 
 			//this.resetInterpNormSynths;
@@ -887,12 +1011,16 @@ AlgaNode {
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
 				(longestWaitTime + 1.0).wait;
 
-				prevInterpSynths.do({ | interpSynth |
-					interpSynth.set(\gate, 0, \fadeTime, 0);
+				prevInterpSynths.do({ | interpSynthsAtParam |
+					interpSynthsAtParam.do({ | interpSynth |
+						interpSynth.set(\gate, 0, \fadeTime, 0);
+					});
 				});
 
-				prevNormSynths.do({ | normSynth |
-					normSynth.set(\gate, 0, \fadeTime, 0);
+				prevNormSynths.do({ | normSynthsAtParam |
+					normSynthsAtParam.do({ | normSynth |
+						normSynth.set(\gate, 0, \fadeTime, 0);
+					});
 				});
 			}
 		});
@@ -910,19 +1038,41 @@ AlgaNode {
 	//This is only used in connection situations
 	//THIS USES connectionTime!!
     //THIS, TOGETHER WITH createInterpSynthAtParam, IS THE WHOLE CORE OF THE INTERPOLATION BEHAVIOUR!!!
-	freeInterpSynthAtParam { | param = \in |
-		var interpSynthAtParam = interpSynths[param];
+	freeInterpSynthAtParam { | sender, param = \in, mix = false |
+		var interpSynthsAtParam = interpSynths[param];
 		var paramConnectionTime = paramsConnectionTime[param];
 
-		if((interpSynthAtParam.isNil).or(paramConnectionTime.isNil), {
-			("Invalid param for interp synth to free: " ++ param).error;
-			^this
-		});
-
 		//If -1, or invalid, set to global connectionTime
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
+		if((paramConnectionTime < 0).or(paramConnectionTime == nil), { paramConnectionTime = connectionTime });
 
-        interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+		//Free them all ( <| )
+		if(sender == nil, {
+			interpSynthsAtParam.keysValuesDo({ | senderName, interpSynthAtParam |
+				interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+			});
+		}, {
+			//Only free one
+			var interpSynthAtParam;
+
+			//if mix == false, it's the \default
+			if(mix == false, {
+				sender = \default;
+			});
+
+			//In case of single numbers, it's gonna be \default anyway
+			if(sender.isNumberOrArray, {
+				sender = \default;
+			});
+
+			interpSynthAtParam = interpSynthsAtParam[sender];
+
+			if((interpSynthAtParam.isNil), {
+				("Invalid param for interp synth to free: " ++ param).error;
+				^this
+			});
+
+			interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+		});
 	}
 
 	//param -> Set[AlgaNode, AlgaNode, ...]
@@ -1046,14 +1196,11 @@ AlgaNode {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 		});
 
-		//If mix == false, free all previous interpSynths
-		if(mix == false, {
-			//Free previous interp synths (fades out)
-			this.freeInterpSynthAtParam(param);
-		});
+		//Free previous interp synths (fades out)
+		this.freeInterpSynthAtParam(sender, param, mix);
 
         //Spawn new interp synth (fades in)
-        this.createInterpSynthAtParam(sender, param, senderChansMapping);
+        this.createInterpSynthAtParam(sender, param, mix, senderChansMapping);
 	}
 
 	//Used in <|
@@ -1067,7 +1214,7 @@ AlgaNode {
 		//Re-order groups shouldn't be needed when removing connections
 
 		//Free previous interp synth (fades out)
-		this.freeInterpSynthAtParam(param);
+		this.freeInterpSynthAtParam(previousSender, param);
 
 		//Create new interp synth with default value (or the one supplied with args at start) (fades in)
 		this.createInterpSynthAtParam(nil, param);
@@ -1078,11 +1225,17 @@ AlgaNode {
 		//Can't connect AlgaNode to itself
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
-		//Connect interpSynth to the sender's synthBus
-		AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
-			this.newInterpConnectionAtParam(sender, param,
-				replace:replace, mix:mix, senderChansMapping:senderChansMapping
-			);
+		if(mix, {
+			//Create new interpBus and normSynth for specific param and sender combination...
+			//this has to happen before this.instantiated
+			this.createMixInterpBusAndNormSynthAtParam(sender, param, senderChansMapping:senderChansMapping);
+		}, {
+			//Connect interpSynth to the sender's synthBus
+			AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
+				this.newInterpConnectionAtParam(sender, param,
+					replace:replace, mix:mix, senderChansMapping:senderChansMapping
+				);
+			});
 		});
 	}
 
@@ -1390,6 +1543,35 @@ AlgaNode {
     }
 
 	isAlgaNode { ^true }
+
+	debug {
+		"longestWaitTime:".postln;
+		("\t" ++ longestWaitTime.asString).postln;
+		"connectionTime:".postln;
+		("\t" ++ connectionTime.asString).postln;
+		"paramsConnectionTime".postln;
+		("\t" ++ paramsConnectionTime.asString).postln;
+		"controlNames".postln;
+		("\t" ++ controlNames.asString).postln;
+		"inNodes:".postln;
+		("\t" ++ inNodes.asString).postln;
+		"outNodes:".postln;
+		("\t" ++ outNodes.asString).postln;
+		"outs:".postln;
+		("\t" ++ outs.asString).postln;
+		"paramChansMapping:".postln;
+		("\t" ++ paramChansMapping.asString).postln;
+		"interpSynths:".postln;
+		("\t" ++ interpSynths.asString).postln;
+		"interpBusses:".postln;
+		("\t" ++ interpBusses.asString).postln;
+		"normSynths:".postln;
+		("\t" ++ normSynths.asString).postln;
+		"normBusses:".postln;
+		("\t" ++ normBusses.asString).postln;
+		"currentDefaults:".postln;
+		("\t" ++ currentDefaults.asString).postln;
+	}
 }
 
 //Alias

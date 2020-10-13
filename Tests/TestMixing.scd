@@ -11,6 +11,8 @@ a <<.f b //a <<+.f b would be the same: i don't wanna keep the default when stac
 
 a <<+.f c
 
+a.debug;
+
 b.replace({DC.kr(441)})
 
 a.replace({Saw.ar(\f.kr(440)) * 0.3})
@@ -21,13 +23,17 @@ c.replace({LFNoise0.kr(1).range(300, 1000)});
 a.disconnect(\f, c);
 a.disconnect(\f, b);
 
+a.debug;
+
 (
 //Reconnect
 a <<+.f b;
 a <<+.f c;
 )
 
-//Remove all
+a.debug;
+
+//Remove all and go back to default
 a <| \f;
 
-a.inNodes;
+a.debug;

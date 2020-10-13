@@ -18,5 +18,5 @@
 +Object {
 	isAlgaNode { ^false }
 	instantiated { ^true }
-	isNumberOrArray { ^((this.isNumber).or(this.isArray)) }
+	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
 }
