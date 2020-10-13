@@ -776,7 +776,6 @@ AlgaNode {
 		interpBusses[param][sender] = interpBus;
 		normSynths[param][sender] = normSynth;
 
-		//Create a fictional interpSynthAtParam with defaultvalue = 0 it will be freed but needed for interp
 		//this.createInterpSynthAtParam(sender, param, fictional_fadein:true);
 		this.createInterpSynthAtParam(sender, param, true, senderChansMapping:senderChansMapping);
 	}
@@ -800,15 +799,14 @@ AlgaNode {
 			if(sender == nil, {
 				senderSym = \default;
 			}, {
-				//create an ad-hoc entry
+				//create an ad-hoc entry... This won't ever be triggered for now
+				//(mix has been already set to false in makeConnection for number/array)
 				if(sender.isNumberOrArray, {
 					senderSym = (sender.asString ++ "_" ++ UniqueID.next.asString).asSymbol;
 				});
 			});
 		}, {
-			//if((sender == nil).or(sender.isNumberOrArray), {
-				senderSym = \default;
-			//});
+			senderSym = \default;
 		});
 
 		controlName = controlNames[param];
@@ -856,9 +854,6 @@ AlgaNode {
 			if(interpBus == nil, { ("Invalid interp bus at param " ++ param ++ " and node " ++ senderSym.asString).error; ^this });
 			interpBusAtParam[senderSym] = interpBus;
 		});
-
-		//Check if normSynth at param needs to be updated with the default one (on first connection!)
-		this.checkDefaultNormSynthConnectionAtParam(senderSym, param);
 
 		senderChansMappingToUse = this.calculateSenderChansMappingArray(
 			param,
@@ -917,41 +912,9 @@ AlgaNode {
 		interpSynths[param][senderSym] = interpSynth;
 
 		//If present, remove the \default stuff from interpSynths
-		if(senderSym != \default, {
-			this.removeDefaultInterpSynthAtParam(param);
-			this.removeDefaultInterpBusNormSynthAtParam(param);
-		}, {
-			//Store current \default (needed when mix==true)
+		//Store current \default (needed when mix == true)
+		if((senderSym == \default).and(mix == false), {
 			currentDefaults[param] = sender;
-		});
-	}
-
-	//On first connection, reassign the default normSynth to the sender
-	checkDefaultNormSynthConnectionAtParam { | sender, param |
-		var normSynthAtParam = normSynths[param];
-		if(normSynthAtParam != nil, {
-			var normSynth = normSynthAtParam[sender];
-			if(normSynth == nil, {
-				normSynth = normSynthAtParam[\default];
-				if(normSynth != nil, {
-					normSynthAtParam[sender] = normSynth;
-				});
-			});
-		});
-	}
-
-	//Remove default interpBusses and normSynths at param (if present)
-	removeDefaultInterpBusNormSynthAtParam { | param |
-		if(interpBusses[param][\default] != nil, {
-			normSynths[param].removeAt(\default);
-			interpBusses[param].removeAt(\default);
-		});
-	}
-
-	//If present, remove the \default stuff from interpBusses and interpSynths
-	removeDefaultInterpSynthAtParam { | param |
-		if(interpSynths[param][\default] != nil, {
-			interpSynths[param].removeAt(\default);
 		});
 	}
 
@@ -1045,26 +1008,15 @@ AlgaNode {
 		//If -1, or invalid, set to global connectionTime
 		if((paramConnectionTime < 0).or(paramConnectionTime == nil), { paramConnectionTime = connectionTime });
 
-		//Free them all ( <| )
-		if(sender == nil, {
-			interpSynthsAtParam.keysValuesDo({ | senderName, interpSynthAtParam |
+		//Free them all for ( <| ) and mix == false ( << )
+		if((sender == nil).or(mix == false), {
+			interpSynthsAtParam.do({ | interpSynthAtParam |
 				interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
 			});
 		}, {
-			//Only free one
-			var interpSynthAtParam;
+			//mix == true, only free the one (disconnect function)
 
-			//if mix == false, it's the \default
-			if(mix == false, {
-				sender = \default;
-			});
-
-			//In case of single numbers, it's gonna be \default anyway
-			if(sender.isNumberOrArray, {
-				sender = \default;
-			});
-
-			interpSynthAtParam = interpSynthsAtParam[sender];
+			var interpSynthAtParam = interpSynthsAtParam[sender];
 
 			if((interpSynthAtParam.isNil), {
 				("Invalid param for interp synth to free: " ++ param).error;
@@ -1220,13 +1172,30 @@ AlgaNode {
 		this.createInterpSynthAtParam(nil, param);
 	}
 
+	cleanupMixBussesAndSynths { | param |
+		var interpBusAtParam = interpBusses[param];
+		if(interpBusAtParam.size > 1, {
+			var interpSynthAtParam = interpSynths[param];
+			var normSynthAtParam = normSynths[param];
+			interpBusAtParam.keysValuesDo({ | key, val |
+				if(key != \default, {
+					interpBusAtParam.removeAt(key);
+					interpSynthAtParam.removeAt(key);
+					normSynthAtParam.removeAt(key);
+				});
+			});
+		});
+	}
+
 	//implements receiver <<.param sender
 	makeConnection { | sender, param = \in, replace = false, mix = false, senderChansMapping |
+		var currentDefaultAtParam;
+
 		//Can't connect AlgaNode to itself
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
 		if(mix, {
-			var currentDefaultAtParam = currentDefaults[param];
+			currentDefaultAtParam = currentDefaults[param];
 
 			//trying to <<+ instead of << on first connection
 			if((currentDefaultAtParam == nil), {
@@ -1246,11 +1215,34 @@ AlgaNode {
 			});
 		});
 
+		//need to re-check as mix might have changed!
 		if(mix, {
-			//Create new interpBus and normSynth for specific param and sender combination...
-			//this has to happen before this.instantiated
-			this.createMixInterpBusAndNormSynthAtParam(sender, param, senderChansMapping:senderChansMapping);
+			if(currentDefaultAtParam.isAlgaNode, {
+				if(currentDefaultAtParam != sender, {
+					var interpBusAtParam = interpBusses[param];
+					var interpSynthAtParam = interpSynths[param];
+					var normSynthAtParam = normSynths[param];
+
+					//Copy the \default key (but keep it in the dict! it will be useful when returning to a non-mix state!)
+					interpBusAtParam[currentDefaultAtParam] = interpBusAtParam[\default];
+					interpSynthAtParam[currentDefaultAtParam] = interpSynthAtParam[\default];
+					normSynthAtParam[currentDefaultAtParam] = normSynthAtParam[\default];
+				}, {
+					mix = false;
+				});
+			});
+		});
+
+		//need to re-check as mix might have changed!
+		if(mix, {
+			//Create new interpBus and normSynth for specific param and sender combination
+			AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
+				this.createMixInterpBusAndNormSynthAtParam(sender, param, senderChansMapping:senderChansMapping);
+			});
 		}, {
+			//Cleanup interpBusses / interpSynths / normSynths from previous mix, leaving \default only
+			this.cleanupMixBussesAndSynths(param);
+
 			//Connect interpSynth to the sender's synthBus
 			AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
 				this.newInterpConnectionAtParam(sender, param,
