@@ -26,6 +26,10 @@ AlgaServerOptions {
 
 Alga {
 
+	*initSynthDefs {
+		AlgaStartup.initSynthDefs;
+	}
+
 	*boot { | onBoot, server, algaServerOptions |
 
 		if(server == nil, { server = Server.default });
@@ -49,13 +53,18 @@ Alga {
 		server.options.threads = algaServerOptions.threads;
 		server.latency = algaServerOptions.latency;
 
+		//Check AlgaSynthDef folder exists...
+		if(File.existsCaseSensitive(AlgaStartup.algaSynthDefPath) == false, {
+			("Could not retrieve the AlgaSyntDef folder. Running 'Alga.initSynthDefs' now...").warn;
+			this.initSynthDefs;
+		});
+
 		//Add to SynthDescLib in order for .add to work... Find a leaner solution.
 		SynthDescLib.global.addServer(server);
 
 		//Boot
 		server.waitForBoot({
 			server.initTree;
-			AlgaStartup.initSynthDefs(server);
 			onBoot.value;
 		});
 	}

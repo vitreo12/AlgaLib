@@ -2,7 +2,37 @@ AlgaStartup {
 
 	classvar <>algaMaxIO = 16;
 
-	*initAlgaPlay { | server |
+	classvar <algaSynthDefPath;
+
+	*initClass {
+		algaSynthDefPath = SynthDef.synthDefDir ++ "AlgaSynthDefs";
+	}
+
+	*initSynthDefs {
+		var folderDeleted = true;
+
+		if(File.exists(algaSynthDefPath), {
+			folderDeleted = File.deleteAll(algaSynthDefPath);
+		});
+
+		if(folderDeleted, {
+			var folderCreated = File.mkdir(algaSynthDefPath);
+
+			if(folderCreated, {
+				"-> Creating all Alga SynthDefs, it may take a while...".postln;
+				this.initAlgaPlay;
+				this.initAlgaInterp;
+				this.initAlgaNorm;
+				"-> Done!".postln;
+			}, {
+				("Could not create path: " ++ algaSynthDefPath).error;
+			});
+		}, {
+			("Could not delete path: " ++ algaSynthDefPath).error;
+		});
+	}
+
+	*initAlgaPlay {
 
 		var alreadyDonePairs = IdentityDictionary.new;
 
@@ -55,7 +85,7 @@ AlgaSynthDef(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
 var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
 Out.ar(\\out.ir(0), input * AlgaEnvGate.ar)
-}).add;
+}).writeDefFile(AlgaStartup.algaSynthDefPath);
 ";
 
 						sdef.interpret;
@@ -65,7 +95,7 @@ Out.ar(\\out.ir(0), input * AlgaEnvGate.ar)
 		});
 	}
 
-	*initAlgaInterp { | server |
+	*initAlgaInterp {
 
 		var alreadyDonePairs = IdentityDictionary.new;
 
@@ -134,7 +164,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//kr -> kr
 							result_control_control = "
@@ -149,7 +179,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//ar -> kr
 							result_audio_control = "
@@ -164,7 +194,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//kr -> ar
 							result_control_audio = "
@@ -179,7 +209,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 						}, {
 							var out;
@@ -199,7 +229,7 @@ outs[i] = " ++ out ++ ";
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//kr -> kr
 							result_control_control = "
@@ -215,7 +245,7 @@ outs[i] = " ++ out ++ ";
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//ar -> kr
 							result_audio_control = "
@@ -231,7 +261,7 @@ outs[i] = " ++ out ++ ";
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//kr -> ar
 							result_control_audio = "
@@ -247,7 +277,7 @@ outs[i] = " ++ out ++ ";
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 						});
 
@@ -270,7 +300,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//kr -> kr
 							result_control_control = "
@@ -285,7 +315,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//ar -> kr
 							result_audio_control = "
@@ -300,7 +330,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//kr -> ar
 							result_control_audio = "
@@ -315,7 +345,7 @@ outs[i] = out;
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 						}, {
 
@@ -339,7 +369,7 @@ outs[i] = " ++ out ++ ";
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//kr -> kr
 							result_control_control = "
@@ -355,7 +385,7 @@ outs[i] = " ++ out ++ ";
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//ar -> kr
 							result_audio_control = "
@@ -371,7 +401,7 @@ outs[i] = " ++ out ++ ";
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 							//kr -> ar
 							result_control_audio = "
@@ -387,7 +417,7 @@ outs[i] = " ++ out ++ ";
 });
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).add;";
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 						});
 
@@ -423,7 +453,7 @@ outs;
 		//file.close;
 	}
 
-	*initAlgaNorm { | server |
+	*initAlgaNorm {
 		algaMaxIO.do({ | i |
 
 			var result_audio, result_control;
@@ -439,7 +469,7 @@ var val = args[0];
 var env = args[1];
 var out = Sanitize.ar(val / env);
 out;
-}).add;";
+}).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 				result_control = "AlgaSynthDef(\\algaNorm_control1, {
 var args = \\args.kr([0, 0]);
@@ -447,7 +477,7 @@ var val = args[0];
 var env = args[1];
 var out = Sanitize.kr(val / env);
 out;
-}).add;";
+}).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 			}, {
 
@@ -465,7 +495,7 @@ var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
 var out = Sanitize.ar(val / env);
 out;
-}).add;";
+}).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 				result_control = "AlgaSynthDef(\\algaNorm_control" ++ i.asString ++ ", {
 var args = \\args.kr(" ++ arrayOfZeros ++ ");
@@ -473,7 +503,7 @@ var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
 var out = Sanitize.kr(val / env);
 out;
-}).add;";
+}).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 			});
 
@@ -486,11 +516,4 @@ out;
 
 		});
 	}
-
-	*initSynthDefs { | server |
-		this.initAlgaPlay(server);
-		this.initAlgaInterp(server);
-		this.initAlgaNorm(server);
-	}
-
 }
