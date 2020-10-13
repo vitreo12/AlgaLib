@@ -1226,6 +1226,27 @@ AlgaNode {
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
 		if(mix, {
+			var currentDefaultAtParam = currentDefaults[param];
+
+			//trying to <<+ instead of << on first connection
+			if((currentDefaultAtParam == nil), {
+				mix = false;
+			});
+
+			//can't add to a num. just replace it
+			if(currentDefaultAtParam.isNumberOrArray, {
+				("Trying to add to a non-AlgaNode: " ++ currentDefaultAtParam.asString ++ ". Replacing it.").warn;
+				mix = false;
+			});
+
+			//can't <<+ with numbers or arrays... how to track them?
+			if((sender == nil).or(sender.isNumberOrArray), {
+				("Mixing only works for explicit AlgaNodes.").error;
+				^this;
+			});
+		});
+
+		if(mix, {
 			//Create new interpBus and normSynth for specific param and sender combination...
 			//this has to happen before this.instantiated
 			this.createMixInterpBusAndNormSynthAtParam(sender, param, senderChansMapping:senderChansMapping);
@@ -1401,7 +1422,7 @@ AlgaNode {
 	}
 
 	//Remove individual connection when mixers
-	disconnect { | param = \in, sender |
+	disconnect { | param = \in, previousSender |
 
 	}
 
