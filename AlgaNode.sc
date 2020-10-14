@@ -1260,7 +1260,7 @@ AlgaNode {
 	}
 
 	//implements receiver <<.param sender
-	makeConnection { | sender, param = \in, replace = false, mix = false, senderChansMapping |
+	makeConnection { | sender, param = \in, replace = false, mix = false senderChansMapping |
 		var currentDefaultAtParam;
 
 		//Can't connect AlgaNode to itself
@@ -1404,10 +1404,17 @@ AlgaNode {
 		this.mixTo(receiver: receiver, param: param);
 	}
 
-    //Replace a mix entry ???
-    <<! { | sender, previousSender, param = \in |
-
-    }
+	//Replace a mix entry at param... Practically just freeing the old one and triggering the new one.
+	//This will be useful in the future if wanting to implement some kind of system to retrieve individual
+	//mix entries (like, \in1, \in2). No need it for now
+	replaceMix { | param = \in, previousSender, newSender, inChans |
+		AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
+			server.makeBundle(nil, {
+				this.disconnectInner(param, previousSender, true);
+				this.mixFrom(newSender, param, inChans);
+			});
+		});
+	}
 
 	//resets to the default value in controlNames
 	//OR, if provided, to the value of the original args that were used to create the node
@@ -1494,36 +1501,46 @@ AlgaNode {
         })
 	}
 
-	//Remove individual connection at mix params
-	disconnect { | param = \in, previousSender |
-		AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
-			var interpSynthsAtParam;
+	//Remove individual mix entries at param (called from replaceMix too)
+	disconnectInner { | param = \in, previousSender, replaceMix = false |
+		if(replaceMix == false, {
+			AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
+				var interpSynthsAtParam;
 
-			server.makeBundle(nil, {
-				this.freeInterpSynthAtParam(previousSender, param, true);
-			});
+				server.makeBundle(nil, {
+					this.freeInterpSynthAtParam(previousSender, param, true);
+				});
 
-			interpSynthsAtParam = interpSynths[param];
+				interpSynthsAtParam = interpSynths[param];
 
-			//If length is now 2, it means it's just one mixer AND the \default node left in the dicts.
-			//Assign the node to \default and remove the previous mixer
-			if(interpSynthsAtParam.size == 2, {
-				interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam |
-					if(interpSender != \default, {
-						var normSynthsAtParam = normSynths[param];
-						var interpBussesAtParam = interpBusses[param];
+				//If length is now 2, it means it's just one mixer AND the \default node left in the dicts.
+				//Assign the node to \default and remove the previous mixer
+				if(interpSynthsAtParam.size == 2, {
+					interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam |
+						if(interpSender != \default, {
+							var normSynthsAtParam = normSynths[param];
+							var interpBussesAtParam = interpBusses[param];
 
-						interpSynthsAtParam[\default] = interpSynthAtParam;
-						interpBussesAtParam[\default] = interpBussesAtParam[interpSender];
-						normSynthsAtParam[\default]   = normSynthsAtParam[interpSender];
+							interpSynthsAtParam[\default] = interpSynthAtParam;
+							interpBussesAtParam[\default] = interpBussesAtParam[interpSender];
+							normSynthsAtParam[\default]   = normSynthsAtParam[interpSender];
 
-						interpSynthsAtParam.removeAt(interpSender);
-						interpBussesAtParam.removeAt(interpSender);
-						normSynthsAtParam.removeAt(interpSender);
+							interpSynthsAtParam.removeAt(interpSender);
+							interpBussesAtParam.removeAt(interpSender);
+							normSynthsAtParam.removeAt(interpSender);
+						});
 					});
 				});
 			});
+		}, {
+			//Just free if replaceMix == true
+			this.freeInterpSynthAtParam(previousSender, param, true);
 		});
+	}
+
+	//Remove individual mix entries at param
+	disconnect { | param = \in, previousSender |
+		this.disconnectInner(param, previousSender);
 	}
 
 	//Execute <| on all outNodes' parameters that are connected to this
