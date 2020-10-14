@@ -763,26 +763,21 @@ AlgaNode {
 				paramNumChannels
 			).asSymbol;
 
-			//Makes sure all the synths are sent together (so that temporary fade in is sample accurate!)
-			//This has been tested: it works! it collects all AlgaSynth in createInterpSynthAtParam too!
-			server.makeBundle(nil, { //nil sends it right away
+			//interpBus has always one more channel for the envelope
+			interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
 
-				//interpBus has always one more channel for the envelope
-				interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+			normSynth = AlgaSynth.new(
+				normSymbol,
+				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
+				normGroup
+			);
 
-				normSynth = AlgaSynth.new(
-					normSymbol,
-					[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-					normGroup
-				);
+			interpBusses[param][sender] = interpBus;
+			normSynths[param][sender] = normSynth;
 
-				interpBusses[param][sender] = interpBus;
-				normSynths[param][sender] = normSynth;
-
-				this.createInterpSynthAtParam(sender, param,
-					mix:true, fadeIn:true, senderChansMapping:senderChansMapping
-				);
-			});
+			this.createInterpSynthAtParam(sender, param,
+				mix:true, fadeIn:true, senderChansMapping:senderChansMapping
+			);
 		}, {
 			("The AlgaNode is already mixed at param " ++ param).warn;
 		});
@@ -928,6 +923,7 @@ AlgaNode {
 				});
 			});
 
+			/*
 			AlgaSynth.new(
 				fadeInSymbol,
 				[
@@ -936,6 +932,7 @@ AlgaNode {
 				],
 				interpGroup
 			);
+			*/
 
 			interpSynth = AlgaSynth.new(
 				interpSymbol,
@@ -1056,14 +1053,16 @@ AlgaNode {
 		if((sender == nil).or(mix == false), {
 			//If interpSynthsAtParam length is more than one, it was a mix entry. Fade it out.
 			if(interpSynthsAtParam.size > 1, {
+				"yeah".postln;
 				//Bundle both the creation of alga synth and set of parameter!
 				server.makeBundle(nil, {
 					interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam  |
 						if(interpSender != \default, {
-							var normSynth = normSynths[param][interpSender];
-							var interpBus = interpBusses[param][interpSender];
 
-							if(interpBus != nil, {
+							if(interpSender != currentDefaults[param], {
+								var normSynth = normSynths[param][interpSender];
+								var interpBus = interpBusses[param][interpSender];
+
 								var fadeOutSymbol = ("alga_fadeOut_" ++
 									interpBus.rate ++
 									(interpBus.numChannels - 1)
@@ -1077,18 +1076,16 @@ AlgaNode {
 									],
 									interpGroup
 								);
+
+								normSynth.set(\gate, 0, \fadeTime, paramConnectionTime);
 							});
 
 							interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
-							normSynth.set(\gate, 0, \fadeTime, paramConnectionTime);
 
 							//Cleanup the dicts too
-							if(sender == nil, {
-								interpSynthsAtParam.removeAt(interpSender);
-								interpBusses[param].removeAt(interpSender);
-								normSynths[param].removeAt(interpSender);
-							});
-
+							interpSynthsAtParam.removeAt(interpSender);
+							interpBusses[param].removeAt(interpSender);
+							normSynths[param].removeAt(interpSender);
 						});
 					});
 				});
@@ -1322,17 +1319,21 @@ AlgaNode {
 		if(mix, {
 			//Create new interpBus and normSynth for specific param and sender combination
 			AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
-				this.createMixInterpBusAndNormSynthAtParam(sender, param, senderChansMapping:senderChansMapping);
+				server.makeBundle(nil, {
+					this.createMixInterpBusAndNormSynthAtParam(sender, param, senderChansMapping:senderChansMapping);
+				});
 			});
 		}, {
-			//Cleanup interpBusses / interpSynths / normSynths from previous mix, leaving \default only
-			this.cleanupMixBussesAndSynths(param);
-
 			//Connect interpSynth to the sender's synthBus
 			AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
-				this.newInterpConnectionAtParam(sender, param,
-					replace:replace, mix:mix, senderChansMapping:senderChansMapping
-				);
+				server.makeBundle(nil, {
+					this.newInterpConnectionAtParam(sender, param,
+						replace:replace, mix:mix, senderChansMapping:senderChansMapping
+					);
+				});
+
+				//Cleanup interpBusses / interpSynths / normSynths from previous mix, leaving \default only
+				this.cleanupMixBussesAndSynths(param);
 			});
 		});
 	}
@@ -1426,14 +1427,18 @@ AlgaNode {
 		if(previousSender != nil, {
 			if(previousSender.isAlgaNode, {
 				AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
-					this.removeInterpConnectionAtParam(previousSender, param);
+					server.makeBundle(nil, {
+						this.removeInterpConnectionAtParam(previousSender, param);
+					});
 				});
 			}, {
 				("Trying to remove a connection to an invalid AlgaNode: " ++ previousSender).error;
 			})
 		}, {
 			AlgaSpinRoutine.waitFor( { this.instantiated }, {
-				this.removeInterpConnectionAtParam(nil, param);
+				server.makeBundle(nil, {
+					this.removeInterpConnectionAtParam(nil, param);
+				});
 			});
 		})
 	}

@@ -474,9 +474,9 @@ out;
 
 				result_control = "AlgaSynthDef(\\alga_norm_control1, {
 var args = \\args.kr([0, 0]);
-var val = args[0].poll;
-var env = args[1].poll;
-var out = Sanitize.kr(val / env).poll;
+var val = args[0];
+var env = args[1];
+var out = Sanitize.kr(val / env);
 out;
 }).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
