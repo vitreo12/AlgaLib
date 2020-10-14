@@ -523,6 +523,7 @@ AlgaNode {
 				interpBusses[paramName] = IdentityDictionary();
 				normSynths[paramName] = IdentityDictionary();
 				interpSynths[paramName] = IdentityDictionary();
+				paramChansMapping[paramName] = IdentityDictionary();
 			});
 		});
 	}
@@ -626,7 +627,7 @@ AlgaNode {
 						//Use previous entry for the channel mapping, otherwise, nil.
 						//nil will generate Array.series(...) in calculateSenderChansMappingArray
 						if(keepChannelsMapping, {
-							oldParamChansMapping = paramChansMapping[paramName];
+							oldParamChansMapping = paramChansMapping[paramName][prevSender];
 						});
 
 						//Sets can't be indexed, need to loop over even if it's just one entry
@@ -715,7 +716,7 @@ AlgaNode {
 
 		//Update entry in Dict with the non-modified one (used in .replace then)
 		if(updateParamChansMapping, {
-			paramChansMapping[param] = actualSenderChansMapping;
+			paramChansMapping[param][sender] = actualSenderChansMapping;
 		});
 
 		//Standard case (perhaps, overkill. This is default of the \indices param anyway)
@@ -863,7 +864,7 @@ AlgaNode {
 
 		senderChansMappingToUse = this.calculateSenderChansMappingArray(
 			param,
-			sender,
+			sender, //must be sender! not senderSym!
 			senderChansMapping,
 			senderNumChannels,
 			paramNumChannels,
@@ -1454,7 +1455,7 @@ AlgaNode {
 				var oldParamChansMapping = nil;
 
 				//Restore old channels mapping! It can either be a symbol, number or array here
-				if(keepChannelsMapping, { oldParamChansMapping = receiver.paramChansMapping[param]; });
+				if(keepChannelsMapping, { oldParamChansMapping = receiver.paramChansMapping[param][this]; });
 
 				//If it was a mixer connection, use mix:true
 				if(receiver.interpSynths[param][this] != nil, {
