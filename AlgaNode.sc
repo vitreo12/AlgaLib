@@ -1543,18 +1543,24 @@ AlgaNode {
 		this.disconnectInner(param, previousSender);
 	}
 
-	//Execute <| on all outNodes' parameters that are connected to this
+	//When clear, run disconnections to nodes connected to this
 	removeConnectionFromReceivers {
 		outNodes.keysValuesDo({ | receiver, paramsSet |
 			paramsSet.do({ | param |
-				receiver.perform('<|', param);
+				//If mixer param, just disconnect the entry connected to this
+				if(receiver.interpSynths[param][this] != nil, {
+					receiver.disconnect(param, this);
+				}, {
+					//no mixer param, just run the disconnect to restore defaults
+					receiver.perform('<|', param);
+				});
 			});
 		});
 	}
 
 	//Clears it all... It should do some sort of fading
 	clear {
-		//If synth had connections, run <| on the receivers (so it resets to defaults)
+		//If synth had connections, run <| (or disconnect, if mixer) on the receivers
 		this.removeConnectionFromReceivers;
 
 		//This could be overwritten if .replace is called
