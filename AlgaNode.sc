@@ -776,7 +776,7 @@ AlgaNode {
 			normSynths[param][sender] = normSynth;
 
 			this.createInterpSynthAtParam(sender, param,
-				mix:true, fadeIn:true, senderChansMapping:senderChansMapping
+				mix:true, senderChansMapping:senderChansMapping
 			);
 		}, {
 			("The AlgaNode is already mixed at param " ++ param).warn;
@@ -784,7 +784,7 @@ AlgaNode {
 	}
 
 	//Used at every << / >> / <|
-	createInterpSynthAtParam { | sender, param = \in, mix = false, fadeIn = false, senderChansMapping |
+	createInterpSynthAtParam { | sender, param = \in, mix = false, senderChansMapping |
 		var controlName, paramConnectionTime;
 		var paramNumChannels, paramRate;
 		var senderNumChannels, senderRate;
@@ -870,24 +870,21 @@ AlgaNode {
 		//THIS USES connectionTime!!
         //THIS, together with freeInterpSynthAtParam, IS THE WHOLE CORE OF THE INTERPOLATION BEHAVIOUR!!!
 		if(sender.isAlgaNode, {
-			//Temporary fade in / fade out synths (val = 0)
+			//Temporarily fade in synths
 			if(mix == true, {
-				//Happens on a new <<+ / >>+ connection
-				if(fadeIn, {
-					var fadeInSymbol = ("alga_fadeIn_" ++
-						paramRate ++
-						paramNumChannels
-					).asSymbol;
+				var fadeInSymbol = ("alga_fadeIn_" ++
+					paramRate ++
+					paramNumChannels
+				).asSymbol;
 
-					AlgaSynth.new(
-						fadeInSymbol,
-						[
-							\out, interpBus.index,
-							\fadeTime, paramConnectionTime,
-						],
-						interpGroup
-					);
-				});
+				AlgaSynth.new(
+					fadeInSymbol,
+					[
+						\out, interpBus.index,
+						\fadeTime, paramConnectionTime,
+					],
+					interpGroup
+				);
 			});
 
 			//Read \in from the sender's synthBus
@@ -905,11 +902,6 @@ AlgaNode {
 			//Used in <| AND << with number / array
 			//if sender is nil, restore the original default value. This is used in <|
 			var paramVal;
-
-			var fadeInSymbol = ("alga_fadeIn_" ++
-				paramRate ++
-				paramNumChannels
-			).asSymbol;
 
 			if(sender == nil, {
 				paramVal = controlName.defaultValue;
@@ -1036,6 +1028,43 @@ AlgaNode {
 		this.freeAllSynths(useConnectionTime, now);
 	}
 
+	//Free a mix node at specific param
+	freeMixNodeAtParam { | sender, param = \in, paramConnectionTime, cleanupDicts = false |
+		var interpSynthAtParam = interpSynths[param][sender];
+		if(interpSynthAtParam != nil, {
+			//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
+			//\default will then be re-used when disconnecting all mixing parameters!
+			if(sender != currentDefaults[param], {
+				var normSynthAtParam = normSynths[param][sender];
+				var interpBusAtParam = interpBusses[param][sender];
+
+				var fadeOutSymbol = ("alga_fadeOut_" ++
+					interpBusAtParam.rate ++
+					(interpBusAtParam.numChannels - 1) //it has one more for env. need to remove that from symbol
+				).asSymbol;
+
+				AlgaSynth.new(
+					fadeOutSymbol,
+					[
+						\out, interpBusAtParam.index,
+						\fadeTime, paramConnectionTime,
+					],
+					interpGroup
+				);
+
+				normSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+			});
+
+			interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+		});
+
+		if(cleanupDicts, {
+			interpSynths[param].removeAt(sender);
+			interpBusses[param].removeAt(sender);
+			normSynths[param].removeAt(sender);
+		});
+	}
+
 	//This is only used in connection situations
 	//THIS USES connectionTime!!
     //THIS, TOGETHER WITH createInterpSynthAtParam, IS THE WHOLE CORE OF THE INTERPOLATION BEHAVIOUR!!!
@@ -1051,61 +1080,22 @@ AlgaNode {
 		//mix == false comes from <<
 		//mix == true comes from <<+
 		if((sender == nil).or(mix == false), {
-			//If interpSynthsAtParam length is more than one, it was a mix entry. Fade it out.
+			//If interpSynthsAtParam length is more than one, the param has mix entries. Fade them all out.
 			if(interpSynthsAtParam.size > 1, {
-				"yeah".postln;
-				//Bundle both the creation of alga synth and set of parameter!
-				server.makeBundle(nil, {
-					interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam  |
-						if(interpSender != \default, {
-
-							if(interpSender != currentDefaults[param], {
-								var normSynth = normSynths[param][interpSender];
-								var interpBus = interpBusses[param][interpSender];
-
-								var fadeOutSymbol = ("alga_fadeOut_" ++
-									interpBus.rate ++
-									(interpBus.numChannels - 1)
-								).asSymbol;
-
-								AlgaSynth.new(
-									fadeOutSymbol,
-									[
-										\out, interpBus.index,
-										\fadeTime, paramConnectionTime,
-									],
-									interpGroup
-								);
-
-								normSynth.set(\gate, 0, \fadeTime, paramConnectionTime);
-							});
-
-							interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
-
-							//Cleanup the dicts too
-							interpSynthsAtParam.removeAt(interpSender);
-							interpBusses[param].removeAt(interpSender);
-							normSynths[param].removeAt(interpSender);
-						});
+				interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam  |
+					if(interpSender != \default, { // ignore \default !
+						this.freeMixNodeAtParam(interpSender, param, paramConnectionTime, true);
 					});
 				});
 			}, {
-				//Just one entry in the dict, free it. (can index first - and only - entry of a dict?)
+				//Just one entry in the dict (\default), just free the interp synth!
 				interpSynthsAtParam.do({ | interpSynthAtParam |
 					interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
 				});
 			});
 		}, {
 			//mix == true, only free the one (disconnect function)
-
-			var interpSynthAtParam = interpSynthsAtParam[sender];
-
-			if((interpSynthAtParam.isNil), {
-				("Invalid param for interp synth to free: " ++ param).error;
-				^this
-			});
-
-			interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+			this.freeMixNodeAtParam(sender, param, paramConnectionTime, true);
 		});
 	}
 
@@ -1504,7 +1494,7 @@ AlgaNode {
         })
 	}
 
-	//Remove individual connection when mixers
+	//Remove individual connection when mix param
 	disconnect { | param = \in, previousSender |
 
 	}
