@@ -154,7 +154,7 @@ Out.ar(\\out.ir(0), input * AlgaEnvGate.ar)
 						if(i == 1, {
 							//ar -> ar
 							result_audio_audio = "
-AlgaSynthDef(\\algaInterp_audio" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
 var in = \\in.ar(0);
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -169,7 +169,7 @@ outs;
 
 							//kr -> kr
 							result_control_control = "
-AlgaSynthDef(\\algaInterp_control" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
 var in = \\in.kr(0);
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -184,7 +184,7 @@ outs;
 
 							//ar -> kr
 							result_audio_control = "
-AlgaSynthDef(\\algaInterp_audio" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
 var in = A2K.kr(\\in.ar(0));
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -199,7 +199,7 @@ outs;
 
 							//kr -> ar
 							result_control_audio = "
-AlgaSynthDef(\\algaInterp_control" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
 var in = K2A.ar(\\in.kr(0));
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -218,7 +218,7 @@ outs;
 
 							//ar -> ar
 							result_audio_audio = "
-AlgaSynthDef(\\algaInterp_audio" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
 var in = \\in.ar(" ++ arrayOfZeros_in ++ ");
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: curve);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
@@ -234,7 +234,7 @@ outs;
 
 							//kr -> kr
 							result_control_control = "
-AlgaSynthDef(\\algaInterp_control" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
 var in = \\in.kr(" ++ arrayOfZeros_in ++ ");
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: curve);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
@@ -250,7 +250,7 @@ outs;
 
 							//ar -> kr
 							result_audio_control = "
-AlgaSynthDef(\\algaInterp_audio" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
 var in = A2K.kr(\\in.ar(" ++ arrayOfZeros_in ++ "));
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: curve);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
@@ -266,7 +266,7 @@ outs;
 
 							//kr -> ar
 							result_control_audio = "
-AlgaSynthDef(\\algaInterp_control" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
 var in = K2A.ar(\\in.kr(" ++ arrayOfZeros_in ++ "));
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: curve);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
@@ -290,7 +290,7 @@ outs;
 
 							//ar -> ar
 							result_audio_audio = "
-AlgaSynthDef(\\algaInterp_audio" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
 var in = \\in.ar(0);
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -305,7 +305,7 @@ outs;
 
 							//kr -> kr
 							result_control_control = "
-AlgaSynthDef(\\algaInterp_control" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
 var in = \\in.kr(0);
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -320,7 +320,7 @@ outs;
 
 							//ar -> kr
 							result_audio_control = "
-AlgaSynthDef(\\algaInterp_audio" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
 var in = A2K.kr(\\in.ar(0));
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -335,7 +335,7 @@ outs;
 
 							//kr -> ar
 							result_control_audio = "
-AlgaSynthDef(\\algaInterp_control" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
 var in = K2A.ar(\\in.kr(0));
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -358,7 +358,7 @@ outs;
 
 							//ar -> ar
 							result_audio_audio = "
-AlgaSynthDef(\\algaInterp_audio" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
 var in = \\in.ar(" ++ arrayOfZeros_in ++ ");
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -374,7 +374,7 @@ outs;
 
 							//kr -> kr
 							result_control_control = "
-AlgaSynthDef(\\algaInterp_control" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
 var in = \\in.kr(" ++ arrayOfZeros_in ++ ");
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -390,7 +390,7 @@ outs;
 
 							//ar -> kr
 							result_audio_control = "
-AlgaSynthDef(\\algaInterp_audio" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | curve = \\lin |
 var in = A2K.kr(\\in.ar(" ++ arrayOfZeros_in ++ "));
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -406,7 +406,7 @@ outs;
 
 							//kr -> ar
 							result_control_audio = "
-AlgaSynthDef(\\algaInterp_control" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | curve = \\sin |
 var in = K2A.ar(\\in.kr(" ++ arrayOfZeros_in ++ "));
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: curve);
 var out = in * env;
@@ -464,7 +464,7 @@ outs;
 
 			if(i == 1, {
 
-				result_audio = "AlgaSynthDef(\\algaNorm_audio1, {
+				result_audio = "AlgaSynthDef(\\alga_norm_audio1, {
 var args = \\args.ar([0, 0]);
 var val = args[0];
 var env = args[1];
@@ -472,11 +472,13 @@ var out = Sanitize.ar(val / env);
 out;
 }).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
-				result_control = "AlgaSynthDef(\\algaNorm_control1, {
-var args = \\args.kr([0, 0]);
-var val = args[0];
-var env = args[1];
-var out = Sanitize.kr(val / env);
+				result_control = "AlgaSynthDef(\\alga_norm_control1, {
+var args, val, env, mixScaling, out;
+args = \\args.kr([0, 0]);
+val = args[0].poll;
+env = args[1].poll;
+mixScaling = \\mixCounter.kr(0).poll;
+out = Sanitize.kr(val / (env / mixScaling)).poll;
 out;
 }).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
@@ -490,7 +492,7 @@ out;
 				//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
 				arrayOfZeros = arrayOfZeros[0..(arrayOfZeros.size - 2)] ++ "]";
 
-				result_audio = "AlgaSynthDef(\\algaNorm_audio" ++ i.asString ++ ", {
+				result_audio = "AlgaSynthDef(\\alga_norm_audio" ++ i.asString ++ ", {
 var args = \\args.ar(" ++ arrayOfZeros ++ ");
 var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
@@ -498,7 +500,7 @@ var out = Sanitize.ar(val / env);
 out;
 }).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
-				result_control = "AlgaSynthDef(\\algaNorm_control" ++ i.asString ++ ", {
+				result_control = "AlgaSynthDef(\\alga_norm_control" ++ i.asString ++ ", {
 var args = \\args.kr(" ++ arrayOfZeros ++ ");
 var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
@@ -519,44 +521,52 @@ out;
 	}
 
 	*initAlgaMixFades {
-		var arrayOfZeros_in;
-
 		algaMaxIO.do({ | i |
-			var result_kr, result_ar;
+			var fadein_kr, fadein_ar;
+			var fadeout_kr, fadeout_ar;
 
 			i = i + 1;
 
-			arrayOfZeros_in = "[";
-
-			//[0, 0, 0...
-			//one more for env out
-			(i + 1).do({ | num |
-				arrayOfZeros_in = arrayOfZeros_in ++ "0,";
-			});
-
-			//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
-			arrayOfZeros_in = arrayOfZeros_in[0..(arrayOfZeros_in.size - 2)] ++ "]";
-
-			result_kr = "SynthDef(\\algaFadeIn_control" ++ i.asString ++ ", { | curve = \\lin |
+			fadein_kr = "AlgaSynthDef(\\alga_fadeIn_control" ++ i.asString ++ ", { | curve = \\lin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = 0;
 });
 val[" ++ i ++ "] = EnvGen.kr(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
-Out.kr(\\out.ir(" ++ arrayOfZeros_in ++ "), val);
-}).writeDefFile(AlgaStartup.algaSynthDefPath);";
+val;
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
-			result_ar = "SynthDef(\\algaFadeIn_audio" ++ i.asString ++ ", { | curve = \\sin |
+			fadein_ar = "AlgaSynthDef(\\alga_fadeIn_audio" ++ i.asString ++ ", { | curve = \\sin |
+var val = Array.newClear(" ++ (i + 1) ++ ");
+" ++ i ++ ".do({ | i |
+val[i] = DC.ar(0);
+});
+val[" ++ i ++ "] = EnvGen.ar(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
+val;
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
+
+			fadeout_kr = "AlgaSynthDef(\\alga_fadeOut_control" ++ i.asString ++ ", { | curve = \\lin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = 0;
 });
-val[" ++ i ++ "] = EnvGen.ar(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
-Out.ar(\\out.ir(" ++ arrayOfZeros_in ++ "), val);
-}).writeDefFile(AlgaStartup.algaSynthDefPath);";
+val[" ++ i ++ "] = EnvGen.kr(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
+val;
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
-			result_kr.interpret;
-			result_ar.interpret;
+			fadeout_ar = "AlgaSynthDef(\\alga_fadeOut_audio" ++ i.asString ++ ", { | curve = \\sin |
+var val = Array.newClear(" ++ (i + 1) ++ ");
+" ++ i ++ ".do({ | i |
+val[i] = DC.ar(0);
+});
+val[" ++ i ++ "] = EnvGen.ar(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
+val;
+}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefPath);";
+
+			fadein_kr.interpret;
+			fadein_ar.interpret;
+			fadeout_kr.interpret;
+			fadeout_ar.interpret;
 		});
 	}
 }

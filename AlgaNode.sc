@@ -37,7 +37,7 @@ AlgaNode {
 	var <outs;
 
 	var <group, <playGroup, <synthGroup, <normGroup, <interpGroup;
-	var <playSynth, <synth, <normSynths, <interpSynths;
+	var <playSynth, <synth, <normSynths, <interpSynths, <mixCounterBusses, <mixCounterSynths;
 	var <synthBus, <normBusses, <interpBusses;
 
 	var <inNodes, <outNodes;
@@ -94,6 +94,9 @@ AlgaNode {
 		outNodes = IdentityDictionary(10);
 
 		currentDefaults = IdentityDictionary(10);
+
+		mixCounterBusses = IdentityDictionary(10);
+		mixCounterSynths = IdentityDictionary(10);
 
 		//Chans mapping from inNodes... How to support <<+ / >>+ ???
 		//IdentityDictionary of IdentityDictionaries:
@@ -313,8 +316,7 @@ AlgaNode {
 			var paramNumChannels = controlName.numChannels;
 
 			//interpBusses have 1 more channel for the envelope shape
-			//interpBusses[paramName] = AlgaBus(server, paramNumChannels + 1, paramRate);
-			interpBusses[paramName][\default] = AlgaBus(server, paramNumChannels + 1, paramRate);
+			interpBusses[paramName] = AlgaBus(server, paramNumChannels + 1, paramRate);
 			normBusses[paramName] = AlgaBus(server, paramNumChannels, paramRate);
 		});
 	}
@@ -519,10 +521,9 @@ AlgaNode {
 					paramsConnectionTime[paramName] = connectionTime;
 				});
 
-				//Create IdentityDictionaries for each interpNode
-				interpBusses[paramName] = IdentityDictionary();
-				normSynths[paramName] = IdentityDictionary();
+				//Create IdentityDictionaries for each dict
 				interpSynths[paramName] = IdentityDictionary();
+				mixCounterSynths[paramName] = IdentityDictionary();
 			});
 		});
 	}
@@ -581,16 +582,16 @@ AlgaNode {
 	createInterpNormSynths { | replace = false, keepChannelsMapping = false |
 		controlNames.do({ | controlName |
 			var interpSymbol, normSymbol;
-			var interpBus, normBus, interpSynth, normSynth;
+			var interpBus, normBus, interpSynth, normSynth, mixCounterBus, mixCounterSynth;
 
 			var paramName = controlName.name;
 			var paramNumChannels = controlName.numChannels;
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
 
-			//e.g. \algaInterp_audio1_control1
+			//e.g. \alga_interp_audio1_control1
 			interpSymbol = (
-				"algaInterp_" ++
+				"alga_interp_" ++
 				paramRate ++
 				paramNumChannels ++
 				"_" ++
@@ -598,15 +599,17 @@ AlgaNode {
 				paramNumChannels
 			).asSymbol;
 
-			//e.g. \algaNorm_audio1
+			//e.g. \alga_norm_audio1
 			normSymbol = (
-				"algaNorm_" ++
+				"alga_norm_" ++
 				paramRate ++
 				paramNumChannels
 			).asSymbol;
 
-			interpBus = interpBusses[paramName][\default];
+			interpBus = interpBusses[paramName];
 			normBus = normBusses[paramName];
+
+			mixCounterBus = AlgaBus(server, 1, \control);
 
             //If replace, connect to the pervious bus, not default
             //This wouldn't work with mixing for now...
@@ -634,7 +637,7 @@ AlgaNode {
 
 						//overwrite interp symbol considering the senders' num channels!
 						interpSymbol = (
-							"algaInterp_" ++
+							"alga_interp_" ++
 							prevSender.rate ++
 							prevSender.numChannels ++
 							"_" ++
@@ -682,17 +685,36 @@ AlgaNode {
                 );
             });
 
+			mixCounterSynth = AlgaSynth(
+				\mixCounter,
+				[
+					\out, mixCounterBus.index,
+					\fadeTime, 0
+				],
+				normGroup
+			);
+
 			//Instantiated right away, with no \fadeTime, as it will directly be connected to
 			//synth's parameter (synth is already reading from all the normBusses)
 			normSynth = AlgaSynth.new(
 				normSymbol,
-				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-				normGroup
+				[
+					\args, interpBus.busArg,
+					\out, normBus.index,
+					\mixCounter, mixCounterBus.busArg,
+					\fadeTime, 0
+				],
+				normGroup,
+				\addToTail
 			);
 
-			//interpSynths and normSynths are a IdentityDict of IdentityDicts
+			//One per param
+			normSynths[paramName] = normSynth;
+			mixCounterBusses[paramName] = mixCounterBus;
+
+			//interpSynths are a IdentityDict of IdentityDicts
 			interpSynths[paramName][\default] = interpSynth;
-			normSynths[paramName][\default] = normSynth;
+			mixCounterSynths[paramName][\default] = mixCounterSynth;
 
 			//Connect synth's parameter to the normBus
 			synth.set(paramName, normBus.busArg);
@@ -742,42 +764,21 @@ AlgaNode {
 	}
 
 	createMixInterpBusAndNormSynthAtParam { | sender, param = \in, senderChansMapping |
-		var controlName;
-		var paramNumChannels, paramRate;
-		var normSymbol, normBus;
-		var interpBus, normSynth;
+		var interpSynthAtParam = interpSynths[param][sender];
+		var interpBus = interpBusses[param];
 
-		controlName = controlNames[param];
-		normBus = normBusses[param];
-
-		if((controlName.isNil).or(normBus.isNil), {
-			("Invalid param for interp synth to free: " ++ param).error;
-			^this
+		//Only run if entry was nil, otherwise it means it was already connected!
+		if(interpSynthAtParam == nil, {
+			//Makes sure all the synths are sent together (so that temporary fade in is sample accurate!)
+			//This has been tested: it works! it collects all AlgaSynth in createInterpSynthAtParam too!
+			server.makeBundle(nil, { //nil sends it right away
+				this.createInterpSynthAtParam(sender, param,
+					mix:true, senderChansMapping:senderChansMapping
+				);
+			});
+		}, {
+			("The AlgaNode is already mixed at param " ++ param).warn;
 		});
-
-		paramNumChannels = controlName.numChannels;
-		paramRate = controlName.rate;
-
-		normSymbol = (
-			"algaNorm_" ++
-			paramRate ++
-			paramNumChannels
-		).asSymbol;
-
-		//interpBus has always one more channel for the envelope
-		interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
-
-		normSynth = AlgaSynth.new(
-			normSymbol,
-			[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-			normGroup
-		);
-
-		interpBusses[param][sender] = interpBus;
-		normSynths[param][sender] = normSynth;
-
-		//this.createInterpSynthAtParam(sender, param, fictional_fadein:true);
-		this.createInterpSynthAtParam(sender, param, true, senderChansMapping:senderChansMapping);
 	}
 
 	//Used at every << / >> / <|
@@ -834,7 +835,7 @@ AlgaNode {
 		});
 
 		interpSymbol = (
-			"algaInterp_" ++
+			"alga_interp_" ++
 			senderRate ++
 			senderNumChannels ++
 			"_" ++
@@ -843,17 +844,7 @@ AlgaNode {
 		).asSymbol;
 
 		//get interp bus ident dict at specific param
-		interpBusAtParam = interpBusses[param];
-		if(interpBusAtParam == nil, { ("Invalid interp bus at param " ++ param).error; ^this });
-
-		//Try to get sender one.
-		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
-		interpBus = interpBusAtParam[senderSym];
-		if(interpBus == nil, {
-			interpBus = interpBusAtParam[\default];
-			if(interpBus == nil, { ("Invalid interp bus at param " ++ param ++ " and node " ++ senderSym.asString).error; ^this });
-			interpBusAtParam[senderSym] = interpBus;
-		});
+		interpBus = interpBusses[param];
 
 		senderChansMappingToUse = this.calculateSenderChansMappingArray(
 			param,
@@ -867,7 +858,36 @@ AlgaNode {
 		//THIS USES connectionTime!!
         //THIS, together with freeInterpSynthAtParam, IS THE WHOLE CORE OF THE INTERPOLATION BEHAVIOUR!!!
 		if(sender.isAlgaNode, {
-			//Used in << / >>
+			//Temporary fade in / fade out synths (val = 0)
+			if(mix == true, {
+				//Happens on a new <<+ / >>+ connection
+				var fadeInSymbol = ("alga_fadeIn_" ++
+					paramRate ++
+					paramNumChannels
+				).asSymbol;
+
+				var mixCounterBus = mixCounterBusses[param];
+
+				AlgaSynth.new(
+					fadeInSymbol,
+					[
+						\out, interpBus.index,
+						\fadeTime, paramConnectionTime,
+					],
+					interpGroup
+				);
+
+				//A new mix entry: Add a mixCounterSynth :)
+				mixCounterSynths[param][senderSym] = AlgaSynth(
+					\mixCounter,
+					[
+						\out, mixCounterBus.index,
+						\fadeTime, 0
+					],
+					normGroup
+				);
+			});
+
 			//Read \in from the sender's synthBus
             interpSynth = AlgaSynth.new(
                 interpSymbol,
@@ -883,8 +903,25 @@ AlgaNode {
 			//Used in <| AND << with number / array
 			//if sender is nil, restore the original default value. This is used in <|
 			var paramVal;
+			var mixCounterBus = mixCounterBusses[param];
+
+			var fadeInSymbol = ("alga_fadeIn_" ++
+				paramRate ++
+				paramNumChannels
+			).asSymbol;
+
+			//A new mix entry: Add a mixCounterSynth :)
+			mixCounterSynths[param][senderSym] = AlgaSynth(
+				\mixCounter,
+				[
+					\out, mixCounterBus.index,
+					\fadeTime, 0
+				],
+				normGroup
+			);
 
 			if(sender == nil, {
+				//<<|
 				paramVal = controlName.defaultValue;
 			}, {
                 //If not nil, check if it's a number or array. Use it if that's the case
@@ -903,6 +940,15 @@ AlgaNode {
 					\out, interpBus.index,
 					\indices, senderChansMappingToUse,
 					\fadeTime, paramConnectionTime
+				],
+				interpGroup
+			);
+
+			AlgaSynth.new(
+				fadeInSymbol,
+				[
+					\out, interpBus.index,
+					\fadeTime, paramConnectionTime,
 				],
 				interpGroup
 			);
@@ -1008,10 +1054,51 @@ AlgaNode {
 		//If -1, or invalid, set to global connectionTime
 		if((paramConnectionTime < 0).or(paramConnectionTime == nil), { paramConnectionTime = connectionTime });
 
-		//Free them all for ( <| ) and mix == false ( << )
+		//Free them all (check if there were mix entries).
+		//sender == nil comes from <|
+		//mix == false comes from <<
+		//mix == true comes from <<+
 		if((sender == nil).or(mix == false), {
-			interpSynthsAtParam.do({ | interpSynthAtParam |
-				interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+			//If interpSynthsAtParam length is more than one, it was a mix entry. Fade it out.
+			if(interpSynthsAtParam.size > 1, {
+				//Bundle both the creation of alga synth and set of parameter!
+				server.makeBundle(nil, {
+					interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam  |
+						if(interpSender != \default, {
+							var mixCounterSynth = mixCounterSynths[param][interpSender];
+
+							var interpBus = interpBusses[param];
+							var fadeOutSymbol = ("alga_fadeOut_" ++
+								interpBus.rate ++
+								(interpBus.numChannels - 1)
+							).asSymbol;
+
+							AlgaSynth.new(
+								fadeOutSymbol,
+								[
+									\out, interpBus.index,
+									\fadeTime, paramConnectionTime,
+								],
+								interpGroup
+							);
+
+							interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+							mixCounterSynth.set(\gate, 0, \fadeTime, paramConnectionTime);
+
+							//Cleanup the dicts too
+							if(sender == nil, {
+								interpSynthsAtParam.removeAt(interpSender);
+								mixCounterSynths[param].removeAt(interpSender);
+							});
+
+						});
+					});
+				});
+			}, {
+				//Just one entry in the dict, free it. (can index first - and only - entry of a dict?)
+				interpSynthsAtParam.do({ | interpSynthAtParam |
+					interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+				});
 			});
 		}, {
 			//mix == true, only free the one (disconnect function)
@@ -1219,14 +1306,12 @@ AlgaNode {
 		if(mix, {
 			if(currentDefaultAtParam.isAlgaNode, {
 				if(currentDefaultAtParam != sender, {
-					var interpBusAtParam = interpBusses[param];
 					var interpSynthAtParam = interpSynths[param];
-					var normSynthAtParam = normSynths[param];
+					var mixCounterSynthAtParam = mixCounterSynths[param];
 
 					//Copy the \default key (but keep it in the dict! it will be useful when returning to a non-mix state!)
-					interpBusAtParam[currentDefaultAtParam] = interpBusAtParam[\default];
 					interpSynthAtParam[currentDefaultAtParam] = interpSynthAtParam[\default];
-					normSynthAtParam[currentDefaultAtParam] = normSynthAtParam[\default];
+					mixCounterSynthAtParam[currentDefaultAtParam] = mixCounterSynthAtParam[\default];
 				}, {
 					mix = false;
 				});
@@ -1375,6 +1460,7 @@ AlgaNode {
 	//If this was connected to a number / array, should I restore that value too or keep the new one?
 	replace { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true, outsMapping |
         var wasPlaying = false;
+
 		//re-init groups if clear was used
 		var initGroups = if(group == nil, { true }, { false });
 
