@@ -1494,9 +1494,36 @@ AlgaNode {
         })
 	}
 
-	//Remove individual connection when mix param
+	//Remove individual connection at mix params
 	disconnect { | param = \in, previousSender |
+		AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
+			var interpSynthsAtParam;
 
+			server.makeBundle(nil, {
+				this.freeInterpSynthAtParam(previousSender, param, true);
+			});
+
+			interpSynthsAtParam = interpSynths[param];
+
+			//If length is now 2, it means it's just one mixer AND the \default node left in the dicts.
+			//Assign the node to \default and remove the previous mixer
+			if(interpSynthsAtParam.size == 2, {
+				interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam |
+					if(interpSender != \default, {
+						var normSynthsAtParam = normSynths[param];
+						var interpBussesAtParam = interpBusses[param];
+
+						interpSynthsAtParam[\default] = interpSynthAtParam;
+						interpBussesAtParam[\default] = interpBussesAtParam[interpSender];
+						normSynthsAtParam[\default]   = normSynthsAtParam[interpSender];
+
+						interpSynthsAtParam.removeAt(interpSender);
+						interpBussesAtParam.removeAt(interpSender);
+						normSynthsAtParam.removeAt(interpSender);
+					});
+				});
+			});
+		});
 	}
 
 	//Execute <| on all outNodes' parameters that are connected to this
