@@ -473,12 +473,10 @@ out;
 }).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
 				result_control = "AlgaSynthDef(\\alga_norm_control1, {
-var args, val, env, mixScaling, out;
-args = \\args.kr([0, 0]);
-val = args[0].poll;
-env = args[1].poll;
-mixScaling = \\mixCounter.kr(0).poll;
-out = Sanitize.kr(val / (env / mixScaling)).poll;
+var args = \\args.kr([0, 0]);
+var val = args[0].poll;
+var env = args[1].poll;
+var out = Sanitize.kr(val / env).poll;
 out;
 }).writeDefFile(AlgaStartup.algaSynthDefPath);";
 
