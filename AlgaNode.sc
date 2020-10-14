@@ -741,15 +741,18 @@ AlgaNode {
 		});
 	}
 
-	createMixInterpBusAndNormSynthAtParam { | sender, param = \in, senderChansMapping |
+	createMixInterpBusAndNormSynthAtParam { | sender, param = \in, replace = false, senderChansMapping |
 		var controlName;
 		var paramNumChannels, paramRate;
 		var normSymbol, normBus;
 		var interpBus, normSynth;
 		var interpBusAtParam = interpBusses[param];
 
-		//Only run if entry was nil, otherwise it means it was already connected!
-		if(interpBusAtParam[sender] == nil, {
+		//Add dicts
+		this.addInOutNodesDict(sender, param, mix:true);
+
+		//Only run if replace OR entry was nil, otherwise it means it was already connected!
+		if(replace.or(interpBusAtParam[sender] == nil), {
 
 			controlName = controlNames[param];
 			normBus = normBusses[param];
@@ -1310,7 +1313,7 @@ AlgaNode {
 			//Create new interpBus and normSynth for specific param and sender combination
 			AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
 				server.makeBundle(nil, {
-					this.createMixInterpBusAndNormSynthAtParam(sender, param, senderChansMapping:senderChansMapping);
+					this.createMixInterpBusAndNormSynthAtParam(sender, param, replace:replace, senderChansMapping:senderChansMapping);
 				});
 			});
 		}, {
@@ -1411,7 +1414,7 @@ AlgaNode {
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
 			server.makeBundle(nil, {
 				this.disconnectInner(param, previousSender, true);
-				this.mixFrom(newSender, param, inChans);
+				this.makeConnection(newSender, param, replace:true, mix:true, senderChansMapping:inChans);
 			});
 		});
 	}
@@ -1453,7 +1456,13 @@ AlgaNode {
 				//Restore old channels mapping! It can either be a symbol, number or array here
 				if(keepChannelsMapping, { oldParamChansMapping = receiver.paramChansMapping[param]; });
 
-				receiver.makeConnection(this, param, replace:true, senderChansMapping:oldParamChansMapping);
+				//If it was a mixer connection, use mix:true
+				if(receiver.interpSynths[param][this] != nil, {
+					receiver.replaceMix(param, this, this, inChans:oldParamChansMapping);
+				}, {
+					//mix == false, normal connection
+					receiver.makeConnection(this, param, replace:true, senderChansMapping:oldParamChansMapping);
+				});
 			});
 		});
 	}
