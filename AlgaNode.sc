@@ -1100,6 +1100,8 @@ AlgaNode {
 			});
 		});
 
+		inNodes.postln;
+
 		if(sender.isAlgaNode, {
 			//Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
 			if((inNodes[param] == nil).or(mix.not), {
@@ -1135,9 +1137,22 @@ AlgaNode {
 		});
 	}
 
-	removeInOutNode { | sender, param = \in |
+	removeInOutNodeAtParam { | sender, param = \in |
+		//Just remove one param from sender's set at this entry
 		sender.outNodes[this].remove(param);
+
+		//If Set is now empty, remove it entirely
+		if(sender.outNodes[this].size == 0, {
+			sender.outNodes.removeAt(this);
+		});
+
+		//Remove the specific param / sender combination from inNodes
 		inNodes[param].remove(sender);
+
+		//If Set is now empty, remove it entirely
+		if(inNodes[param].size == 0, {
+			inNodes.removeAt(param);
+		});
 
 		//Recalculate longestConnectionTime too...
 		//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
@@ -1149,39 +1164,22 @@ AlgaNode {
 	//Remove entries from inNodes / outNodes / connectionTimeOutNodes for all involved nodes
 	removeInOutNodesDict { | previousSender = nil, param = \in |
 		var previousSenders = inNodes[param];
-		if(previousSenders == nil, { /*( "No previous connection enstablished at param:" ++ param).error;*/ ^this; });
+		if(previousSenders == nil, { ( "No previous connection enstablished at param:" ++ param).error; ^this; });
 
 		previousSenders.do({ | sender |
 			var sendersParamsSet = sender.outNodes[this];
 			if(sendersParamsSet != nil, {
-				//Multiple entries in the set
-				if(sendersParamsSet.size > 1, {
-					//no previousSender specified: remove them all!
-					if(previousSender == nil, {
-						this.removeInOutNode(sender, param);
-					}, {
-						//If specified previousSender, only remove that one (in mixing scenarios)
-						if(sender == previousSender, {
-							this.removeInOutNode(sender, param);
-						})
-					})
+				//no previousSender specified: remove them all!
+				if(previousSender == nil, {
+					this.removeInOutNodeAtParam(sender, param);
 				}, {
-					//If Set with just one entry, remove the entire Set
-					sender.outNodes.removeAt(this);
-
-					//Recalculate longestConnectionTime too...
-					//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
-					//(Right now, this happens before creating new synths)
-					sender.connectionTimeOutNodes[this] = 0;
-					sender.calculateLongestConnectionTime(0);
+					//If specified previousSender, only remove that one (in mixing scenarios)
+					if(sender == previousSender, {
+						this.removeInOutNodeAtParam(sender, param);
+					})
 				})
 			})
 		});
-
-		//If Set with just one entry, remove the entire Set
-		if(previousSenders.size == 1, {
-			inNodes.removeAt(param);
-		})
 	}
 
 	//Clear the dicts
@@ -1245,7 +1243,7 @@ AlgaNode {
 		);
 	}
 
-	//Used in <|
+	//Used in <| and replaceMix
 	removeInterpConnectionAtParam { | previousSender = nil, param = \in  |
 		var controlName = controlNames[param];
 		if(controlName == nil, {
@@ -1284,6 +1282,8 @@ AlgaNode {
 	//implements receiver <<.param sender
 	makeConnection { | sender, param = \in, replace = false, mix = false, senderChansMapping |
 		var currentDefaultAtParam;
+
+		if(sender.isAlgaNode.not, { "Can't connect to something that's not an AlgaNode".error; ^this });
 
 		//Can't connect AlgaNode to itself
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
@@ -1432,6 +1432,11 @@ AlgaNode {
 	//This will be useful in the future if wanting to implement some kind of system to retrieve individual
 	//mix entries (like, \in1, \in2). No need it for now
 	replaceMix { | param = \in, previousSender, newSender, inChans |
+		if(newSender.isAlgaNode.not, {
+			(newSender.asString) ++ " is not an AlgaNode".error;
+			^this;
+		});
+
 		AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
 			server.makeBundle(nil, {
 				this.disconnectInner(param, previousSender, true);
@@ -1537,6 +1542,14 @@ AlgaNode {
 
 	//Remove individual mix entries at param (called from replaceMix too)
 	disconnectInner { | param = \in, previousSender, replaceMix = false |
+		if(previousSender.isAlgaNode.not, {
+			(previousSender.asString) ++ " is not an AlgaNode".error;
+			^this;
+		});
+
+		//Remove inNodes / outNodes / connectionTimeOutNodes
+		this.removeInOutNodesDict(previousSender, param);
+
 		if(replaceMix == false, {
 			AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
 				var interpSynthsAtParam;
