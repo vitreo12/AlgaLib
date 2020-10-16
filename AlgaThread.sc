@@ -4,7 +4,7 @@ AlgaThread {
 
 	*new { | server, clock, autostart = true |
 		var argServer = server ? Server.default;
-		var argName = server.name;
+		var argName = argServer.name;
 		var argClock = clock ? SystemClock;
 		^super.newCopyArgs(argName, argServer, argClock).init(autostart);
 	}
@@ -71,7 +71,7 @@ AlgaScheduler : AlgaThread {
 
 	*new { | server, clock, cascadeMode = false, autostart = true |
 		var argServer = server ? Server.default;
-		var argName = server.name;
+		var argName = argServer.name;
 		var argClock = clock ? SystemClock;
 		^super.newCopyArgs(argName, argServer, argClock).init(cascadeMode, autostart);
 	}
@@ -100,7 +100,7 @@ AlgaScheduler : AlgaThread {
 
 		if(accumTime >= maxSpinTime, {
 			(
-				"AlgaScheduler: the condition '" ++
+				"AlgaScheduler: the condition of caller in '" ++
 				condition.def.context ++
 				"' exceeded maximum wait time " ++
 				maxSpinTime
@@ -121,7 +121,7 @@ AlgaScheduler : AlgaThread {
 
 	executeFunc { | action, func, bundle, consumedActions |
 		if(verbose, (
-			"AlgaScheduler: executing function: '" ++
+			"AlgaScheduler: executing function from context '" ++
 			action[0].def.context ++ "'"
 		).postcln);
 
@@ -200,16 +200,22 @@ AlgaScheduler : AlgaThread {
 		spinningActions.clear;
 	}
 
-	addAction { | condition, func |
-		var action = [condition, func];
-		if((condition.isFunction.not).or(func.isFunction.not), {
+	//Default condition is just { true }, just execute it when its time comes on the scheduler
+	addAction { | condition, action |
+		var conditionAndAction;
+
+		condition = condition ? { true };
+
+		if((condition.isFunction.not).or(action.isFunction.not), {
 			"AlgaScheduler: addAction only accepts Functions as both the condition and the func arguments".error;
 			^this;
 		});
-		actions.add(action);
-		spinningActions[action] = 0;
 
-		//New actions! Unlock the semaphore
+		conditionAndAction = [condition, action];
+		actions.add(conditionAndAction);
+		spinningActions[conditionAndAction] = 0;
+
+		//New action! Unlock the semaphore
 		if(semaphore.test.not, {
 			semaphore.unhang;
 		});

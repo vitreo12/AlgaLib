@@ -1122,9 +1122,6 @@ AlgaNode {
 				inNodes[param].add(sender);
 			})
 		});
-
-		mix.postln;
-		inNodes.postln;
 	}
 
 	//AlgaNode -> IdentitySet[param, param, ...]
@@ -1356,27 +1353,6 @@ AlgaNode {
 			//Cleanup interpBusses / interpSynths / normSynths from previous mix, leaving \default only
 			this.cleanupMixBussesAndSynths(param);
 		});
-
-		/*
-		//need to re-check as mix might have changed!
-		if(mix, {
-			//Create new interpBus and normSynth for specific param and sender combination,
-			//only if connection isn't already in the mix
-			if(this.mixerParamContainsSender(param, sender).not, {
-				this.newMixConnectionAtParam(sender, param,
-					replace:replace, senderChansMapping:senderChansMapping
-				)
-			});
-		}, {
-			//Connect interpSynth to the sender's synthBus
-			this.newInterpConnectionAtParam(sender, param,
-				replace:replace, senderChansMapping:senderChansMapping
-			);
-
-			//Cleanup interpBusses / interpSynths / normSynths from previous mix, leaving \default only
-			this.cleanupMixBussesAndSynths(param);
-		});
-		*/
 	}
 
 	//Wrapper for scheduler
@@ -1428,9 +1404,9 @@ AlgaNode {
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
-			}, {
-				this.makeConnection(sender, param, mix:true, senderChansMapping:inChans);
+				^this;
 			});
+			this.makeConnection(sender, param, mix:true, senderChansMapping:inChans);
 		}, {
 			if(sender.isNumberOrArray, {
 				this.makeConnection(sender, param, mix:true, senderChansMapping:inChans);
@@ -1449,9 +1425,9 @@ AlgaNode {
         if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
-			}, {
-				receiver.makeConnection(this, param, mix:true, senderChansMapping:outChans);
+				^this;
 			});
+			receiver.makeConnection(this, param, mix:true, senderChansMapping:outChans);
         }, {
 			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
         });
@@ -1603,11 +1579,11 @@ AlgaNode {
 			^this;
 		});
 
+		//Remove inNodes / outNodes / connectionTimeOutNodes for previousSender
+		this.removeInOutNodesDict(previousSender, param);
+
 		if(replaceMix == false, {
 			var interpSynthsAtParam;
-
-			//Remove inNodes / outNodes / connectionTimeOutNodes
-			this.removeInOutNodesDict(previousSender, param);
 
 			this.freeInterpSynthAtParam(previousSender, param, true);
 

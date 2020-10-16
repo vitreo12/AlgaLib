@@ -5,14 +5,11 @@ AlgaStartup.algaMaxIO=3;
 Alga.initSynthDefs;
 )
 
+//Verbose to print out stuff from AlgaScheduler (debug)
+AlgaScheduler.verbose = false;
+
 (
 Alga.boot({
-	AlgaSynthDef(\mixCounter, {
-		DC.kr(1);
-	}).add;
-
-	s.sync;
-
 	//s.plotTree;
 	a = AlgaNode({SinOsc.ar(\f.kr(440)).dup * 0.2}, connectionTime:1).play;
 	b = AlgaNode({DC.kr(220)});
@@ -21,12 +18,6 @@ Alga.boot({
 
 	a <<.f b;
 	a <<+.f c;
-
-	a <<+.f b;//problem here!
-
-	("a" + a.name).postln;
-	("b" + b.name).postln;
-	("c" + c.name).postln;
 })
 )
 
@@ -42,10 +33,11 @@ a.inNodes
 b.outNodes
 c.outNodes
 
-a.disconnect(\f, c)
+a.disconnect(\f, b)
 
+a.interpSynths
 
-d.replace({DC.kr(5)})
+d.replace({DC.kr(100)})
 
 a.disconnect(\f, d);
 
@@ -67,6 +59,8 @@ a.play
 a.ct=1;
 a <<.f 323;
 )
+
+a <<+.f 10
 
 a.debug
 s.scope
