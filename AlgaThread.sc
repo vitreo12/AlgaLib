@@ -152,7 +152,6 @@ AlgaScheduler : AlgaThread {
 								if(exceededMaxSpinTime[0], {
 									condition = true; //exit the while loop
 								});
-								"spin".postln;
 								interval.wait;
 							});
 

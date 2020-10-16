@@ -21,7 +21,6 @@ Alga.boot({
 
 	a <<.f b;
 	a <<+.f c;
-	a <<+.f b;
 
 	("a" + a.name).postln;
 	("b" + b.name).postln;
@@ -31,7 +30,7 @@ Alga.boot({
 
 a <<.f b;
 
-a <<+.f c;
+a <<+.f b;
 
 a.replaceMix(\f, c, d);
 
