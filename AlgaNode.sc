@@ -82,13 +82,13 @@ AlgaNode {
 		interpSynths = IdentityDictionary(10);
 
 		//Per-argument connections to this AlgaNode. These are in the form:
-		//(param -> Set[AlgaNode, AlgaNode...]). Multiple AlgaNodes are used when
+		//(param -> IdentitySet[AlgaNode, AlgaNode...]). Multiple AlgaNodes are used when
 		//using the mixing <<+ / >>+
 		inNodes = IdentityDictionary(10);
 
 		//outNodes are not indexed by param name, as they could be attached to multiple nodes with same param name.
-		//they are indexed by identity of the connected node, and then it contains a Set of all parameters
-		//that it controls in that node (AlgaNode -> Set[\freq, \amp ...])
+		//they are indexed by identity of the connected node, and then it contains a IdentitySet of all parameters
+		//that it controls in that node (AlgaNode -> IdentitySet[\freq, \amp ...])
 		outNodes = IdentityDictionary(10);
 
 		//Chans mapping from inNodes... How to support <<+ / >>+ ???
@@ -530,7 +530,7 @@ AlgaNode {
 
 	resetSynth {
 		if(toBeCleared, {
-			//Set to nil (should it fork?)
+			//IdentitySet to nil (should it fork?)
 			synth = nil;
 			synthDef = nil;
 			controlNames.clear;
@@ -1087,7 +1087,7 @@ AlgaNode {
 		});
 	}
 
-	//param -> Set[AlgaNode, AlgaNode, ...]
+	//param -> IdentitySet[AlgaNode, AlgaNode, ...]
 	addInNode { | sender, param = \in, mix = false |
 		//First of all, remove the outNodes that the previous sender had with the
 		//param of this node, if there was any. Only apply if mix==false (no <<+ / >>+)
@@ -1103,20 +1103,20 @@ AlgaNode {
 		inNodes.postln;
 
 		if(sender.isAlgaNode, {
-			//Empty entry OR not doing mixing, create new Set. Otherwise, add to existing
+			//Empty entry OR not doing mixing, create new IdentitySet. Otherwise, add to existing
 			if((inNodes[param] == nil).or(mix.not), {
-				inNodes[param] = Set[sender];
+				inNodes[param] = IdentitySet[sender];
 			}, {
 				inNodes[param].add(sender);
 			})
 		});
 	}
 
-	//AlgaNode -> Set[param, param, ...]
+	//AlgaNode -> IdentitySet[param, param, ...]
 	addOutNode { | receiver, param = \in |
-		//Empty entry, create Set. Otherwise, add to existing
+		//Empty entry, create IdentitySet. Otherwise, add to existing
 		if(outNodes[receiver] == nil, {
-			outNodes[receiver] = Set[param];
+			outNodes[receiver] = IdentitySet[param];
 		}, {
 			outNodes[receiver].add(param);
 		});
@@ -1127,7 +1127,7 @@ AlgaNode {
 		//This will replace the entries on new connection (as mix == false)
 		this.addInNode(sender, param, mix);
 
-		//This will add the entries to the existing Set, or create a new one
+		//This will add the entries to the existing IdentitySet, or create a new one
 		if(sender.isAlgaNode, {
 			sender.addOutNode(this, param);
 
@@ -1141,7 +1141,7 @@ AlgaNode {
 		//Just remove one param from sender's set at this entry
 		sender.outNodes[this].remove(param);
 
-		//If Set is now empty, remove it entirely
+		//If IdentitySet is now empty, remove it entirely
 		if(sender.outNodes[this].size == 0, {
 			sender.outNodes.removeAt(this);
 		});
@@ -1149,7 +1149,7 @@ AlgaNode {
 		//Remove the specific param / sender combination from inNodes
 		inNodes[param].remove(sender);
 
-		//If Set is now empty, remove it entirely
+		//If IdentitySet is now empty, remove it entirely
 		if(inNodes[param].size == 0, {
 			inNodes.removeAt(param);
 		});

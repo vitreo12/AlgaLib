@@ -132,7 +132,7 @@ AlgaScheduler : AlgaThread {
 			});
 
 			//Check the size again here,
-			//as ~actions are getting removed at the end of the previous
+			//as actions are getting removed at the end of the previous if statement
 			if(actions.size > 0, {
 				//Still actions to consume, spin
 				interval.wait;
