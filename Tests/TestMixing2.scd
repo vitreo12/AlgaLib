@@ -22,6 +22,8 @@ Alga.boot({
 	a <<.f b;
 	a <<+.f c;
 
+	a <<+.f b;//problem here!
+
 	("a" + a.name).postln;
 	("b" + b.name).postln;
 	("c" + c.name).postln;

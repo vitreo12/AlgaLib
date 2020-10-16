@@ -51,9 +51,6 @@ Alga {
 		//Add to SynthDescLib in order for .add to work... Find a leaner solution.
 		SynthDescLib.global.addServer(server);
 
-		//Verbose to print out stuff from AlgaScheduler (debug)
-		AlgaThread.verbose = true;
-
 		//Clear all previous schedulers, if present
 		this.clearAllSchedulers;
 
@@ -63,7 +60,7 @@ Alga {
 
 			//Create an AlgaScheduler on current server (using SystemClock for now...)
 			//starting it here so printing happens after server boot.
-			algaSchedulers[server] = AlgaScheduler(server.name, cascadeMode:true);
+			algaSchedulers[server] = AlgaScheduler(server, cascadeMode:true);
 
 			onBoot.value;
 		});

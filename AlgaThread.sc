@@ -1,13 +1,12 @@
 AlgaThread {
-	classvar <>verbose = false, <defaultClock;
-	var <name, <clock, <task;
+	classvar <>verbose = false;
+	var <name, <server, <clock, <task;
 
-	*new { | name = "anon", clock, autostart = true |
-		^super.newCopyArgs(name, clock).init(autostart);
-	}
-
-	*initClass {
-		defaultClock = SystemClock;
+	*new { | server, clock, autostart = true |
+		var argServer = server ? Server.default;
+		var argName = server.name;
+		var argClock = clock ? SystemClock;
+		^super.newCopyArgs(argName, argServer, argClock).init(autostart);
 	}
 
 	init { | autostart = true |
@@ -39,7 +38,7 @@ AlgaThread {
 			if(verbose, { ("AlgaThread" + name + "already playing.").postcln });
 			^this;
 		});
-		task.reset.play(clock ? defaultClock);
+		task.reset.play(clock);
 		CmdPeriod.add(this);
 		if(verbose, { ("AlgaThread" + name + "started.").postcln });
 	}
@@ -66,13 +65,15 @@ AlgaScheduler : AlgaThread {
 	var <>maxSpinTime = 3;
 	var semaphore;
 
-	var cascadeMode = false;
+	var <>cascadeMode = false;
 
 	var <actions, <spinningActions;
 
-	*new { | name, clock, cascadeMode = false, autostart = true |
-		name = name ? UniqueID.next.asString;
-		^super.newCopyArgs(name, clock).init(cascadeMode, autostart);
+	*new { | server, clock, cascadeMode = false, autostart = true |
+		var argServer = server ? Server.default;
+		var argName = server.name;
+		var argClock = clock ? SystemClock;
+		^super.newCopyArgs(argName, argServer, argClock).init(cascadeMode, autostart);
 	}
 
 	init { | argCascadeMode = false, autostart = true |
@@ -100,7 +101,7 @@ AlgaScheduler : AlgaThread {
 		if(accumTime >= maxSpinTime, {
 			(
 				"AlgaScheduler: the condition '" ++
-				condition.def.sourceCode ++
+				condition.def.context ++
 				"' exceeded maximum wait time " ++
 				maxSpinTime
 			).error;
@@ -118,13 +119,14 @@ AlgaScheduler : AlgaThread {
 		spinningActions[action] = accumTime;
 	}
 
-	executeFunc { | action, func, consumedActions |
+	executeFunc { | action, func, bundle, consumedActions |
 		if(verbose, (
 			"AlgaScheduler: executing function: '" ++
 			action[0].def.context ++ "'"
 		).postcln);
 
-		func.value;
+		//Collect all bundles from func and add them to bundle
+		bundle[0] = server.makeBundle(false, { func.value }, bundle[0]);
 		consumedActions.add(action);
 	}
 
@@ -132,7 +134,10 @@ AlgaScheduler : AlgaThread {
 		loop {
 			if(actions.size > 0, {
 				var consumedActions = IdentitySet();
+				var bundle = [server.makeBundle(false)]; //use array to pass by reference
 
+				//Bundle all the actions of this interval tick together
+				//This will be the core of clock / server syncing of actions
 				//Consume actions (they are ordered thanks to OrderedIdentitySet)
 				actions.do({ | action |
 					var condition = action[0];
@@ -140,7 +145,7 @@ AlgaScheduler : AlgaThread {
 
 					if(condition.value, {
 						//If condition, execute it and remove from the OrderedIdentitySet
-						this.executeFunc(action, func, consumedActions)
+						this.executeFunc(action, func, bundle, consumedActions)
 					}, {
 						//if cascadeMode, spin here (so the successive actions won't be
 						//done until this one is). If it errors out, it will move to the next action
@@ -157,7 +162,7 @@ AlgaScheduler : AlgaThread {
 
 							//If finished spinning (or it errors out), execute func
 							if(exceededMaxSpinTime[0].not, {
-								this.executeFunc(action, func, consumedActions)
+								this.executeFunc(action, func, bundle, consumedActions)
 							});
 						}, {
 							//Just accumTime, while letting it go for successive actions
@@ -171,6 +176,10 @@ AlgaScheduler : AlgaThread {
 					actions.remove(action);
 					spinningActions.removeAt(action);
 				});
+
+				//Send bundle
+				if(verbose, { ("AlgaScheduler: sending bundle " ++ bundle[0].asString).warn });
+				server.makeBundle(nil, nil, bundle[0]);
 			});
 
 			//Check the size again here,
