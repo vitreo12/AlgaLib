@@ -18,8 +18,8 @@ Alga.boot({
 	b = AlgaNode({DC.kr(220)});
 	c = AlgaNode({DC.kr(100)});
 	d = AlgaNode({DC.kr(10)});
-	a <<+.f b;
-	a <<+.f c;
+	//a <<+.f b;
+	//a <<+.f c;
 })
 )
 

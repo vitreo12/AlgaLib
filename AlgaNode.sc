@@ -10,6 +10,9 @@ AlgaNode {
     //This controls the fade in and out when .play / .stop
     var <playTime = 0;
 
+	//The algaScheduler @ this server
+	var <algaScheduler;
+
 	//This is the longestConnectionTime between all the outNodes.
 	//it's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
@@ -57,7 +60,14 @@ AlgaNode {
 
     init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, outsMapping, argServer |
 		//Default server if not specified otherwise
-		if(argServer == nil, { server = Server.default }, { server = argServer });
+		server = argServer ? Server.default;
+
+		//AlgaScheduler from specific server
+		algaScheduler = Alga.algaSchedulers[server];
+		if(algaScheduler == nil, {
+			("Can't retrieve correct AlgaScheduler for server " ++ server.name ++ ". Has Alga.boot been called on it?").error;
+			^nil;
+		});
 
 		//param -> ControlName
 		controlNames = IdentityDictionary(10);
@@ -1100,8 +1110,6 @@ AlgaNode {
 			});
 		});
 
-		inNodes.postln;
-
 		if(sender.isAlgaNode, {
 			//Empty entry OR not doing mixing, create new IdentitySet. Otherwise, add to existing
 			if((inNodes[param] == nil).or(mix.not), {
@@ -1330,7 +1338,8 @@ AlgaNode {
 		//need to re-check as mix might have changed!
 		if(mix, {
 			//Create new interpBus and normSynth for specific param and sender combination
-			AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
+			//AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
+			algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
 				server.makeBundle(nil, {
 					this.newMixConnectionAtParam(sender, param,
 						replace:replace, senderChansMapping:senderChansMapping
@@ -1339,7 +1348,8 @@ AlgaNode {
 			});
 		}, {
 			//Connect interpSynth to the sender's synthBus
-			AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
+			//AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
+			algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
 				server.makeBundle(nil, {
 					this.newInterpConnectionAtParam(sender, param,
 						replace:replace, senderChansMapping:senderChansMapping
@@ -1437,7 +1447,8 @@ AlgaNode {
 			^this;
 		});
 
-		AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
+		//AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
+		algaScheduler.addAction( { (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
 			server.makeBundle(nil, {
 				this.disconnectInner(param, previousSender, true);
 				this.makeConnection(newSender, param,
@@ -1454,7 +1465,8 @@ AlgaNode {
 		//Also remove inNodes / outNodes / connectionTimeOutNodes
 		if(previousSender != nil, {
 			if(previousSender.isAlgaNode, {
-				AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
+				//AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
+				algaScheduler.addAction( { (this.instantiated).and(previousSender.instantiated) }, {
 					server.makeBundle(nil, {
 						this.removeInterpConnectionAtParam(previousSender, param);
 					});
@@ -1463,7 +1475,8 @@ AlgaNode {
 				("Trying to remove a connection to an invalid AlgaNode: " ++ previousSender).error;
 			})
 		}, {
-			AlgaSpinRoutine.waitFor( { this.instantiated }, {
+			//AlgaSpinRoutine.waitFor( { this.instantiated }, {
+			algaScheduler.addAction( { this.instantiated }, {
 				server.makeBundle(nil, {
 					this.removeInterpConnectionAtParam(nil, param);
 				});
@@ -1551,7 +1564,8 @@ AlgaNode {
 		this.removeInOutNodesDict(previousSender, param);
 
 		if(replaceMix == false, {
-			AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
+			//AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated) }, {
+			algaScheduler.addAction( { (this.instantiated).and(previousSender.instantiated) }, {
 				var interpSynthsAtParam;
 
 				server.makeBundle(nil, {
@@ -1726,14 +1740,16 @@ AlgaNode {
 
 	//Add option for fade time here!
 	play { | channelsToPlay |
-		AlgaSpinRoutine.waitFor({ this.instantiated }, {
+		//AlgaSpinRoutine.waitFor( { this.instantiated }, {
+		algaScheduler.addAction( { this.instantiated }, {
 			this.createPlaySynth(channelsToPlay);
 		});
 	}
 
 	//Add option for fade time here!
     stop {
-		AlgaSpinRoutine.waitFor({ this.instantiated }, {
+		//AlgaSpinRoutine.waitFor( { this.instantiated }, {
+		algaScheduler.addAction( { this.instantiated }, {
             this.freePlaySynth;
 		});
     }

@@ -9,10 +9,20 @@ Alga {
 		algaSchedulers = IdentityDictionary();
 	}
 
+	*clearAllSchedulers {
+		if(algaSchedulers != nil, {
+			algaSchedulers.do({ | algaScheduler |
+				algaScheduler.clear;
+			});
+
+			algaSchedulers.clear;
+		});
+	}
+
 	*boot { | onBoot, server, algaServerOptions |
 
 		server = server ? Server.default;
-		algaServerOptions = ? AlgaServerOptions();
+		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
 		//quit server if it was on
 		server.quit;
@@ -44,13 +54,16 @@ Alga {
 		//Verbose to print out stuff from AlgaScheduler (debug)
 		AlgaThread.verbose = true;
 
+		//Clear all previous schedulers, if present
+		this.clearAllSchedulers;
+
 		//Boot
 		server.waitForBoot({
 			server.initTree;
 
 			//Create an AlgaScheduler on current server (using SystemClock for now...)
 			//starting it here so printing happens after server boot.
-			algaSchedulers[server] = AlgaScheduler(server.name);
+			algaSchedulers[server] = AlgaScheduler(server.name, cascadeMode:true);
 
 			onBoot.value;
 		});
