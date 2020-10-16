@@ -1,9 +1,9 @@
 AlgaThread {
 	classvar <>verbose = false, <defaultClock;
-	var <func, <name, <clock, <task;
+	var <func, <clearFunc, <name, <clock, <task;
 
-	*new { | func, name = "anon", clock, autostart = true |
-		^super.newCopyArgs(func, name, clock).init(autostart);
+	*new { | func, clearFunc, name = "anon", clock, autostart = true |
+		^super.newCopyArgs(func, clearFunc, name, clock).init(autostart);
 	}
 
 	*initClass {
@@ -45,8 +45,9 @@ AlgaThread {
 
 	clear {
 		CmdPeriod.remove(this);
-		if(verbose, { ("AlgaThread" + name + "cleared.").postcln });
+		clearFunc.value;
 		task.stop;
 		task.clear;
+		if(verbose, { ("AlgaThread" + name + "cleared.").postcln });
 	}
 }

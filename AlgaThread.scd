@@ -71,6 +71,9 @@ AlgaThread.verbose = true;
 			~semaphore.hang;
 		});
 	}
+}, clearFunc: {
+	~actions.clear;
+	~spinningActions.clear;
 })
 )
 
@@ -79,7 +82,4 @@ AlgaThread.verbose = true;
 ~addAction.({ 0 == 0 }, { "yaey".postln});
 )
 
-d = 0
-
-~actions
-~spinningActions
+c = 0
