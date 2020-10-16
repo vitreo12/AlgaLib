@@ -4,7 +4,7 @@
 	nodesLoop { | function |
 		this.keysValuesDo({
 			arg key, value, i;
-			if(value.class == Set, {
+			if(value.class == IdentitySet, {
 				value.do({ | entry |
 					function.value(entry, i);
 				});
