@@ -62,7 +62,7 @@ AlgaThread {
 
 AlgaScheduler : AlgaThread {
 	var <>interval = 0.01;
-	var <>maxSpinTime = 3;
+	var <>maxSpinTime = 1;
 	var semaphore;
 
 	var <>cascadeMode = false;
