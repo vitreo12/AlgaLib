@@ -18,8 +18,14 @@ Alga.boot({
 	b = AlgaNode({DC.kr(220)});
 	c = AlgaNode({DC.kr(100)});
 	d = AlgaNode({DC.kr(10)});
-	//a <<+.f b;
-	//a <<+.f c;
+
+	a <<.f b;
+	a <<+.f c;
+	a <<+.f b;
+
+	("a" + a.name).postln;
+	("b" + b.name).postln;
+	("c" + c.name).postln;
 })
 )
 
@@ -27,9 +33,7 @@ a <<.f b;
 
 a <<+.f c;
 
-a.replaceMix(\f, c, z);
-
-
+a.replaceMix(\f, c, d);
 
 a.from(b, \f, \out3);
 

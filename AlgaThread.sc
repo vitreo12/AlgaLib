@@ -119,6 +119,11 @@ AlgaScheduler : AlgaThread {
 	}
 
 	executeFunc { | action, func, consumedActions |
+		if(verbose, (
+			"AlgaScheduler: executing function: '" ++
+			action[0].def.context ++ "'"
+		).postcln);
+
 		func.value;
 		consumedActions.add(action);
 	}
@@ -147,6 +152,7 @@ AlgaScheduler : AlgaThread {
 								if(exceededMaxSpinTime[0], {
 									condition = true; //exit the while loop
 								});
+								"spin".postln;
 								interval.wait;
 							});
 

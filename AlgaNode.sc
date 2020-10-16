@@ -1,6 +1,8 @@
 AlgaNode {
 	var <server;
 
+	var <>name;
+
 	//Index of the corresponding AlgaBlock in the AlgaBlocksDict
 	var <>blockIndex = -1;
 
@@ -61,6 +63,8 @@ AlgaNode {
     init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, outsMapping, argServer |
 		//Default server if not specified otherwise
 		server = argServer ? Server.default;
+
+		name = UniqueID.next;
 
 		//AlgaScheduler from specific server
 		algaScheduler = Alga.algaSchedulers[server];
@@ -1288,7 +1292,7 @@ AlgaNode {
 	}
 
 	//implements receiver <<.param sender
-	makeConnection { | sender, param = \in, replace = false, mix = false, senderChansMapping |
+	makeConnectionInner { | sender, param = \in, replace = false, mix = false, senderChansMapping |
 		var currentDefaultAtParam;
 
 		if(sender.isAlgaNode.not, { "Can't connect to something that's not an AlgaNode".error; ^this });
@@ -1338,27 +1342,28 @@ AlgaNode {
 		//need to re-check as mix might have changed!
 		if(mix, {
 			//Create new interpBus and normSynth for specific param and sender combination
-			//AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
-			algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
-				server.makeBundle(nil, {
-					this.newMixConnectionAtParam(sender, param,
-						replace:replace, senderChansMapping:senderChansMapping
-					)
-				});
+			server.makeBundle(nil, {
+				this.newMixConnectionAtParam(sender, param,
+					replace:replace, senderChansMapping:senderChansMapping
+				)
 			});
 		}, {
 			//Connect interpSynth to the sender's synthBus
-			//AlgaSpinRoutine.waitFor( { (this.instantiated).and(sender.instantiated) }, {
-			algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
-				server.makeBundle(nil, {
-					this.newInterpConnectionAtParam(sender, param,
-						replace:replace, senderChansMapping:senderChansMapping
-					);
-				});
-
-				//Cleanup interpBusses / interpSynths / normSynths from previous mix, leaving \default only
-				this.cleanupMixBussesAndSynths(param);
+			server.makeBundle(nil, {
+				this.newInterpConnectionAtParam(sender, param,
+					replace:replace, senderChansMapping:senderChansMapping
+				);
 			});
+
+			//Cleanup interpBusses / interpSynths / normSynths from previous mix, leaving \default only
+			this.cleanupMixBussesAndSynths(param);
+		});
+	}
+
+	//Wrapper for scheduler
+	makeConnection { | sender, param = \in, replace = false, mix = false, senderChansMapping |
+		algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
+			this.makeConnectionInner(sender, param, replace, mix, senderChansMapping);
 		});
 	}
 
@@ -1449,12 +1454,10 @@ AlgaNode {
 
 		//AlgaSpinRoutine.waitFor( { (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
 		algaScheduler.addAction( { (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
-			server.makeBundle(nil, {
-				this.disconnectInner(param, previousSender, true);
-				this.makeConnection(newSender, param,
-					replace:true, mix:true, senderChansMapping:inChans
-				);
-			});
+			this.disconnectInner(param, previousSender, true);
+			this.makeConnection(newSender, param,
+				replace:true, mix:true, senderChansMapping:inChans
+			);
 		});
 	}
 
