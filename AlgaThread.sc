@@ -66,16 +66,19 @@ AlgaScheduler : AlgaThread {
 	var <>interval = 0.01;
 	var <>maxSpinTime = 3;
 	var semaphore;
+
+	var cascadeMode = false;
+
 	var <actions, <spinningActions;
 
-	*new { | clock, autostart = true |
+	*new { | clock, cascadeMode = false, autostart = true |
 		var name = UniqueID.next.asString;
-		^super.newCopyArgs(name, clock).init(autostart);
+		^super.newCopyArgs(name, clock).init(cascadeMode, autostart);
 	}
 
-	init { | autostart = true |
+	init { | argCascadeMode = false, autostart = true |
 		if(actions == nil, {
-			actions = OrderedIdentitySet(10);
+			actions = OrderedIdentitySet(10); //needs to be ordered so that they're consumed first-in first-out
 		});
 
 		if(spinningActions == nil, {
@@ -86,7 +89,39 @@ AlgaScheduler : AlgaThread {
 			semaphore = Condition();
 		});
 
+		cascadeMode = argCascadeMode;
+
 		super.init(autostart);
+	}
+
+	accumTimeAtAction { | action, condition, exceededMaxSpinTime, consumedActions |
+		//Else, check how much time the specific action is taking
+		var accumTime = (spinningActions[action]) + interval;
+
+		if(accumTime >= maxSpinTime, {
+			(
+				"AlgaScheduler: the condition '" ++
+				condition.def.sourceCode ++
+				"' exceeded maximum wait time " ++
+				maxSpinTime
+			).error;
+
+			//remove the culprit action
+			consumedActions.add(action);
+
+			//if cascadeMode, gotta exit the condition too
+			if(cascadeMode, {
+				exceededMaxSpinTime[0] = true;
+			});
+		});
+
+		//Update timing
+		spinningActions[action] = accumTime;
+	}
+
+	executeFunc { | action, func, consumedActions |
+		func.value;
+		consumedActions.add(action);
 	}
 
 	run {
@@ -94,33 +129,36 @@ AlgaScheduler : AlgaThread {
 			if(actions.size > 0, {
 				var consumedActions = IdentitySet();
 
-				//Consume actions (they are ordered thansk to OrderedIdentitySet)
+				//Consume actions (they are ordered thanks to OrderedIdentitySet)
 				actions.do({ | action |
 					var condition = action[0];
 					var func = action[1];
 
 					if(condition.value, {
-						//If condition, execute it and remove from the Set
-						func.value;
-						consumedActions.add(action);
+						//If condition, execute it and remove from the OrderedIdentitySet
+						this.executeFunc(action, func, consumedActions)
 					}, {
-						//Else, check how much time the specific action is taking
-						var accumTime = (spinningActions[action]) + interval;
+						//if cascadeMode, spin here (so the successive actions won't be
+						//done until this one is). If it errors out, it will move to the next action
+						if(cascadeMode, {
+							var exceededMaxSpinTime = [false]; //use array for a "pass by reference" equivalent
 
-						if(accumTime >= maxSpinTime, {
-							(
-								"AlgaScheduler: the condition '" ++
-								condition.def.sourceCode ++
-								"' exceeded maximum wait time " ++
-								maxSpinTime
-							).error;
+							while({ condition.value.not }, {
+								this.accumTimeAtAction(action, condition, exceededMaxSpinTime, consumedActions);
+								if(exceededMaxSpinTime[0], {
+									condition = true; //exit the while loop
+								});
+								interval.wait;
+							});
 
-							//remove the culprit action
-							consumedActions.add(action);
+							//If finished spinning (or it errors out), execute func
+							if(exceededMaxSpinTime[0].not, {
+								this.executeFunc(action, func, consumedActions)
+							});
+						}, {
+							//Just accumTime, while letting it go for successive actions
+							this.accumTimeAtAction(action, condition, nil, consumedActions);
 						});
-
-						//Update timing
-						spinningActions[action] = accumTime;
 					});
 				});
 
@@ -151,8 +189,14 @@ AlgaScheduler : AlgaThread {
 
 	addAction { | condition, func |
 		var action = [condition, func];
+		if((condition.isFunction.not).or(func.isFunction.not), {
+			"AlgaScheduler: addAction only accepts Functions as both the condition and the func arguments".error;
+			^this;
+		});
 		actions.add(action);
 		spinningActions[action] = 0;
+
+		//New actions! Unlock the semaphore
 		if(semaphore.test.not, {
 			semaphore.unhang;
 		});
