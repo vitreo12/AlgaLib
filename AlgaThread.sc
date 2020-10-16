@@ -32,7 +32,6 @@ AlgaThread {
 	cmdPeriod {
 		this.clear; //stop and clear the previous task
 		this.init(true); //re-init the task
-		if( verbose ) { ("AlgaThread" + name + "is back up.").postcln };
 	}
 
 	start {
@@ -71,8 +70,8 @@ AlgaScheduler : AlgaThread {
 
 	var <actions, <spinningActions;
 
-	*new { | clock, cascadeMode = false, autostart = true |
-		var name = UniqueID.next.asString;
+	*new { | name, clock, cascadeMode = false, autostart = true |
+		name = name ? UniqueID.next.asString;
 		^super.newCopyArgs(name, clock).init(cascadeMode, autostart);
 	}
 
