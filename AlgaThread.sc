@@ -177,9 +177,13 @@ AlgaScheduler : AlgaThread {
 					spinningActions.removeAt(action);
 				});
 
-				//Send bundle
+				//Send bundle right away.. Here it will be scheduled by a clock, eventually
 				if(verbose, { ("AlgaScheduler: sending bundle " ++ bundle[0].asString).warn });
 				server.makeBundle(nil, nil, bundle[0]);
+
+				//With a clock, gotta check this schedBundleArrayOnClock function!
+				//It's the one used in Patterns too ;)
+				//schedBundleArrayOnClock(0, clock, bundle[0], 0, server, server.latency);
 			});
 
 			//Check the size again here,
