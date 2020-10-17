@@ -7,6 +7,7 @@ Alga.initSynthDefs;
 
 
 (
+AlgaStartup.algaMaxIO=3;
 AlgaScheduler.verbose = true;
 
 Alga.boot({
@@ -18,8 +19,12 @@ Alga.boot({
 
 	a <<.f b;
 	a <<+.f c;
+	a.replaceMix(\f, c, d);
 })
 )
+
+//Run multiple times, bug: no envelope scaling!
+d.replace({DC.kr(100)})
 
 [].isEmpty
 
@@ -27,7 +32,7 @@ a <<.f b;
 
 a <<+.f b;
 
-a.replaceMix(\f, d, d);
+
 
 a.from(b, \f, \out3);
 
@@ -38,8 +43,6 @@ c.outNodes
 a.disconnect(\f, b)
 
 a.interpSynths
-
-d.replace({DC.kr(100)})
 
 a.disconnect(\f, d);
 

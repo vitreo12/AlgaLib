@@ -1,6 +1,8 @@
 Alga {
 	classvar <>schedulers;
 
+	var <server;
+
 	*initSynthDefs {
 		AlgaStartup.initSynthDefs;
 	}
@@ -55,7 +57,7 @@ Alga {
 		server.latency = algaServerOptions.latency;
 
 		//Check AlgaSynthDef folder exists...
-		if(File.existsCaseSensitive(AlgaStartup.algaSynthDefPath) == false, {
+		if(File.existsCaseSensitive(AlgaStartup.algaSynthDefIOPath) == false, {
 			("Could not retrieve the AlgaSyntDef folder. Running 'Alga.initSynthDefs' now...").warn;
 			this.initSynthDefs;
 		});
@@ -68,6 +70,7 @@ Alga {
 
 		//Boot
 		server.waitForBoot({
+			//Make sure to init everything
 			server.initTree;
 
 			//Create an AlgaScheduler on current server (using TempoClock for now...)
