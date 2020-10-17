@@ -63,7 +63,7 @@ AlgaNode {
 		server = argServer ? Server.default;
 
 		//AlgaScheduler from specific server
-		algaScheduler = Alga.algaSchedulers[server];
+		algaScheduler = Alga.getScheduler(server);
 		if(algaScheduler == nil, {
 			(
 				"Can't retrieve correct AlgaScheduler for server " ++
@@ -1295,7 +1295,10 @@ AlgaNode {
 	makeConnectionInner { | sender, param = \in, replace = false, mix = false, senderChansMapping |
 		var currentDefaultAtParam;
 
-		if(sender.isAlgaNode.not, { "Can't connect to something that's not an AlgaNode".error; ^this });
+		if((sender.isAlgaNode.not).and(sender.isNumberOrArray.not), {
+			"Can't connect to something that's not an AlgaNode, a Number or an Array".error;
+			^this
+		});
 
 		//Can't connect AlgaNode to itself
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });

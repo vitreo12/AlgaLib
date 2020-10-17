@@ -130,10 +130,14 @@ AlgaScheduler : AlgaThread {
 		//Generate bundle just for this func
 		funcBundle = server.makeBundle(false, { func.value });
 
-		//Add this func's bundle to global bundle
-		bundle[0] = bundle[0].add(funcBundle);
-		//Add timing information for the bundle generated in this func
-		scheds[0] = scheds[0].add(sched);
+		//If any OSC funcs are generated in bundle, add them to the global bundle
+		if(funcBundle.isEmpty.not, {
+			//Add this func's bundle to global bundle
+			bundle[0] = bundle[0].add(funcBundle);
+
+			//Add timing information for the bundle generated in this func
+			scheds[0] = scheds[0].add(sched);
+		});
 
 		//Action completed: add to consumedActions
 		consumedActions.add(action);
@@ -217,7 +221,8 @@ AlgaScheduler : AlgaThread {
 					spinningActions.removeAt(action);
 				});
 
-				if(bundle[0].size > 0, {
+				//If there is something to send
+				if(bundle[0].isEmpty.not, {
 
 					//Print bundles out
 					if(verbose, { ("AlgaScheduler: sending bundle " ++ bundle[0].asString).warn });

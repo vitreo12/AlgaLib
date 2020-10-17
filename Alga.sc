@@ -1,22 +1,34 @@
 Alga {
-	classvar <>algaSchedulers;
+	classvar <>schedulers;
 
 	*initSynthDefs {
 		AlgaStartup.initSynthDefs;
 	}
 
 	*initClass {
-		algaSchedulers = IdentityDictionary();
+		schedulers = IdentityDictionary();
 	}
 
 	*clearAllSchedulers {
-		if(algaSchedulers != nil, {
-			algaSchedulers.do({ | algaScheduler |
-				algaScheduler.clear;
+		if(schedulers != nil, {
+			schedulers.do({ | scheduler |
+				scheduler.clear;
 			});
 
-			algaSchedulers.clear;
+			schedulers.clear;
 		});
+	}
+
+	*newScheduler { | server, clock, cascadeMode = true |
+		server = server ? Server.default;
+		clock = clock ? TempoClock; //use tempo clock as default
+		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
+	}
+
+	*getScheduler { | server |
+		var scheduler = schedulers[server];
+		if(scheduler.isNil, { ("No AlgaScheduler initialized for server " ++ server.asString).error });
+		^scheduler;
 	}
 
 	*boot { | onBoot, server, algaServerOptions |
@@ -58,9 +70,9 @@ Alga {
 		server.waitForBoot({
 			server.initTree;
 
-			//Create an AlgaScheduler on current server (using SystemClock for now...)
+			//Create an AlgaScheduler on current server (using TempoClock for now...)
 			//starting it here so printing happens after server boot.
-			algaSchedulers[server] = AlgaScheduler(server, cascadeMode:true);
+			this.newScheduler(server, cascadeMode:true);
 
 			onBoot.value;
 		});
