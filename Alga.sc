@@ -1,7 +1,6 @@
 Alga {
-	classvar <>schedulers;
-
-	var <server;
+	classvar <schedulers;
+	classvar <servers;
 
 	*initSynthDefs {
 		AlgaStartup.initSynthDefs;
@@ -9,6 +8,23 @@ Alga {
 
 	*initClass {
 		schedulers = IdentityDictionary();
+		servers = IdentityDictionary(1);
+	}
+
+	*clearScheduler { | server |
+		var scheduler = schedulers[server];
+		if(scheduler.isNil.not, {
+			scheduler.clear;
+			schedulers.removeAt(server);
+		});
+	}
+
+	*clearServer { | server |
+		var tempServer = servers[server];
+		if(tempServer.isNil.not, {
+			tempServer.quit;
+			servers.removeAt(tempServer);
+		});
 	}
 
 	*clearAllSchedulers {
@@ -58,15 +74,21 @@ Alga {
 
 		//Check AlgaSynthDef folder exists...
 		if(File.existsCaseSensitive(AlgaStartup.algaSynthDefIOPath) == false, {
-			("Could not retrieve the AlgaSyntDef folder. Running 'Alga.initSynthDefs' now...").warn;
+			("Could not retrieve the correct AlgaSyntDef/IO folder. Running 'Alga.initSynthDefs' now...").warn;
 			this.initSynthDefs;
 		});
 
 		//Add to SynthDescLib in order for .add to work... Find a leaner solution.
 		SynthDescLib.global.addServer(server);
 
-		//Clear all previous schedulers, if present
-		this.clearAllSchedulers;
+		//clear scheduler @server if present
+		this.clearScheduler(server);
+
+		//clear server @server if present
+		this.clearServer(server);
+
+		//Add the server
+		servers[server] = server;
 
 		//Boot
 		server.waitForBoot({

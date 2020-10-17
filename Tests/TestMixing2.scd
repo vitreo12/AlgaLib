@@ -26,7 +26,11 @@ Alga.boot({
 //Run multiple times, bug: no envelope scaling!
 d.replace({DC.kr(100)})
 
-[].isEmpty
+
+
+
+
+
 
 a <<.f b;
 
