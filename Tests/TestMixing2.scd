@@ -5,10 +5,10 @@ AlgaStartup.algaMaxIO=3;
 Alga.initSynthDefs;
 )
 
-//Verbose to print out stuff from AlgaScheduler (debug)
-AlgaScheduler.verbose = false;
 
 (
+AlgaScheduler.verbose = true;
+
 Alga.boot({
 	//s.plotTree;
 	a = AlgaNode({SinOsc.ar(\f.kr(440)).dup * 0.2}, connectionTime:1).play;

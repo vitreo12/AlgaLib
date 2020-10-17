@@ -119,14 +119,23 @@ AlgaScheduler : AlgaThread {
 		spinningActions[action] = accumTime;
 	}
 
-	executeFunc { | action, func, bundle, consumedActions |
+	executeFunc { | action, condition, func, sched, bundle, consumedActions, scheds |
+		var funcBundle;
+
 		if(verbose, (
 			"AlgaScheduler: executing function from context '" ++
-			action[0].def.context ++ "'"
+			condition.def.context ++ "'"
 		).postcln);
 
-		//Collect all bundles from func and add them to bundle
-		bundle[0] = server.makeBundle(false, { func.value }, bundle[0]);
+		//Generate bundle just for this func
+		funcBundle = server.makeBundle(false, { func.value });
+
+		//Add this func's bundle to global bundle
+		bundle[0] = bundle[0].add(funcBundle);
+		//Add timing information for the bundle generated in this func
+		scheds[0] = scheds[0].add(sched);
+
+		//Action completed: add to consumedActions
 		consumedActions.add(action);
 	}
 
@@ -134,7 +143,8 @@ AlgaScheduler : AlgaThread {
 		loop {
 			if(actions.size > 0, {
 				var consumedActions = IdentitySet();
-				var bundle = [server.makeBundle(false)]; //use array to pass by reference
+				var scheds = [Array()]; //use [] to pass by reference
+				var bundle = [Array()]; //use [] to pass by reference
 
 				//Bundle all the actions of this interval tick together
 				//This will be the core of clock / server syncing of actions
@@ -142,48 +152,85 @@ AlgaScheduler : AlgaThread {
 				actions.do({ | action |
 					var condition = action[0];
 					var func = action[1];
+					var sched = action[2];
 
 					if(condition.value, {
 						//If condition, execute it and remove from the OrderedIdentitySet
-						this.executeFunc(action, func, bundle, consumedActions)
+						this.executeFunc(
+							action,
+							condition,
+							func,
+							sched,
+							bundle,
+							consumedActions,
+							scheds
+						)
 					}, {
 						//if cascadeMode, spin here (so the successive actions won't be
 						//done until this one is). If it errors out, it will move to the next action
 						if(cascadeMode, {
-							var exceededMaxSpinTime = [false]; //use array for a "pass by reference" equivalent
+							var exceededMaxSpinTime = [false]; //use [] to pass by reference
 
 							while({ condition.value.not }, {
-								this.accumTimeAtAction(action, condition, exceededMaxSpinTime, consumedActions);
+								this.accumTimeAtAction(
+									action,
+									condition,
+									exceededMaxSpinTime,
+									consumedActions
+								);
+
 								if(exceededMaxSpinTime[0], {
 									condition = true; //exit the while loop
 								});
+
 								interval.wait;
 							});
 
 							//If finished spinning (or it errors out), execute func
 							if(exceededMaxSpinTime[0].not, {
-								this.executeFunc(action, func, bundle, consumedActions)
-							});
+								this.executeFunc(
+									action,
+									condition,
+									func,
+									sched,
+									bundle,
+									consumedActions,
+									scheds
+								)
+							})
 						}, {
-							//Just accumTime, while letting it go for successive actions
-							this.accumTimeAtAction(action, condition, nil, consumedActions);
+							//Just accumTime, while letting it go for successive actions.
+							//exceededMaxSpinTime is here nil
+							this.accumTimeAtAction(
+								action,
+								condition,
+								nil,
+								consumedActions
+							)
 						});
 					});
 				});
 
 				//Needs to be outside to remove actions
-				consumedActions.do({ | action |
+				consumedActions.do({ | action, i |
 					actions.remove(action);
 					spinningActions.removeAt(action);
 				});
 
-				//Send bundle right away.. Here it will be scheduled by a clock, eventually
-				if(verbose, { ("AlgaScheduler: sending bundle " ++ bundle[0].asString).warn });
-				server.makeBundle(nil, nil, bundle[0]);
+				if(bundle[0].size > 0, {
 
-				//With a clock, gotta check this schedBundleArrayOnClock function!
-				//It's the one used in Patterns too ;)
-				//schedBundleArrayOnClock(0, clock, bundle[0], 0, server, server.latency);
+					//Print bundles out
+					if(verbose, { ("AlgaScheduler: sending bundle " ++ bundle[0].asString).warn });
+					if(verbose, { ("AlgaScheduler: scheds array: " ++ scheds[0].asString).warn });
+
+					//Send the bundle with each entry at specific scheduled time on clock
+					scheds[0].algaSchedBundleArrayOnClock(
+						clock,
+						bundle[0],
+						server,
+						server.latency
+					);
+				});
 			});
 
 			//Check the size again here,
@@ -205,8 +252,8 @@ AlgaScheduler : AlgaThread {
 	}
 
 	//Default condition is just { true }, just execute it when its time comes on the scheduler
-	addAction { | condition, action |
-		var conditionAndAction;
+	addAction { | condition, action, sched = 0 |
+		var conditionActionSched;
 
 		condition = condition ? { true };
 
@@ -215,13 +262,75 @@ AlgaScheduler : AlgaThread {
 			^this;
 		});
 
-		conditionAndAction = [condition, action];
-		actions.add(conditionAndAction);
-		spinningActions[conditionAndAction] = 0;
+		if(sched.isNumber.not, {
+			"AlgaScheduler: addAction only accepts Numbers as sched arguments".error;
+			^this;
+		});
+
+		conditionActionSched = [condition, action, sched];
+		actions.add(conditionActionSched);
+		spinningActions[conditionActionSched] = 0; //set to 0 the accumulator of spinningActions
 
 		//New action! Unlock the semaphore
 		if(semaphore.test.not, {
 			semaphore.unhang;
 		});
+	}
+}
+
+//Just as schedBundleArrayOnClock, but it also supports array of array bundles
++ SequenceableCollection {
+	algaSchedBundleArrayOnClock { | clock, bundleArray, server, latency, lag = 0 |
+
+		// "this" is an array of delta times for the clock (usually in beats)
+		// "lag" is a value or an array of tempo independent absolute lag times (in seconds)
+
+		var sendBundle;
+
+		latency = latency ? server.latency;
+
+		sendBundle = { |i|
+			//this could either be an array of array, or just array.
+			//the star makes sure of "unpacking" things to send correctly!
+			var bundle = bundleArray.wrapAt(i);
+			server.algaSendClumpedBundle(latency, *bundle) //this star here fixes it all!
+		};
+
+		if(lag == 0, {
+			this.do({ |delta, i|
+				if(delta != 0, {
+					// schedule only on the clock passed in
+					clock.sched(delta, { sendBundle.value(i) })
+				}, {
+					// send directly
+					sendBundle.value(i)
+				});
+			});
+		}, {
+			lag = lag.asArray;
+
+			this.do({ |delta, i|
+				if(delta != 0, {
+					// schedule on both clocks
+					clock.sched(delta, {
+						SystemClock.sched(lag.wrapAt(i), { sendBundle.value(i) })
+					})
+				}, {
+					// schedule only on the system clock
+					SystemClock.sched(lag.wrapAt(i), { sendBundle.value(i) })
+				});
+			});
+		});
+	}
+}
+
++ Server {
+	algaSendClumpedBundle { | time ... msgs |
+		if(AlgaScheduler.verbose, {
+			("Server: latency: " ++ time).postcln;
+			("Server: msg bundle: " ++ msgs).postcln;
+		});
+
+		addr.sendClumpedBundles(time, *msgs); //Better than sendBundle, as it checks for msg size!
 	}
 }
