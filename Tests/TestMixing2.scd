@@ -11,17 +11,36 @@ AlgaStartup.algaMaxIO=3;
 AlgaScheduler.verbose = false;
 
 Alga.boot({
-	s.plotTree;
+	//s.plotTree;
 	a = AlgaNode({SinOsc.ar(\f.kr(440)).dup * 0.2}, connectionTime:1).play;
 	b = AlgaNode({DC.kr(220)});
 	c = AlgaNode({DC.kr(100)});
 	d = AlgaNode({DC.kr(200)});
 
-	//a <<.f b;
-	//a <<+.f c;
-	//a.replaceMix(\f, c, d);
+	a <<.f b;
+	a <<+.f c;
+	a.replaceMix(\f, c, d);
+
+	//this doesn't work yet
+	/*
+	d.replace({DC.kr(1000)});
+	b.replace({DC.ar(2020)});
+	a <<.f b;
+	*/
 })
 )
+
+d.replace({DC.kr(1000)});
+b.replace({DC.ar(2020)});
+
+a <<.f b;
+
+//bugged
+a <<+.f b;
+
+
+
+
 
 a <<.f b;
 a <<+.f c;
@@ -41,7 +60,7 @@ b.replace({DC.ar(220)})
 
 a <<.f b;
 
-a <<+.f b;
+a <<+.f d;
 
 
 

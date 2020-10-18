@@ -46,7 +46,7 @@ AlgaNode {
 	var <inNodes, <outNodes;
 
 	//keep track of current \default nodes
-	var <currentDefaults;
+	var <currentDefaultNodes;
 
 	var <paramChansMapping;
 
@@ -112,7 +112,7 @@ AlgaNode {
 
 		//This keeps track of current \default nodes for every param.
 		//These are then used to restore default connections on <| or << after the param being a mix one (<<+)
-		currentDefaults = IdentityDictionary(10);
+		currentDefaultNodes = IdentityDictionary(10);
 
 		//Keeps all the connectionTimes of the connected nodes
 		connectionTimeOutNodes = IdentityDictionary(10);
@@ -327,7 +327,6 @@ AlgaNode {
 			var paramNumChannels = controlName.numChannels;
 
 			//interpBusses have 1 more channel for the envelope shape
-			//interpBusses[paramName] = AlgaBus(server, paramNumChannels + 1, paramRate);
 			interpBusses[paramName][\default] = AlgaBus(server, paramNumChannels + 1, paramRate);
 			normBusses[paramName] = AlgaBus(server, paramNumChannels, paramRate);
 		});
@@ -758,7 +757,13 @@ AlgaNode {
 	//Run when <<+ / .replace (on mixed connection) / .replaceMix
 	createMixInterpSynthInterpBusBusNormSynthAtParam { | sender, param = \in, replaceMix = false, replace = false, senderChansMapping |
 		//on a new <<+ !
-		var newMixConnection = this.mixerParamContainsSender(param, sender).not;
+
+		//also check sender is not the default!
+		var newMixConnection = (
+			this.mixerParamContainsSender(param, sender).not).and(
+			sender != currentDefaultNodes[param]
+		);
+
 		var newMixConnectionOrReplaceMix = newMixConnection.or(replaceMix);
 		var newMixConnectionOrReplace = newMixConnection.or(replace);
 
@@ -951,10 +956,9 @@ AlgaNode {
 		//Add to interpSynths for the param
 		interpSynths[param][senderSym] = interpSynth;
 
-		//If present, remove the \default stuff from interpSynths
 		//Store current \default (needed when mix == true)
 		if((senderSym == \default).and(mix == false), {
-			currentDefaults[param] = sender;
+			currentDefaultNodes[param] = sender;
 		});
 	}
 
@@ -1042,15 +1046,13 @@ AlgaNode {
 	freeMixNodeAtParam { | sender, param = \in, paramConnectionTime, replace = false, cleanupDicts = false |
 		var interpSynthAtParam = interpSynths[param][sender];
 
-		interpSynthAtParam.postln;
-
 		if(interpSynthAtParam != nil, {
 			var normSynthAtParam = normSynths[param][sender];
 			var interpBusAtParam = interpBusses[param][sender];
 			var triggerFadeOut = false;
 
 			//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
-			if(sender != currentDefaults[param], {
+			if(sender != currentDefaultNodes[param], {
 				triggerFadeOut = true;
 			});
 
@@ -1339,10 +1341,8 @@ AlgaNode {
 		//Can't connect AlgaNode to itself
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
-		mix.postln;
-
 		if(mix, {
-			currentDefaultAtParam = currentDefaults[param];
+			currentDefaultAtParam = currentDefaultNodes[param];
 
 			//trying to <<+ instead of << on first connection
 			if((currentDefaultAtParam == nil), {
@@ -1870,8 +1870,8 @@ AlgaNode {
 		("\t" ++ normSynths.asString).postln;
 		"normBusses:".postln;
 		("\t" ++ normBusses.asString).postln;
-		"currentDefaults:".postln;
-		("\t" ++ currentDefaults.asString).postln;
+		"currentDefaultNodes:".postln;
+		("\t" ++ currentDefaultNodes.asString).postln;
 	}
 }
 
