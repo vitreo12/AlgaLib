@@ -7,7 +7,7 @@ Alga {
 	}
 
 	*initClass {
-		schedulers = IdentityDictionary();
+		schedulers = IdentityDictionary(1);
 		servers = IdentityDictionary(1);
 	}
 
@@ -54,9 +54,6 @@ Alga {
 		server = server ? Server.default;
 		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
-		//quit server if it was on
-		server.quit;
-
 		//set options
 		server.options.sampleRate = algaServerOptions.sampleRate;
 		server.options.blockSize = algaServerOptions.blockSize;
@@ -78,13 +75,13 @@ Alga {
 			this.initSynthDefs;
 		});
 
-		//Add to SynthDescLib in order for .add to work... Find a leaner solution.
+		//Add to SynthDescLib in order for SynthDef.add to work
 		SynthDescLib.global.addServer(server);
 
 		//clear scheduler @server if present
 		this.clearScheduler(server);
 
-		//clear server @server if present
+		//clear server @server if present, also quit it
 		this.clearServer(server);
 
 		//Add the server
@@ -98,6 +95,7 @@ Alga {
 			//Make sure to init everything
 			server.initTree;
 
+			//Execute onBoot function
 			onBoot.value;
 		});
 	}
