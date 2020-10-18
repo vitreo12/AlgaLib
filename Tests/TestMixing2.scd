@@ -19,6 +19,7 @@ Alga.boot({
 
 	a <<.f b;
 	a <<+.f c;
+	//1.wait;
 	a.replaceMix(\f, c, d);
 })
 )
@@ -27,8 +28,9 @@ Alga.boot({
 d.replace({DC.kr(100)})
 
 
-
-
+//ok this still works
+a <<.f b;
+b.replace({DC.ar(220)})
 
 
 

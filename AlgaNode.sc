@@ -1034,30 +1034,40 @@ AlgaNode {
 	freeMixNodeAtParam { | sender, param = \in, paramConnectionTime, cleanupDicts = false |
 		var interpSynthAtParam = interpSynths[param][sender];
 		if(interpSynthAtParam != nil, {
+			var normSynthAtParam = normSynths[param][sender];
+			var interpBusAtParam = interpBusses[param][sender];
+			var freeNormSynthToo = false;
+
 			//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
 			//\default will then be re-used when disconnecting all mixing parameters!
 			if(sender != currentDefaults[param], {
-				var normSynthAtParam = normSynths[param][sender];
-				var interpBusAtParam = interpBusses[param][sender];
-
-				var fadeOutSymbol = ("alga_fadeOut_" ++
-					interpBusAtParam.rate ++
-					(interpBusAtParam.numChannels - 1) //it has one more for env. need to remove that from symbol
-				).asSymbol;
-
-				AlgaSynth.new(
-					fadeOutSymbol,
-					[
-						\out, interpBusAtParam.index,
-						\fadeTime, paramConnectionTime,
-					],
-					interpGroup
-				);
-
-				normSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+				freeNormSynthToo = true;
 			});
 
-			interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+			//Make sure all of these are scheduled correctly to each other!
+			algaScheduler.addAction({ (normSynthAtParam.instantiated).and(interpSynthAtParam.instantiated) }, {
+				if(freeNormSynthToo, {
+					var fadeOutSymbol = ("alga_fadeOut_" ++
+						interpBusAtParam.rate ++
+						(interpBusAtParam.numChannels - 1) //it has one more for env. need to remove that from symbol
+					).asSymbol;
+
+					AlgaSynth.new(
+						fadeOutSymbol,
+						[
+							\out, interpBusAtParam.index,
+							\fadeTime, paramConnectionTime,
+						],
+						interpGroup
+					);
+
+					//This has to be surely instantiated before being freed
+					normSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+				});
+
+				//This has to be surely instantiated before being freed
+				interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
+			});
 		});
 
 		if(cleanupDicts, {
@@ -1069,7 +1079,6 @@ AlgaNode {
 
 	//Free interpSynth at param. This is also used in .replace for both mix entries and normal ones
 	//THIS USES connectionTime!!
-	//THIS, together with freeInterpSynthAtParam, IS THE WHOLE CORE OF THE INTERPOLATION BEHAVIOUR!!!
 	freeInterpSynthAtParam { | sender, param = \in, mix = false |
 		var interpSynthsAtParam = interpSynths[param];
 		var paramConnectionTime = paramsConnectionTime[param];
