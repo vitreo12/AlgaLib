@@ -8,21 +8,26 @@ Alga.initSynthDefs;
 
 (
 AlgaStartup.algaMaxIO=3;
-AlgaScheduler.verbose = true;
+AlgaScheduler.verbose = false;
 
 Alga.boot({
-	//s.plotTree;
+	s.plotTree;
 	a = AlgaNode({SinOsc.ar(\f.kr(440)).dup * 0.2}, connectionTime:1).play;
 	b = AlgaNode({DC.kr(220)});
 	c = AlgaNode({DC.kr(100)});
 	d = AlgaNode({DC.kr(200)});
 
-	a <<.f b;
-	a <<+.f c;
-	//1.wait;
-	a.replaceMix(\f, c, d);
+	//a <<.f b;
+	//a <<+.f c;
+	//a.replaceMix(\f, c, d);
 })
 )
+
+a <<.f b;
+a <<+.f c;
+a.replaceMix(\f, c, d);
+
+s.scope
 
 //Run multiple times, bug: no envelope scaling!
 d.replace({DC.kr(100)})
