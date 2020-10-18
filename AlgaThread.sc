@@ -62,12 +62,14 @@ AlgaThread {
 
 AlgaScheduler : AlgaThread {
 	var <>interval = 0.01;
-	var <>maxSpinTime = 1;
+	var <>maxSpinTime = 2;
 	var semaphore;
 
 	var <>cascadeMode = false;
 
 	var <actions, <spinningActions;
+
+	var isAlgaPatchScheduler = false;
 
 	*new { | server, clock, cascadeMode = false, autostart = true |
 		var argServer = server ? Server.default;
@@ -119,24 +121,29 @@ AlgaScheduler : AlgaThread {
 		spinningActions[action] = accumTime;
 	}
 
-	executeFunc { | action, condition, func, sched, bundle, consumedActions, scheds |
+	executeFunc { | action, condition, func, sched, consumedActions |
 		var funcBundle;
 
-		if(verbose, (
-			"AlgaScheduler: executing function from context '" ++
-			condition.def.context ++ "'"
-		).postcln);
+		if(verbose, {
+			(
+				"AlgaScheduler: executing function from context '" ++
+				condition.def.context ++ "'"
+			).postcln;
+		});
 
 		//Generate bundle just for this func
 		funcBundle = server.makeBundle(false, { func.value });
 
-		//If any OSC funcs are generated in bundle, add them to the global bundle
+		//Send bundle out at the specific time frame.
+		//Wrap it in an array so that algaSchedBundleArrayOnClock
+		//schedules all the OSC funcs on same sched
 		if(funcBundle.isEmpty.not, {
-			//Add this func's bundle to global bundle
-			bundle[0] = bundle[0].add(funcBundle);
-
-			//Add timing information for the bundle generated in this func
-			scheds[0] = scheds[0].add(sched);
+			[sched].algaSchedBundleArrayOnClock(
+				clock,
+				[funcBundle],
+				server,
+				server.latency
+			);
 		});
 
 		//Action completed: add to consumedActions
@@ -147,8 +154,6 @@ AlgaScheduler : AlgaThread {
 		loop {
 			if(actions.size > 0, {
 				var consumedActions = IdentitySet();
-				var scheds = [Array()]; //use [] to pass by reference
-				var bundle = [Array()]; //use [] to pass by reference
 
 				//Bundle all the actions of this interval tick together
 				//This will be the core of clock / server syncing of actions
@@ -165,9 +170,7 @@ AlgaScheduler : AlgaThread {
 							condition,
 							func,
 							sched,
-							bundle,
 							consumedActions,
-							scheds
 						)
 					}, {
 						//if cascadeMode, spin here (so the successive actions won't be
@@ -197,9 +200,7 @@ AlgaScheduler : AlgaThread {
 									condition,
 									func,
 									sched,
-									bundle,
 									consumedActions,
-									scheds
 								)
 							})
 						}, {
@@ -219,22 +220,6 @@ AlgaScheduler : AlgaThread {
 				consumedActions.do({ | action, i |
 					actions.remove(action);
 					spinningActions.removeAt(action);
-				});
-
-				//If there is something to send
-				if(bundle[0].isEmpty.not, {
-
-					//Print bundles out
-					if(verbose, { ("AlgaScheduler: sending bundle " ++ bundle[0].asString).warn });
-					if(verbose, { ("AlgaScheduler: scheds array: " ++ scheds[0].asString).warn });
-
-					//Send the bundle with each entry at specific scheduled time on clock
-					scheds[0].algaSchedBundleArrayOnClock(
-						clock,
-						bundle[0],
-						server,
-						server.latency
-					);
 				});
 			});
 
@@ -281,4 +266,28 @@ AlgaScheduler : AlgaThread {
 			semaphore.unhang;
 		});
 	}
+
+	executeAlgaPatch { | func |
+		isAlgaPatchScheduler = true;
+		this.addAction(action:func);
+	}
 }
+
+//Run things concurrently in the scheduler.
+//Each event waits for the previous one to be completed.
+AlgaPatch {
+	*new { | func, server |
+		var algaScheduler;
+		server = server ? Server.default;
+		algaScheduler = Alga.newAlgaPatchScheduler(server);
+		algaScheduler.executeAlgaPatch(func);
+	}
+}
+
+/*
++ Function {
+	algaPatch {
+		^AlgaPatch(this);
+	}
+}
+*/

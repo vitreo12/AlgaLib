@@ -476,13 +476,13 @@ AlgaNode {
 			//this way, some params mapping set 5 replace ago would be kept and eventually set.
 			//As of now, only the previous ones are kept.
 			if(replace.and(keepChannelsMapping), {
-				var new_outs = IdentityDictionary(10);
+				var newOuts = IdentityDictionary(10);
 
 				//copy previous ones
 				outs.keysValuesDo({ | key, value |
 					//Delete out of bounds entries? Or keep it for future .replaces?
 					//if(value < numChannels, {
-						new_outs[key] = value;
+						newOuts[key] = value;
 					//});
 				});
 
@@ -490,11 +490,11 @@ AlgaNode {
 				synthDef.outsMapping.keysValuesDo({ | key, value |
 					//Delete out of bounds entries? Or keep it for future .replaces?
 					//if(value < numChannels, {
-						new_outs[key] = value;
+						newOuts[key] = value;
 					//});
 				});
 
-				outs = new_outs;
+				outs = newOuts;
 
 			}, {
 				outs = synthDef.outsMapping;
@@ -1049,15 +1049,16 @@ AlgaNode {
 		if(interpSynthAtParam != nil, {
 			var normSynthAtParam = normSynths[param][sender];
 			var interpBusAtParam = interpBusses[param][sender];
-			var triggerFadeOut = false;
-
-			//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
-			if(sender != currentDefaultNodes[param], {
-				triggerFadeOut = true;
-			});
 
 			//Make sure all of these are scheduled correctly to each other!
 			algaScheduler.addAction({ (normSynthAtParam.instantiated).and(interpSynthAtParam.instantiated) }, {
+				var triggerFadeOut = false;
+
+				//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
+				if(sender != currentDefaultNodes[param], {
+					triggerFadeOut = true;
+				});
+
 				//Only create fadeOut and free normSynth on .replaceMix and .disconnect! (not .replace)
 				if(triggerFadeOut.and(replace.not), {
 					var fadeOutSymbol = ("alga_fadeOut_" ++

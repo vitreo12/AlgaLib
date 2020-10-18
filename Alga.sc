@@ -43,6 +43,15 @@ Alga {
 		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
 	}
 
+	*newAlgaPatchScheduler { | server, clock |
+		var algaScheduler;
+		server = server ? Server.default;
+		clock = clock ? TempoClock; //use tempo clock as default
+		algaScheduler = AlgaScheduler(server, clock, true);
+		schedulers[UniqueID.next] = algaScheduler;
+		^algaScheduler;
+	}
+
 	*getScheduler { | server |
 		var scheduler = schedulers[server];
 		if(scheduler.isNil, { ("No AlgaScheduler initialized for server " ++ server.asString).error });
@@ -88,7 +97,8 @@ Alga {
 		servers[server] = server;
 
 		//Create an AlgaScheduler on current server (using TempoClock for now...)
-		this.newScheduler(server, cascadeMode:true);
+		//this.newScheduler(server, cascadeMode:true);
+		this.newScheduler(server, cascadeMode:false);
 
 		//Boot
 		server.waitForBoot({

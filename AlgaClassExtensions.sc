@@ -70,8 +70,8 @@
 + Server {
 	algaSendClumpedBundle { | time ... msgs |
 		if(AlgaScheduler.verbose, {
-			("Server: latency: " ++ time).postcln;
-			("Server: msg bundle: " ++ msgs).postcln;
+			("Server: latency: " ++ time).warn;
+			("Server: msg bundle: " ++ msgs).warn;
 		});
 
 		addr.sendClumpedBundles(time, *msgs); //Better than sendBundle, as it checks for msg size!
