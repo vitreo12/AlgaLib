@@ -69,7 +69,7 @@ AlgaScheduler : AlgaThread {
 
 	var <actions, <spinningActions;
 
-	var isAlgaPatchScheduler = false;
+	var isAlgaPatch = false;
 
 	*new { | server, clock, cascadeMode = false, autostart = true |
 		var argServer = server ? Server.default;
@@ -258,6 +258,10 @@ AlgaScheduler : AlgaThread {
 		});
 
 		conditionActionSched = [condition, action, sched];
+
+		//If cascadeMode, actions within actions should be correctly placed right after the other.
+		//this will make the whole AlgaPatch concept work
+
 		actions.add(conditionActionSched);
 		spinningActions[conditionActionSched] = 0; //set to 0 the accumulator of spinningActions
 
@@ -268,8 +272,9 @@ AlgaScheduler : AlgaThread {
 	}
 
 	executeAlgaPatch { | func |
-		isAlgaPatchScheduler = true;
+		isAlgaPatch = true;
 		this.addAction(action:func);
+		//actions need to be stack (so that an action within an action is in the same stack)
 	}
 }
 
@@ -279,8 +284,11 @@ AlgaPatch {
 	*new { | func, server |
 		var algaScheduler;
 		server = server ? Server.default;
-		algaScheduler = Alga.newAlgaPatchScheduler(server);
-		algaScheduler.executeAlgaPatch(func);
+
+		"AlgaPatch is not implemented yet".error;
+
+		//algaScheduler = Alga.newAlgaPatchScheduler(server);
+		//algaScheduler.executeAlgaPatch(func);
 	}
 }
 
