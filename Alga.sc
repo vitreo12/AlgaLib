@@ -90,14 +90,13 @@ Alga {
 		//Add the server
 		servers[server] = server;
 
+		//Create an AlgaScheduler on current server (using TempoClock for now...)
+		this.newScheduler(server, cascadeMode:true);
+
 		//Boot
 		server.waitForBoot({
 			//Make sure to init everything
 			server.initTree;
-
-			//Create an AlgaScheduler on current server (using TempoClock for now...)
-			//starting it here so printing happens after server boot.
-			this.newScheduler(server, cascadeMode:true);
 
 			onBoot.value;
 		});
