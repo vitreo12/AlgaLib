@@ -147,7 +147,9 @@ AlgaScheduler : AlgaThread {
 		});
 
 		//Action completed: add to consumedActions
-		consumedActions.add(action);
+		if(consumedActions != nil, {
+			consumedActions.add(action);
+		});
 	}
 
 	run {
@@ -254,6 +256,19 @@ AlgaScheduler : AlgaThread {
 
 		if(sched.isNumber.not, {
 			"AlgaScheduler: addAction only accepts Numbers as sched arguments".error;
+			^this;
+		});
+
+		//If condition is true already, execute the func right away
+		if(condition.value, {
+			this.executeFunc(
+				nil,
+				condition,
+				action,
+				sched,
+				nil
+			);
+
 			^this;
 		});
 

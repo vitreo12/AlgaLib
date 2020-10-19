@@ -25,28 +25,9 @@ Alga.boot({
 
 	d.replace({DC.kr(1000)});
 	b.replace({DC.kr(2020)});
-
-	//a <<.f b;
 })
 )
 
-
-AlgaPatch({
-	//s.plotTree;
-	a = AlgaNode({SinOsc.ar(\f.kr(440)).dup * 0.2}, connectionTime:1).play;
-	b = AlgaNode({DC.kr(220)});
-	c = AlgaNode({DC.kr(100)});
-	d = AlgaNode({DC.kr(200)});
-
-	a <<.f b;
-	a <<+.f c;
-	a.replaceMix(\f, c, d);
-
-	d.replace({DC.kr(1000)});
-	b.replace({DC.kr(2020)});
-
-	//a <<.f b;
-});
 
 
 

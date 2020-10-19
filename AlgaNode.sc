@@ -962,6 +962,17 @@ AlgaNode {
 		});
 	}
 
+	//Eventually use this func to free all synths around that use \gate and \fadeTime
+	freeSynthOnScheduler { | whatSynth, whatFadeTime |
+		if(whatSynth.instantiated, {
+			whatSynth.set(\gate, 0, \fadeTime, whatFadeTime);
+		}, {
+			algaScheduler.addAction({ whatSynth.instantiated }, {
+				whatSynth.set(\gate, 0, \fadeTime, whatFadeTime);
+			});
+		});
+	}
+
 	//Default now and useConnectionTime to true for synths.
 	//Synth always uses longestConnectionTime, in order to make sure that everything connected to it
 	//will have time to run fade ins and outs
