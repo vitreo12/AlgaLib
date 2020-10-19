@@ -1117,6 +1117,8 @@ AlgaNode {
 		//mix == false comes from <<
 		//mix == true comes from <<+, .replaceMix, .replace, .disconnect
 		if((sender == nil).or(mix == false), {
+			interpSynthsAtParam.postln;
+			interpSynthsAtParam.size.postln;
 			//If interpSynthsAtParam length is more than one, the param has mix entries. Fade them all out.
 			if(interpSynthsAtParam.size > 1, {
 				interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam  |
@@ -1131,6 +1133,7 @@ AlgaNode {
 					});
 				});
 			}, {
+				"aa".error;
 				//Just one entry in the dict (\default), just free the interp synth!
 				interpSynthsAtParam.do({ | interpSynthAtParam |
 					interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
@@ -1223,7 +1226,7 @@ AlgaNode {
 	//Remove entries from inNodes / outNodes / connectionTimeOutNodes for all involved nodes
 	removeInOutNodesDict { | previousSender = nil, param = \in |
 		var previousSenders = inNodes[param];
-		if(previousSenders == nil, { ( "No previous connection enstablished at param:" ++ param).error; ^this; });
+		if(previousSenders == nil, { ( "No previous connection enstablished at param: " ++ param).error; ^this; });
 
 		previousSenders.do({ | sender |
 			var sendersParamsSet = sender.outNodes[this];

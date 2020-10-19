@@ -45,6 +45,35 @@
 	}
 }
 
+//Debug purposes
++BundleNetAddr {
+	closeBundle { arg time;
+		var bundleList, lastBundles;
+		if(time != false) {
+			if(async.not) {
+				if(AlgaScheduler.verbose, {
+					("Server: latency: " ++ time).warn;
+					("Server: msg bundle: " ++ bundle).warn;
+				});
+				saveAddr.sendClumpedBundles(time, *bundle);
+				^bundle;
+			};
+
+			forkIfNeeded {
+				bundleList = this.splitBundles(time);
+				lastBundles = bundleList.pop;
+				bundleList.do { |bundles|
+					var t = bundles.removeAt(0);
+					saveAddr.sync(nil, bundles, t); // make an independent condition.
+				};
+				saveAddr.sendClumpedBundles(*lastBundles);  // time ... args
+			}
+		};
+		^bundle
+	}
+}
+
+/*
 //Just as schedBundleArrayOnClock, but it also supports array of array bundles
 + SequenceableCollection {
 	algaSchedBundleArrayOnClock { | clock, bundleArray, server, latency, lag = 0 |
@@ -101,3 +130,4 @@
 		addr.sendClumpedBundles(time, *msgs); //Better than sendBundle, as it checks for msg size!
 	}
 }
+*/

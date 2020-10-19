@@ -64,8 +64,9 @@ AlgaScheduler : AlgaThread {
 	var <>interval = 0.01;
 	var <>maxSpinTime = 2;
 
-	var <>cascadeMode = false;
-	var <>switchCascadeMode = false;
+	var <cascadeMode = false;
+	var <switchCascadeMode = false;
+	var <scheduling = false;
 
 	var semaphore;
 
@@ -98,6 +99,16 @@ AlgaScheduler : AlgaThread {
 		cascadeMode = argCascadeMode;
 
 		super.init(autostart);
+	}
+
+	cascadeMode_ { | val |
+		if(scheduling, { "Can't set cascadeMode while scheduling events".error; ^this });
+		cascadeMode = val;
+	}
+
+	switchCascadeMode_ { | val |
+		if(scheduling, { "Can't set switchCascadeMode_ while scheduling events".error; ^this });
+		switchCascadeMode = val;
 	}
 
 	removeAction { | action |
@@ -225,6 +236,9 @@ AlgaScheduler : AlgaThread {
 				//Reset spinningActionsCount
 				spinningActionsCount = 0;
 
+				//To protect cascadeMode_
+				scheduling = true;
+
 				//Bundle all the actions of this interval tick together
 				//This will be the core of clock / server syncing of actions
 				//Consume actions (they are ordered thanks to OrderedIdentitySet)
@@ -273,11 +287,9 @@ AlgaScheduler : AlgaThread {
 			//All actions are completed: reset currentExecAction
 			currentExecAction = nil;
 
-			cascadeMode.postln;
-
-			//If switchCascadeMode, revert to cascadeMode = false
+			//If switchCascadeMode... This is used for AlgaPatch
 			if(switchCascadeMode, {
-				"Switching mode".postln;
+				if(verbose, { "AlgaPatch: switching mode".postcln; });
 				if(cascadeMode, {
 					cascadeMode = false;
 				}, {
@@ -285,7 +297,7 @@ AlgaScheduler : AlgaThread {
 				});
 			});
 
-			cascadeMode.postln;
+			scheduling = false;
 
 			//No actions to consume, hang
 			if(verbose, { ("AlgaScheduler" + name + "hangs").postcln; });
@@ -329,9 +341,6 @@ AlgaScheduler : AlgaThread {
 		});
 		*/
 
-		//new action
-		action = [condition, func, sched];
-
 		/*
 		"\nBefore".postln;
 		actions.do({|bubu|
@@ -339,6 +348,9 @@ AlgaScheduler : AlgaThread {
 		});
 		"".postln;
 		*/
+
+		//new action
+		action = [condition, func, sched];
 
 		//We're in a callee situation: add this node after the index of currentExecAction
 		if(currentExecAction != nil, {
@@ -387,6 +399,7 @@ AlgaPatch {
 				//If already cascadeMode
 				algaScheduler.addAction(func: func);
 			}, {
+				//Make cascadeMode true and switch back to false when done
 				algaScheduler.cascadeMode = true;
 				algaScheduler.switchCascadeMode = true;
 				algaScheduler.addAction(func: func);
