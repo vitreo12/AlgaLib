@@ -13,9 +13,10 @@ Alga {
 
 	*clearScheduler { | server |
 		var scheduler = schedulers[server];
+		scheduler.postln;
 		if(scheduler.isNil.not, {
-			scheduler.clear;
 			schedulers.removeAt(server);
+			scheduler.clear;
 		});
 	}
 
@@ -44,12 +45,12 @@ Alga {
 	}
 
 	*newAlgaPatchScheduler { | server, clock |
-		var algaScheduler;
+		var scheduler;
 		server = server ? Server.default;
 		clock = clock ? TempoClock; //use tempo clock as default
-		algaScheduler = AlgaScheduler(server, clock, true);
-		schedulers[UniqueID.next] = algaScheduler;
-		^algaScheduler;
+		scheduler = AlgaScheduler(server:server, clock:clock, cascadeMode:true);
+		schedulers[scheduler] = scheduler;
+		^scheduler;
 	}
 
 	*getScheduler { | server |
@@ -97,8 +98,8 @@ Alga {
 		servers[server] = server;
 
 		//Create an AlgaScheduler on current server (using TempoClock for now...)
-		//this.newScheduler(server, cascadeMode:true);
 		this.newScheduler(server, cascadeMode:true);
+		//this.newScheduler(server, cascadeMode:false);
 
 		//Boot
 		server.waitForBoot({

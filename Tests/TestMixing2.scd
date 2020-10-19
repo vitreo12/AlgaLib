@@ -29,6 +29,8 @@ Alga.boot({
 })
 )
 
+s.scope
+
 (
 AlgaStartup.algaMaxIO=3;
 AlgaScheduler.verbose = true;

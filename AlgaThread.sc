@@ -65,14 +65,15 @@ AlgaScheduler : AlgaThread {
 	var <>maxSpinTime = 2;
 
 	var <>cascadeMode = false;
-	var isAlgaPatch = false;
+	var <>switchCascadeMode = false;
 
 	var semaphore;
 
 	var <actions, <spinningActions;
 
 	//sclang is single threaded, there won't ever be data races here ;)
-	var <currentExecAction;
+	var currentExecAction;
+	var spinningActionsCount = 0;
 
 	*new { | server, clock, cascadeMode = false, autostart = true |
 		var argServer = server ? Server.default;
@@ -123,36 +124,12 @@ AlgaScheduler : AlgaThread {
 			if(cascadeMode, {
 				exceededMaxSpinTime[0] = true;
 			});
+
+			^nil;
 		});
 
 		//Update timing
 		spinningActions[action] = accumTime;
-	}
-
-	//If sched, exec func and send bundle after that time. Otherwise, exec func and send bundle now
-	execFuncOnSched { | action, func, sched |
-		if(sched > 0, {
-			//Update maxSpinTime if it's longer than sched
-			if(sched > maxSpinTime, {
-				maxSpinTime = sched + interval;
-			});
-
-			clock.sched(sched, {
-				server.bind({
-					func.value;
-
-					//Action completed
-					this.removeAction(action);
-				});
-			});
-		}, {
-			server.bind({
-				func.value;
-
-				//Action completed
-				this.removeAction(action);
-			});
-		});
 	}
 
 	executeFunc { | action, func, sched |
@@ -163,83 +140,152 @@ AlgaScheduler : AlgaThread {
 			).postcln;
 		});
 
-		//Update currentExecAction
+		//Update currentExecAction (so it's picked in func.value for child addAction)
 		currentExecAction = action;
 
-		//Should I just send the func to clock and execute it on sched?
-		this.execFuncOnSched(action, func, sched);
+		//execute and remove action
+		server.bind({ func.value });
+		this.removeAction(action);
+
+		//Reset currentExecAction
+		currentExecAction = nil;
+	}
+
+	loopFunc { | action |
+		//Unpack things
+		var condition = action[0];
+		var func = action[1];
+
+		if(condition.value, {
+			//If condition, execute it and remove from the List
+			this.executeFunc(
+				action,
+				func,
+			);
+		}, {
+			//enter one of the two cascadeModes
+			if(cascadeMode, {
+				//cascadeMode == true
+				//concurrent waiting
+
+				var exceededMaxSpinTime = [false]; //use [] to pass by reference
+
+				while({ condition.value.not }, {
+					this.accumTimeAtAction(
+						action,
+						condition,
+						exceededMaxSpinTime
+					);
+
+					if(exceededMaxSpinTime[0], {
+						condition = true; //exit the while loop
+					});
+
+					//Block the execution: spin around this action
+					interval.wait;
+				});
+
+				//If finished spinning, execute func
+				if(exceededMaxSpinTime[0].not, {
+					this.executeFunc(
+						action,
+						func,
+					)
+				})
+			}, {
+				//cascadeMode == false
+				//parallell spinning
+
+				//Just accumTime, while letting it go for successive actions.
+				//exceededMaxSpinTime is here nil
+				this.accumTimeAtAction(
+					action,
+					condition,
+					nil
+				);
+
+				//("Hanging at func" + condition.def.context).postln;
+
+				//Or, this action is spinning
+				spinningActionsCount = spinningActionsCount + 1;
+
+				//Before adding, check if this was last entry in the list.
+				//If that's the case, spin
+				if((spinningActionsCount == (actions.size)).or(actions.size == 1), {
+					spinningActionsCount = 0; //reset
+					interval.wait; //spin
+				});
+			});
+		});
 	}
 
 	run {
 		loop {
 			if(actions.size > 0, {
+				//Reset spinningActionsCount
+				spinningActionsCount = 0;
+
 				//Bundle all the actions of this interval tick together
 				//This will be the core of clock / server syncing of actions
 				//Consume actions (they are ordered thanks to OrderedIdentitySet)
 				while({ actions.size > 0 }, {
-					var action, condition, func, sched;
+					var action, sched;
 
-					//if cascading, pop action from top of the list
 					if(cascadeMode, {
+						//if cascading, pop action from top of the list.
+						//this will always be the next action available
 						action = actions[0];
 					}, {
-						//Otherwise, just get the next action
+						//Otherwise, just get the next available action
+
+						//Make sure of boundaries (it happens on addActions that add more addActions)
+						if(spinningActionsCount >= actions.size, {
+							spinningActionsCount = actions.size - 1
+						});
+
+						action = actions[spinningActionsCount];
 					});
 
-					condition = action[0];
-					func = action[1];
+					//Individual sched for the action
 					sched = action[2];
 
-					if(condition.value, {
-						//If condition, execute it and remove from the OrderedIdentitySet
-						this.executeFunc(
-							action,
-							func,
-							sched,
-						)
-					}, {
-						//if cascadeMode, spin here (so the successive actions won't be
-						//done until this one is). If it errors out, it will move to the next action
-						if(cascadeMode, {
-							var exceededMaxSpinTime = [false]; //use [] to pass by reference
+					if(sched > 0, {
+						//remove it or it clogs the scheduler!
+						this.removeAction(action);
 
-							while({ condition.value.not }, {
-								this.accumTimeAtAction(
-									action,
-									condition,
-									exceededMaxSpinTime
-								);
+						//reset sched (so it will be executed right away)
+						action[2] = 0;
 
-								if(exceededMaxSpinTime[0], {
-									condition = true; //exit the while loop
-								});
-
-								interval.wait;
-							});
-
-							//If finished spinning (or it errors out), execute func
-							if(exceededMaxSpinTime[0].not, {
-								this.executeFunc(
-									action,
-									func,
-									sched,
-								)
-							})
-						}, {
-							//Just accumTime, while letting it go for successive actions.
-							//exceededMaxSpinTime is here nil
-							this.accumTimeAtAction(
-								action,
-								condition,
-								nil
-							)
+						clock.sched(sched, {
+							//Add the action back up the scheduled time.
+							//This will trigger the scheduler loop
+							actions.add(action);
+							spinningActions[action] = 0;
+							semaphore.unhang;
 						});
+					}, {
+						//Actual loop function :)
+						this.loopFunc(action);
 					});
 				});
-
-				//Still actions to consume, spin
-				interval.wait;
 			});
+
+			//All actions are completed: reset currentExecAction
+			currentExecAction = nil;
+
+			cascadeMode.postln;
+
+			//If switchCascadeMode, revert to cascadeMode = false
+			if(switchCascadeMode, {
+				"Switching mode".postln;
+				if(cascadeMode, {
+					cascadeMode = false;
+				}, {
+					cascadeMode = true;
+				});
+			});
+
+			cascadeMode.postln;
 
 			//No actions to consume, hang
 			if(verbose, { ("AlgaScheduler" + name + "hangs").postcln; });
@@ -254,7 +300,7 @@ AlgaScheduler : AlgaThread {
 	}
 
 	//Default condition is just { true }, just execute it when its time comes on the scheduler
-	addAction { | condition, func, sched = 0 |
+	addAction { | condition, func, sched = 0, inheritable = true |
 		var action;
 
 		condition = condition ? { true };
@@ -269,23 +315,38 @@ AlgaScheduler : AlgaThread {
 			^this;
 		});
 
-		//If condition is true already, execute the func right away
+		//If condition is true already, execute the func right away...
+		//This, however, invalidates sched!
+		/*
 		if(condition.value, {
 			this.executeFunc(
 				nil,
 				func,
-				sched,
-				nil
+				sched
 			);
 
 			^this;
 		});
+		*/
 
 		//new action
 		action = [condition, func, sched];
 
+		/*
+		"\nBefore".postln;
+		actions.do({|bubu|
+			bubu[0].def.context.postln;
+		});
+		"".postln;
+		*/
+
 		//We're in a callee situation: add this node after the index of currentExecAction
 		if(currentExecAction != nil, {
+			if(verbose, {
+				("AlgaScheduler: adding function:" + func.def.context.asString +
+					"as child of function:" + currentExecAction[1].def.context.asString).warn;
+			});
+
 			//Add after the currentExecAction
 			actions.insertAfterEntry(currentExecAction, action);
 
@@ -296,6 +357,14 @@ AlgaScheduler : AlgaThread {
 			actions.add(action);
 		});
 
+		/*
+		"After".postln;
+		actions.do({|bubu|
+			bubu[0].def.context.postln;
+		});
+		"".postln;
+		*/
+
 		//set to 0 the accumulator of spinningActions
 		spinningActions[action] = 0;
 
@@ -303,13 +372,6 @@ AlgaScheduler : AlgaThread {
 		if(semaphore.test.not, {
 			semaphore.unhang;
 		});
-	}
-
-	executeAlgaPatch { | func |
-		isAlgaPatch = true;
-		this.addAction(action:func);
-
-		//actions need to be stack (so that an action within an action is in the same stack)
 	}
 }
 
@@ -319,10 +381,19 @@ AlgaPatch {
 	*new { | func, server |
 		var algaScheduler;
 		server = server ? Server.default;
-
-		"AlgaPatch is not implemented yet".error;
-
-		//algaScheduler = Alga.newAlgaPatchScheduler(server);
-		//algaScheduler.executeAlgaPatch(func);
+		algaScheduler = Alga.schedulers[server];
+		if(algaScheduler != nil, {
+			if(algaScheduler.cascadeMode, {
+				//If already cascadeMode
+				algaScheduler.addAction(func: func);
+			}, {
+				algaScheduler.cascadeMode = true;
+				algaScheduler.switchCascadeMode = true;
+				algaScheduler.addAction(func: func);
+			});
+		}, {
+			("Alga is not booted on server" + server.name).error;
+		});
+		^nil;
 	}
 }
