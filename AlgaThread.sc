@@ -63,16 +63,16 @@ AlgaThread {
 AlgaScheduler : AlgaThread {
 	var <>interval = 0.01;
 	var <>maxSpinTime = 2;
-	var semaphore;
 
 	var <>cascadeMode = false;
+	var isAlgaPatch = false;
+
+	var semaphore;
 
 	var <actions, <spinningActions;
 
 	//sclang is single threaded, there won't ever be data races here ;)
-	var <currentExecFunc;
-
-	var isAlgaPatch = false;
+	var <currentExecAction;
 
 	*new { | server, clock, cascadeMode = false, autostart = true |
 		var argServer = server ? Server.default;
@@ -83,7 +83,7 @@ AlgaScheduler : AlgaThread {
 
 	init { | argCascadeMode = false, autostart = true |
 		if(actions == nil, {
-			actions = OrderedIdentitySet(10); //needs to be ordered so that they're consumed first-in first-out
+			actions = List(10);
 		});
 
 		if(spinningActions == nil, {
@@ -99,7 +99,12 @@ AlgaScheduler : AlgaThread {
 		super.init(autostart);
 	}
 
-	accumTimeAtAction { | action, condition, exceededMaxSpinTime, consumedActions |
+	removeAction { | action |
+		actions.removeAtEntry(action);
+		spinningActions.removeAt(action);
+	}
+
+	accumTimeAtAction { | action, condition, exceededMaxSpinTime |
 		//Else, check how much time the specific action is taking
 		var accumTime = (spinningActions[action]) + interval;
 
@@ -112,7 +117,7 @@ AlgaScheduler : AlgaThread {
 			).error;
 
 			//remove the culprit action
-			consumedActions.add(action);
+			this.removeAction(action);
 
 			//if cascadeMode, gotta exit the condition too
 			if(cascadeMode, {
@@ -124,18 +129,33 @@ AlgaScheduler : AlgaThread {
 		spinningActions[action] = accumTime;
 	}
 
-	//If sched, send bundle after that time. Otherwise, send bundle now
-	sendBundleOnSched { | sched, func |
+	//If sched, exec func and send bundle after that time. Otherwise, exec func and send bundle now
+	execFuncOnSched { | action, func, sched |
 		if(sched > 0, {
+			//Update maxSpinTime if it's longer than sched
+			if(sched > maxSpinTime, {
+				maxSpinTime = sched + interval;
+			});
+
 			clock.sched(sched, {
-				server.bind({ func.value }); // == server.makeBundle(server.latency, { func.value });
+				server.bind({
+					func.value;
+
+					//Action completed
+					this.removeAction(action);
+				});
 			});
 		}, {
-			server.bind({ func.value }); // == server.makeBundle(server.latency, { func.value });
+			server.bind({
+				func.value;
+
+				//Action completed
+				this.removeAction(action);
+			});
 		});
 	}
 
-	executeFunc { | action, func, sched, consumedActions |
+	executeFunc { | action, func, sched |
 		if(verbose, {
 			(
 				"AlgaScheduler: executing function from context '" ++
@@ -143,51 +163,32 @@ AlgaScheduler : AlgaThread {
 			).postcln;
 		});
 
-		//Update currentExecFunc
-		currentExecFunc = func;
+		//Update currentExecAction
+		currentExecAction = action;
 
 		//Should I just send the func to clock and execute it on sched?
-		this.sendBundleOnSched(sched, func);
-
-		//Or generate the bundle now and send it at scheduled time?
-		//The problem is that, however, func is executed, and values thus updated
-		//in the metadata of AlgaNodes...
-
-		/*
-		//Generate bundle just for this func
-		funcBundle = server.makeBundle(false, { func.value });
-
-		//Send bundle out at the specific time frame.
-		//Wrap it in an array so that algaSchedBundleArrayOnClock
-		//schedules all the OSC funcs on same sched
-		if(funcBundle.isEmpty.not, {
-			[sched].algaSchedBundleArrayOnClock(
-				clock,
-				[funcBundle],
-				server,
-				server.latency
-			);
-		});
-		*/
-
-		//Action completed: add to consumedActions
-		if(consumedActions != nil, {
-			consumedActions.add(action);
-		});
+		this.execFuncOnSched(action, func, sched);
 	}
 
 	run {
 		loop {
 			if(actions.size > 0, {
-				var consumedActions = IdentitySet();
-
 				//Bundle all the actions of this interval tick together
 				//This will be the core of clock / server syncing of actions
 				//Consume actions (they are ordered thanks to OrderedIdentitySet)
-				actions.do({ | action |
-					var condition = action[0];
-					var func = action[1];
-					var sched = action[2];
+				while({ actions.size > 0 }, {
+					var action, condition, func, sched;
+
+					//if cascading, pop action from top of the list
+					if(cascadeMode, {
+						action = actions[0];
+					}, {
+						//Otherwise, just get the next action
+					});
+
+					condition = action[0];
+					func = action[1];
+					sched = action[2];
 
 					if(condition.value, {
 						//If condition, execute it and remove from the OrderedIdentitySet
@@ -195,7 +196,6 @@ AlgaScheduler : AlgaThread {
 							action,
 							func,
 							sched,
-							consumedActions,
 						)
 					}, {
 						//if cascadeMode, spin here (so the successive actions won't be
@@ -207,8 +207,7 @@ AlgaScheduler : AlgaThread {
 								this.accumTimeAtAction(
 									action,
 									condition,
-									exceededMaxSpinTime,
-									consumedActions
+									exceededMaxSpinTime
 								);
 
 								if(exceededMaxSpinTime[0], {
@@ -224,7 +223,6 @@ AlgaScheduler : AlgaThread {
 									action,
 									func,
 									sched,
-									consumedActions,
 								)
 							})
 						}, {
@@ -233,30 +231,19 @@ AlgaScheduler : AlgaThread {
 							this.accumTimeAtAction(
 								action,
 								condition,
-								nil,
-								consumedActions
+								nil
 							)
 						});
 					});
 				});
 
-				//Needs to be outside to remove actions
-				consumedActions.do({ | action, i |
-					actions.remove(action);
-					spinningActions.removeAt(action);
-				});
-			});
-
-			//Check the size again here,
-			//as actions are getting removed at the end of the previous if statement
-			if(actions.size > 0, {
 				//Still actions to consume, spin
 				interval.wait;
-			}, {
-				//No actions to consume, hang
-				if(verbose, { ("AlgaScheduler" + name + "hangs").postcln; });
-				semaphore.hang;
 			});
+
+			//No actions to consume, hang
+			if(verbose, { ("AlgaScheduler" + name + "hangs").postcln; });
+			semaphore.hang;
 		}
 	}
 
@@ -267,12 +254,12 @@ AlgaScheduler : AlgaThread {
 	}
 
 	//Default condition is just { true }, just execute it when its time comes on the scheduler
-	addAction { | condition, action, sched = 0 |
-		var conditionActionSched;
+	addAction { | condition, func, sched = 0 |
+		var action;
 
 		condition = condition ? { true };
 
-		if((condition.isFunction.not).or(action.isFunction.not), {
+		if((condition.isFunction.not).or(func.isFunction.not), {
 			"AlgaScheduler: addAction only accepts Functions as both the condition and the func arguments".error;
 			^this;
 		});
@@ -286,7 +273,7 @@ AlgaScheduler : AlgaThread {
 		if(condition.value, {
 			this.executeFunc(
 				nil,
-				action,
+				func,
 				sched,
 				nil
 			);
@@ -294,18 +281,23 @@ AlgaScheduler : AlgaThread {
 			^this;
 		});
 
-		conditionActionSched = [condition, action, sched];
+		//new action
+		action = [condition, func, sched];
 
-		if(currentExecFunc != nil, {
-			("caller func: " ++ currentExecFunc.def.context.asString).error;
-			("adding func: " ++ action.def.context.asString).error;
+		//We're in a callee situation: add this node after the index of currentExecAction
+		if(currentExecAction != nil, {
+			//Add after the currentExecAction
+			actions.insertAfterEntry(currentExecAction, action);
+
+			//Reset currentExecAction to nil
+			currentExecAction = nil;
+		}, {
+			//Normal case: just push to bottom of the List
+			actions.add(action);
 		});
 
-		//If cascadeMode, actions within actions should be correctly placed right after the other.
-		//this will make the whole AlgaPatch concept work
-
-		actions.add(conditionActionSched);
-		spinningActions[conditionActionSched] = 0; //set to 0 the accumulator of spinningActions
+		//set to 0 the accumulator of spinningActions
+		spinningActions[action] = 0;
 
 		//New action! Unlock the semaphore
 		if(semaphore.test.not, {
@@ -334,11 +326,3 @@ AlgaPatch {
 		//algaScheduler.executeAlgaPatch(func);
 	}
 }
-
-/*
-+ Function {
-	algaPatch {
-		^AlgaPatch(this);
-	}
-}
-*/

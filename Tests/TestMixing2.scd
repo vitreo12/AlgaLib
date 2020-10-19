@@ -25,8 +25,25 @@ Alga.boot({
 
 	d.replace({DC.kr(1000)});
 	b.replace({DC.kr(2020)});
+	a <<.f b;
 })
 )
+
+(
+AlgaStartup.algaMaxIO=3;
+AlgaScheduler.verbose = true;
+//AlgaScheduler.verbose = false;
+
+Alga.boot({
+
+	//s.plotTree;
+	a = AlgaNode({SinOsc.ar(\f.kr(440)).dup * 0.2}, connectionTime:1);
+	b = AlgaNode({DC.kr(220)});
+	a <<.f b;
+})
+)
+
+b.replace({DC.kr(440)});
 
 
 

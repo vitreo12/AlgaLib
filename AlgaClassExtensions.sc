@@ -21,6 +21,30 @@
 	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
 }
 
++List {
+	//object equality!
+	indexOf { | entry |
+		this.do({ | item, i |
+			if(item === entry, { ^i });
+		});
+		^nil;
+	}
+
+	insertAfterEntry { | entry, what |
+		var index = this.indexOf(entry);
+		if(index != nil, {
+			this.insert(index + 1, what);
+		});
+	}
+
+	removeAtEntry { | entry |
+		var index = this.indexOf(entry);
+		if(index != nil, {
+			this.removeAt(index);
+		});
+	}
+}
+
 //Just as schedBundleArrayOnClock, but it also supports array of array bundles
 + SequenceableCollection {
 	algaSchedBundleArrayOnClock { | clock, bundleArray, server, latency, lag = 0 |

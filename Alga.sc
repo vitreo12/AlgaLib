@@ -98,7 +98,7 @@ Alga {
 
 		//Create an AlgaScheduler on current server (using TempoClock for now...)
 		//this.newScheduler(server, cascadeMode:true);
-		this.newScheduler(server, cascadeMode:false);
+		this.newScheduler(server, cascadeMode:true);
 
 		//Boot
 		server.waitForBoot({
