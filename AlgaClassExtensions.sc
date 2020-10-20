@@ -18,6 +18,8 @@
 +Object {
 	isAlgaNode { ^false }
 	instantiated { ^true }
+	cleared { ^false }
+	toBeCleared { ^false }
 	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
 }
 
@@ -30,10 +32,15 @@
 		^nil;
 	}
 
-	insertAfterEntry { | entry, what |
+	insertAfterEntry { | entry, offset, what |
 		var index = this.indexOf(entry);
 		if(index != nil, {
-			this.insert(index + 1, what);
+			index = index + 1 + offset;
+			if(index < this.size, {
+				this.insert(index, what);
+			}, {
+				this.add(what);
+			});
 		}, {
 			//If nil entry, just add at bottom
 			this.add(what);

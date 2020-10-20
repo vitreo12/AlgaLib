@@ -1,13 +1,4 @@
-Alga.boot({s.plotTree})
-
 (
-AlgaStartup.algaMaxIO=3;
-Alga.initSynthDefs;
-)
-
-
-(
-AlgaStartup.algaMaxIO=3;
 AlgaScheduler.verbose = true;
 //AlgaScheduler.verbose = false;
 
