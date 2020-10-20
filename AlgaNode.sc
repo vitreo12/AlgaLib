@@ -409,21 +409,18 @@ AlgaNode {
 	createObjArgs { | args |
 		if(args != nil, {
 			if(args.isSequenceableCollection.not, { "AlgaNode: args must be an array".error; ^this });
-			if((args.size) % 2 != 0, { "AlgaNode: args'size must be a power of two".error; ^this });
+			if((args.size) % 2 != 0, { "AlgaNode: args' size must be a power of two".error; ^this });
 
 			args.do({ | param, i |
 				if(param.class == Symbol, {
 					var iPlusOne = i + 1;
 					if(iPlusOne < args.size, {
 						var val = args[i+1];
-						objArgs[param] = val;
-						/*
-						if(val.isNumberOrArray, {
+						if((val.isNumberOrArray).or(val.isAlgaNode), {
 							objArgs[param] = val;
 						}, {
-							"AlgaNode: invalid arg " ++ param ++ " : only numbers and arrays are supported".error;
+							("AlgaNode: args at param " ++ param ++ " must be a number, array or AlgaNode").error;
 						});
-						*/
 					});
 				});
 			});
