@@ -1,38 +1,68 @@
-AlgaServerOptions {
-	var <>sampleRate, <>blockSize, <>memSize, <>numBuffers, <>numAudioBusChannels, <>numControlBusChannels, <>maxSynthDefs, <>numWireBufs, <>numInputBusChannels, <>numOutputBusChannels, <>supernova, <>threads, <>latency;
-
-	*new { | sampleRate=48000, blockSize=256, memSize=(8192*256), numBuffers=(1024*8), numAudioBusChannels=(1024*8), numControlBusChannels=(1024*8),  maxSynthDefs=16384, numWireBufs=1024, numInputBusChannels=2, numOutputBusChannels=2, supernova=false, threads=12, latency=0.1 |
-
-		^super.new.init(sampleRate, blockSize, memSize, numBuffers, numAudioBusChannels, numControlBusChannels,  maxSynthDefs, numWireBufs, numInputBusChannels, numOutputBusChannels, supernova, threads, latency);
-	}
-
-	init { |sampleRate=48000, blockSize=256, memSize=(8192*256), numBuffers=(1024*8), numAudioBusChannels=(1024*8), numControlBusChannels=(1024*8),  maxSynthDefs=16384, numWireBufs=1024, numInputBusChannels=2, numOutputBusChannels=2, supernova=false, threads=12, latency=0.1 |
-
-		this.sampleRate = sampleRate;
-		this.blockSize = blockSize;
-		this.memSize = memSize;
-		this.numBuffers = numBuffers;
-		this.numAudioBusChannels = numAudioBusChannels;
-		this.numControlBusChannels = numControlBusChannels;
-		this.maxSynthDefs = maxSynthDefs;
-		this.numWireBufs = numWireBufs;
-		this.numInputBusChannels = numInputBusChannels;
-		this.numOutputBusChannels = numOutputBusChannels;
-		this.supernova = supernova;
-		this.threads = threads;
-		this.latency = latency;
-	}
-}
-
 Alga {
+	classvar <schedulers;
+	classvar <servers;
+
+	*initSynthDefs {
+		AlgaStartup.initSynthDefs;
+	}
+
+	*initClass {
+		schedulers = IdentityDictionary(1);
+		servers = IdentityDictionary(1);
+	}
+
+	*clearScheduler { | server |
+		var scheduler = schedulers[server];
+		scheduler.postln;
+		if(scheduler.isNil.not, {
+			schedulers.removeAt(server);
+			scheduler.clear;
+		});
+	}
+
+	*clearServer { | server |
+		var tempServer = servers[server];
+		if(tempServer.isNil.not, {
+			tempServer.quit;
+			servers.removeAt(tempServer);
+		});
+	}
+
+	*clearAllSchedulers {
+		if(schedulers != nil, {
+			schedulers.do({ | scheduler |
+				scheduler.clear;
+			});
+
+			schedulers.clear;
+		});
+	}
+
+	*newScheduler { | server, clock, cascadeMode = true |
+		server = server ? Server.default;
+		clock = clock ? TempoClock; //use tempo clock as default
+		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
+	}
+
+	*newAlgaPatchScheduler { | server, clock |
+		var scheduler;
+		server = server ? Server.default;
+		clock = clock ? TempoClock; //use tempo clock as default
+		scheduler = AlgaScheduler(server:server, clock:clock, cascadeMode:true);
+		schedulers[scheduler] = scheduler;
+		^scheduler;
+	}
+
+	*getScheduler { | server |
+		var scheduler = schedulers[server];
+		if(scheduler.isNil, { ("No AlgaScheduler initialized for server " ++ server.asString).error });
+		^scheduler;
+	}
 
 	*boot { | onBoot, server, algaServerOptions |
 
-		if(server == nil, { server = Server.default });
-		if(algaServerOptions == nil, { algaServerOptions = AlgaServerOptions() });
-
-		//quit server if it was on
-		server.quit;
+		server = server ? Server.default;
+		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
 		//set options
 		server.options.sampleRate = algaServerOptions.sampleRate;
@@ -49,13 +79,34 @@ Alga {
 		server.options.threads = algaServerOptions.threads;
 		server.latency = algaServerOptions.latency;
 
-		//Add to SynthDescLib in order for .add to work... Find a leaner solution.
+		//Check AlgaSynthDef folder exists...
+		if(File.existsCaseSensitive(AlgaStartup.algaSynthDefIOPath) == false, {
+			("Could not retrieve the correct AlgaSyntDef/IO folder. Running 'Alga.initSynthDefs' now...").warn;
+			this.initSynthDefs;
+		});
+
+		//Add to SynthDescLib in order for SynthDef.add to work
 		SynthDescLib.global.addServer(server);
+
+		//clear scheduler @server if present
+		this.clearScheduler(server);
+
+		//clear server @server if present, also quit it
+		this.clearServer(server);
+
+		//Add the server
+		servers[server] = server;
+
+		//Create an AlgaScheduler on current server (using TempoClock for now...)
+		this.newScheduler(server, cascadeMode:true);
+		//this.newScheduler(server, cascadeMode:false);
 
 		//Boot
 		server.waitForBoot({
+			//Make sure to init everything
 			server.initTree;
-			AlgaStartup.initSynthDefs(server);
+
+			//Execute onBoot function
 			onBoot.value;
 		});
 	}

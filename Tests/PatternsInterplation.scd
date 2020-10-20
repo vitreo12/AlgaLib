@@ -16,6 +16,12 @@ SynthDef(\sinePerc_freq, {
 	Out.kr(\out.ir(-1), \in.kr(440));
 }).add;
 
+SynthDef(\sinePerc_freq_noise, {
+	var env = EnvGen.ar(Env.perc, doneAction:2);
+	Bus.free(\out.ir(-1));
+	Out.kr(\out.ir(-1), LFNoise0.kr(3).range(200, 500));
+}).add;
+
 SynthDef(\sinePerc, {
 	var x = SinOsc.ar(\freq.kr(440));
 	var env = EnvGen.ar(Env.perc, doneAction:2);
@@ -35,6 +41,7 @@ Event.addEventType(\algaNote, { | server |
 	var bundle = server.makeBundle(false, {
 		var bus = Bus.control(s, 1);
 		var setter = Synth(\sinePerc_freq, [\out, bus.index, \in, ~freq]);
+		//var setter = Synth(\sinePerc_freq_noise, [\out, bus.index]);
 		var sine = Synth.after(setter, \sinePerc, [\freq, bus.asMap, \amp, ~amp]);
 
 		//Free the bus on Synth's end
