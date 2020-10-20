@@ -21,6 +21,62 @@
 	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
 }
 
++List {
+	//object equality!
+	indexOf { | entry |
+		this.do({ | item, i |
+			if(item === entry, { ^i });
+		});
+		^nil;
+	}
+
+	insertAfterEntry { | entry, what |
+		var index = this.indexOf(entry);
+		if(index != nil, {
+			this.insert(index + 1, what);
+		}, {
+			//If nil entry, just add at bottom
+			this.add(what);
+		});
+	}
+
+	removeAtEntry { | entry |
+		var index = this.indexOf(entry);
+		if(index != nil, {
+			this.removeAt(index);
+		});
+	}
+}
+
+//Debug purposes
++BundleNetAddr {
+	closeBundle { arg time;
+		var bundleList, lastBundles;
+		if(time != false) {
+			if(async.not) {
+				if(AlgaScheduler.verbose, {
+					("Server: latency: " ++ time).warn;
+					("Server: msg bundle: " ++ bundle).warn;
+				});
+				saveAddr.sendClumpedBundles(time, *bundle);
+				^bundle;
+			};
+
+			forkIfNeeded {
+				bundleList = this.splitBundles(time);
+				lastBundles = bundleList.pop;
+				bundleList.do { |bundles|
+					var t = bundles.removeAt(0);
+					saveAddr.sync(nil, bundles, t); // make an independent condition.
+				};
+				saveAddr.sendClumpedBundles(*lastBundles);  // time ... args
+			}
+		};
+		^bundle
+	}
+}
+
+/*
 //Just as schedBundleArrayOnClock, but it also supports array of array bundles
 + SequenceableCollection {
 	algaSchedBundleArrayOnClock { | clock, bundleArray, server, latency, lag = 0 |
@@ -70,10 +126,11 @@
 + Server {
 	algaSendClumpedBundle { | time ... msgs |
 		if(AlgaScheduler.verbose, {
-			("Server: latency: " ++ time).postcln;
-			("Server: msg bundle: " ++ msgs).postcln;
+			("Server: latency: " ++ time).warn;
+			("Server: msg bundle: " ++ msgs).warn;
 		});
 
 		addr.sendClumpedBundles(time, *msgs); //Better than sendBundle, as it checks for msg size!
 	}
 }
+*/
