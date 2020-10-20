@@ -34,6 +34,9 @@
 		var index = this.indexOf(entry);
 		if(index != nil, {
 			this.insert(index + 1, what);
+		}, {
+			//If nil entry, just add at bottom
+			this.add(what);
 		});
 	}
 

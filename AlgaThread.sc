@@ -112,8 +112,10 @@ AlgaScheduler : AlgaThread {
 	}
 
 	removeAction { | action |
-		actions.removeAtEntry(action);
-		spinningActions.removeAt(action);
+		if(action != nil, {
+			actions.removeAtEntry(action);
+			spinningActions.removeAt(action);
+		});
 	}
 
 	accumTimeAtAction { | action, condition, exceededMaxSpinTime |
@@ -158,7 +160,7 @@ AlgaScheduler : AlgaThread {
 		server.bind({ func.value });
 		this.removeAction(action);
 
-		//Reset currentExecAction
+		//Reset currentExecAction (so it's reset for new stage)
 		currentExecAction = nil;
 	}
 
@@ -173,6 +175,9 @@ AlgaScheduler : AlgaThread {
 				action,
 				func,
 			);
+
+			//Sync server after each completed func ???
+			server.sync;
 		}, {
 			//enter one of the two cascadeModes
 			if(cascadeMode, {
@@ -215,7 +220,9 @@ AlgaScheduler : AlgaThread {
 					nil
 				);
 
-				//("Hanging at func" + condition.def.context).postln;
+				if(verbose, {
+					("Hanging at func" + condition.def.context).postln;
+				});
 
 				//Or, this action is spinning
 				spinningActionsCount = spinningActionsCount + 1;
@@ -270,11 +277,10 @@ AlgaScheduler : AlgaThread {
 						//reset sched (so it will be executed right away)
 						action[2] = 0;
 
+						//In sched time, add action again and trigger scheduer loop
 						clock.sched(sched, {
-							//Add the action back up the scheduled time.
-							//This will trigger the scheduler loop
 							actions.add(action);
-							spinningActions[action] = 0;
+							spinningActions[action] = 0; //reset spin too
 							semaphore.unhang;
 						});
 					}, {
@@ -317,6 +323,8 @@ AlgaScheduler : AlgaThread {
 
 		condition = condition ? { true };
 
+		if(sched < 0, { sched = 0 });
+
 		if((condition.isFunction.not).or(func.isFunction.not), {
 			"AlgaScheduler: addAction only accepts Functions as both the condition and the func arguments".error;
 			^this;
@@ -327,19 +335,24 @@ AlgaScheduler : AlgaThread {
 			^this;
 		});
 
-		//If condition is true already, execute the func right away...
-		//This, however, invalidates sched!
-		/*
-		if(condition.value, {
-			this.executeFunc(
-				nil,
-				func,
-				sched
-			);
+		//If condition is true already and sched is 0, execute the func right away.
+		//Should I remove this and push everything to scheduler regardless?
+		if((condition.value).and(sched == 0), {
+			if(verbose, { "AlgaScheduler: executing func right away".postcln });
 
+			//If it's a child one, don't do server.bind (as it will be collected by parent already)
+			if(currentExecAction != nil, {
+				func.value
+			}, {
+				//It's a standalone: execute with server.bind
+				this.executeFunc(
+					nil,
+					func,
+					sched
+				);
+			});
 			^this;
 		});
-		*/
 
 		/*
 		"\nBefore".postln;
@@ -361,9 +374,6 @@ AlgaScheduler : AlgaThread {
 
 			//Add after the currentExecAction
 			actions.insertAfterEntry(currentExecAction, action);
-
-			//Reset currentExecAction to nil
-			currentExecAction = nil;
 		}, {
 			//Normal case: just push to bottom of the List
 			actions.add(action);

@@ -21,6 +21,7 @@ Alga.boot({
 
 	a <<.f b;
 	a <<+.f c;
+
 	a.replaceMix(\f, c, d);
 
 	d.replace({DC.kr(1000)});
@@ -29,6 +30,10 @@ Alga.boot({
 	a <| \f;
 })
 )
+
+a.inNodes
+b.outNodes
+c.outNodes
 
 (
 AlgaStartup.algaMaxIO=3;

@@ -1058,15 +1058,17 @@ AlgaNode {
 		var interpSynthAtParam = interpSynths[param][sender];
 
 		if(interpSynthAtParam != nil, {
+			//These must be fetched before the addAction (they refer to the current state!)
 			var normSynthAtParam = normSynths[param][sender];
 			var interpBusAtParam = interpBusses[param][sender];
+			var currentDefaultNode = currentDefaultNodes[param];
 
 			//Make sure all of these are scheduled correctly to each other!
 			algaScheduler.addAction({ (normSynthAtParam.instantiated).and(interpSynthAtParam.instantiated) }, {
 				var triggerFadeOut = false;
 
 				//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
-				if(sender != currentDefaultNodes[param], {
+				if(sender != currentDefaultNode, {
 					triggerFadeOut = true;
 				});
 
@@ -1119,6 +1121,7 @@ AlgaNode {
 		if((sender == nil).or(mix == false), {
 			interpSynthsAtParam.postln;
 			interpSynthsAtParam.size.postln;
+
 			//If interpSynthsAtParam length is more than one, the param has mix entries. Fade them all out.
 			if(interpSynthsAtParam.size > 1, {
 				interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam  |
@@ -1133,7 +1136,6 @@ AlgaNode {
 					});
 				});
 			}, {
-				"aa".error;
 				//Just one entry in the dict (\default), just free the interp synth!
 				interpSynthsAtParam.do({ | interpSynthAtParam |
 					interpSynthAtParam.set(\gate, 0, \fadeTime, paramConnectionTime);
