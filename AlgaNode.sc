@@ -806,8 +806,88 @@ AlgaNode {
 		});
 	}
 
+	//Check correct array sizes
+	checkScaleParameterSize { | scaleEntry, name, param, paramNumChannels |
+		if(scaleEntry.isSequenceableCollection, {
+			var scaleEntrySize = scaleEntry.size;
+			if(scaleEntry.size != paramNumChannels, {
+				("AlgaNode: the " ++ name ++ " entry of the scale parameter has less channels(" ++
+					scaleEntrySize ++ ") than param " ++ param ++
+					". Wrapping around " ++ paramNumChannels ++ " number of channels."
+				).warn;
+				^(scaleEntry.reshape(paramNumChannels));
+			});
+			^scaleEntry;
+		}, {
+			if(scaleEntry.isNumber, {
+				^([scaleEntry].reshape(paramNumChannels));
+			}, {
+				"AlgaNode: scale entries can only be number or array".error;
+				^nil;
+			})
+		});
+	}
+
+	//Calculate scale to send to interp synth
+	calculateScaling { | scale, param, paramNumChannels |
+		if(scale.isSequenceableCollection.not, {
+			"AlgaNode: the scale parameter must be an array".error;
+			^nil
+		});
+
+		//just lowMax / hiMax
+		if(scale.size == 2, {
+			var outArray = Array.newClear(2);
+			var lowMax = scale[0];
+			var hiMax = scale[1];
+			var newLowMax = this.checkScaleParameterSize(lowMax, "lowMax", param, paramNumChannels);
+			var newHiMax = this.checkScaleParameterSize(hiMax, "hiMax", param, paramNumChannels);
+
+			scale[0].postln;
+
+			if((newLowMax.isNil).or(newHiMax.isNil), {
+				^nil
+			});
+
+			outArray[0] = [\lowMax, newLowMax];
+			outArray[1] = [\hiMax, newHiMax];
+
+			^outArray;
+		}, {
+			//all four of the scales
+			if(scale.size == 4, {
+				var outArray = Array.newClear(4);
+				var lowMin = scale[0];
+				var hiMin = scale[1];
+				var lowMax = scale[2];
+				var hiMax = scale[3];
+				var newLowMin = this.checkScaleParameterSize(lowMin, "lowMin", param, paramNumChannels);
+				var newHiMin = this.checkScaleParameterSize(hiMin, "hiMin", param, paramNumChannels);
+				var newLowMax = this.checkScaleParameterSize(lowMax, "lowMax", param, paramNumChannels);
+				var newHiMax = this.checkScaleParameterSize(hiMax, "hiMax", param, paramNumChannels);
+
+				if((newLowMin.isNil).or(newHiMin.isNil).or(newLowMax.isNil).or(newHiMax.isNil), {
+					^nil
+				});
+
+				outArray[0] = [\lowMin, newLowMin];
+				outArray[1] = [\hiMin, newHiMin];
+				outArray[2] = [\lowMax, newLowMax];
+				outArray[3] = [\hiMax, newHiMax];
+
+				^outArray;
+			}, {
+				("AlgaNode: the scale parameter must be an array of either 2 " ++
+					" (lowMax / hiMax) or 4 (lowMin, hiMin, lowMax, hiMax) entries.").error;
+				^nil
+			});
+		});
+	}
+
 	//Run when <<+ / .replace (on mixed connection) / .replaceMix
-	createMixInterpSynthInterpBusBusNormSynthAtParam { | sender, param = \in, replaceMix = false, replace = false, senderChansMapping |
+	createMixInterpSynthInterpBusBusNormSynthAtParam { | sender, param = \in, replaceMix = false,
+		replace = false, senderChansMapping, scale |
+
 		//on a new <<+ !
 
 		//also check sender is not the default!
@@ -855,7 +935,8 @@ AlgaNode {
 		//Make sure to not duplicate something that's already in the mix
 		if(newMixConnectionOrReplace.or(newMixConnectionOrReplaceMix), {
 			this.createInterpSynthAtParam(sender, param,
-				mix:true, newMixConnectionOrReplaceMix:newMixConnectionOrReplaceMix, senderChansMapping:senderChansMapping
+				mix:true, newMixConnectionOrReplaceMix:newMixConnectionOrReplaceMix,
+				senderChansMapping:senderChansMapping, scale:scale
 			);
 		}, {
 			("The AlgaNode is already mixed at param " ++ param).warn;
@@ -863,12 +944,16 @@ AlgaNode {
 	}
 
 	//Used at every <<, >>, <<+, >>+, <|
-	createInterpSynthAtParam { | sender, param = \in, mix = false, newMixConnectionOrReplaceMix = false, senderChansMapping |
+	createInterpSynthAtParam { | sender, param = \in, mix = false,
+		newMixConnectionOrReplaceMix = false, senderChansMapping, scale |
+
 		var controlName, paramConnectionTime;
 		var paramNumChannels, paramRate;
 		var senderNumChannels, senderRate;
 
 		var senderChansMappingToUse;
+
+		var scaleArray;
 
 		var interpSymbol;
 
@@ -944,6 +1029,10 @@ AlgaNode {
 			senderNumChannels,
 			paramNumChannels,
 		);
+
+		scaleArray = this.calculateScaling(scale, param, paramNumChannels);
+
+		scaleArray.asString.error;
 
 		//new interp synth, with input connected to sender and output to the interpBus
 		//THIS USES connectionTime!!
@@ -1307,7 +1396,7 @@ AlgaNode {
 	}
 
 	//New interp connection at specific parameter
-	newInterpConnectionAtParam { | sender, param = \in, replace = false, senderChansMapping |
+	newInterpConnectionAtParam { | sender, param = \in, replace = false, senderChansMapping, scale |
 		var controlName = controlNames[param];
 		if(controlName == nil, {
 			("Invalid param to create a new interp synth for: " ++ param).error;
@@ -1329,11 +1418,13 @@ AlgaNode {
 		this.freeInterpSynthAtParam(sender, param);
 
         //Spawn new interp synth (fades in)
-        this.createInterpSynthAtParam(sender, param, senderChansMapping:senderChansMapping);
+        this.createInterpSynthAtParam(sender, param, senderChansMapping:senderChansMapping, scale:scale);
 	}
 
 	//New mix connection at specific parameter
-	newMixConnectionAtParam { | sender, param = \in, replace = false, replaceMix = false, senderChansMapping |
+	newMixConnectionAtParam { | sender, param = \in, replace = false,
+		replaceMix = false, senderChansMapping, scale |
+
 		var controlName = controlNames[param];
 		if(controlName == nil, {
 			("Invalid param to create a new interp synth for: " ++ param).error;
@@ -1358,7 +1449,8 @@ AlgaNode {
 
 		//Spawn new interp mix node
 		this.createMixInterpSynthInterpBusBusNormSynthAtParam(sender, param,
-			replaceMix:replaceMix, replace:replace, senderChansMapping:senderChansMapping
+			replaceMix:replaceMix, replace:replace,
+			senderChansMapping:senderChansMapping, scale:scale
 		);
 	}
 
@@ -1399,7 +1491,9 @@ AlgaNode {
 	}
 
 	//implements receiver <<.param sender
-	makeConnectionInner { | sender, param = \in, replace = false, mix = false, replaceMix = false, senderChansMapping |
+	makeConnectionInner { | sender, param = \in, replace = false, mix = false,
+		replaceMix = false, senderChansMapping, scale |
+
 		var currentDefaultAtParam;
 
 		if((sender.isAlgaNode.not).and(sender.isNumberOrArray.not), {
@@ -1449,14 +1543,15 @@ AlgaNode {
 
 			//Either new one <<+ / .replaceMix OR .replace
 			this.newMixConnectionAtParam(sender, param,
-				replace:replace, replaceMix:replaceMix, senderChansMapping:senderChansMapping
+				replace:replace, replaceMix:replaceMix,
+				senderChansMapping:senderChansMapping, scale:scale
 			)
 		}, {
 			//mix == false, clean everything up
 
 			//Connect interpSynth to the sender's synthBus
 			this.newInterpConnectionAtParam(sender, param,
-				replace:replace, senderChansMapping:senderChansMapping
+				replace:replace, senderChansMapping:senderChansMapping, scale:scale
 			);
 
 			//Cleanup interpBusses / interpSynths / normSynths from previous mix, leaving \default only
@@ -1465,26 +1560,28 @@ AlgaNode {
 	}
 
 	//Wrapper for scheduler
-	makeConnection { | sender, param = \in, replace = false, mix = false, replaceMix = false, senderChansMapping |
+	makeConnection { | sender, param = \in, replace = false, mix = false,
+		replaceMix = false, senderChansMapping, scale |
+
 		if(this.cleared.not.and(sender.cleared.not).and(sender.toBeCleared.not), {
 			algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
-				this.makeConnectionInner(sender, param, replace, mix, replaceMix, senderChansMapping);
+				this.makeConnectionInner(sender, param, replace, mix, replaceMix, senderChansMapping, scale);
 			});
 		}, {
 			"AlgaNode: can't makeConnection, sender has been cleared".error;
 		});
 	}
 
-	from { | sender, param = \in, inChans |
+	from { | sender, param = \in, inChans, scale |
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param, senderChansMapping:inChans);
+			this.makeConnection(sender, param, senderChansMapping:inChans, scale:scale);
 		}, {
 			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param, senderChansMapping:inChans);
+				this.makeConnection(sender, param, senderChansMapping:inChans, scale:scale);
 			}, {
 				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
 			});
@@ -1693,6 +1790,8 @@ AlgaNode {
             this.play;
         })
 	}
+
+	//Keep min max ??
 
 	//replace content of the node, re-making all the connections.
 	//If this was connected to a number / array, should I restore that value too or keep the new one?
