@@ -4,6 +4,8 @@ AlgaScheduler.verbose = true;
 
 Alga.boot({
 
+	//Alga.getScheduler(s).interruptOnSched = true;
+
 	//s.plotTree;
 	a = AlgaNode({SinOsc.ar(\f.kr(440)).dup * 0.2}, connectionTime:1).play;
 	b = AlgaNode({DC.kr(220)});

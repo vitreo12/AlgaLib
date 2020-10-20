@@ -67,10 +67,14 @@ AlgaScheduler : AlgaThread {
 	var <cascadeMode = false;
 	var <switchCascadeMode = false;
 	var <scheduling = false;
+	var <>interruptOnSched = false;
 
 	var semaphore;
 
 	var <actions, <spinningActions;
+
+	var <interruptOnSchedActions;
+	var <interruptOnSchedRunning = false;
 
 	//sclang is single threaded, there won't ever be data races here ;)
 	var currentExecAction;
@@ -110,6 +114,36 @@ AlgaScheduler : AlgaThread {
 	switchCascadeMode_ { | val |
 		if(scheduling, { "Can't set switchCascadeMode_ while scheduling events".error; ^this });
 		switchCascadeMode = val;
+	}
+
+	//Normal case: just push to bottom of the List
+	pushAction { | action |
+		if(interruptOnSchedRunning.not, {
+			//Normal case: add to actions
+			actions.add(action);
+		}, {
+			//A scheduled action is happening with the interruptOnSched mode: add to interruptOnSchedActions
+			if(interruptOnSchedActions != nil, {
+				interruptOnSchedActions.add(action);
+			});
+		});
+	}
+
+	//Add action after currentExecAction, with correct offset currentExecActionOffset.
+	//This is essential for actions that trigger multiple other actions
+	pushActionAfterCurrentExecAction { | action |
+		if(interruptOnSchedRunning.not, {
+			//Normal case: add to actions
+			actions.insertAfterEntry(currentExecAction, currentExecActionOffset, action);
+		}, {
+			//A scheduled action is happening with the interruptOnSched mode: add to interruptOnSchedActions
+			if(interruptOnSchedActions != nil, {
+				interruptOnSchedActions.insertAfterEntry(currentExecAction, currentExecActionOffset, action);
+			});
+		});
+
+		//Increase offset. This is needed for nested calls!
+		currentExecActionOffset = currentExecActionOffset + 1;
 	}
 
 	removeAction { | action |
@@ -165,6 +199,16 @@ AlgaScheduler : AlgaThread {
 		//Reset currentExecAction (so it's reset for new stage)
 		currentExecAction = nil;
 		currentExecActionOffset = 0; //needs resetting here (for next calls)
+	}
+
+	hangSemaphore {
+		semaphore.hang;
+	}
+
+	unhangSemaphore {
+		if(semaphore.test.not, {
+			semaphore.unhang;
+		});
 	}
 
 	loopFunc { | action |
@@ -273,18 +317,64 @@ AlgaScheduler : AlgaThread {
 					//Individual sched for the action
 					sched = action[2];
 
+					//Found a sched
 					if(sched > 0, {
-						//remove it or it clogs the scheduler!
-						this.removeAction(action);
+						if(interruptOnSched, {
+							//Interrupt here until clock releases. New actions will be pushed to interruptOnSchedActions
+							var actionIndex;
 
-						//reset sched (so it will be executed right away)
-						action[2] = 0;
+							//Need to deep copy
+							interruptOnSchedActions = actions.copy;
 
-						//In sched time, add action again and trigger scheduer loop
-						clock.sched(sched, {
-							actions.add(action);
-							spinningActions[action] = 0; //reset spin too
-							semaphore.unhang;
+							//With this, new actions will be pushed to interruptOnSchedActions instead
+							interruptOnSchedRunning = true;
+
+							//Remove all actions (so that scheduler won't be triggered)
+							actions.clear;
+							spinningActions.clear;
+
+							//Clear sched entry for the action that triggered the sched,
+							//so it will be executed right away after clock.sched()
+							actionIndex = interruptOnSchedActions.indexOf(action);
+							if(actionIndex != nil, {
+								interruptOnSchedActions[actionIndex][2] = 0; //reset entry's sched
+							});
+
+							//Sched in the future the unhanging
+							clock.sched(sched, {
+								//Copy all the actions back in.
+								//Use .add in case new actions were pushed to interruptOnSchedActions meanwhile
+								interruptOnSchedActions.do({ | interruptOnSchedAction |
+									actions.add(interruptOnSchedAction);
+									spinningActions[interruptOnSchedAction] = 0; //reset spins too
+								});
+
+								//Add new actions back to actions from now on (and not interruptOnSchedActions)
+								interruptOnSchedRunning = false;
+
+								//Release the reference to the GC (it will be updated with new copies anyway)
+								interruptOnSchedActions = nil;
+
+								//Unhang
+								this.unhangSemaphore;
+							});
+						}, {
+							//Only remove the one action and postpone it in the future.
+							//Other actions would still go on!
+							this.removeAction(action);
+
+							//reset sched entry inside of action
+							//(so it will be executed right away after sched time)
+							action[2] = 0;
+
+							//In sched time, add action again and trigger scheduler loop
+							clock.sched(sched, {
+								actions.add(action);
+								spinningActions[action] = 0; //reset spin too
+
+								//Unhang
+								this.unhangSemaphore
+							});
 						});
 					}, {
 						//Actual loop function :)
@@ -306,11 +396,12 @@ AlgaScheduler : AlgaThread {
 				});
 			});
 
+			//Done scheduling
 			scheduling = false;
 
 			//No actions to consume, hang
 			if(verbose, { ("AlgaScheduler" + name + "hangs").postcln; });
-			semaphore.hang;
+			this.hangSemaphore;
 		}
 	}
 
@@ -338,27 +429,6 @@ AlgaScheduler : AlgaThread {
 			^this;
 		});
 
-		//If condition is true already and sched is 0, execute the func right away.
-		//Should I remove this and push everything to scheduler regardless?
-		/*
-		if((condition.value).and(sched == 0), {
-			if(verbose, { "AlgaScheduler: executing func right away".postcln });
-
-			//If it's a child one, don't do server.bind (as it will be collected by parent already)
-			if(currentExecAction != nil, {
-				func.value
-			}, {
-				//It's a standalone: execute with server.bind
-				this.executeFunc(
-					nil,
-					func,
-					sched
-				);
-			});
-			^this;
-		});
-		*/
-
 		/*
 		"\nBefore".postln;
 		actions.do({|bubu|
@@ -377,14 +447,11 @@ AlgaScheduler : AlgaThread {
 					"as child of function:" + currentExecAction[1].def.context.asString).warn;
 			});
 
-			//Add after the currentExecAction
-			actions.insertAfterEntry(currentExecAction, currentExecActionOffset, action);
-
-			//Increase offset. This is needed for nested calls!
-			currentExecActionOffset = currentExecActionOffset + 1;
+			//Add action after currentExecAction (with correct offset)
+			this.pushActionAfterCurrentExecAction(action);
 		}, {
-			//Normal case: just push to bottom of the List
-			actions.add(action);
+			//Normal case: add action to bottom of the List
+			this.pushAction(action);
 		});
 
 		/*
@@ -398,9 +465,9 @@ AlgaScheduler : AlgaThread {
 		//set to 0 the accumulator of spinningActions
 		spinningActions[action] = 0;
 
-		//New action! Unlock the semaphore
-		if(semaphore.test.not, {
-			semaphore.unhang;
+		//New action pushed to actions (not interruptOnSchedActions).
+		if(interruptOnSchedRunning.not, {
+			this.unhangSemaphore;
 		});
 	}
 }
