@@ -53,6 +53,7 @@ AlgaNode {
 	var <isPlaying = false;
 	var <toBeCleared = false;
     var <beingStopped = false;
+	var <cleared = false;
 
 	*new { | obj, args, connectionTime = 0, playTime = 0, outsMapping, server |
 		^super.new.init(obj, args, connectionTime, playTime, outsMapping, server)
@@ -75,6 +76,9 @@ AlgaNode {
 
 		//param -> ControlName
 		controlNames = IdentityDictionary(10);
+
+		//param -> val
+		objArgs = IdentityDictionary(10);
 
 		//param -> connectionTime
 		paramsConnectionTime = IdentityDictionary(10);
@@ -401,6 +405,32 @@ AlgaNode {
 		this.freeInterpNormBusses(now);
 	}
 
+	//This will also be kept across replaces, as it's just updating the dict
+	createObjArgs { | args |
+		if(args != nil, {
+			if(args.isSequenceableCollection.not, { "AlgaNode: args must be an array".error; ^this });
+			if((args.size) % 2 != 0, { "AlgaNode: args'size must be a power of two".error; ^this });
+
+			args.do({ | param, i |
+				if(param.class == Symbol, {
+					var iPlusOne = i + 1;
+					if(iPlusOne < args.size, {
+						var val = args[i+1];
+						objArgs[param] = val;
+						/*
+						if(val.isNumberOrArray, {
+							objArgs[param] = val;
+						}, {
+							"AlgaNode: invalid arg " ++ param ++ " : only numbers and arrays are supported".error;
+						});
+						*/
+					});
+				});
+			});
+		});
+	}
+
+
 	//dispatches controlnames / numChannels / rate according to obj class
 	dispatchNode { | obj, args, initGroups = false, replace = false, keepChannelsMapping = false, outsMapping |
 		objClass = obj.class;
@@ -409,6 +439,9 @@ AlgaNode {
 		//this is mostly needed for .replace to work properly and wait for the new synth
 		//to be instantiated!
 		if(synth != nil, { synth.instantiated = false });
+
+		//Create args dict
+		this.createObjArgs(args);
 
 		//Symbol
 		if(objClass == Symbol, {
@@ -591,7 +624,28 @@ AlgaNode {
 		normBusses.clear;
 	}
 
-	//First creation: use defaults
+	//Either retrieve default value from controlName or from args
+	getDefaultOrArg { | controlName, param = \in |
+		var defaultOrArg = controlName.defaultValue;
+
+		var objArg = objArgs[param];
+
+		//If objArgs has entry, use that one as default instead
+		if(objArg != nil, {
+			if(objArg.isNumberOrArray, {
+				defaultOrArg = objArg;
+			}, {
+				if(objArg.isAlgaNode, {
+					//Schedule connection with the algaNode
+					this.makeConnection(objArg, param);
+				});
+			});
+		});
+
+		^defaultOrArg;
+	}
+
+	//First creation: use defaults or args
 	createInterpNormSynths { | replace = false, keepChannelsMapping = false |
 		controlNames.do({ | controlName |
 			var interpSymbol, normSymbol;
@@ -599,8 +653,9 @@ AlgaNode {
 
 			var paramName = controlName.name;
 			var paramNumChannels = controlName.numChannels;
+
 			var paramRate = controlName.rate;
-			var paramDefault = controlName.defaultValue;
+			var paramDefault = this.getDefaultOrArg(controlName, paramName);
 
 			//e.g. \alga_interp_audio1_control1
 			interpSymbol = (
@@ -930,7 +985,7 @@ AlgaNode {
 			var paramVal;
 
 			if(sender == nil, {
-				paramVal = controlName.defaultValue;
+				paramVal = this.getDefaultOrArg(controlName, param); //either default or provided arg!
 			}, {
                 //If not nil, check if it's a number or array. Use it if that's the case
 				if(sender.isNumberOrArray,  {
@@ -1414,8 +1469,12 @@ AlgaNode {
 
 	//Wrapper for scheduler
 	makeConnection { | sender, param = \in, replace = false, mix = false, replaceMix = false, senderChansMapping |
-		algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
-			this.makeConnectionInner(sender, param, replace, mix, replaceMix, senderChansMapping);
+		if(this.cleared.not.and(sender.cleared.not).and(sender.toBeCleared.not), {
+			algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
+				this.makeConnectionInner(sender, param, replace, mix, replaceMix, senderChansMapping);
+			});
+		}, {
+			"AlgaNode: can't makeConnection, sender has been cleared".error;
 		});
 	}
 
@@ -1644,6 +1703,9 @@ AlgaNode {
 		algaScheduler.addAction({ this.instantiated }, {
 			this.replaceInner(obj, args, keepChannelsMappingIn, keepChannelsMappingOut, outsMapping);
 		});
+
+		//Not cleared
+		cleared = false;
 	}
 
 	//Remove individual mix entries at param (called from replaceMix too)
@@ -1710,10 +1772,10 @@ AlgaNode {
 			paramsSet.do({ | param |
 				//If mixer param, just disconnect the entry connected to this
 				if(receiver.mixerParamContainsSender(param, this), {
-					receiver.disconnectInner(param, this);
+					receiver.disconnect(param, this);
 				}, {
 					//no mixer param, just run the disconnect to restore defaults
-					receiver.resetParamInner(param, nil);
+					receiver.resetParam(param, nil);
 				});
 			});
 		});
@@ -1742,6 +1804,8 @@ AlgaNode {
 			this.resetInterpNormSynths;
 			this.resetGroups;
 			this.resetInOutNodesDicts;
+
+			cleared = true;
 		}
 	}
 
@@ -1856,7 +1920,7 @@ AlgaNode {
 	//Add option for fade time here!
     stop {
 		algaScheduler.addAction({ this.instantiated }, {
-            this.stop;
+            this.stopInner;
 		});
     }
 

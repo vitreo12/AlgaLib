@@ -74,6 +74,7 @@ AlgaScheduler : AlgaThread {
 
 	//sclang is single threaded, there won't ever be data races here ;)
 	var currentExecAction;
+	var currentExecActionOffset = 0;
 	var spinningActionsCount = 0;
 
 	*new { | server, clock, cascadeMode = false, autostart = true |
@@ -155,6 +156,7 @@ AlgaScheduler : AlgaThread {
 
 		//Update currentExecAction (so it's picked in func.value for child addAction)
 		currentExecAction = action;
+		currentExecActionOffset = 0; //reset it here, so that nested calls have proper index offset
 
 		//execute and remove action
 		server.bind({ func.value });
@@ -162,6 +164,7 @@ AlgaScheduler : AlgaThread {
 
 		//Reset currentExecAction (so it's reset for new stage)
 		currentExecAction = nil;
+		currentExecActionOffset = 0; //needs resetting here (for next calls)
 	}
 
 	loopFunc { | action |
@@ -337,6 +340,7 @@ AlgaScheduler : AlgaThread {
 
 		//If condition is true already and sched is 0, execute the func right away.
 		//Should I remove this and push everything to scheduler regardless?
+		/*
 		if((condition.value).and(sched == 0), {
 			if(verbose, { "AlgaScheduler: executing func right away".postcln });
 
@@ -353,6 +357,7 @@ AlgaScheduler : AlgaThread {
 			});
 			^this;
 		});
+		*/
 
 		/*
 		"\nBefore".postln;
@@ -373,7 +378,10 @@ AlgaScheduler : AlgaThread {
 			});
 
 			//Add after the currentExecAction
-			actions.insertAfterEntry(currentExecAction, action);
+			actions.insertAfterEntry(currentExecAction, currentExecActionOffset, action);
+
+			//Increase offset. This is needed for nested calls!
+			currentExecActionOffset = currentExecActionOffset + 1;
 		}, {
 			//Normal case: just push to bottom of the List
 			actions.add(action);
