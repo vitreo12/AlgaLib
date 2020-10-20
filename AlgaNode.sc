@@ -837,7 +837,7 @@ AlgaNode {
 
 		//just lowMax / hiMax
 		if(scale.size == 2, {
-			var outArray = Array.newClear(2);
+			var outArray = Array.newClear(4);
 			var lowMax = scale[0];
 			var hiMax = scale[1];
 			var newLowMax = this.checkScaleParameterSize(lowMax, "lowMax", param, paramNumChannels);
@@ -849,14 +849,14 @@ AlgaNode {
 				^nil
 			});
 
-			outArray[0] = [\lowMax, newLowMax];
-			outArray[1] = [\hiMax, newHiMax];
+			outArray[0] = \lowMax; outArray[1] = newLowMax;
+			outArray[2] = \hiMax; outArray[3] = newHiMax;
 
 			^outArray;
 		}, {
 			//all four of the scales
 			if(scale.size == 4, {
-				var outArray = Array.newClear(4);
+				var outArray = Array.newClear(8);
 				var lowMin = scale[0];
 				var hiMin = scale[1];
 				var lowMax = scale[2];
@@ -870,10 +870,10 @@ AlgaNode {
 					^nil
 				});
 
-				outArray[0] = [\lowMin, newLowMin];
-				outArray[1] = [\hiMin, newHiMin];
-				outArray[2] = [\lowMax, newLowMax];
-				outArray[3] = [\hiMax, newHiMax];
+				outArray[0] = \lowMin; outArray[1] = newLowMin;
+				outArray[2] = \hiMin; outArray[3] = newHiMin;
+				outArray[4] = \lowMax; outArray[5] = newLowMax;
+				outArray[6] = \hiMax; outArray[7] = newHiMax;
 
 				^outArray;
 			}, {
@@ -1031,6 +1031,11 @@ AlgaNode {
 		);
 
 		scaleArray = this.calculateScaling(scale, param, paramNumChannels);
+
+		if(scaleArray != nil, {
+			scaleArray = scaleArray.add(\useScaling);
+			scaleArray = scaleArray.add(1);
+		});
 
 		scaleArray.asString.error;
 
