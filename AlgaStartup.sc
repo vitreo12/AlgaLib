@@ -115,7 +115,7 @@ Out.ar(\\out.ir(0), input * AlgaEnvGate.ar)
 
 	*initAlgaInterp {
 
-		var alreadyDonePairs = IdentityDictionary.new;
+		var alreadyDonePairs = IdentityDictionary.new(algaMaxIO);
 
 		//var file = File("~/test.txt".standardizePath,"w");
 
@@ -142,20 +142,29 @@ Out.ar(\\out.ir(0), input * AlgaEnvGate.ar)
 			algaMaxIO.do({ | y |
 
 				var arrayOfIndices;
+				var arrayOfMinusOnes, arrayOfOnes;
 				var currentPair, isAlreadyDone;
 
 				y = y + 1;
 
 				if(y == 1, {
 					arrayOfIndices = "0";
+					arrayOfMinusOnes = "-1.0";
+					arrayOfOnes = "1.0";
 				}, {
 					arrayOfIndices = "[";
+					arrayOfMinusOnes = "[";
+					arrayOfOnes = "[";
 
 					y.do({ | num |
 						arrayOfIndices = arrayOfIndices ++ num.asString ++ ",";
+						arrayOfMinusOnes = arrayOfMinusOnes ++ "-1.0,";
+						arrayOfOnes = arrayOfOnes ++ "1.0,";
 					});
 
 					arrayOfIndices = arrayOfIndices[0..(arrayOfIndices.size - 2)] ++ "]";
+					arrayOfMinusOnes = arrayOfMinusOnes[0..(arrayOfMinusOnes.size - 2)] ++ "]";
+					arrayOfOnes = arrayOfOnes[0..(arrayOfOnes.size - 2)] ++ "]";
 				});
 
 				currentPair = [i, y];
@@ -169,16 +178,33 @@ Out.ar(\\out.ir(0), input * AlgaEnvGate.ar)
 					if(i >= y, {
 
 						if(i == 1, {
+							var out;
+							var outArray;
+							if(y == 1, {
+								out = "in * env;";
+								outArray = "out;";
+							}, {
+								out = "Array.fill(" ++ y ++ ", in * env);";
+								outArray = "out[i];";
+							});
+
 							//ar -> ar
 							result_audio_audio = "
-AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | envCurve = \\sin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | scaleCurve = 0, envCurve = \\sin |
 var in = \\in.ar(0);
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: envCurve);
-var out = in * env;
+var out = " ++ out ++ "
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
-" ++ y ++ ".do({
-arg i;
-outs[i] = out;
+out = Select.ar(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -189,33 +215,39 @@ outs;
 AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | scaleCurve = 0, envCurve = \\lin |
 var in = \\in.kr(0);
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: envCurve);
-var out = in * env;
+var out = " ++ out ++ "
 var outScale = out.lincurve(
-\\lowMin.ir(-1.0),
-\\lowMax.ir(1.0),
-\\highMin.ir(-1.0),
-\\highMax.ir(1.0),
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
 scaleCurve,
 );
 var outs = Array.newClear(" ++ (y + 1) ++ ");
-out = Select.kr(\\useScale.ir(0), [out, outScale]).poll;
-" ++ y ++ ".do({
-arg i;
-outs[i] = out;
+out = Select.kr(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 }, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
 
 							//ar -> kr
 							result_audio_control = "
-AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | envCurve = \\lin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | scaleCurve = 0, envCurve = \\lin |
 var in = A2K.kr(\\in.ar(0));
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: envCurve);
-var out = in * env;
+var out = " ++ out ++ "
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
-" ++ y ++ ".do({
-arg i;
-outs[i] = out;
+out = Select.kr(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -223,34 +255,48 @@ outs;
 
 							//kr -> ar
 							result_control_audio = "
-AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | envCurve = \\sin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | scaleCurve = 0, envCurve = \\sin |
 var in = K2A.ar(\\in.kr(0));
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: envCurve);
-var out = in * env;
+var out = " ++ out ++ "
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
-" ++ y ++ ".do({
-arg i;
-outs[i] = out;
+out = Select.ar(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
 }, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
 
 						}, {
-							var out;
-							if(y == 1, { out = "out" }, { out = "out[i]" });
+							var outArray;
+							if(y == 1, { outArray = "out;" }, { outArray = "out[i];" });
 
 							//ar -> ar
 							result_audio_audio = "
-AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | envCurve = \\sin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | scaleCurve = 0, envCurve = \\sin |
 var in = \\in.ar(" ++ arrayOfZeros_in ++ ");
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: envCurve);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
 var out = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), in);
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
+out = Select.ar(\\useScaling.ir(0), [out, outScale]);
 out = out * env;
-" ++ y ++ ".do({
-arg i;
-outs[i] = " ++ out ++ ";
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -258,15 +304,22 @@ outs;
 
 							//kr -> kr
 							result_control_control = "
-AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | envCurve = \\lin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | scaleCurve = 0, envCurve = \\lin |
 var in = \\in.kr(" ++ arrayOfZeros_in ++ ");
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: envCurve);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
 var out = Select.kr(\\indices.ir(" ++ arrayOfIndices ++ "), in);
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
+out = Select.kr(\\useScaling.ir(0), [out, outScale]);
 out = out * env;
-" ++ y ++ ".do({
-arg i;
-outs[i] = " ++ out ++ ";
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -274,15 +327,22 @@ outs;
 
 							//ar -> kr
 							result_audio_control = "
-AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | envCurve = \\lin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | scaleCurve = 0, envCurve = \\lin |
 var in = A2K.kr(\\in.ar(" ++ arrayOfZeros_in ++ "));
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: envCurve);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
 var out = Select.kr(\\indices.ir(" ++ arrayOfIndices ++ "), in);
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
+out = Select.kr(\\useScaling.ir(0), [out, outScale]);
 out = out * env;
-" ++ y ++ ".do({
-arg i;
-outs[i] = " ++ out ++ ";
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -290,15 +350,22 @@ outs;
 
 							//kr -> ar
 							result_control_audio = "
-AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | envCurve = \\sin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | scaleCurve = 0, envCurve = \\sin |
 var in = K2A.ar(\\in.kr(" ++ arrayOfZeros_in ++ "));
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: envCurve);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
 var out = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), in);
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
+out = Select.ar(\\useScaling.ir(0), [out, outScale]);
 out = out * env;
-" ++ y ++ ".do({
-arg i;
-outs[i] = " ++ out ++ ";
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -312,16 +379,33 @@ outs;
 
 						if(i == 1, {
 
+							var out;
+							var outArray;
+							if(y == 1, {
+								out = "in * env;";
+								outArray = "out;";
+							}, {
+								out = "Array.fill(" ++ y ++ ", in * env);";
+								outArray = "out[i];";
+							});
+
 							//ar -> ar
 							result_audio_audio = "
-AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | envCurve = \\sin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | scaleCurve = 0, envCurve = \\sin |
 var in = \\in.ar(0);
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: envCurve);
-var out = in * env;
+var out = " ++ out ++ "
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++ "),
+scaleCurve,
+);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
-" ++ y ++ ".do({
-arg i;
-outs[i] = out;
+out = Select.ar(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -329,14 +413,21 @@ outs;
 
 							//kr -> kr
 							result_control_control = "
-AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | envCurve = \\lin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | scaleCurve = 0, envCurve = \\lin |
 var in = \\in.kr(0);
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: envCurve);
-var out = in * env;
+var out = Array.fill(" ++ y ++ ", in * env);
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
-" ++ y ++ ".do({
-arg i;
-outs[i] = out;
+out = Select.kr(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -344,14 +435,21 @@ outs;
 
 							//ar -> kr
 							result_audio_control = "
-AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | envCurve = \\lin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | scaleCurve = 0, envCurve = \\lin |
 var in = A2K.kr(\\in.ar(0));
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: envCurve);
-var out = in * env;
+var out = Array.fill(" ++ y ++ ", in * env);
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
-" ++ y ++ ".do({
-arg i;
-outs[i] = out;
+out = Select.kr(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -359,14 +457,21 @@ outs;
 
 							//kr -> ar
 							result_control_audio = "
-AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | envCurve = \\sin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | scaleCurve = 0, envCurve = \\sin |
 var in = K2A.ar(\\in.kr(0));
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: envCurve);
-var out = in * env;
+var out = Array.fill(" ++ y ++ ", in * env);
+var outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
 var outs = Array.newClear(" ++ (y + 1) ++ ");
-" ++ y ++ ".do({
-arg i;
-outs[i] = out;
+out = Select.ar(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -374,23 +479,28 @@ outs;
 
 						}, {
 
-							//var mod_i = i % " ++ i ++ ";
-							//outs[i] = out[mod_i];
-
-							var out;
-							if(y == 1, { out = "out" }, { out = "out[i]" });
+							var outArray;
+							if(y == 1, { outArray = "out" }, { outArray = "out[i]" });
 
 							//ar -> ar
 							result_audio_audio = "
-AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | envCurve = \\sin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_audio" ++ y ++ ", { | scaleCurve = 0, envCurve = \\sin |
 var in = \\in.ar(" ++ arrayOfZeros_in ++ ");
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: envCurve);
 var out = in * env;
+var outScale;
 var outs = Array.newClear(" ++ (y + 1) ++ ");
 out = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), out);
-" ++ y ++ ".do({
-arg i;
-outs[i] = " ++ out ++ ";
+outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
+out = Select.ar(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -398,15 +508,23 @@ outs;
 
 							//kr -> kr
 							result_control_control = "
-AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | envCurve = \\lin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_control" ++ y ++ ", { | scaleCurve = 0, envCurve = \\lin |
 var in = \\in.kr(" ++ arrayOfZeros_in ++ ");
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: envCurve);
 var out = in * env;
+var outScale;
 var outs = Array.newClear(" ++ (y + 1) ++ ");
 out = Select.kr(\\indices.ir(" ++ arrayOfIndices ++ "), out);
-" ++ y ++ ".do({
-arg i;
-outs[i] = " ++ out ++ ";
+outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
+out = Select.kr(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -414,15 +532,23 @@ outs;
 
 							//ar -> kr
 							result_audio_control = "
-AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | envCurve = \\lin |
+AlgaSynthDef(\\alga_interp_audio" ++ i ++ "_control" ++ y ++ ", { | scaleCurve = 0, envCurve = \\lin |
 var in = A2K.kr(\\in.ar(" ++ arrayOfZeros_in ++ "));
 var env = AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: envCurve);
 var out = in * env;
+var outScale;
 var outs = Array.newClear(" ++ (y + 1) ++ ");
 out = Select.kr(\\indices.ir(" ++ arrayOfIndices ++ "), out);
-" ++ y ++ ".do({
-arg i;
-outs[i] = " ++ out ++ ";
+outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
+out = Select.kr(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -430,15 +556,23 @@ outs;
 
 							//kr -> ar
 							result_control_audio = "
-AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | envCurve = \\sin |
+AlgaSynthDef(\\alga_interp_control" ++ i ++ "_audio" ++ y ++ ", { | scaleCurve = 0, envCurve = \\sin |
 var in = K2A.ar(\\in.kr(" ++ arrayOfZeros_in ++ "));
 var env = AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: envCurve);
 var out = in * env;
+var outScale;
 var outs = Array.newClear(" ++ (y + 1) ++ ");
 out = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), out);
-" ++ y ++ ".do({
-arg i;
-outs[i] = " ++ out ++ ";
+outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++"),
+scaleCurve,
+);
+out = Select.ar(\\useScaling.ir(0), [out, outScale]);
+" ++ y ++ ".do({ | i |
+outs[i] = " ++ outArray ++ "
 });
 outs[" ++ y ++ "] = env;
 outs;
@@ -454,6 +588,8 @@ outs;
 					result_control_control.interpret;
 					result_audio_control.interpret;
 					result_control_audio.interpret;
+
+					result_control_control.error;
 
 					/*
 					file.write(result_audio_audio ++ "\n");
