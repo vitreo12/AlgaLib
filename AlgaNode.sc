@@ -1076,8 +1076,6 @@ AlgaNode {
 				});
 			});
 
-			interpSynthArgs.asString.error;
-
 			//Read \in from the sender's synthBus
             interpSynth = AlgaSynth.new(
                 interpSymbol,
