@@ -837,48 +837,50 @@ AlgaNode {
 
 		//just lowMax / hiMax
 		if(scale.size == 2, {
-			var outArray = Array.newClear(4);
-			var lowMax = scale[0];
-			var hiMax = scale[1];
-			var newLowMax = this.checkScaleParameterSize(lowMax, "lowMax", param, paramNumChannels);
-			var newHiMax = this.checkScaleParameterSize(hiMax, "hiMax", param, paramNumChannels);
+			var outArray = Array.newClear(6);
+			var highMin = scale[0];
+			var highMax = scale[1];
+			var newHighMin = this.checkScaleParameterSize(highMin, "highMin", param, paramNumChannels);
+			var newHighMax = this.checkScaleParameterSize(highMax, "highMax", param, paramNumChannels);
 
-			scale[0].postln;
-
-			if((newLowMax.isNil).or(newHiMax.isNil), {
+			if((newHighMin.isNil).or(newHighMax.isNil), {
 				^nil
 			});
 
-			outArray[0] = \lowMax; outArray[1] = newLowMax;
-			outArray[2] = \hiMax; outArray[3] = newHiMax;
+			outArray[0] = \highMin; outArray[1] = newHighMin;
+			outArray[2] = \highMax; outArray[3] = newHighMax;
+
+			outArray[4] = \useScaling; outArray[5] = 1;
 
 			^outArray;
 		}, {
 			//all four of the scales
 			if(scale.size == 4, {
-				var outArray = Array.newClear(8);
+				var outArray = Array.newClear(10);
 				var lowMin = scale[0];
-				var hiMin = scale[1];
-				var lowMax = scale[2];
-				var hiMax = scale[3];
+				var lowMax = scale[1];
+				var highMin = scale[2];
+				var highMax = scale[3];
 				var newLowMin = this.checkScaleParameterSize(lowMin, "lowMin", param, paramNumChannels);
-				var newHiMin = this.checkScaleParameterSize(hiMin, "hiMin", param, paramNumChannels);
 				var newLowMax = this.checkScaleParameterSize(lowMax, "lowMax", param, paramNumChannels);
-				var newHiMax = this.checkScaleParameterSize(hiMax, "hiMax", param, paramNumChannels);
+				var newHighMin = this.checkScaleParameterSize(highMin, "highMin", param, paramNumChannels);
+				var newHighMax = this.checkScaleParameterSize(highMax, "highMax", param, paramNumChannels);
 
-				if((newLowMin.isNil).or(newHiMin.isNil).or(newLowMax.isNil).or(newHiMax.isNil), {
+				if((newLowMin.isNil).or(newHighMin.isNil).or(newLowMax.isNil).or(newHighMax.isNil), {
 					^nil
 				});
 
 				outArray[0] = \lowMin; outArray[1] = newLowMin;
-				outArray[2] = \hiMin; outArray[3] = newHiMin;
-				outArray[4] = \lowMax; outArray[5] = newLowMax;
-				outArray[6] = \hiMax; outArray[7] = newHiMax;
+				outArray[2] = \lowMax; outArray[3] = newLowMax;
+				outArray[4] = \highMin; outArray[5] = newHighMin;
+				outArray[6] = \highMax; outArray[7] = newHighMax;
+
+				outArray[8] = \useScaling; outArray[9] = 1;
 
 				^outArray;
 			}, {
 				("AlgaNode: the scale parameter must be an array of either 2 " ++
-					" (lowMax / hiMax) or 4 (lowMin, hiMin, lowMax, hiMax) entries.").error;
+					" (hiMin / hiMax) or 4 (lowMin, lowMax, hiMin, hiMax) entries.").error;
 				^nil
 			});
 		});
@@ -959,6 +961,7 @@ AlgaNode {
 
 		var interpBusAtParam;
 		var interpBus, interpSynth;
+		var interpSynthArgs;
 
 		var senderSym = sender;
 
@@ -1018,7 +1021,14 @@ AlgaNode {
 		interpBus = interpBusAtParam[senderSym];
 		if(interpBus == nil, {
 			interpBus = interpBusAtParam[\default];
-			if(interpBus == nil, { ("Invalid interp bus at param " ++ param ++ " and node " ++ senderSym.asString).error; ^this });
+			if(interpBus == nil, {
+				(
+					"Invalid interp bus at param " ++
+					param ++ " and node " ++ senderSym.asString
+				).error;
+				^this
+			});
+
 			interpBusAtParam[senderSym] = interpBus;
 		});
 
@@ -1031,13 +1041,6 @@ AlgaNode {
 		);
 
 		scaleArray = this.calculateScaling(scale, param, paramNumChannels);
-
-		if(scaleArray != nil, {
-			scaleArray = scaleArray.add(\useScaling);
-			scaleArray = scaleArray.add(1);
-		});
-
-		scaleArray.asString.error;
 
 		//new interp synth, with input connected to sender and output to the interpBus
 		//THIS USES connectionTime!!
@@ -1059,15 +1062,26 @@ AlgaNode {
 				);
 			});
 
+			interpSynthArgs = [
+				\in, sender.synthBus.busArg,
+				\out, interpBus.index,
+				\indices, senderChansMappingToUse,
+				\fadeTime, paramConnectionTime
+			];
+
+			//add scaleArray to args
+			if(scaleArray != nil, {
+				scaleArray.do({ | entry |
+					interpSynthArgs = interpSynthArgs.add(entry);
+				});
+			});
+
+			interpSynthArgs.asString.error;
+
 			//Read \in from the sender's synthBus
             interpSynth = AlgaSynth.new(
                 interpSymbol,
-                [
-					\in, sender.synthBus.busArg,
-					\out, interpBus.index,
-					\indices, senderChansMappingToUse,
-					\fadeTime, paramConnectionTime
-				],
+                interpSynthArgs,
                 interpGroup
             );
 		}, {
@@ -1087,14 +1101,23 @@ AlgaNode {
 				});
 			});
 
+			interpSynthArgs = [
+				\in, paramVal,
+				\out, interpBus.index,
+				\indices, senderChansMappingToUse,
+				\fadeTime, paramConnectionTime
+			];
+
+			//add scaleArray to args
+			if(scaleArray != nil, {
+				scaleArray.do({ | entry |
+					interpSynthArgs = interpSynthArgs.add(entry);
+				});
+			});
+
 			interpSynth = AlgaSynth.new(
 				interpSymbol,
-				[
-					\in, paramVal,
-					\out, interpBus.index,
-					\indices, senderChansMappingToUse,
-					\fadeTime, paramConnectionTime
-				],
+				interpSynthArgs,
 				interpGroup
 			);
 		});
