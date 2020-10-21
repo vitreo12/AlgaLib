@@ -48,6 +48,9 @@ AlgaNode {
 	//keep track of current \default nodes
 	var <currentDefaultNodes;
 
+	//keep track of current scaling for params
+	var <scalings;
+
 	var <paramChansMapping;
 
 	var <isPlaying = false;
@@ -120,6 +123,9 @@ AlgaNode {
 
 		//Keeps all the connectionTimes of the connected nodes
 		connectionTimeOutNodes = IdentityDictionary(10);
+
+		//
+		scalings = IdentityDictionary(10);
 
 		//starting connectionTime (using the setter so it also sets longestConnectionTime)
 		this.connectionTime_(argConnectionTime, true);
@@ -429,7 +435,9 @@ AlgaNode {
 
 
 	//dispatches controlnames / numChannels / rate according to obj class
-	dispatchNode { | obj, args, initGroups = false, replace = false, keepChannelsMapping = false, outsMapping |
+	dispatchNode { | obj, args, initGroups = false, replace = false,
+		keepChannelsMapping = false, outsMapping, keepScale = false |
+
 		objClass = obj.class;
 
 		//If there is a synth playing, set its instantiated status to false:
@@ -442,11 +450,13 @@ AlgaNode {
 
 		//Symbol
 		if(objClass == Symbol, {
-			this.dispatchSynthDef(obj, args, initGroups, replace, keepChannelsMapping:keepChannelsMapping);
+			this.dispatchSynthDef(obj, args, initGroups, replace,
+				keepChannelsMapping:keepChannelsMapping, keepScale:keepScale);
 		}, {
 			//Function
 			if(objClass == Function, {
-				this.dispatchFunction(obj, args, initGroups, replace, keepChannelsMapping:keepChannelsMapping, outsMapping:outsMapping);
+				this.dispatchFunction(obj, args, initGroups, replace,
+					keepChannelsMapping:keepChannelsMapping, outsMapping:outsMapping, keepScale:keepScale);
 			}, {
 				("AlgaNode: class '" ++ objClass ++ "' is invalid").error;
 				this.clear;
@@ -455,7 +465,7 @@ AlgaNode {
 	}
 
 	//Dispatch a SynthDef
-	dispatchSynthDef { | obj, args, initGroups = false, replace = false, keepChannelsMapping = false |
+	dispatchSynthDef { | obj, args, initGroups = false, replace = false, keepChannelsMapping = false, keepScale = false |
 		var synthDescControlNames;
 		var synthDesc = SynthDescLib.global.at(obj);
 
@@ -484,11 +494,16 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		this.createAllSynths(synthDef.name, replace, keepChannelsMapping:keepChannelsMapping);
+		this.createAllSynths(synthDef.name, replace,
+			keepChannelsMapping:keepChannelsMapping,
+			keepScale:keepScale
+		);
 	}
 
 	//Dispatch a Function
-	dispatchFunction { | obj, args, initGroups = false, replace = false, keepChannelsMapping = false, outsMapping |
+	dispatchFunction { | obj, args, initGroups = false, replace = false,
+		keepChannelsMapping = false, outsMapping, keepScale = false |
+
 		//Need to wait for server's receiving the sdef
 		fork {
 			var synthDescControlNames;
@@ -535,7 +550,10 @@ AlgaNode {
 			this.createAllBusses;
 
 			//Create actual synths
-			this.createAllSynths(synthDef.name, replace, keepChannelsMapping:keepChannelsMapping);
+			this.createAllSynths(synthDef.name, replace,
+				keepChannelsMapping:keepChannelsMapping,
+				keepScale:keepScale
+			);
 		};
 	}
 
@@ -643,7 +661,7 @@ AlgaNode {
 	}
 
 	//First creation: use defaults or args
-	createInterpNormSynths { | replace = false, keepChannelsMapping = false |
+	createInterpNormSynths { | replace = false, keepChannelsMapping = false, keepScale = false |
 		controlNames.do({ | controlName |
 			var interpSymbol, normSymbol;
 			var interpBus, normBus, interpSynth, normSynth;
@@ -675,7 +693,6 @@ AlgaNode {
 			normBus = normBusses[paramName];
 
             //If replace, connect to the pervious bus, not default
-            //This wouldn't work with mixing for now...
             if(replace, {
                 var sendersSet = inNodes[paramName];
 
@@ -687,7 +704,15 @@ AlgaNode {
 
 						//nil will use Array.series
 						var oldParamChansMapping = nil;
+						var oldParamScale = nil;
+
+						var interpSynthArgs;
+
 						var channelsMapping;
+						var scaleArray;
+
+						//Sets can't be indexed, need to loop over even if it's just one entry
+						sendersSet.do({ | sender | prevSender = sender });
 
 						//Use previous entry for the channel mapping, otherwise, nil.
 						//nil will generate Array.series(...) in calculateSenderChansMappingArray
@@ -695,8 +720,10 @@ AlgaNode {
 							oldParamChansMapping = paramChansMapping[paramName][prevSender];
 						});
 
-						//Sets can't be indexed, need to loop over even if it's just one entry
-						sendersSet.do({ | sender | prevSender = sender });
+						//Use previous entry for inputs scaling
+						if(keepScale, {
+							oldParamScale = scalings[paramName][prevSender];
+						});
 
 						//overwrite interp symbol considering the senders' num channels!
 						interpSymbol = (
@@ -718,14 +745,25 @@ AlgaNode {
 							false
 						);
 
+						scaleArray = this.calculateScaling(paramName, prevSender, paramNumChannels, oldParamScale);
+
+						interpSynthArgs = [
+							\in, prevSender.synthBus.busArg,
+							\out, interpBus.index,
+							\indices, channelsMapping,
+							\fadeTime, 0
+						];
+
+						//Add scale array to args
+						if(scaleArray != nil, {
+							scaleArray.do({ | entry |
+								interpSynthArgs = interpSynthArgs.add(entry);
+							});
+						});
+
                         interpSynth = AlgaSynth.new(
                             interpSymbol,
-                            [
-								\in, prevSender.synthBus.busArg,
-								\out, interpBus.index,
-								\indices, channelsMapping,
-								\fadeTime, 0
-							],
+                            interpSynthArgs,
                             interpGroup
                         )
                     })
@@ -765,9 +803,12 @@ AlgaNode {
 		});
 	}
 
-	createAllSynths { | defName, replace = false, keepChannelsMapping = false |
+	createAllSynths { | defName, replace = false, keepChannelsMapping = false, keepScale = false |
 		this.createSynth(defName);
-		this.createInterpNormSynths(replace, keepChannelsMapping:keepChannelsMapping);
+		this.createInterpNormSynths(replace,
+			keepChannelsMapping:keepChannelsMapping,
+			keepScale:keepScale
+		);
 	}
 
 	calculateSenderChansMappingArray { | param, sender, senderChansMapping, senderNumChans, paramNumChans, updateParamChansMapping = true |
@@ -828,8 +869,25 @@ AlgaNode {
 		});
 	}
 
+	addScaling { | param, sender, scale |
+		if(scalings[param] == nil, {
+			scalings[param] = IdentityDictionary(2);
+			scalings[param][sender] = scale;
+		}, {
+			scalings[param][sender] = scale;
+		});
+	}
+
+	removeScaling { | param, sender |
+		if(scalings[param] != nil, {
+			scalings[param].removeAt(sender);
+		});
+	}
+
 	//Calculate scale to send to interp synth
-	calculateScaling { | scale, param, paramNumChannels |
+	calculateScaling { | param, sender, paramNumChannels, scale |
+		if(scale.isNil, { ^nil });
+
 		if(scale.isSequenceableCollection.not, {
 			"AlgaNode: the scale parameter must be an array".error;
 			^nil
@@ -849,8 +907,12 @@ AlgaNode {
 
 			outArray[0] = \highMin; outArray[1] = newHighMin;
 			outArray[2] = \highMax; outArray[3] = newHighMax;
-
 			outArray[4] = \useScaling; outArray[5] = 1;
+
+			scale[0] = newHighMin;
+			scale[1] = newHighMax;
+
+			this.addScaling(param, sender, scale);
 
 			^outArray;
 		}, {
@@ -874,8 +936,14 @@ AlgaNode {
 				outArray[2] = \lowMax; outArray[3] = newLowMax;
 				outArray[4] = \highMin; outArray[5] = newHighMin;
 				outArray[6] = \highMax; outArray[7] = newHighMax;
-
 				outArray[8] = \useScaling; outArray[9] = 1;
+
+				scale[0] = newLowMin;
+				scale[1] = newLowMax;
+				scale[2] = newHighMin;
+				scale[3] = newHighMax;
+
+				this.addScaling(param, sender, scale);
 
 				^outArray;
 			}, {
@@ -1040,7 +1108,8 @@ AlgaNode {
 			paramNumChannels,
 		);
 
-		scaleArray = this.calculateScaling(scale, param, paramNumChannels);
+		//calculate scale array
+		scaleArray = this.calculateScaling(param, sender, paramNumChannels, scale);
 
 		//new interp synth, with input connected to sender and output to the interpBus
 		//THIS USES connectionTime!!
@@ -1591,7 +1660,9 @@ AlgaNode {
 
 		if(this.cleared.not.and(sender.cleared.not).and(sender.toBeCleared.not), {
 			algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
-				this.makeConnectionInner(sender, param, replace, mix, replaceMix, senderChansMapping, scale);
+				this.makeConnectionInner(sender, param, replace, mix,
+					replaceMix, senderChansMapping, scale
+				);
 			});
 		}, {
 			"AlgaNode: can't makeConnection, sender has been cleared".error;
@@ -1619,13 +1690,13 @@ AlgaNode {
 		this.from(sender: sender, param: param);
 	}
 
-	to { | receiver, param = \in, outChans |
+	to { | receiver, param = \in, outChans, scale |
         if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-            receiver.makeConnection(this, param, senderChansMapping:outChans);
+            receiver.makeConnection(this, param, senderChansMapping:outChans, scale:scale);
         }, {
 			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
         });
@@ -1636,16 +1707,16 @@ AlgaNode {
 		this.to(receiver: receiver, param: param);
 	}
 
-	mixFrom { | sender, param = \in, inChans |
+	mixFrom { | sender, param = \in, inChans, scale |
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param, mix:true, senderChansMapping:inChans);
+			this.makeConnection(sender, param, mix:true, senderChansMapping:inChans, scale:scale);
 		}, {
 			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param, mix:true, senderChansMapping:inChans);
+				this.makeConnection(sender, param, mix:true, senderChansMapping:inChans, scale:scale);
 			}, {
 				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
 			});
@@ -1657,13 +1728,13 @@ AlgaNode {
 		this.mixFrom(sender: sender, param: param);
 	}
 
-	mixTo { | receiver, param = \in, outChans |
+	mixTo { | receiver, param = \in, outChans, scale |
         if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			receiver.makeConnection(this, param, mix:true, senderChansMapping:outChans);
+			receiver.makeConnection(this, param, mix:true, senderChansMapping:outChans, scale:scale);
         }, {
 			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
         });
@@ -1674,18 +1745,18 @@ AlgaNode {
 		this.mixTo(receiver: receiver, param: param);
 	}
 
-	replaceMixInner { | param = \in, previousSender, newSender, inChans |
+	replaceMixInner { | param = \in, previousSender, newSender, inChans, scale |
 		this.disconnectInner(param, previousSender, true);
 		this.makeConnectionInner(newSender, param,
 			replace:false, mix:true, replaceMix:true,
-			senderChansMapping:inChans
+			senderChansMapping:inChans, scale:scale
 		);
 	}
 
 	//Replace a mix entry at param... Practically just freeing the old one and triggering the new one.
 	//This will be useful in the future if wanting to implement some kind of system to retrieve individual
 	//mix entries (like, \in1, \in2). No need it for now
-	replaceMix { | param = \in, previousSender, newSender, inChans |
+	replaceMix { | param = \in, previousSender, newSender, inChans, scale |
 		if(newSender.isAlgaNode.not, {
 			(newSender.asString) ++ " is not an AlgaNode".error;
 			^this;
@@ -1700,7 +1771,7 @@ AlgaNode {
 			});
 
 			if(validPreviousSender, {
-				this.replaceMixInner(param, previousSender, newSender, inChans);
+				this.replaceMixInner(param, previousSender, newSender, inChans, scale);
 			});
 		});
 	}
@@ -1732,22 +1803,22 @@ AlgaNode {
 	}
 
 	//On .replace on an already running mix connection
-	replaceMixConnectionInner { | param = \in, sender, senderChansMapping |
+	replaceMixConnectionInner { | param = \in, sender, senderChansMapping, scale |
 		this.makeConnectionInner(sender, param,
 			replace:true, mix:true, replaceMix:false,
-			senderChansMapping:senderChansMapping
+			senderChansMapping:senderChansMapping, scale:scale
 		);
 	}
 
 	//On .replace on an already running mix connection
-	replaceMixConnection { | param = \in, sender, senderChansMapping |
+	replaceMixConnection { | param = \in, sender, senderChansMapping, scale |
 		algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
-			this.replaceMixConnectionInner(param, sender, senderChansMapping);
+			this.replaceMixConnectionInner(param, sender, senderChansMapping, scale);
 		});
 	}
 
 	//replace connections FROM this
-	replaceConnections { | keepChannelsMapping = true |
+	replaceConnections { | keepChannelsMapping = true, keepScale = true |
         //inNodes are already handled in dispatchNode(replace:true)
 
 		//outNodes. Remake connections that were in place with receivers.
@@ -1755,28 +1826,36 @@ AlgaNode {
 		outNodes.keysValuesDo({ | receiver, paramsSet |
 			paramsSet.do({ | param |
 				var oldParamChansMapping = nil;
+				var oldScale = nil;
 
 				//Restore old channels mapping! It can either be a symbol, number or array here
-				if(keepChannelsMapping, { oldParamChansMapping = receiver.paramChansMapping[param][this]; });
+				if(keepChannelsMapping, { oldParamChansMapping = receiver.paramChansMapping[param][this] });
+
+				//Restore old scale mapping!
+				if(keepScale, { oldScale = receiver.scalings[param][this] });
+
+				oldScale.asString.error;
 
 				//If it was a mixer connection, use replaceMixConnection
 				if(receiver.mixerParamContainsSender(param, this), {
 					//use the scheduler version! don't know if receiver and this are both instantiated
-					receiver.replaceMixConnection(param, this, senderChansMapping:oldParamChansMapping);
-
-					//receiver.replaceMix(param, this, this, inChans:oldParamChansMapping);
+					receiver.replaceMixConnection(param, this,
+						senderChansMapping:oldParamChansMapping, scale:oldScale
+					);
 				}, {
 					//use the scheduler version! don't know if receiver and this are both instantiated
 					//Normal connection, use makeConnection to re-enstablish it
 					receiver.makeConnection(this, param,
-						replace:true, senderChansMapping:oldParamChansMapping
+						replace:true, senderChansMapping:oldParamChansMapping, scale:oldScale
 					);
 				});
 			});
 		});
 	}
 
-	replaceInner { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true, outsMapping |
+	replaceInner { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
+		outsMapping, keepInScale = true, keepOutScale = true |
+
 		var wasPlaying = false;
 
 		//re-init groups if clear was used
@@ -1805,11 +1884,15 @@ AlgaNode {
 		//New one
 		//Just pass the entry, not the whole thingy
 		this.dispatchNode(obj, args, initGroups, true,
-			keepChannelsMapping:keepChannelsMappingIn, outsMapping:outsMapping
+			keepChannelsMapping:keepChannelsMappingIn, outsMapping:outsMapping,
+			keepScale:keepInScale
 		);
 
 		//Re-enstablish connections that were already in place
-		this.replaceConnections(keepChannelsMapping:keepChannelsMappingOut);
+		this.replaceConnections(
+			keepChannelsMapping:keepChannelsMappingOut,
+			keepScale:keepOutScale
+		);
 
         //If node was playing, or .replace has been called while .stop / .clear, play again
         if(wasPlaying.or(beingStopped), {
@@ -1821,9 +1904,12 @@ AlgaNode {
 
 	//replace content of the node, re-making all the connections.
 	//If this was connected to a number / array, should I restore that value too or keep the new one?
-	replace { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true, outsMapping |
+	replace { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
+		outsMapping, keepInScale = true, keepOutScale = true |
+
 		algaScheduler.addAction({ this.instantiated }, {
-			this.replaceInner(obj, args, keepChannelsMappingIn, keepChannelsMappingOut, outsMapping);
+			this.replaceInner(obj, args, keepChannelsMappingIn,
+				keepChannelsMappingOut, outsMapping, keepInScale, keepOutScale);
 		});
 
 		//Not cleared
@@ -1881,6 +1967,10 @@ AlgaNode {
 		algaScheduler.addAction({ (this.instantiated).and(previousSender.instantiated) }, {
 			this.disconnectInner(param, previousSender);
 		});
+	}
+
+	removeMix { | param = \in, previousSender |
+		this.disconnect(param, previousSender);
 	}
 
 	//Find out if specific param / sender combination is in the mix
