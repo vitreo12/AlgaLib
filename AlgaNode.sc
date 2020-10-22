@@ -532,7 +532,8 @@ AlgaNode {
 		});
 	}
 
-	buildSynthFromSynthDef { | initGroups = false, replace = false,
+	//build all synths
+	buildFromSynthDef { | initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false |
 
 		//Retrieve controlNames from SynthDesc
@@ -578,7 +579,7 @@ AlgaNode {
 			^this;
 		});
 
-		this.buildSynthFromSynthDef(
+		this.buildFromSynthDef(
 			initGroups, replace,
 			keepChannelsMapping:keepChannelsMapping,
 			keepScale:keepScale
@@ -599,7 +600,7 @@ AlgaNode {
 
 			server.sync;
 
-			this.buildSynthFromSynthDef(
+			this.buildFromSynthDef(
 				initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
 				keepScale:keepScale
@@ -677,196 +678,7 @@ AlgaNode {
 		^defaultOrArg;
 	}
 
-	//First creation: use defaults or args
-	createInterpNormSynths { | replace = false, keepChannelsMapping = false, keepScale = false |
-		controlNames.do({ | controlName |
-			var interpSymbol, normSymbol;
-			var interpBus, normBus, interpSynth, normSynth;
-
-			var paramName = controlName.name;
-			var paramNumChannels = controlName.numChannels;
-
-			var paramRate = controlName.rate;
-			var paramDefault = this.getDefaultOrArg(controlName, paramName);
-
-			//e.g. \alga_interp_audio1_control1
-			interpSymbol = (
-				"alga_interp_" ++
-				paramRate ++
-				paramNumChannels ++
-				"_" ++
-				paramRate ++
-				paramNumChannels
-			).asSymbol;
-
-			//e.g. \alga_norm_audio1
-			normSymbol = (
-				"alga_norm_" ++
-				paramRate ++
-				paramNumChannels
-			).asSymbol;
-
-			interpBus = interpBusses[paramName][\default];
-			normBus = normBusses[paramName];
-
-            //If replace, connect to the pervious bus, not default
-            if(replace, {
-                var sendersSet = inNodes[paramName];
-
-				if(sendersSet.size > 1, { "Restoring mixing parameters is not implemented yet"; ^nil; });
-
-				if(sendersSet != nil, {
-                    if(sendersSet.size == 1, {
-                        var prevSender;
-
-						//nil will use Array.series
-						var oldParamsChansMapping = nil;
-						var oldParamScale = nil;
-
-						var interpSynthArgs;
-
-						var channelsMapping;
-						var scaleArray;
-
-						//Sets can't be indexed, need to loop over even if it's just one entry
-						sendersSet.do({ | sender | prevSender = sender });
-
-						//Use previous entry for the channel mapping, otherwise, nil.
-						//nil will generate Array.series(...) in calculateSenderChansMappingArray
-						if(keepChannelsMapping, {
-							oldParamsChansMapping = paramsChansMapping[paramName][prevSender];
-						});
-
-						//Use previous entry for inputs scaling
-						if(keepScale, {
-							oldParamScale = paramsScalings[paramName][prevSender];
-						});
-
-						//overwrite interp symbol considering the senders' num channels!
-						interpSymbol = (
-							"alga_interp_" ++
-							prevSender.rate ++
-							prevSender.numChannels ++
-							"_" ++
-							paramRate ++
-							paramNumChannels
-						).asSymbol;
-
-						//Calculate the array for channelsMapping
-						channelsMapping = this.calculateSenderChansMappingArray(
-							paramName,
-							prevSender,
-							oldParamsChansMapping,
-							prevSender.numChannels,
-							paramNumChannels,
-							false
-						);
-
-						scaleArray = this.calculateScaling(paramName, prevSender, paramNumChannels, oldParamScale);
-
-						interpSynthArgs = [
-							\in, prevSender.synthBus.busArg,
-							\out, interpBus.index,
-							\indices, channelsMapping,
-							\fadeTime, 0
-						];
-
-						//Add scale array to args
-						if(scaleArray != nil, {
-							scaleArray.do({ | entry |
-								interpSynthArgs = interpSynthArgs.add(entry);
-							});
-						});
-
-                        interpSynth = AlgaSynth.new(
-                            interpSymbol,
-                            interpSynthArgs,
-                            interpGroup
-                        )
-                    })
-                }, {
-                    //sendersSet is nil, run the default one
-                    interpSynth = AlgaSynth.new(
-                        interpSymbol,
-                        [\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
-                        interpGroup
-                    );
-                })
-            }, {
-                //No previous nodes connected: create a new interpSynth with the paramDefault value
-                //Instantiated right away, with no \fadeTime, as it will directly be connected to
-                //synth's parameter
-                interpSynth = AlgaSynth.new(
-                    interpSymbol,
-                    [\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
-                    interpGroup
-                );
-            });
-
-			//Instantiated right away, with no \fadeTime, as it will directly be connected to
-			//synth's parameter (synth is already reading from all the normBusses)
-			normSynth = AlgaSynth.new(
-				normSymbol,
-				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-				normGroup
-			);
-
-			//interpSynths and normSynths are a IdentityDict of IdentityDicts
-			interpSynths[paramName][\default] = interpSynth;
-			normSynths[paramName][\default] = normSynth;
-
-			//Connect synth's parameter to the normBus
-			//synth.set(paramName, normBus.busArg);
-		});
-	}
-
-	createAllSynths { | defName, replace = false, keepChannelsMapping = false, keepScale = false |
-		this.createInterpNormSynths(replace,
-			keepChannelsMapping:keepChannelsMapping,
-			keepScale:keepScale
-		);
-		this.createSynth(defName);
-	}
-
-	calculateSenderChansMappingArray { | param, sender, senderChansMapping,
-		senderNumChans, paramNumChans, updateParamsChansMapping = true |
-
-		var actualSenderChansMapping = senderChansMapping;
-
-		//Connect with outMapping symbols. Retrieve it from the sender
-		if(actualSenderChansMapping.class == Symbol, {
-			actualSenderChansMapping = sender.outsMapping[actualSenderChansMapping];
-		});
-
-		//Update entry in Dict with the non-modified one (used in .replace then)
-		if(updateParamsChansMapping, {
-			paramsChansMapping[param][sender] = actualSenderChansMapping;
-		});
-
-		//Standard case (perhaps, overkill. This is default of the \indices param anyway)
-		if(actualSenderChansMapping == nil, { ^(Array.series(paramNumChans)) });
-
-		if(actualSenderChansMapping.isSequenceableCollection, {
-			//Also allow [\out1, \out2] here.
-			actualSenderChansMapping.do({ | entry, index |
-				if(entry.class == Symbol, {
-					actualSenderChansMapping[index] = sender.outsMapping[entry];
-				});
-			});
-
-			//flatten the array, modulo around the max number of channels and reshape according to param num chans
-			^((actualSenderChansMapping.flat % senderNumChans).reshape(paramNumChans));
-		}, {
-			if(actualSenderChansMapping.isNumber, {
-				^(Array.fill(paramNumChans, { actualSenderChansMapping }));
-			}, {
-				"senderChansMapping must be a number or an array. Using default one.".error;
-				^(Array.series(paramNumChans));
-			});
-		});
-	}
-
-	//Check correct array sizes
+	//Check correct array size for scale arguments
 	checkScaleParameterSize { | scaleEntry, name, param, paramNumChannels |
 		if(scaleEntry.isSequenceableCollection, {
 			var scaleEntrySize = scaleEntry.size;
@@ -973,15 +785,205 @@ AlgaNode {
 		});
 	}
 
+	//Calculate the array to be used as \indices param for interpSynth
+	calculateSenderChansMappingArray { | param, sender, senderChansMapping,
+		senderNumChans, paramNumChans, updateParamsChansMapping = true |
+
+		var actualSenderChansMapping = senderChansMapping;
+
+		//Connect with outMapping symbols. Retrieve it from the sender
+		if(actualSenderChansMapping.class == Symbol, {
+			actualSenderChansMapping = sender.outsMapping[actualSenderChansMapping];
+		});
+
+		//Update entry in Dict with the non-modified one (used in .replace then)
+		if(updateParamsChansMapping, {
+			paramsChansMapping[param][sender] = actualSenderChansMapping;
+		});
+
+		//Standard case (perhaps, overkill. This is default of the \indices param anyway)
+		if(actualSenderChansMapping == nil, { ^(Array.series(paramNumChans)) });
+
+		if(actualSenderChansMapping.isSequenceableCollection, {
+			//Also allow [\out1, \out2] here.
+			actualSenderChansMapping.do({ | entry, index |
+				if(entry.class == Symbol, {
+					actualSenderChansMapping[index] = sender.outsMapping[entry];
+				});
+			});
+
+			//flatten the array, modulo around the max number of channels and reshape according to param num chans
+			^((actualSenderChansMapping.flat % senderNumChans).reshape(paramNumChans));
+		}, {
+			if(actualSenderChansMapping.isNumber, {
+				^(Array.fill(paramNumChans, { actualSenderChansMapping }));
+			}, {
+				"senderChansMapping must be a number or an array. Using default one.".error;
+				^(Array.series(paramNumChans));
+			});
+		});
+	}
+
+	//First creation: use defaults or args
+	createInterpNormSynths { | replace = false, keepChannelsMapping = false, keepScale = false |
+		controlNames.do({ | controlName |
+			var interpSymbol, normSymbol;
+			var interpBus, normBus, interpSynth, normSynth;
+
+			var paramName = controlName.name;
+			var paramNumChannels = controlName.numChannels;
+
+			var paramRate = controlName.rate;
+			var paramDefault = this.getDefaultOrArg(controlName, paramName);
+
+			//e.g. \alga_interp_audio1_control1
+			interpSymbol = (
+				"alga_interp_" ++
+				paramRate ++
+				paramNumChannels ++
+				"_" ++
+				paramRate ++
+				paramNumChannels
+			).asSymbol;
+
+			//e.g. \alga_norm_audio1
+			normSymbol = (
+				"alga_norm_" ++
+				paramRate ++
+				paramNumChannels
+			).asSymbol;
+
+			interpBus = interpBusses[paramName][\default];
+			normBus = normBusses[paramName];
+
+            //If replace, connect to the pervious bus, not default
+            if(replace, {
+                var sendersSet = inNodes[paramName];
+
+				if(sendersSet != nil, {
+                    if(sendersSet.size == 1, {
+                        var prevSender;
+
+						//nil will use Array.series
+						var oldParamsChansMapping = nil;
+						var oldParamScale = nil;
+
+						var interpSynthArgs;
+
+						var channelsMapping;
+						var scaleArray;
+
+						//Sets can't be indexed, need to loop over even if it's just one entry
+						sendersSet.do({ | sender | prevSender = sender });
+
+						//Use previous entry for the channel mapping, otherwise, nil.
+						//nil will generate Array.series(...) in calculateSenderChansMappingArray
+						if(keepChannelsMapping, {
+							oldParamsChansMapping = paramsChansMapping[paramName][prevSender];
+						});
+
+						//Use previous entry for inputs scaling
+						if(keepScale, {
+							oldParamScale = paramsScalings[paramName][prevSender];
+						});
+
+						//overwrite interp symbol considering the senders' num channels!
+						interpSymbol = (
+							"alga_interp_" ++
+							prevSender.rate ++
+							prevSender.numChannels ++
+							"_" ++
+							paramRate ++
+							paramNumChannels
+						).asSymbol;
+
+						//Calculate the array for channelsMapping
+						channelsMapping = this.calculateSenderChansMappingArray(
+							paramName,
+							prevSender,
+							oldParamsChansMapping,
+							prevSender.numChannels,
+							paramNumChannels,
+							false
+						);
+
+						scaleArray = this.calculateScaling(
+							paramName, prevSender,
+							paramNumChannels, oldParamScale
+						);
+
+						interpSynthArgs = [
+							\in, prevSender.synthBus.busArg,
+							\out, interpBus.index,
+							\indices, channelsMapping,
+							\fadeTime, 0
+						];
+
+						//Add scale array to args
+						if(scaleArray != nil, {
+							scaleArray.do({ | entry |
+								interpSynthArgs = interpSynthArgs.add(entry);
+							});
+						});
+
+                        interpSynth = AlgaSynth.new(
+                            interpSymbol,
+                            interpSynthArgs,
+                            interpGroup
+                        )
+                    })
+                }, {
+                    //sendersSet is nil, use the paramDefault
+                    interpSynth = AlgaSynth.new(
+                        interpSymbol,
+                        [\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
+                        interpGroup
+                    );
+                })
+            }, {
+                //No previous nodes connected: create a new interpSynth with the paramDefault value
+                //Instantiated right away, with no \fadeTime, as it will directly be connected to
+                //synth's parameter
+                interpSynth = AlgaSynth.new(
+                    interpSymbol,
+                    [\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
+                    interpGroup
+                );
+            });
+
+			//Instantiated right away, with no \fadeTime, as it will directly be connected to
+			//synth's parameter. Synth will read its params from all the normBusses
+			normSynth = AlgaSynth.new(
+				normSymbol,
+				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
+				normGroup
+			);
+
+			//interpSynths and normSynths are a IdentityDict of IdentityDicts
+			interpSynths[paramName][\default] = interpSynth;
+			normSynths[paramName][\default] = normSynth;
+
+			//Connect synth's parameter to the normBus
+			//synth.set(paramName, normBus.busArg);
+		});
+	}
+
+	//Create all synths for each param
+	createAllSynths { | defName, replace = false, keepChannelsMapping = false, keepScale = false |
+		this.createInterpNormSynths(replace,
+			keepChannelsMapping:keepChannelsMapping,
+			keepScale:keepScale
+		);
+		this.createSynth(defName);
+	}
+
 	//Run when <<+ / .replace (on mixed connection) / .replaceMix
 	createMixInterpSynthInterpBusBusNormSynthAtParam { | sender, param = \in, replaceMix = false,
 		replace = false, senderChansMapping, scale |
 
-		//on a new <<+ !
-
 		//also check sender is not the default!
 		var newMixConnection = (
-			this.mixerParamContainsSender(param, sender).not).and(
+			this.mixParamContainsSender(param, sender).not).and(
 			sender != currentDefaultNodes[param]
 		);
 
@@ -1217,7 +1219,7 @@ AlgaNode {
 		});
 	}
 
-	//Eventually use this func to free all synths around that use \gate and \fadeTime
+	//Eventually use this func to free all synths that use \gate and \fadeTime
 	freeSynthOnScheduler { | whatSynth, whatFadeTime |
 		if(whatSynth.instantiated, {
 			whatSynth.set(\gate, 0, \fadeTime, whatFadeTime);
@@ -1302,10 +1304,6 @@ AlgaNode {
 	freeAllSynths { | useConnectionTime = true, now = true |
 		this.freeInterpNormSynths(useConnectionTime, now);
 		this.freeSynth(useConnectionTime, now);
-	}
-
-	freeAllSynthOnNewInstantiation { | useConnectionTime = true, now = true |
-		this.freeAllSynths(useConnectionTime, now);
 	}
 
 	//Free the entire mix node at specific param.
@@ -1784,7 +1782,7 @@ AlgaNode {
 		algaScheduler.addAction({ (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
 			var validPreviousSender = true;
 
-			if(this.mixerParamContainsSender(param, previousSender).not, {
+			if(this.mixParamContainsSender(param, previousSender).not, {
 				(previousSender.asString ++ " was not present in the mix for param " ++ param.asString).error;
 				validPreviousSender = false;
 			});
@@ -1856,7 +1854,7 @@ AlgaNode {
 				oldScale.asString.error;
 
 				//If it was a mixer connection, use replaceMixConnection
-				if(receiver.mixerParamContainsSender(param, this), {
+				if(receiver.mixParamContainsSender(param, this), {
 					//use the scheduler version! don't know if receiver and this are both instantiated
 					receiver.replaceMixConnection(param, this,
 						senderChansMapping:oldParamsChansMapping, scale:oldScale
@@ -1937,7 +1935,7 @@ AlgaNode {
 
 	//Remove individual mix entries at param (called from replaceMix too)
 	disconnectInner { | param = \in, previousSender, replaceMix = false |
-		if(this.mixerParamContainsSender(param, previousSender).not, {
+		if(this.mixParamContainsSender(param, previousSender).not, {
 			(previousSender.asString ++ " was not present in the mix for param " ++ param.asString).error;
 			^this;
 		});
@@ -1988,12 +1986,13 @@ AlgaNode {
 		});
 	}
 
+	//alias for disconnect: remove a mix entry
 	removeMix { | param = \in, previousSender |
 		this.disconnect(param, previousSender);
 	}
 
 	//Find out if specific param / sender combination is in the mix
-	mixerParamContainsSender { | param = \in, sender |
+	mixParamContainsSender { | param = \in, sender |
 		^(interpSynths[param][sender] != nil)
 	}
 
@@ -2002,7 +2001,7 @@ AlgaNode {
 		outNodes.keysValuesDo({ | receiver, paramsSet |
 			paramsSet.do({ | param |
 				//If mixer param, just disconnect the entry connected to this
-				if(receiver.mixerParamContainsSender(param, this), {
+				if(receiver.mixParamContainsSender(param, this), {
 					receiver.disconnect(param, this);
 				}, {
 					//no mixer param, just run the disconnect to restore defaults
@@ -2051,11 +2050,11 @@ AlgaNode {
 		if(synth == nil, { ^false });
 
 		interpSynths.do({ | interpSynth |
-			if(interpSynth.instantiated == false, { ^false });
+			if(interpSynth.instantiated.not, { ^false });
 		});
 
 		normSynths.do({ | normSynth |
-			if(normSynth.instantiated == false, { ^false });
+			if(normSynth.instantiated.not, { ^false });
 		});
 
 		//Lastly, the actual synth
