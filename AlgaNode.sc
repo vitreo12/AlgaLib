@@ -973,7 +973,8 @@ AlgaNode {
 
 	//Create all synths for each param
 	createAllSynths { | replace = false, keepChannelsMapping = false, keepScale = false |
-		this.createInterpNormSynths(replace,
+		this.createInterpNormSynths(
+			replace,
 			keepChannelsMapping:keepChannelsMapping,
 			keepScale:keepScale
 		);
