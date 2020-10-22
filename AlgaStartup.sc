@@ -98,11 +98,12 @@ AlgaStartup {
 							arrayOfIndices = arrayOfIndices[0..(arrayOfIndices.size - 2)] ++ "]";
 						});
 
+						//Limiter to make sure not to blow up speakers
 						sdef = "
 AlgaSynthDef(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
 var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
-Out.ar(\\out.ir(0), input * AlgaEnvGate.ar)
+Out.ar(\\out.ir(0), Limiter.ar(input) * AlgaEnvGate.ar)
 }).writeDefFile(AlgaStartup.algaSynthDefIOPath);
 ";
 
