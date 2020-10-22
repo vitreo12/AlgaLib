@@ -6,7 +6,7 @@ Alga.initSynthDefs;
 (
 AlgaStartup.algaMaxIO = 2;
 Alga.boot({
-	a = AlgaNode({SinOsc.ar(\f.kr([440, 441]))}, connectionTime:2).play;
+	a = AlgaNode({SinOsc.ar(\f.kr([440, 441]))}, connectionTime:2, playTime:1).play;
 	b = AlgaNode({SinOsc.ar(1)});
 	c = AlgaNode({DC.kr(0)});
 
@@ -19,10 +19,14 @@ a.mixFrom(c, \f, scale:[0, 1, 100, 500]);
 
 a.replaceMix(\f, c, c, scale:[0, 1, 200, 1000]);
 
-b.replace({SinOsc.ar(\f.kr(1))})
+b.replace({SinOsc.ar(\f.kr(100))})
 
-a.from(b, \f, scale:[[10, 30], 200])
+a.from(b, \f, scale:[[200, 201], [201, 202]])
 
 a.replace({SinOsc.ar(\f.ar([440, 441]))})
+
+a.pt = 1
+
+a.inNodes
 
 a.clear

@@ -544,7 +544,7 @@ AlgaNode {
 		rate = synthDef.rate;
 
 		//Generate outs (for outsMapping connectinons)
-		this.calculateOuts(synthDef, replace, keepChannelsMapping);
+		this.calculateOuts(replace, keepChannelsMapping);
 
 		//Create groups if needed
 		if(initGroups, { this.createAllGroups });
@@ -553,7 +553,8 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		this.createAllSynths(synthDef.name, replace,
+		this.createAllSynths(
+			replace,
 			keepChannelsMapping:keepChannelsMapping,
 			keepScale:keepScale
 		);
@@ -631,7 +632,9 @@ AlgaNode {
 	//Synth writes to the synthBus
 	//Synth always uses longestConnectionTime, in order to make sure that everything connected to it
 	//will have time to run fade ins and outs when running .replace!
-	createSynth { | defName |
+	createSynth {
+		var defName = synthDef.name;
+
 		//synth's \fadeTime is longestWaitTime. It could probably be removed here,
 		//as it will be set eventually in the case of .clear / etc...
 		var synthArgs = [\out, synthBus.index, \fadeTime, longestWaitTime];
@@ -969,12 +972,12 @@ AlgaNode {
 	}
 
 	//Create all synths for each param
-	createAllSynths { | defName, replace = false, keepChannelsMapping = false, keepScale = false |
+	createAllSynths { | replace = false, keepChannelsMapping = false, keepScale = false |
 		this.createInterpNormSynths(replace,
 			keepChannelsMapping:keepChannelsMapping,
 			keepScale:keepScale
 		);
-		this.createSynth(defName);
+		this.createSynth;
 	}
 
 	//Run when <<+ / .replace (on mixed connection) / .replaceMix
