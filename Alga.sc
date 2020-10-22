@@ -13,16 +13,15 @@ Alga {
 
 	*clearScheduler { | server |
 		var scheduler = schedulers[server];
-		scheduler.postln;
-		if(scheduler.isNil.not, {
-			schedulers.removeAt(server);
+		if(scheduler != nil, {
 			scheduler.clear;
+			schedulers.removeAt(server);
 		});
 	}
 
 	*clearServer { | server |
 		var tempServer = servers[server];
-		if(tempServer.isNil.not, {
+		if(tempServer != nil, {
 			tempServer.quit;
 			servers.removeAt(tempServer);
 		});
@@ -44,15 +43,6 @@ Alga {
 		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
 	}
 
-	*newAlgaPatchScheduler { | server, clock |
-		var scheduler;
-		server = server ? Server.default;
-		clock = clock ? TempoClock; //use tempo clock as default
-		scheduler = AlgaScheduler(server:server, clock:clock, cascadeMode:true);
-		schedulers[scheduler] = scheduler;
-		^scheduler;
-	}
-
 	*getScheduler { | server |
 		var scheduler = schedulers[server];
 		if(scheduler.isNil, { ("No AlgaScheduler initialized for server " ++ server.asString).error });
@@ -60,7 +50,6 @@ Alga {
 	}
 
 	*boot { | onBoot, server, algaServerOptions |
-
 		server = server ? Server.default;
 		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
@@ -76,7 +65,8 @@ Alga {
 		server.options.numInputBusChannels = algaServerOptions.numInputBusChannels;
 		server.options.numOutputBusChannels = algaServerOptions.numOutputBusChannels;
 		if(algaServerOptions.supernova, {Server.supernova}, {Server.scsynth});
-		server.options.threads = algaServerOptions.threads;
+		server.options.threads = algaServerOptions.supernovaThreads;
+		server.options.useSystemClock = algaServerOptions.supernovaUseSystemClock;
 		server.latency = algaServerOptions.latency;
 
 		//Check AlgaSynthDef folder exists...
