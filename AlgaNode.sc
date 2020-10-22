@@ -62,7 +62,7 @@ AlgaNode {
 		^super.new.init(obj, args, connectionTime, playTime, outsMapping, server)
 	}
 
-    init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, outsMapping, argServer |
+    init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, argOutsMapping, argServer |
 		//Default server if not specified otherwise
 		server = argServer ? Server.default;
 
@@ -132,7 +132,7 @@ AlgaNode {
         this.playTime_(argPlayTime);
 
 		//Dispatch node creation
-		this.dispatchNode(argObj, argArgs, true, outsMapping:outsMapping);
+		this.dispatchNode(argObj, argArgs, true, outsMapping:argOutsMapping);
 	}
 
 	setParamsConnectionTime { | val, all = false, param |
