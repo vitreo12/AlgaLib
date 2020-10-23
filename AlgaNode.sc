@@ -2055,16 +2055,19 @@ AlgaNode {
 
 			this.freeInterpSynthAtParam(previousSender, param, true);
 
+			//retrieve the updated ones
 			interpSynthsAtParam = interpSynths[param];
 
 			//If length is now 2, it means it's just one mixer AND the \default node left in the dicts.
-			//Assign the node to \default and remove the previous mixer
+			//Assign the node to \default and remove the previous mixer.
+			//Should I retrieve inNodes.size == 1 instead?
 			if(interpSynthsAtParam.size == 2, {
 				interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam |
 					if(interpSender != \default, {
 						var normSynthsAtParam = normSynths[param];
 						var interpBussesAtParam = interpBusses[param];
 
+						//leave only \default
 						interpSynthsAtParam[\default] = interpSynthAtParam;
 						interpBussesAtParam[\default] = interpBussesAtParam[interpSender];
 						normSynthsAtParam[\default]   = normSynthsAtParam[interpSender];
