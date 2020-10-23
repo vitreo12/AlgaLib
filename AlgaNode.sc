@@ -135,7 +135,7 @@ AlgaNode {
 		this.playTime_(argPlayTime);
 
 		//Dispatch node creation
-		this.dispatchNode(argObj, argArgs, true, outsMapping:argOutsMapping);
+		this.dispatchNode(argObj, argArgs, initGroups:true, outsMapping:argOutsMapping);
 	}
 
 	setParamsConnectionTime { | val, all = false, param |
