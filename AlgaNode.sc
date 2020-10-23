@@ -1976,7 +1976,9 @@ AlgaNode {
 
 		//New one
 		//Just pass the entry, not the whole thingy
-		this.dispatchNode(obj, args, initGroups, true,
+		this.dispatchNode(obj, args,
+			initGroups:initGroups,
+			replace:true,
 			keepChannelsMapping:keepChannelsMappingIn, outsMapping:outsMapping,
 			keepScale:keepInScale
 		);
