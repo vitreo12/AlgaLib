@@ -1263,6 +1263,9 @@ AlgaNode {
 
 		//Store current \default (needed when going from mix == true to mix == false)...
 		//basically, restoring proper connections after going from <<+ to << or <|
+		//This is only activated with << and <<|, and it makes sure of hainvg proper \default nodes
+		//The \default entries for interpBusses, interpSynths and normSynths
+		//are already taken care of in createInterpNormSynths
 		if((senderSym == \default).and(mix == false), {
 			currentDefaultNodes[param] = sender;
 		});
@@ -1653,11 +1656,36 @@ AlgaNode {
 		});
 	}
 
+	//First time a mix parameter is added: make sure to add what was the \default to
+	//all the mix dictionaries. This is actually only needed once, on the first time of <<+
+	//so that the previous connection is considered part of the mix
+	moveDefaultNodeToMix { | param = \in, sender |
+		var currentDefaultNodeAtParam = currentDefaultNodes[param];
+		if(currentDefaultNodeAtParam.isAlgaNode, { //only if default is AlgaNode (not number or array)
+			if(currentDefaultNodeAtParam != sender, {
+				var interpBussesAtParam = interpBusses[param];
+				var interpSynthsAtParam = interpSynths[param];
+				var normSynthsAtParam = normSynths[param];
+
+				//If there was no entry, add it!
+				if(interpBussesAtParam[currentDefaultNodeAtParam] == nil, {
+					interpBussesAtParam[currentDefaultNodeAtParam] = interpBussesAtParam[\default];
+				});
+
+				if(interpSynthsAtParam[currentDefaultNodeAtParam] == nil, {
+					interpSynthsAtParam[currentDefaultNodeAtParam] = interpSynthsAtParam[\default];
+				});
+
+				if(normSynthsAtParam[currentDefaultNodeAtParam] == nil, {
+					normSynthsAtParam[currentDefaultNodeAtParam] = normSynthsAtParam[\default];
+				});
+			});
+		});
+	}
+
 	//implements receiver <<.param sender
 	makeConnectionInner { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale |
-
-		var currentDefaultNodeAtParam;
 
 		if((sender.isAlgaNode.not).and(sender.isNumberOrArray.not), {
 			"Can't connect to something that's not an AlgaNode, a Number or an Array".error;
@@ -1668,7 +1696,7 @@ AlgaNode {
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
 		if(mix, {
-			currentDefaultNodeAtParam = currentDefaultNodes[param];
+			var currentDefaultNodeAtParam = currentDefaultNodes[param];
 
 			//trying to <<+ instead of << on first connection
 			if((currentDefaultNodeAtParam == nil), {
@@ -1681,7 +1709,7 @@ AlgaNode {
 				mix = false;
 			});
 
-			//can't <<+ with numbers or arrays... how to track them?
+			//can't <<+ with numbers or arrays. There would be no way to track them, unless DC.kr/ar
 			if((sender == nil).or(sender.isNumberOrArray), {
 				("Mixing only works for explicit AlgaNodes.").error;
 				^this;
@@ -1698,29 +1726,8 @@ AlgaNode {
 
 		//need to re-check as mix might have changed!
 		if(mix, {
-			//First time a mix parameter is added: make sure to add what was the \default to
-			//all the mix dictionaries. This is actually only needed once, on the first time of <<+
-			//so that the previous connection is considered part of the mix
-			if(currentDefaultNodeAtParam.isAlgaNode, { //only if default is AlgaNode (not number or array)
-				if(currentDefaultNodeAtParam != sender, {
-					var interpBussesAtParam = interpBusses[param];
-					var interpSynthsAtParam = interpSynths[param];
-					var normSynthsAtParam = normSynths[param];
-
-					//If there was no entry, add it!
-					if(interpBussesAtParam[currentDefaultNodeAtParam] == nil, {
-						interpBussesAtParam[currentDefaultNodeAtParam] = interpBussesAtParam[\default];
-					});
-
-					if(interpSynthsAtParam[currentDefaultNodeAtParam] == nil, {
-						interpSynthsAtParam[currentDefaultNodeAtParam] = interpSynthsAtParam[\default];
-					});
-
-					if(normSynthsAtParam[currentDefaultNodeAtParam] == nil, {
-						normSynthsAtParam[currentDefaultNodeAtParam] = normSynthsAtParam[\default];
-					});
-				});
-			});
+			//Make sure the \default node is also added to mix
+			this.moveDefaultNodeToMix(param, sender);
 
 			//Either new one <<+ / .replaceMix OR .replace
 			this.newMixConnectionAtParam(sender, param,
@@ -1831,6 +1838,7 @@ AlgaNode {
 		this.mixTo(receiver: receiver, param: param);
 	}
 
+	//disconnect + makeConnection, very easy
 	replaceMixInner { | param = \in, previousSender, newSender, inChans, scale |
 		this.disconnectInner(param, previousSender, true);
 		this.makeConnectionInner(newSender, param,
@@ -2003,25 +2011,18 @@ AlgaNode {
 		cleared = false;
 	}
 
-	//Remove individual mix entries at param (called from replaceMix too)
-	disconnectInner { | param = \in, previousSender, replaceMix = false |
-		if(this.mixParamContainsSender(param, previousSender).not, {
-			(previousSender.asString ++ " was not present in the mix for param " ++ param.asString).error;
-			^this;
-		});
-
-		//Remove inNodes / outNodes / connectionTimeOutNodes for previousSender
-		this.removeInOutNodesDict(previousSender, param);
-
+	//Basically, this checks if the current sender that is being disconnected was the \default node.
+	//if it is, it switch the default node with the next available
+	checkForUpdateToDefaultNodeAtParam { | param = \in, previousSender |
 		//If disconnecting the one that \default is assigned to, it must be switched to another one first!!
 		if(currentDefaultNodes[param] == previousSender, {
 			var newDefaultNode;
 
-			//Find another one
+			//Find another one (the first one available)
 			newDefaultNode = block ({ | break |
 				inNodes[param].do({ | inNode |
 					if(inNode != previousSender, {
-						break.(inNode);
+						break.(inNode); //break returns the argument
 					});
 				});
 			});
@@ -2034,6 +2035,20 @@ AlgaNode {
 				interpBusses[param][\default] = interpBusses[param][newDefaultNode];
 			});
 		});
+	}
+
+	//Remove individual mix entries at param (called from replaceMix too)
+	disconnectInner { | param = \in, previousSender, replaceMix = false |
+		if(this.mixParamContainsSender(param, previousSender).not, {
+			(previousSender.asString ++ " was not present in the mix for param " ++ param.asString).error;
+			^this;
+		});
+
+		//Remove inNodes / outNodes / connectionTimeOutNodes for previousSender
+		this.removeInOutNodesDict(previousSender, param);
+
+		//check if \default node needs updating
+		this.checkForUpdateToDefaultNodeAtParam(param, previousSender);
 
 		if(replaceMix.not, {
 			var interpSynthsAtParam;
@@ -2093,8 +2108,9 @@ AlgaNode {
 
 	//Find out if specific param / sender combination is in the mix
 	mixParamContainsSender { | param = \in, sender |
-		//^(interpSynths[param][sender] != nil)
-		^(inNodes[param].findMatch(sender) != nil);
+		^(interpSynths[param][sender] != nil)
+		//Or this?
+		//^(inNodes[param].findMatch(sender) != nil);
 	}
 
 	//When clear, run disconnections to nodes connected to this
