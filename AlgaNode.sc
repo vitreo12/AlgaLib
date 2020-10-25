@@ -1491,12 +1491,16 @@ AlgaNode {
 
 				//This has to be surely instantiated before being freed
 				interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
+
+				//Set correct fadeTime for all active interp synths at param / sender combination
+				this.setFadeTimeForAllActiveInterpSynths(param, sender, time);
 			});
 		});
 
-		//On a .disconnect / .replaceMix, remove the entry
+		//On a .disconnect / .replaceMix, remove the entries
 		if(cleanupDicts, {
 			interpSynths[param].removeAt(sender);
+			activeInterpSynths[param].removeAt(sender);
 			interpBusses[param].removeAt(sender);
 			normSynths[param].removeAt(sender);
 		});
