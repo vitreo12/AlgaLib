@@ -45,6 +45,8 @@ AlgaNode {
 	var <playSynth, <synth, <normSynths, <interpSynths;
 	var <synthBus, <normBusses, <interpBusses;
 
+	var <activeInterpSynths;
+
 	var <inNodes, <outNodes;
 
 	//keep track of current \default nodes
@@ -103,6 +105,13 @@ AlgaNode {
 		//IdentityDictionary of IdentityDictonaries: (needed for mixing)
 		//\param -> IdentityDictionary(sender -> interpSynth)
 		interpSynths = IdentityDictionary(10);
+
+		//IdentityDictionary of IdentityDictonaries: (needed for mixing)
+		//\param -> IdentityDictionary(sender -> IdentitySet(interpSynth))
+		//there are used when changing time on connections, and need to update already running
+		//interpSynths at specific param / sender combination. It's the whole core that allows
+		//to have dynamic fadeTimes
+		activeInterpSynths = IdentityDictionary(10);
 
 		//Per-argument connections to this AlgaNode. These are in the form:
 		//(param -> IdentitySet[AlgaNode, AlgaNode...]). Multiple AlgaNodes are used when
@@ -528,6 +537,7 @@ AlgaNode {
 				interpSynths[paramName] = IdentityDictionary();
 				normSynths[paramName] = IdentityDictionary();
 				interpBusses[paramName] = IdentityDictionary();
+				activeInterpSynths[paramName] = IdentityDictionary();
 			});
 		});
 	}
@@ -856,6 +866,35 @@ AlgaNode {
 		});
 	}
 
+	//The actual empty function
+	removeActiveInterpSynthOnFree { | param, sender, interpSynth |
+		interpSynth.onFree({
+			activeInterpSynths[param][sender].remove(interpSynth);
+		});
+	}
+
+	//Use the .onFree node function to dynamically fill and empty the activeInterpSynths for
+	//each param / sender combination!
+	addActiveInterpSynthOnFree { | param, sender, interpSynth |
+		//Each sender has IdentitySet with all the active ones
+		if(activeInterpSynths[param][sender].class == IdentitySet, {
+			activeInterpSynths[param][sender].add(interpSynth)
+		}, {
+			activeInterpSynths[param][sender] = IdentitySet();
+			activeInterpSynths[param][sender].add(interpSynth)
+		});
+
+		//The actual function that empties
+		this.removeActiveInterpSynthOnFree(param, sender, interpSynth);
+	}
+
+	//Set proper fadeTime for all active interpSynths on param / sender combination
+	setFadeTimeForAllActiveInterpSynths { | param, sender, time |
+		activeInterpSynths[param][sender].do({ | activeInterpSynth |
+			activeInterpSynth.set(\fadeTime, time);
+		});
+	}
+
 	//AlgaNode.new or .replace
 	createInterpNormSynths { | replace = false, keepChannelsMapping = false, keepScale = false |
 		controlNames.do({ | controlName |
@@ -979,10 +1018,16 @@ AlgaNode {
 							//normal param
 							interpSynths[paramName][\default] = interpSynth;
 							normSynths[paramName][\default] = normSynth;
+
+							//Add interpSynth to the current active ones for specific param / sender combination
+							this.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
 						}, {
 							//mix param
 							interpSynths[paramName][prevSender] = interpSynth;
 							normSynths[paramName][prevSender] = normSynth;
+
+							//Add interpSynth to the current active ones for specific param / sender combination
+							this.addActiveInterpSynthOnFree(paramName, prevSender, interpSynth);
 
 							//And update the ones in \default if this sender is the currentDefaultNode!!!
 							//This is essential, because otherwise interpBusses[paramName][\default]
@@ -1038,6 +1083,9 @@ AlgaNode {
 
 				interpSynths[paramName][\default] = interpSynth;
 				normSynths[paramName][\default] = normSynth;
+
+				//Add interpSynth to the current active ones for specific param / sender combination
+				this.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
 			});
 		});
 	}
@@ -1160,8 +1208,6 @@ AlgaNode {
 
 		//calc temporary time
 		time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
-
-		time.asString.error;
 
 		paramNumChannels = controlName.numChannels;
 		paramRate = controlName.rate;
@@ -1296,6 +1342,9 @@ AlgaNode {
 
 		//Add to interpSynths for the param
 		interpSynths[param][senderSym] = interpSynth;
+
+		//Add interpSynth to the current active ones for specific param / sender combination
+		this.addActiveInterpSynthOnFree(param, senderSym, interpSynth);
 
 		//Store current \default (needed when going from mix == true to mix == false)...
 		//basically, restoring proper connections after going from <<+ to << or <|
@@ -1489,10 +1538,13 @@ AlgaNode {
 				//calculate temporary time
 				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
-				//Just one entry in the dict (\default), just free that interp synth!
+				//Start the free on the previous interp synth (size is 1 here)
 				interpSynthsAtParam.do({ | interpSynthAtParam |
 					interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
 				});
+
+				//Set correct fadeTime for all active interp synths at param / sender combination
+				this.setFadeTimeForAllActiveInterpSynths(param, \default, time);
 			});
 		}, {
 			//mix == true, only free the one (disconnect function)
