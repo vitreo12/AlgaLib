@@ -328,7 +328,7 @@ AlgaNode {
 		if(group == nil, {
 			group = Group(this.server);
 			playGroup = Group(group);
-			synthGroup = Group(group); //It could be ParGroup here for supernova
+			synthGroup = Group(group);
 			normGroup = Group(group);
 			interpGroup = Group(group);
 		});
@@ -357,7 +357,7 @@ AlgaNode {
 			}, {
 				//Wait longestWaitTime, then free
 				fork {
-					longestWaitTime.wait;
+					(longestWaitTime + 1.0).wait;
 
 					group.free;
 
@@ -439,8 +439,10 @@ AlgaNode {
 				});
 
 				if(prevInterpBusses != nil, {
-					prevInterpBusses.do({ | interpBus |
-						if(interpBus != nil, { interpBus.free });
+					prevInterpBusses.do({ | interpBussesAtParam |
+						interpBussesAtParam.do({ | interpBus |
+							if(interpBus != nil, { interpBus.free });
+						});
 					});
 				});
 			}
