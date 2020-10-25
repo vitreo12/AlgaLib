@@ -1352,7 +1352,7 @@ AlgaNode {
 			//Free synths now
 			interpSynths.do({ | interpSynthsAtParam |
 				interpSynthsAtParam.do({ | interpSynth |
-					interpSynth.set(\gate, 0, \fadeTime, 0);
+					interpSynth.set(\t_release, 1, \fadeTime, 0);
 				});
 			});
 
@@ -1376,7 +1376,7 @@ AlgaNode {
 
 				prevInterpSynths.do({ | interpSynthsAtParam |
 					interpSynthsAtParam.do({ | interpSynth |
-						interpSynth.set(\gate, 0, \fadeTime, 0);
+						interpSynth.set(\t_release, 1, \fadeTime, 0);
 					});
 				});
 
@@ -1441,7 +1441,7 @@ AlgaNode {
 				});
 
 				//This has to be surely instantiated before being freed
-				interpSynthAtParam.set(\gate, 0, \fadeTime, time);
+				interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
 			});
 		});
 
@@ -1489,12 +1489,9 @@ AlgaNode {
 				//calculate temporary time
 				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
-				time.asString.warn;
-
 				//Just one entry in the dict (\default), just free that interp synth!
 				interpSynthsAtParam.do({ | interpSynthAtParam |
-					interpSynthAtParam.nodeID.asString.error;
-					interpSynthAtParam.set(\gate, 0, \fadeTime, time);
+					interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
 				});
 			});
 		}, {

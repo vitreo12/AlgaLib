@@ -103,7 +103,7 @@ AlgaStartup {
 AlgaSynthDef(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
 var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
-Out.ar(\\out.ir(0), Limiter.ar(input) * AlgaEnvGate.ar)
+Out.ar(\\out.ir(0), Limiter.ar(input) * AlgaDynamicEnvGate.ar)
 }).writeDefFile(AlgaStartup.algaSynthDefIOPath);
 ";
 
@@ -195,7 +195,7 @@ Out.ar(\\out.ir(0), Limiter.ar(input) * AlgaEnvGate.ar)
 							in = "\\in.ar(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: envCurve);";
+							env = "AlgaDynamicEnvGate.ar(t_release:t_release, fadeTime:fadeTime);";
 						});
 
 						if(rate == \kr_kr, {
@@ -203,7 +203,7 @@ Out.ar(\\out.ir(0), Limiter.ar(input) * AlgaEnvGate.ar)
 							in = "\\in.kr(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: envCurve);";
+							env = "AlgaDynamicEnvGate.kr(t_release:t_release, fadeTime:fadeTime);";
 						});
 
 						if(rate == \ar_kr, {
@@ -211,7 +211,7 @@ Out.ar(\\out.ir(0), Limiter.ar(input) * AlgaEnvGate.ar)
 							in = "A2K.kr(\\in.ar(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaEnvGate.kr(i_level: 0, doneAction:2, curve: envCurve);";
+							env = "AlgaDynamicEnvGate.kr(t_release:t_release, fadeTime:fadeTime);";
 						});
 
 						if(rate == \kr_ar, {
@@ -219,11 +219,11 @@ Out.ar(\\out.ir(0), Limiter.ar(input) * AlgaEnvGate.ar)
 							in = "K2A.ar(\\in.kr(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaEnvGate.ar(i_level: 0, doneAction:2, curve: envCurve);";
+							env = "AlgaDynamicEnvGate.ar(t_release:t_release, fadeTime:fadeTime);";
 						});
 
 						result = "
-AlgaSynthDef(" ++ name ++ ", { | scaleCurve = 0, envCurve = \\sin |
+AlgaSynthDef(" ++ name ++ ", { | scaleCurve = 0, t_release = 0, fadeTime = 0 |
 var in, env, out, outScale, outs;
 in = " ++ in ++ "
 out = " ++ indices ++ "
