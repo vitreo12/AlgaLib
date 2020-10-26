@@ -144,7 +144,7 @@ AlgaSynthDef : SynthDef {
 		def.canFreeSynth = def.canReleaseSynth || canFree;
 
 		//Set outsMapping as \out1 -> 0, etc...
-		def.outs = Dictionary.new(numChannels);
+		def.outs = IdentityDictionary(numChannels);
 		numChannels.do({ | i |
 			var out = ("out" ++ (i + 1)).asSymbol;
 			def.outs[out] = i;

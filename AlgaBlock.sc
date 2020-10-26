@@ -29,8 +29,8 @@ AlgaBlock {
 
 		blockIndex = inBlockIndex;
 
-		nodesDict      = IdentityDictionary.new(20);
-		statesDict     = Dictionary.new(20);
+		nodesDict      = IdentityDictionary(20);
+		statesDict     = IdentityDictionary(20);
 		bottomOutNodes = IdentityDictionary.new;
 		topInNodes     = IdentityDictionary.new;
 	}
@@ -225,7 +225,7 @@ AlgaBlocksDict {
 	classvar <blocksDict;
 
 	*initClass {
-		blocksDict = Dictionary.new(50);
+		blocksDict = IdentityDictionary(50);
 	}
 
 	*reorderBlock { | blockIndex, server |
