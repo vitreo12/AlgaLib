@@ -6,7 +6,8 @@ AlgaSynthDef : SynthDef {
 
 	var <>outs;
 
-	classvar <>sampleAccurate=false;
+	//Use OffsetOut by default!
+	classvar <>sampleAccurate=true;
 
 	outsMapping {
 		^outs
