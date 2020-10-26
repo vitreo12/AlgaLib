@@ -7,13 +7,14 @@ AlgaDynamicEnvGate {
 		var invFadeTime = Sanitize.kr(fadeTime.reciprocal);
 
 		//Trick: if fadeTime is 0 or less, the increment will be BlockSize
-		//(which will make Sweep jump to 1 instantly)
+		//(which will make Sweep jump to 1 instantly, so that when it will be locked with riseEndPoint,
+		//it will be one, if coming from a fadeTime of 0)
 		invFadeTime = Select.kr(invFadeTime > 0, [BlockSize.ir, invFadeTime]);
 
 		//rise envelope
 		riseEnv = (Sweep.ar(1, invFadeTime).clip(0, 1) * pi * 0.5).sin; //ar: use sin shape
 
-		//if fadeTime == 1, output 1 (instantly)
+		//if fadeTime == 0, output 1 (instantly)
 		riseEnv = Select.ar(invFadeTime > 0, [DC.ar(1), riseEnv]);
 
 		//Sample the end point when triggering release
