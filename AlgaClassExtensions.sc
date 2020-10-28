@@ -1,6 +1,5 @@
 +Dictionary {
-	//Loop over a Dict, unpacking Set. It's used in AlgaBlock
-	//to unpack inNodes of an AlgaNode
+	//Loop over a Dict, unpacking Set. It's used in AlgaBlock to unpack inNodes of an AlgaNode
 	nodesLoop { | function |
 		this.keysValuesDo({
 			arg key, value, i;
@@ -55,7 +54,22 @@
 	}
 }
 
-//Debug purposes
+//Add support for >> and >>+
++Pattern {
+
+}
+
+//Add support for >> and >>+
++Number {
+
+}
+
+//Add support for >> and >>+
++SequenceableCollection {
+
+}
+
+//Debug purposes (used in the s.bind calls in AlgaScheduler)
 +BundleNetAddr {
 	closeBundle { arg time;
 		var bundleList, lastBundles;
@@ -83,9 +97,9 @@
 	}
 }
 
-/*
-//Just as schedBundleArrayOnClock, but it also supports array of array bundles
-+ SequenceableCollection {
+//Just as schedBundleArrayOnClock, but it also supports array of array bundles.
+//This is used for AlgaPatterns in order to send all synths together in a single bundle
++SequenceableCollection {
 	algaSchedBundleArrayOnClock { | clock, bundleArray, server, latency, lag = 0 |
 
 		// "this" is an array of delta times for the clock (usually in beats)
@@ -130,7 +144,8 @@
 	}
 }
 
-+ Server {
+//This is used for AlgaPatterns in order to send all synths together in a single bundle
++Server {
 	algaSendClumpedBundle { | time ... msgs |
 		if(AlgaScheduler.verbose, {
 			("Server: latency: " ++ time).warn;
@@ -140,4 +155,3 @@
 		addr.sendClumpedBundles(time, *msgs); //Better than sendBundle, as it checks for msg size!
 	}
 }
-*/
