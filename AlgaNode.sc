@@ -759,6 +759,13 @@ AlgaNode {
 		});
 	}
 
+	getParamScaling { | param, sender |
+		if(paramsScalings[param] != nil, {
+			^(paramsScalings[param][sender])
+		});
+		^nil;
+	}
+
 	//Calculate scale to send to interp synth
 	calculateScaling { | param, sender, paramNumChannels, scale |
 		if(scale.isNil, { ^nil });
@@ -827,6 +834,13 @@ AlgaNode {
 				^nil
 			});
 		});
+	}
+
+	getParamChansMapping { | param, sender |
+		if(paramsChansMapping[param] != nil, {
+			^(paramsChansMapping[param][sender])
+		});
+		^nil;
 	}
 
 	//Calculate the array to be used as \indices param for interpSynth
@@ -949,12 +963,12 @@ AlgaNode {
 						//Use previous entry for the channel mapping, otherwise, nil.
 						//nil will generate Array.series(...) in calculateSenderChansMappingArray
 						if(keepChannelsMapping, {
-							oldParamsChansMapping = paramsChansMapping[paramName][prevSender];
+							oldParamsChansMapping = this.getParamChansMapping(paramName, prevSender);
 						});
 
 						//Use previous entry for inputs scaling
 						if(keepScale, {
-							oldParamScale = paramsScalings[paramName][prevSender];
+							oldParamScale = this.getParamScaling(paramName, prevSender);
 						});
 
 						//overwrite interp symbol considering the senders' num channels!
@@ -2053,10 +2067,10 @@ AlgaNode {
 				var oldScale = nil;
 
 				//Restore old channels mapping! It can either be a symbol, number or array here
-				if(keepChannelsMapping, { oldParamsChansMapping = receiver.paramsChansMapping[param][this] });
+				if(keepChannelsMapping, { oldParamsChansMapping = receiver.getParamChansMapping(param, this) });
 
 				//Restore old scale mapping!
-				if(keepScale, { oldScale = receiver.paramsScalings[param][this] });
+				if(keepScale, { oldScale = receiver.getParamScaling(param, this) });
 
 				//If it was a mixer connection, use replaceMixConnection
 				if(receiver.mixParamContainsSender(param, this), {
