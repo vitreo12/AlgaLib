@@ -2295,6 +2295,9 @@ AlgaNode {
 			this.resetGroups;
 			this.resetInOutNodesDicts;
 
+			objClass = nil;
+			objArgs = nil;
+
 			cleared = true;
 		}
 	}

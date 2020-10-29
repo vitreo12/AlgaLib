@@ -412,7 +412,7 @@ AlgaScheduler : AlgaThread {
 	}
 
 	//Default condition is just { true }, just execute it when its time comes on the scheduler
-	addAction { | condition, func, sched = 0, inheritable = true |
+	addAction { | condition, func, sched = 0 |
 		var action;
 
 		condition = condition ? { true };

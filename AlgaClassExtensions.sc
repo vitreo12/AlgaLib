@@ -20,6 +20,11 @@
 	cleared { ^false }
 	toBeCleared { ^false }
 	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
+
+	//Fallback on AlgaSpinRoutine if anything goes wrong
+	addAction { | condition, func, sched = 0 |
+		AlgaSpinRoutine.waitFor(condition, func);
+	}
 }
 
 +List {
