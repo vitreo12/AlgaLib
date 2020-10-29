@@ -15,10 +15,10 @@ a = AlgaPattern(
 	\test,
 	\dur, Pseq([0.25, 0.5, 1]),
 	\freq, Pwhite(300, 1000)
-)
+).it_(2)
 )
 
-a <<.freq Pseq([440, 880], inf)
+a <<.freq Pseq([440, 880])
 
 a <<.dur Pwhite(0.01, 1);
 

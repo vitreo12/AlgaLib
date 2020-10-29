@@ -16,6 +16,7 @@
 
 +Object {
 	isAlgaNode { ^false }
+	isAlgaPattern { ^false }
 	instantiated { ^true }
 	cleared { ^false }
 	toBeCleared { ^false }

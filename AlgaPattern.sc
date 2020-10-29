@@ -23,7 +23,7 @@ AlgaPattern : AlgaNode {
 		this.dispatchNode(pairs[0]);
 	}
 
-	dispatchNode { | obj, args, initGroups = false, replace = false,
+	dispatchNode { | obj, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false |
 
 		//Store class
@@ -33,9 +33,6 @@ AlgaPattern : AlgaNode {
 		//this is mostly needed for .replace to work properly and wait for the new synth
 		//to be instantiated!
 		if(synth != nil, { synth.instantiated = false });
-
-		//Create args dict
-		this.createObjArgs(args);
 
 		//Symbol
 		if(objClass == Symbol, {
@@ -80,6 +77,8 @@ AlgaPattern : AlgaNode {
 	replace {
 		//Basically, replace the SynthDef used, or the ListPattern
 	}
+
+	isAlgaPattern { ^true }
 }
 
 AP : AlgaPattern {}
