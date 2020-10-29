@@ -59,6 +59,13 @@
 	}
 }
 
+//default Pseq to inf
++Pseq {
+	*new { arg list, repeats=inf, offset=0;
+		^super.new(list, repeats).offset_(offset)
+	}
+}
+
 //Add support for >> and >>+
 +Pattern {
 
