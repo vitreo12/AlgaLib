@@ -66,7 +66,7 @@ AlgaNode {
 		^super.new.init(obj, args, connectionTime, playTime, outsMapping, server)
 	}
 
-	init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, argOutsMapping, argServer |
+	initAllVariables { | argServer |
 		//Default server if not specified otherwise
 		server = argServer ? Server.default;
 
@@ -78,7 +78,7 @@ AlgaNode {
 				server.name ++
 				". Has Alga.boot been called on it?"
 			).error;
-			^nil;
+			^false;
 		});
 
 		//param -> ControlName
@@ -138,6 +138,32 @@ AlgaNode {
 
 		//Keeps all the connectionTimes of the connected nodes
 		connectionTimeOutNodes = IdentityDictionary(10);
+
+		^true;
+	}
+
+	init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, argOutsMapping, argServer |
+
+		//Check supported classes for argObj, so that things won't even init if wrong.
+		//Also check for AlgaPattern
+		if(this.isAlgaPattern, {
+			if(argObj.class != Event, {
+				"AlgaPattern: first argument must be an Event describing the pattern".error;
+				^this;
+			});
+		}, {
+			if((argObj.class != Symbol).and(
+				argObj.class != Function), {
+				"AlgaNode: first argument must be either a Symbol or a Function".error;
+				^this;
+			});
+		});
+
+		//initialize all IdentityDictionaries. Check if init went through correctly,
+		//otherwise, don't go through with anything
+		if(this.initAllVariables(argServer).not, {
+			^this
+		});
 
 		//starting connectionTime (using the setter so it also sets longestConnectionTime)
 		this.connectionTime_(argConnectionTime, true);
@@ -608,7 +634,7 @@ AlgaNode {
 		var synthDesc = SynthDescLib.global.at(obj);
 
 		if(synthDesc == nil, {
-			("Invalid AlgaSynthDef: '" ++ obj.asString ++ "'").error;
+			("AlgaNode: Invalid AlgaSynthDef: '" ++ obj.asString ++ "'").error;
 			this.clear;
 			^this;
 		});
@@ -616,7 +642,7 @@ AlgaNode {
 		synthDef = synthDesc.def;
 
 		if(synthDef.class != AlgaSynthDef, {
-			("Invalid AlgaSynthDef: '" ++ obj.asString ++"'").error;
+			("AlgaNode: Invalid AlgaSynthDef: '" ++ obj.asString ++"'").error;
 			this.clear;
 			^this;
 		});

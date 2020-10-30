@@ -11,11 +11,11 @@ Alga.boot({
 )
 
 (
-a = AlgaPattern(
-	\test,
-	\dur, Pseq([0.25, 0.5, 1]),
-	\freq, Pwhite(300, 1000)
-).it_(2)
+a = AlgaPattern((
+	synth: \test,
+	dur: Pseq([0.25, 0.5, 1]),
+	freq: Pwhite(300, 1000)
+))
 )
 
 a <<.freq Pseq([440, 880])
@@ -30,3 +30,5 @@ a.replace(
 	\dur, Pseq([0.01, 0.2])
 )
 )
+
+b = AlgaNode(\test)

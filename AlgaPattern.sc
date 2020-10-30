@@ -13,18 +13,17 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	*new { | ... pairs |
-		//Don't know why ^super.new won't work here tbh.
-		//It would call AlgaNode's new and init
-		^super.newCopyArgs(nil).init(pairs);
-	}
-
-	init { | pairs |
-		this.dispatchNode(pairs[0]);
-	}
-
-	dispatchNode { | obj, initGroups = false, replace = false,
+	//dispatchNode: first argument is an Event
+	dispatchNode { | eventPairs, args, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false |
+
+		//synth: entry
+		var obj = eventPairs[\synth];
+
+		if(obj == nil, {
+			"AlgaPattern: no synth entry in the Event".error;
+			^this;
+		});
 
 		//Store class
 		objClass = obj.class;
@@ -36,7 +35,10 @@ AlgaPattern : AlgaNode {
 
 		//Symbol
 		if(objClass == Symbol, {
-			this.dispatchSynthDef;
+			this.dispatchSynthDef(obj, initGroups, replace,
+				keepChannelsMapping:keepChannelsMapping,
+				keepScale:keepScale
+			);
 		}, {
 			//Function
 			if(objClass == Function, {
@@ -51,12 +53,27 @@ AlgaPattern : AlgaNode {
 				});
 			});
 		});
-
 	}
 
-	//Only support one SynthDef symbol for now.
-	dispatchSynthDef {
-		"AlgaPattern: dispatching SynthDef".warn;
+	//build all synths
+	buildFromSynthDef { | initGroups = false, replace = false,
+		keepChannelsMapping = false, keepScale = false |
+
+		//Retrieve controlNames from SynthDesc
+		var synthDescControlNames = synthDef.asSynthDesc.controls;
+		this.createControlNamesAndParamsConnectionTime(synthDescControlNames);
+
+		numChannels = synthDef.numChannels;
+		rate = synthDef.rate;
+
+		//Generate outs (for outsMapping connectinons)
+		this.calculateOuts(replace, keepChannelsMapping);
+
+		//Create groups if needed
+		if(initGroups, { this.createAllGroups });
+
+		//Create busses
+		this.createAllBusses;
 	}
 
 	//Support Function in the future
