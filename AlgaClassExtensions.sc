@@ -110,6 +110,7 @@
 	}
 }
 
+/*
 //Just as schedBundleArrayOnClock, but it also supports array of array bundles.
 //This is used for AlgaPatterns in order to send all synths together in a single bundle
 +SequenceableCollection {
@@ -168,3 +169,4 @@
 		addr.sendClumpedBundles(time, *msgs); //Better than sendBundle, as it checks for msg size!
 	}
 }
+*/

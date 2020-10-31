@@ -1,11 +1,11 @@
 (
 Alga.boot({
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.kr(440))
+		SinOsc.ar(\freq.kr(440)) * EnvGen.ar(Env.perc, doneAction:2)
 	}).add;
 
 	AlgaSynthDef(\test2, {
-		Saw.ar(\freq.kr(440)) * 0.5
+		Saw.ar(\freq.kr(440)) * EnvGen.ar(Env.perc, doneAction:2)
 	}).add;
 });
 )
@@ -25,10 +25,25 @@ a <<.dur Pwhite(0.01, 1);
 a.replace(\test2);
 
 (
-a.replace(
-	\test,
-	\dur, Pseq([0.01, 0.2])
-)
+a.replace((
+	synth: \test,
+	dur: Pseq([0.01, 0.2])
+));
 )
 
-b = AlgaNode(\test)
+
+
+(
+AlgaScheduler.verbose = true;
+
+a = AlgaPattern((
+	synth: \test
+));
+
+Pbind(
+	\type, \algaNote,
+	\algaPattern, a,
+	\freq, Pwhite([200, 400], 300),
+	\dur, Pseq([0.5, 1])
+).play;
+)

@@ -3,15 +3,36 @@ AlgaPattern : AlgaNode {
 	//Add the \algaNote event to Event
 	*initClass {
 		StartUp.add({ //StartUp.add is needed
-			Event.addEventType(\algaNote, { | server |
-				//per-param synths
+			Event.addEventType(\algaNote, #{
+				var bundle;
+				var offset = ~timingOffset;
+				var lag = ~lag;
+				var server = ~algaPattern.server;
+				var clock = ~algaPattern.algaScheduler.clock;
 
-				//actual synth that makes sound, connected to synthBus
+				//Needed for some Pattern syncing
+				~isPlaying = true;
 
-				//Use the overloaded algaSchedBundleArrayOnClock function to send all bundles together
+				//per-param busses and synths synths
+				~freq.postln;
+
+				//Create all Synths and pack the bundle
+				bundle = server.makeBundle(false, {
+					AlgaSynth(\test)
+				});
+
+				//Send bundle to server using the same AlgaScheduler's clock
+				schedBundleArrayOnClock(
+					offset,
+					clock,
+					bundle,
+					lag,
+					server
+				);
 			});
 		});
 	}
+
 
 	//dispatchNode: first argument is an Event
 	dispatchNode { | eventPairs, args, initGroups = false, replace = false,
@@ -55,7 +76,7 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//build all synths
+	//Overloaded function
 	buildFromSynthDef { | initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false |
 
