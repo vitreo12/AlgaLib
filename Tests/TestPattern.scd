@@ -11,16 +11,18 @@ Alga.boot({
 	s.sync;
 
 	a = AlgaPattern((
-		synth: \test,
+		def: \test,
 		dur: Pseq([0.25, 0.5, 1]),
 		freq: Pwhite(300, 1000)
-	))
+	));
+
+	a.pattern.patternpairs.postln;
 });
 )
 
 (
 a = AlgaPattern((
-	synth: \test,
+	def: \test,
 	dur: Pseq([0.25, 0.5, 1]),
 	freq: Pwhite(300, 1000)
 ))
@@ -34,7 +36,7 @@ a.replace(\test2);
 
 (
 a.replace((
-	synth: \test,
+	def: \test,
 	dur: Pseq([0.01, 0.2])
 ));
 )

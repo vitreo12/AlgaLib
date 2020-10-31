@@ -42,8 +42,8 @@ AlgaPattern : AlgaNode {
 	dispatchNode { | obj, args, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false |
 
-		//synth: entry
-		var synthEntry = obj[\synth];
+		//def: entry
+		var synthEntry = obj[\def];
 
 		if(synthEntry == nil, {
 			"AlgaPattern: no synth entry in the Event".error;
@@ -118,8 +118,46 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Build the actual pattern
-	createPattern { | eventPairs |
-		eventPairs.postln;
+	createPattern {
+		var patternPairs = Array.newClear(0);
+
+		//Turn every Pattern entry into a Stream
+		eventPairs.keysValuesDo({ | event, value |
+			if(event != \def, {
+				//Behaviour for keys != \def
+				var valueAsStream = value.asStream;
+
+				//Update eventPairs with the Stream
+				eventPairs[event] = valueAsStream;
+
+				//Use Pfuncn on the Stream for parameters
+				patternPairs = patternPairs.addAll([
+					event,
+					Pfuncn( { eventPairs[event].next }, inf)
+				]);
+			}, {
+				//Add \def key as \instrument
+				patternPairs = patternPairs.addAll([
+					\instrument,
+					value
+				]);
+			});
+		});
+
+		//Add \type, \algaNode, \algaPattern, \this and \out, synthBus.busArg
+		patternPairs = patternPairs.addAll([
+			\type, \algaNode,
+			\algaPattern, this,
+			\out, synthBus.busArg
+		]);
+
+		//Create the Pattern by calling .next from the streams
+		pattern = Pbind(*patternPairs);
+	}
+
+	//the interpolation function for Pattern << Pattern
+	interpPattern {
+
 	}
 
 	makeConnection {
