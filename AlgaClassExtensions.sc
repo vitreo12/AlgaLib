@@ -17,6 +17,7 @@
 +Object {
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
+	isPattern { ^false }
 	instantiated { ^true }
 	cleared { ^false }
 	toBeCleared { ^false }
@@ -26,6 +27,10 @@
 	addAction { | condition, func, sched = 0 |
 		AlgaSpinRoutine.waitFor(condition, func);
 	}
+}
+
++Pattern {
+	isPattern { ^true }
 }
 
 +List {

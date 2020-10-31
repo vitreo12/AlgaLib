@@ -1,4 +1,9 @@
 AlgaPattern : AlgaNode {
+	//The building eventPairs
+	var <eventPairs;
+
+	//The actual Pattern to be manipulated
+	var <pattern;
 
 	//Add the \algaNote event to Event
 	*initClass {
@@ -33,21 +38,23 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-
 	//dispatchNode: first argument is an Event
-	dispatchNode { | eventPairs, args, initGroups = false, replace = false,
+	dispatchNode { | obj, args, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false |
 
 		//synth: entry
-		var obj = eventPairs[\synth];
+		var synthEntry = obj[\synth];
 
-		if(obj == nil, {
+		if(synthEntry == nil, {
 			"AlgaPattern: no synth entry in the Event".error;
 			^this;
 		});
 
-		//Store class
-		objClass = obj.class;
+		//Store initial eventPairs
+		eventPairs = obj;
+
+		//Store class of the synthEntry
+		objClass = synthEntry.class;
 
 		//If there is a synth playing, set its instantiated status to false:
 		//this is mostly needed for .replace to work properly and wait for the new synth
@@ -56,7 +63,7 @@ AlgaPattern : AlgaNode {
 
 		//Symbol
 		if(objClass == Symbol, {
-			this.dispatchSynthDef(obj, initGroups, replace,
+			this.dispatchSynthDef(synthEntry, initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
 				keepScale:keepScale
 			);
@@ -70,7 +77,6 @@ AlgaPattern : AlgaNode {
 					this.dispatchListPattern;
 				}, {
 					("AlgaPattern: class '" ++ objClass ++ "' is invalid").error;
-					this.clear;
 				});
 			});
 		});
@@ -95,6 +101,9 @@ AlgaPattern : AlgaNode {
 
 		//Create busses
 		this.createAllBusses;
+
+		//Create the actual pattern
+		this.createPattern(eventPairs);
 	}
 
 	//Support Function in the future
@@ -106,6 +115,11 @@ AlgaPattern : AlgaNode {
 	//only if expressed with ListPattern subclasses (like Pseq, Prand, etc...)
 	dispatchListPattern {
 		"AlgaPattern: ListPatterns are not supported yet".error;
+	}
+
+	//Build the actual pattern
+	createPattern { | eventPairs |
+		eventPairs.postln;
 	}
 
 	makeConnection {

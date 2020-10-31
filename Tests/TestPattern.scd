@@ -7,6 +7,14 @@ Alga.boot({
 	AlgaSynthDef(\test2, {
 		Saw.ar(\freq.kr(440)) * EnvGen.ar(Env.perc, doneAction:2)
 	}).add;
+
+	s.sync;
+
+	a = AlgaPattern((
+		synth: \test,
+		dur: Pseq([0.25, 0.5, 1]),
+		freq: Pwhite(300, 1000)
+	))
 });
 )
 

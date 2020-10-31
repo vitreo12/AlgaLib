@@ -532,7 +532,6 @@ AlgaNode {
 				);
 			}, {
 				("AlgaNode: class '" ++ objClass ++ "' is invalid").error;
-				this.clear;
 			});
 		});
 	}
@@ -635,7 +634,6 @@ AlgaNode {
 
 		if(synthDesc == nil, {
 			("AlgaNode: Invalid AlgaSynthDef: '" ++ obj.asString ++ "'").error;
-			this.clear;
 			^this;
 		});
 
@@ -643,7 +641,6 @@ AlgaNode {
 
 		if(synthDef.class != AlgaSynthDef, {
 			("AlgaNode: Invalid AlgaSynthDef: '" ++ obj.asString ++"'").error;
-			this.clear;
 			^this;
 		});
 

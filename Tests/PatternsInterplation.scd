@@ -75,7 +75,7 @@ Pbind(
 ).play;
 
 ~interp = { | param, what, ft = 1 |
-	var blend = Pseg([0, 1, 1], [ft, inf], \lin, 1);
+	var blend = Pseg([0, 1, 1], [ft, inf], \lin);
 	~params[param] = (~params[param].blend(what, blend)).asStream;
 };
 )
@@ -104,13 +104,30 @@ d = Pbindef(
 	\instrument, \imp,
 	\amp, 0.8,
 	\dur, Pfuncn({ ~dur.next }, inf);
-).quant_(0).play
+).play
 )
 
 (
-~blend = Pseg([0, 1, 1], [5, inf], \lin, 1);
-~what = Pseq([0.01, 0.1], inf);
-~dur = (~dur.blend(~what, ~blend)).asStream
+~ft = 10;
+~blend = Pseg([0, 1, 1], [~ft, inf], \lin);
+//~what = Pseq([0.01, 0.1], inf);
+~what = 0.05;
+~dur = (~dur.blend(~what, ~blend)).asStream;
+fork {
+	~ft.wait;
+	"done".postln;
+}
+)
+
+(
+~ft = 1;
+~blend = Pseg([0, 1, 1], [~ft, inf], \lin);
+~what = 0.5;
+~dur = (~dur.blend(~what, ~blend)).asStream;
+fork {
+	~ft.wait;
+	"done".postln;
+}
 )
 
 
@@ -136,7 +153,7 @@ d = Pbindef(
 
 
 ~interp = { | param, what, ft = 1 |
-	var blend = Pseg([0, 1, 1], [ft, inf], \lin, 1);
+	var blend = Pseg([0, 1, 1], [ft, inf], \lin);
 	~params[param] = (~params[param].blend(what, blend)).asStream;
 }
 )
