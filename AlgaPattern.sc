@@ -15,16 +15,34 @@ AlgaPattern : AlgaNode {
 				var server = ~algaPattern.server;
 				var clock = ~algaPattern.algaScheduler.clock;
 
-				//Needed for some Pattern syncing
+				//this is a function that generates the array of args for the synth in the form:
+				//[\freq, ~freq, \amp, ~amp]
+				var msgFunc = ~getMsgFunc.valueEnvir;
+
+				//The name of the synthdef
+				var instrumentName = ~synthDefName.valueEnvir;
+
+				//Retrieved from the synthdef
+				var sendGate = ~sendGate ? ~hasGate;
+
+				msgFunc.def.sourceCode.postln;
+				instrumentName.postln;
+
+				//Needed for Pattern syncing
 				~isPlaying = true;
 
-				//per-param busses and synths synths
-				~freq.postln;
+				msgFunc.valueEnvir.postln;
 
 				//Create all Synths and pack the bundle
 				bundle = server.makeBundle(false, {
-					AlgaSynth(\test)
+					AlgaSynth(
+						instrumentName,
+						msgFunc.valueEnvir, //Compute Array of args
+						~algaPattern.synthGroup
+					)
 				});
+
+				bundle.postln;
 
 				//Send bundle to server using the same AlgaScheduler's clock
 				schedBundleArrayOnClock(
@@ -43,10 +61,10 @@ AlgaPattern : AlgaNode {
 		keepChannelsMapping = false, outsMapping, keepScale = false |
 
 		//def: entry
-		var synthEntry = obj[\def];
+		var defEntry = obj[\def];
 
-		if(synthEntry == nil, {
-			"AlgaPattern: no synth entry in the Event".error;
+		if(defEntry == nil, {
+			"AlgaPattern: no 'def' entry in the Event".error;
 			^this;
 		});
 
@@ -54,7 +72,7 @@ AlgaPattern : AlgaNode {
 		eventPairs = obj;
 
 		//Store class of the synthEntry
-		objClass = synthEntry.class;
+		objClass = defEntry.class;
 
 		//If there is a synth playing, set its instantiated status to false:
 		//this is mostly needed for .replace to work properly and wait for the new synth
@@ -63,7 +81,7 @@ AlgaPattern : AlgaNode {
 
 		//Symbol
 		if(objClass == Symbol, {
-			this.dispatchSynthDef(synthEntry, initGroups, replace,
+			this.dispatchSynthDef(defEntry, initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
 				keepScale:keepScale
 			);
@@ -144,15 +162,18 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
-		//Add \type, \algaNode, \algaPattern, \this and \out, synthBus.busArg
+		//Add \type, \algaNode, \algaPattern, \this and \out, synthBus.index
 		patternPairs = patternPairs.addAll([
-			\type, \algaNode,
+			\type, \algaNote,
 			\algaPattern, this,
-			\out, synthBus.busArg
+			\out, synthBus.index
 		]);
 
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);
+
+		//start the pattern right away
+		pattern.play;
 	}
 
 	//the interpolation function for Pattern << Pattern
@@ -169,6 +190,9 @@ AlgaPattern : AlgaNode {
 	}
 
 	isAlgaPattern { ^true }
+
+	//debug purposes
+	instantiated { ^true }
 }
 
 AP : AlgaPattern {}

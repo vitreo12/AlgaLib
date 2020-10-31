@@ -1,5 +1,7 @@
 (
 Alga.boot({
+	AlgaScheduler.verbose = true;
+
 	AlgaSynthDef(\test, {
 		SinOsc.ar(\freq.kr(440)) * EnvGen.ar(Env.perc, doneAction:2)
 	}).add;
@@ -14,9 +16,7 @@ Alga.boot({
 		def: \test,
 		dur: Pseq([0.25, 0.5, 1]),
 		freq: Pwhite(300, 1000)
-	));
-
-	a.pattern.patternpairs.postln;
+	)).play;
 });
 )
 
@@ -44,16 +44,29 @@ a.replace((
 
 
 (
-AlgaScheduler.verbose = true;
+Alga.boot({
+	AlgaSynthDef(\test, {
+		SinOsc.ar(\freq.kr(440)) * EnvGen.ar(Env.perc, doneAction:2)
+	}).add;
 
-a = AlgaPattern((
-	synth: \test
-));
+	s.sync;
 
-Pbind(
-	\type, \algaNote,
-	\algaPattern, a,
-	\freq, Pwhite([200, 400], 300),
-	\dur, Pseq([0.5, 1])
-).play;
+	AlgaScheduler.verbose = true;
+
+	a = AlgaPattern((
+		synth: \test
+	));
+
+	c = Pbind(
+		\freq, Pwhite([200, 400], 300),
+		\dur, Pseq([0.5, 1]),
+		\instrument, \test,
+		\type, \algaNote,
+		\algaPattern, a
+	);
+
+	c.play;
+})
 )
+
+c.patternpairs.postln
