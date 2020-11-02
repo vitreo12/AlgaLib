@@ -12,6 +12,7 @@ AlgaPattern : AlgaNode {
 				var bundle;
 				var offset = ~timingOffset;
 				var lag = ~lag;
+				var addAction = Node.actionNumberFor(~addAction);
 				var server = ~algaPattern.server;
 				var clock = ~algaPattern.algaScheduler.clock;
 
@@ -25,8 +26,8 @@ AlgaPattern : AlgaNode {
 				//Retrieved from the synthdef
 				var sendGate = ~sendGate ? ~hasGate;
 
-				msgFunc.def.sourceCode.postln;
-				instrumentName.postln;
+				//msgFunc.def.sourceCode.postln;
+				//instrumentName.postln;
 
 				//Needed for Pattern syncing
 				~isPlaying = true;
@@ -41,8 +42,6 @@ AlgaPattern : AlgaNode {
 						~algaPattern.synthGroup
 					)
 				});
-
-				bundle.postln;
 
 				//Send bundle to server using the same AlgaScheduler's clock
 				schedBundleArrayOnClock(
@@ -162,12 +161,33 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
+		//Add all the default entries from SynthDef that the user hasn't set yet
+		controlNames.do({ | controlName |
+			var paramName = controlName.name;
+
+			//if not set explicitly yet
+			if(eventPairs[paramName] == nil, {
+				var paramDefault = this.getDefaultOrArg(controlName, paramName);
+
+				//Update eventPairs with the Stream
+				eventPairs[paramName] = paramDefault.asStream;
+
+				//Use Pfuncn on the Stream for parameters
+				patternPairs = patternPairs.addAll([
+					paramName,
+					Pfuncn( { eventPairs[paramName].next }, inf)
+				]);
+			});
+		});
+
 		//Add \type, \algaNode, \algaPattern, \this and \out, synthBus.index
 		patternPairs = patternPairs.addAll([
 			\type, \algaNote,
 			\algaPattern, this,
 			\out, synthBus.index
 		]);
+
+		patternPairs.postln;
 
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);

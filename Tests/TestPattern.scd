@@ -3,7 +3,7 @@ Alga.boot({
 	AlgaScheduler.verbose = true;
 
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.kr(440)) * EnvGen.ar(Env.perc, doneAction:2)
+		SinOsc.ar(\freq.kr([440, 441]) + \something.kr(1)) * EnvGen.ar(Env.perc, doneAction:2)
 	}).add;
 
 	AlgaSynthDef(\test2, {
@@ -20,7 +20,16 @@ Alga.boot({
 });
 )
 
+//This sounds so weird: it's doubling!
 (
+Pbind(
+	\instrument, \test,
+	\dur, Pseq([0.25, 0.5, 1]),
+	\freq, Pwhite([300, 200], [1000, 2000])
+).play
+)
+
+	(
 a = AlgaPattern((
 	def: \test,
 	dur: Pseq([0.25, 0.5, 1]),
