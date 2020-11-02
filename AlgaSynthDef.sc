@@ -13,7 +13,7 @@ AlgaSynthDef : SynthDef {
 		^outs
 	}
 
-	*new { | name, func, rates, prependArgs, makeFadeEnv = true, channelOffset = 0,
+	*new { | name, func, rates, prependArgs, makeFadeEnv = false, channelOffset = 0,
 		chanConstraint, rateConstraint, outsMapping |
 
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;

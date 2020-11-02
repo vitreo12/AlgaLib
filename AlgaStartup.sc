@@ -106,7 +106,7 @@ AlgaSynthDef(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
 var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
 Limiter.ar(input) * AlgaEnvGate.ar
-}).writeDefFile(AlgaStartup.algaSynthDefIOPath);
+}, makeFadeEnv:true).writeDefFile(AlgaStartup.algaSynthDefIOPath);
 ";
 
 						sdef.interpret;
@@ -276,7 +276,7 @@ var val = args[0];
 var env = args[1];
 var out = Sanitize.ar(val / env);
 out;
-}).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
 
 				result_control = "AlgaSynthDef(\\alga_norm_control1, {
 var args = \\args.kr([0, 0]);
@@ -284,7 +284,7 @@ var val = args[0];
 var env = args[1];
 var out = Sanitize.kr(val / env);
 out;
-}).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
 
 			}, {
 
@@ -302,7 +302,7 @@ var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
 var out = Sanitize.ar(val / env);
 out;
-}).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
 
 				result_control = "AlgaSynthDef(\\alga_norm_control" ++ i.asString ++ ", {
 var args = \\args.kr(" ++ arrayOfZeros ++ ");
@@ -310,7 +310,7 @@ var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
 var out = Sanitize.kr(val / env);
 out;
-}).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
 
 			});
 
