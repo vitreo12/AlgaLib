@@ -10,11 +10,17 @@ AlgaPattern : AlgaNode {
 		StartUp.add({ //StartUp.add is needed
 			Event.addEventType(\algaNote, #{
 				var bundle;
+
 				var offset = ~timingOffset;
 				var lag = ~lag;
 				var addAction = Node.actionNumberFor(~addAction);
+
+				//AlgaPattern related stuff
 				var server = ~algaPattern.server;
 				var clock = ~algaPattern.algaScheduler.clock;
+				var controlNames = ~algaPattern.controlNames;
+				var synthGroup = ~algaPattern.synthGroup;
+				var interpGroup = ~algaPattern.interpGroup;
 
 				//this is a function that generates the array of args for the synth in the form:
 				//[\freq, ~freq, \amp, ~amp]
@@ -26,21 +32,72 @@ AlgaPattern : AlgaNode {
 				//Retrieved from the synthdef
 				var sendGate = ~sendGate ? ~hasGate;
 
-				//msgFunc.def.sourceCode.postln;
-				//instrumentName.postln;
-
 				//Needed for Pattern syncing
 				~isPlaying = true;
 
-				msgFunc.valueEnvir.postln;
-
 				//Create all Synths and pack the bundle
 				bundle = server.makeBundle(false, {
-					AlgaSynth(
+					var synth = AlgaSynth(
 						instrumentName,
-						msgFunc.valueEnvir, //Compute Array of args
-						~algaPattern.synthGroup
-					)
+						[\gate, 1],
+						synthGroup
+					);
+
+					//As of now, multi channel expansion doesn't work unless the parameter implements it
+					//Implement it in the future
+					controlNames.do({ | controlName |
+						var paramName = controlName.name;
+						var paramRate = controlName.rate;
+						var paramNumChannels = controlName.numChannels;
+						var paramVal = ("~" ++ paramName.asString).compile.value; //get param value from Event context
+
+						var interpBus = AlgaBus(server, paramNumChannels, paramRate);
+
+						var paramValSize;
+						var interpSymbol, interpSynthArgs, interpSynth;
+
+						if(paramVal.isSequenceableCollection, {
+							//an array
+							paramValSize = paramVal.size;
+						}, {
+							//a num
+							paramValSize = 1;
+						});
+
+						interpSymbol = (
+							"alga_interp_" ++
+							paramRate ++
+							paramValSize ++
+							"_" ++
+							paramRate ++
+							paramNumChannels
+						).asSymbol;
+
+						interpSynthArgs = [
+							\in, paramVal,
+							\out, interpBus.index,
+							\fadeTime, 0
+						];
+
+						interpSynth = AlgaSynth(
+							interpSymbol,
+							interpSynthArgs,
+							interpGroup
+						);
+
+						//Set param in synth with the interpBus
+						synth.set(paramName, interpBus.busArg);
+
+						//Free interpBus and interpSynth on Synth's end
+						OSCFunc.newMatching({ | msg |
+							if(interpBus != nil, {
+								interpBus.free;
+							});
+							if(interpSynth != nil, {
+								interpSynth.free;
+							});
+						}, '/n_end', server.addr, argTemplate:[synth.nodeID]).oneShot;
+					});
 				});
 
 				//Send bundle to server using the same AlgaScheduler's clock
@@ -109,6 +166,12 @@ AlgaPattern : AlgaNode {
 
 		numChannels = synthDef.numChannels;
 		rate = synthDef.rate;
+
+		//Detect if SynthDef can be freed automatically. Otherwise, error!
+		if(synthDef.canFreeSynth.not, {
+			("AlgaPattern: AlgaSynthDef '" ++ synthDef.name.asString ++ "' can't free itself: it doesn't implement any DoneAction.").error;
+			^this
+		});
 
 		//Generate outs (for outsMapping connectinons)
 		this.calculateOuts(replace, keepChannelsMapping);
@@ -216,3 +279,6 @@ AlgaPattern : AlgaNode {
 }
 
 AP : AlgaPattern {}
+
+//Implements Pmono behaviour
+AlgaMonoPattern : AlgaPattern {}

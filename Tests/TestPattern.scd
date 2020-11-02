@@ -15,8 +15,11 @@ Alga.boot({
 	a = AlgaPattern((
 		def: \test,
 		dur: Pseq([0.25, 0.5, 1]),
-		freq: Pwhite(300, 1000)
+		freq: Pwhite(200, 1000)
 	)).play;
+
+	s.scope;
+	s.plotTree;
 });
 )
 
@@ -29,7 +32,7 @@ Pbind(
 ).play
 )
 
-	(
+(
 a = AlgaPattern((
 	def: \test,
 	dur: Pseq([0.25, 0.5, 1]),
