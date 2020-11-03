@@ -52,26 +52,32 @@ AlgaPattern : AlgaNode {
 
 						var interpBus;
 
-						var paramValSize;
+						var senderRate;
+						var senderNumChannels;
 						var interpSymbol, interpSynthArgs, interpSynth;
 
 						if(paramVal.isNumberOrArray, {
 							if(paramVal.isSequenceableCollection, {
 								//an array
-								paramValSize = paramVal.size;
+								senderNumChannels = paramVal.size;
+								senderRate = "control";
 							}, {
 								//a num
-								paramValSize = 1;
+								senderNumChannels = 1;
+								senderRate = "control";
 							});
 						}, {
 							//Check if it's an algaNode
 							if(paramVal.isAlgaNode, {
-								paramValSize = paramNumChannels;
 								if(paramVal.instantiated, {
-									//if instantiated, use it
+									//if instantiated, use the rate, numchannels and bus arg from the alga bus
+									senderRate = paramVal.rate;
+									senderNumChannels = paramVal.numChannels;
 									paramVal = paramVal.synthBus.busArg;
 								}, {
 									//otherwise, use default
+									senderRate = "control";
+									senderNumChannels = paramNumChannels;
 									paramVal = controlName.defaultValue;
 									("AlgaNode wasn't instantiated yet. Using default value for " ++ paramName).warn;
 								});
@@ -80,8 +86,8 @@ AlgaPattern : AlgaNode {
 
 						interpSymbol = (
 							"alga_interp_" ++
-							paramRate ++
-							paramValSize ++
+							senderRate ++
+							senderNumChannels ++
 							"_" ++
 							paramRate ++
 							paramNumChannels
