@@ -1,13 +1,17 @@
 (
+AlgaStartup.algaMaxIO=2;
+Alga.initSynthDefs;
+
+AlgaScheduler.verbose = true;
+
 Alga.boot({
-	AlgaScheduler.verbose = true;
 
 	AlgaSynthDef(\test, {
 		SinOsc.ar(\freq.kr([440, 441]) + \something.kr(1)) * EnvGen.ar(Env.perc, doneAction:2)
 	}).add;
 
 	AlgaSynthDef(\test2, {
-		Saw.ar(\freq.kr(440)) * EnvGen.ar(Env.perc, doneAction:2)
+		Saw.ar(\freq.kr(0)) * EnvGen.ar(Env.perc, doneAction:2)
 	}).add;
 
 	s.sync;
@@ -17,16 +21,23 @@ Alga.boot({
 		dur: Pseq([0.25, 0.5, 1]),
 		freq: Pwhite(200, 1000)
 	)).play;
-
-	s.scope;
-	s.plotTree;
 });
+)
+
+Alga.servers
+
+(
+Pbind(
+	\instrument, \test,
+	\dur, Pseq([0.25, 0.5, 1]),
+	\freq, Pwhite(200, 1000).dup
+).play
 )
 
 //This sounds so weird: it's doubling!
 (
 Pbind(
-	\instrument, \test,
+	\instrument, \test2,
 	\dur, Pseq([0.25, 0.5, 1]),
 	\freq, Pwhite([300, 200], [1000, 2000])
 ).play

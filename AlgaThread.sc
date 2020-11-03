@@ -53,8 +53,8 @@ AlgaThread {
 
 	clear {
 		CmdPeriod.remove(this);
-		this.clearFunc;
 		task.stop;
+		this.clearFunc;
 		task.clear;
 		if(verbose, { ("AlgaThread" + name + "cleared.").postcln });
 	}
