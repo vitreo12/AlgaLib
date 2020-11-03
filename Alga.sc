@@ -19,11 +19,13 @@ Alga {
 		});
 	}
 
-	*clearServer { | server |
+	*clearServer { | server, prevServerQuit |
 		var tempServer = servers[server];
 		if(tempServer != nil, {
-			tempServer.quit;
+			tempServer.quit(onComplete: { prevServerQuit[0] = true });
 			servers.removeAt(tempServer);
+		}, {
+			prevServerQuit[0] = true;
 		});
 	}
 
@@ -50,6 +52,8 @@ Alga {
 	}
 
 	*boot { | onBoot, server, algaServerOptions |
+		var prevServerQuit = [false]; //pass by reference: use Array
+
 		server = server ? Server.default;
 		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
@@ -78,11 +82,14 @@ Alga {
 		//Add to SynthDescLib in order for SynthDef.add to work
 		SynthDescLib.global.addServer(server);
 
+		//Run CmdPeriod
+		CmdPeriod.run;
+
 		//clear scheduler @server if present
 		this.clearScheduler(server);
 
 		//clear server @server if present, also quit it
-		this.clearServer(server);
+		this.clearServer(server, prevServerQuit);
 
 		//Add the server
 		servers[server] = server;
@@ -92,12 +99,14 @@ Alga {
 		//this.newScheduler(server, cascadeMode:false);
 
 		//Boot
-		server.waitForBoot({
-			//Make sure to init everything
-			server.initTree;
+		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
+			server.waitForBoot({
+				//Make sure to init everything
+				server.initTree;
 
-			//Execute onBoot function
-			onBoot.value;
+				//Execute onBoot function
+				onBoot.value;
+			});
 		});
 	}
 }
