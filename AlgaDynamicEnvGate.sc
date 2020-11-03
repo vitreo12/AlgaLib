@@ -92,5 +92,4 @@ AlgaDynamicEnvGate {
 
 		^env;
 	}
-
 }

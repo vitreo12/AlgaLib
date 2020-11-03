@@ -7,7 +7,7 @@ AlgaScheduler.verbose = true;
 Alga.boot({
 
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.kr([440, 441]) + \something.kr(1)) * EnvGen.ar(Env.perc, doneAction:2)
+		SinOsc.ar(\freq.ar([440, 441]) + \something.kr(1)) * EnvGen.ar(Env.perc, doneAction:2)
 	}).add;
 
 	AlgaSynthDef(\test2, {
@@ -16,15 +16,25 @@ Alga.boot({
 
 	s.sync;
 
+	b = AlgaNode({SinOsc.kr(1).range(100, 500)});
+
 	a = AlgaPattern((
 		def: \test,
 		dur: Pseq([0.25, 0.5, 1]),
-		freq: Pwhite(200, 1000)
+		freq: b
 	)).play;
 });
 )
 
-Alga.servers
+a.interpPattern(\freq, Pseq([1000, 880]), 2)
+
+a.interpPattern(\freq, Pwhite(1000, 800), 2)
+
+a.interpPattern(\dur, Pwhite(0.01, 0.3), 10)
+
+b = AlgaNode({SinOsc.ar.range(100, 2000)})
+
+a.interpPattern(\freq, Pseq([b]), 5)
 
 (
 Pbind(

@@ -5,6 +5,8 @@ AlgaPattern : AlgaNode {
 	//The actual Pattern to be manipulated
 	var <pattern;
 
+	var <>patternInstantiated = false;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		StartUp.add({ //StartUp.add is needed
@@ -53,12 +55,27 @@ AlgaPattern : AlgaNode {
 						var paramValSize;
 						var interpSymbol, interpSynthArgs, interpSynth;
 
-						if(paramVal.isSequenceableCollection, {
-							//an array
-							paramValSize = paramVal.size;
+						if(paramVal.isNumberOrArray, {
+							if(paramVal.isSequenceableCollection, {
+								//an array
+								paramValSize = paramVal.size;
+							}, {
+								//a num
+								paramValSize = 1;
+							});
 						}, {
-							//a num
-							paramValSize = 1;
+							//Check if it's an algaNode
+							if(paramVal.isAlgaNode, {
+								paramValSize = paramNumChannels;
+								if(paramVal.instantiated, {
+									//if instantiated, use it
+									paramVal = paramVal.synthBus.busArg;
+								}, {
+									//otherwise, use default
+									paramVal = controlName.defaultValue;
+									("AlgaNode wasn't instantiated yet. Using default value for " ++ paramName).warn;
+								});
+							});
 						});
 
 						interpSymbol = (
@@ -99,14 +116,17 @@ AlgaPattern : AlgaNode {
 
 					//Free all interpBusses and interpSynths on synth's release
 					OSCFunc.newMatching({ | msg |
-						interpBussesAndSynths.keysValuesDo({ | interpBus, interpSynth|
+						interpBussesAndSynths.keysValuesDo({ | interpBus, interpSynth |
 							interpBus.free;
 							interpSynth.free;
 						});
 					}, '/n_end', server.addr, argTemplate:[synth.nodeID]).oneShot;
+
+					//Consider instantiated to be true at this point
+					~algaPattern.patternInstantiated = true;
 				});
 
-				bundle.postln;
+				//bundle.postln;
 
 				//Send bundle to server using the same AlgaScheduler's clock
 				schedBundleArrayOnClock(
@@ -267,9 +287,27 @@ AlgaPattern : AlgaNode {
 		pattern.play;
 	}
 
-	//the interpolation function for Pattern << Pattern
-	interpPattern {
+	//the interpolation function for AlgaPattern << Pattern
+	interpPattern { | param = \in, sender, time = 0 |
+		var interpSeg;
 
+		var paramConnectionTime = paramsConnectionTime[param];
+		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
+		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
+
+		time = time ? paramConnectionTime;
+
+		if((sender.isPattern.not).and(sender.isNumberOrArray.not), {
+			"AlgaPattern: interpPattern only works with Patterns, Numbers and Arrays".error;
+		});
+
+		//Just \lin for now (just like the other interps)
+		interpSeg = Pseg([0, 1, 1], [time, inf], \lin);
+
+		//Run interp by replacing the entry directly
+		if(eventPairs[param] != nil, {
+			eventPairs[param] = (eventPairs[param].blend(sender, interpSeg)).asStream;
+		});
 	}
 
 	makeConnection {
@@ -282,8 +320,7 @@ AlgaPattern : AlgaNode {
 
 	isAlgaPattern { ^true }
 
-	//debug purposes
-	instantiated { ^true }
+	instantiated { ^patternInstantiated }
 }
 
 AP : AlgaPattern {}

@@ -1243,6 +1243,7 @@ AlgaNode {
 		});
 
 		//If -1, or invalid, set to global connectionTime
+		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 
 		//calc temporary time
@@ -1552,7 +1553,8 @@ AlgaNode {
 		var paramConnectionTime = paramsConnectionTime[param];
 
 		//If -1, or invalid, set to global connectionTime
-		if((paramConnectionTime < 0).or(paramConnectionTime == nil), { paramConnectionTime = connectionTime });
+		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
+		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 
 		//Free them all (check if there were mix entries).
 		//sender == nil comes from <|
