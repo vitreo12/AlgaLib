@@ -197,7 +197,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 							in = "\\in.ar(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicEnvGate.ar(t_release:t_release, fadeTime:fadeTime);";
+							env = "AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));";
 						});
 
 						if(rate == \kr_kr, {
@@ -205,7 +205,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 							in = "\\in.kr(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicEnvGate.kr(t_release:t_release, fadeTime:fadeTime);";
+							env = "AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));";
 						});
 
 						if(rate == \ar_kr, {
@@ -213,7 +213,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 							in = "A2K.kr(\\in.ar(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicEnvGate.kr(t_release:t_release, fadeTime:fadeTime);";
+							env = "AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));";
 						});
 
 						if(rate == \kr_ar, {
@@ -221,11 +221,11 @@ Limiter.ar(input) * AlgaEnvGate.ar
 							in = "K2A.ar(\\in.kr(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicEnvGate.ar(t_release:t_release, fadeTime:fadeTime);";
+							env = "AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));";
 						});
 
 						result = "
-AlgaSynthDef(" ++ name ++ ", { | scaleCurve = 0, t_release = 0, fadeTime = 0 |
+AlgaSynthDef(" ++ name ++ ", { | scaleCurve = 0 |
 var in, env, out, outScale, outs;
 in = " ++ in ++ "
 out = " ++ indices ++ "
