@@ -13,7 +13,6 @@ AlgaPattern : AlgaNode {
 
 				var offset = ~timingOffset;
 				var lag = ~lag;
-				var addAction = Node.actionNumberFor(~addAction);
 
 				//AlgaPattern related stuff
 				var server = ~algaPattern.server;
@@ -37,11 +36,9 @@ AlgaPattern : AlgaNode {
 
 				//Create all Synths and pack the bundle
 				bundle = server.makeBundle(false, {
-					var synth = AlgaSynth(
-						instrumentName,
-						[\gate, 1],
-						synthGroup
-					);
+					var interpBussesAndSynths = IdentityDictionary(controlNames.size);
+					var synthArgs = [\gate, 1];
+					var synth;
 
 					//As of now, multi channel expansion doesn't work unless the parameter implements it
 					//Implement it in the future
@@ -51,7 +48,7 @@ AlgaPattern : AlgaNode {
 						var paramNumChannels = controlName.numChannels;
 						var paramVal = ("~" ++ paramName.asString).compile.value; //get param value from Event context
 
-						var interpBus = AlgaBus(server, paramNumChannels, paramRate);
+						var interpBus;
 
 						var paramValSize;
 						var interpSymbol, interpSynthArgs, interpSynth;
@@ -73,6 +70,8 @@ AlgaPattern : AlgaNode {
 							paramNumChannels
 						).asSymbol;
 
+						interpBus = AlgaBus(server, paramNumChannels, paramRate);
+
 						interpSynthArgs = [
 							\in, paramVal,
 							\out, interpBus.index,
@@ -85,20 +84,29 @@ AlgaPattern : AlgaNode {
 							interpGroup
 						);
 
-						//Set param in synth with the interpBus
-						synth.set(paramName, interpBus.busArg);
+						//add interpBus and interpSynth
+						interpBussesAndSynths[interpBus] = interpSynth;
 
-						//Free interpBus and interpSynth on Synth's end
-						OSCFunc.newMatching({ | msg |
-							if(interpBus != nil, {
-								interpBus.free;
-							});
-							if(interpSynth != nil, {
-								interpSynth.free;
-							});
-						}, '/n_end', server.addr, argTemplate:[synth.nodeID]).oneShot;
+						//add paramName, interpBus to synth arguments
+						synthArgs = synthArgs.add(paramName).add(interpBus.busArg);
 					});
+
+					synth = AlgaSynth(
+						instrumentName,
+						synthArgs,
+						synthGroup
+					);
+
+					//Free all interpBusses and interpSynths on synth's release
+					OSCFunc.newMatching({ | msg |
+						interpBussesAndSynths.keysValuesDo({ | interpBus, interpSynth|
+							interpBus.free;
+							interpSynth.free;
+						});
+					}, '/n_end', server.addr, argTemplate:[synth.nodeID]).oneShot;
 				});
+
+				bundle.postln;
 
 				//Send bundle to server using the same AlgaScheduler's clock
 				schedBundleArrayOnClock(
