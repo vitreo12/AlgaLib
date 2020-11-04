@@ -21,7 +21,7 @@ Alga.boot({
 	a = AlgaPattern((
 		def: \test,
 		dur: Pseq([0.25, 0.5, 1]),
-		freq: b
+		freq: Pwhite(100, 1000)
 	)).play;
 });
 )
@@ -31,6 +31,8 @@ a.interpPattern(\freq, Pseq([1000, 880]), 2)
 a.interpPattern(\freq, Pwhite(1000, 800), 2)
 
 a.interpPattern(\dur, Pwhite(0.01, 0.3), 10)
+
+
 
 b = AlgaNode({SinOsc.ar.range(100, 2000)})
 

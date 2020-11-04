@@ -30,6 +30,9 @@ AlgaPattern : AlgaNode {
 				//The name of the synthdef
 				var instrumentName = ~synthDefName.valueEnvir;
 
+				//The name of the fxDef
+				var fx = ~fx;
+
 				//Retrieved from the synthdef
 				var sendGate = ~sendGate ? ~hasGate;
 
@@ -113,6 +116,19 @@ AlgaPattern : AlgaNode {
 						//add paramName, interpBus to synth arguments
 						synthArgs = synthArgs.add(paramName).add(interpBus.busArg);
 					});
+
+					//Specified an fx
+					//fx: (def: Pseq([\delay, \tanh]), dt: Pseq([0.2, 0.4]))
+					//Things to do:
+					// 1) Check the def exists
+					// 2) Check it has an \in parameter
+					// 3) Check it can free itself (like with DetectSilence).
+					//    If not, it will be freed with interpSynths
+					// 4) Route synth's audio through it
+
+					//Connect to specific nodes? It would just with nodes with \in param.
+					//Mixing?
+					//out: (node: Pseq([a, b])
 
 					synth = AlgaSynth(
 						instrumentName,
@@ -236,18 +252,18 @@ AlgaPattern : AlgaNode {
 		var patternPairs = Array.newClear(0);
 
 		//Turn every Pattern entry into a Stream
-		eventPairs.keysValuesDo({ | event, value |
-			if(event != \def, {
+		eventPairs.keysValuesDo({ | paramName, value |
+			if(paramName != \def, {
 				//Behaviour for keys != \def
 				var valueAsStream = value.asStream;
 
 				//Update eventPairs with the Stream
-				eventPairs[event] = valueAsStream;
+				eventPairs[paramName] = valueAsStream;
 
 				//Use Pfuncn on the Stream for parameters
 				patternPairs = patternPairs.addAll([
-					event,
-					Pfuncn( { eventPairs[event].next }, inf)
+					paramName,
+					Pfuncn( { eventPairs[paramName].next }, inf)
 				]);
 			}, {
 				//Add \def key as \instrument
