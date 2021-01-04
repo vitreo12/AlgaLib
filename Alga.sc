@@ -22,7 +22,11 @@ Alga {
 	*clearServer { | server, prevServerQuit |
 		var tempServer = servers[server];
 		if(tempServer != nil, {
-			tempServer.quit(onComplete: { prevServerQuit[0] = true });
+			if(tempServer.serverRunning, {
+				tempServer.quit(onComplete: { prevServerQuit[0] = true });
+			}, {
+				prevServerQuit[0] = true;
+			});
 			servers.removeAt(tempServer);
 		}, {
 			prevServerQuit[0] = true;
