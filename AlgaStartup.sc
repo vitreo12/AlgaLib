@@ -179,10 +179,14 @@ Limiter.ar(input) * AlgaEnvGate.ar
 					var indices_ar = "in;";
 					var indices_kr = "in;";
 
+					//constant multiplier. this is set when mix's scale argument is a single Number
+					var multiplier = "\\outMultiplier.ir(1);";
+
 					if(y > 1, {
 						outs = y.asString ++ ".do({ | i | outs[i] = out[i]});";
 					});
 
+					//keep in; for i == 0
 					if(i > 1, {
 						indices_ar = "Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), in);";
 						indices_kr = "Select.kr(\\indices.ir(" ++ arrayOfIndices ++ "), in);";
@@ -226,9 +230,10 @@ Limiter.ar(input) * AlgaEnvGate.ar
 
 						result = "
 AlgaSynthDef(" ++ name ++ ", { | scaleCurve = 0 |
-var in, env, out, outScale, outs;
+var in, env, out, outMultiplier, outScale, outs;
 in = " ++ in ++ "
 out = " ++ indices ++ "
+outMultiplier = " ++ multiplier ++ "
 outScale = out.lincurve(
 \\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
 \\lowMax.ir(" ++ arrayOfOnes ++ "),
@@ -238,6 +243,7 @@ scaleCurve,
 );
 out = " ++ scaling ++ "
 env = " ++ env ++ "
+out = out * outMultiplier;
 out = out * env;
 outs = Array.newClear(" ++ (y + 1) ++ ");
 " ++ outs ++ "

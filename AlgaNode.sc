@@ -147,11 +147,13 @@ AlgaNode {
 		//Check supported classes for argObj, so that things won't even init if wrong.
 		//Also check for AlgaPattern
 		if(this.isAlgaPattern, {
+			//AlgaPattern init
 			if(argObj.class != Event, {
 				"AlgaPattern: first argument must be an Event describing the pattern".error;
 				^this;
 			});
 		}, {
+			//AlgaNode init
 			if((argObj.class != Symbol).and(
 				argObj.class != Function), {
 				"AlgaNode: first argument must be either a Symbol or a Function".error;
@@ -793,9 +795,16 @@ AlgaNode {
 	calculateScaling { | param, sender, paramNumChannels, scale |
 		if(scale.isNil, { ^nil });
 
-		if(scale.isSequenceableCollection.not, {
-			"AlgaNode: the scale parameter must be an array".error;
+		if(scale.isNumberOrArray.not, {
+			"AlgaNode: the scale parameter must be a Number or an Array".error;
 			^nil
+		});
+
+		//just a number: act like a multiplier
+		if(scale.isNumber, {
+			var outArray = [\outMultiplier, scale];
+			this.addScaling(param, sender, scale);
+			^outArray;
 		});
 
 		//just lowMax / hiMax
