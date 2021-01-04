@@ -20,6 +20,7 @@ AlgaPattern : AlgaNode {
 				var server = ~algaPattern.server;
 				var clock = ~algaPattern.algaScheduler.clock;
 				var controlNames = ~algaPattern.controlNames;
+				var synthBusIndex = ~out; //this is being passed explicitly
 				var synthGroup = ~algaPattern.synthGroup;
 				var interpGroup = ~algaPattern.interpGroup;
 
@@ -42,8 +43,11 @@ AlgaPattern : AlgaNode {
 				//Create all Synths and pack the bundle
 				bundle = server.makeBundle(false, {
 					var interpBussesAndSynths = IdentityDictionary(controlNames.size);
-					var synthArgs = [\gate, 1];
-					var synth;
+					var synthArgs = [
+						\gate, 1,
+						\out, synthBusIndex //passed in from the AlgaPattern
+					];
+					var patternSynth;
 
 					//As of now, multi channel expansion doesn't work unless the parameter implements it
 					//Implement it in the future
@@ -117,8 +121,8 @@ AlgaPattern : AlgaNode {
 						synthArgs = synthArgs.add(paramName).add(interpBus.busArg);
 					});
 
-					//Specified an fx
-					//fx: (def: Pseq([\delay, \tanh]), dt: Pseq([0.2, 0.4]))
+					//Specify an fx?
+					//fx: (def: Pseq([\delay, \tanh]), delayTime: Pseq([0.2, 0.4]))
 					//Things to do:
 					// 1) Check the def exists
 					// 2) Check it has an \in parameter
@@ -126,31 +130,33 @@ AlgaPattern : AlgaNode {
 					//    If not, it will be freed with interpSynths
 					// 4) Route synth's audio through it
 
-					//Connect to specific nodes? It would just with nodes with \in param.
-					//Mixing?
+					//Connect to specific nodes? It would just connect to nodes with \in param.
+					//What about mixing? Is mixing the default behaviour for this? (yes!!)
 					//out: (node: Pseq([a, b])
 
-					synth = AlgaSynth(
+					synthArgs.postln;
+
+					//This synth writes directly to synthBus
+					patternSynth = AlgaSynth(
 						instrumentName,
 						synthArgs,
 						synthGroup
 					);
 
-					//Free all interpBusses and interpSynths on synth's release
+					//Free all interpBusses and interpSynths on patternSynth's release
 					OSCFunc.newMatching({ | msg |
 						interpBussesAndSynths.keysValuesDo({ | interpBus, interpSynth |
 							interpBus.free;
 							interpSynth.free;
 						});
-					}, '/n_end', server.addr, argTemplate:[synth.nodeID]).oneShot;
+					}, '/n_end', server.addr, argTemplate:[patternSynth.nodeID]).oneShot;
 
 					//Consider instantiated to be true at this point
 					~algaPattern.patternInstantiated = true;
 				});
 
-				//bundle.postln;
-
-				//Send bundle to server using the same AlgaScheduler's clock
+				//Send bundle to server using the same AlgaScheduler's clock.
+				//Should this be moved to the AlgaScheduler altogether?
 				schedBundleArrayOnClock(
 					offset,
 					clock,
@@ -196,7 +202,7 @@ AlgaPattern : AlgaNode {
 			if(objClass == Function, {
 				this.dispatchFunction;
 			}, {
-				//ListPattern
+				//ListPattern (Pseq, Pser, Prand...)
 				if(objClass.superclass == ListPattern, {
 					this.dispatchListPattern;
 				}, {
@@ -223,6 +229,9 @@ AlgaPattern : AlgaNode {
 			^this
 		});
 
+		//Resets patternInstantiated
+		patternInstantiated = false;
+
 		//Generate outs (for outsMapping connectinons)
 		this.calculateOuts(replace, keepChannelsMapping);
 
@@ -231,6 +240,9 @@ AlgaPattern : AlgaNode {
 
 		//Create busses
 		this.createAllBusses;
+
+		//Create the synth that AlgaPatterns will play to
+		this.createSynth;
 
 		//Create the actual pattern
 		this.createPattern(eventPairs);
@@ -300,7 +312,7 @@ AlgaPattern : AlgaNode {
 			\out, synthBus.index
 		]);
 
-		patternPairs.postln;
+		//patternPairs.postln;
 
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);
@@ -309,24 +321,24 @@ AlgaPattern : AlgaNode {
 		pattern.play;
 	}
 
-	//the interpolation function for AlgaPattern << Pattern
+	//the interpolation function for AlgaPattern << Pattern / Number / Array
 	interpPattern { | param = \in, sender, time = 0 |
 		var interpSeg;
-
 		var paramConnectionTime = paramsConnectionTime[param];
-		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
-
-		time = time ? paramConnectionTime;
 
 		if((sender.isPattern.not).and(sender.isNumberOrArray.not), {
 			"AlgaPattern: interpPattern only works with Patterns, Numbers and Arrays".error;
+			^this;
 		});
+
+		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
+		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
+		time = time ? paramConnectionTime;
 
 		//Just \lin for now (just like the other interps)
 		interpSeg = Pseg([0, 1, 1], [time, inf], \lin);
 
-		//Run interp by replacing the entry directly
+		//Run interp by replacing the entry directly, using the .blend function
 		if(eventPairs[param] != nil, {
 			eventPairs[param] = (eventPairs[param].blend(sender, interpSeg)).asStream;
 		});
@@ -334,10 +346,21 @@ AlgaPattern : AlgaNode {
 
 	makeConnection {
 		//This must add support for Patterns as args for <<, <<+ and <|
+
+		//Possible RECEIVER connections:
+		// <<.param Pattern
+		// <<+.param Pattern (not yet)
+		// <<| \param (goes back to defaults)
+
+		// <<.param AlgaNode
 	}
 
 	replace {
-		//Basically, replace the SynthDef used, or the ListPattern
+		//2 options:
+		// 1) replace the entire AlgaPattern with a new one (like AlgaNode.replace)
+		// 2) replace just the SynthDef with either a new SynthDef or a ListPattern with only SynthDefs.
+		//    This would be equivalent to <<.def \newSynthDef OR <<.def Pseq([\newSynthDef1, \newSynthDef2])
+
 	}
 
 	isAlgaPattern { ^true }
@@ -349,3 +372,22 @@ AP : AlgaPattern {}
 
 //Implements Pmono behaviour
 AlgaMonoPattern : AlgaPattern {}
+
+AMP : AlgaMonoPattern {}
+
+/*
++Object {
+	blend { | that, blendFrac = 0.5 |
+		if(this.isAlgaNode, {
+			^(this.synthBus.bus.getSynchronous) + (blendFrac * (that - this.synthBus.bus.getSynchronous));
+		}, {
+			if(that.isAlgaNode, {
+				^(this + (blendFrac * (that.synthBus.bus.getSynchronous - this)));
+			});
+		});
+
+		//Standard behaviour
+		^this + (blendFrac * (that - this));
+	}
+}
+*/
