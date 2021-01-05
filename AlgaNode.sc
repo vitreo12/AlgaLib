@@ -354,11 +354,11 @@ AlgaNode {
 
 	createAllGroups {
 		if(group == nil, {
-			group = Group(this.server);
-			playGroup = Group(group);
-			synthGroup = Group(group);
-			normGroup = Group(group);
-			interpGroup = Group(group);
+			group = AlgaGroup(this.server);
+			playGroup = AlgaGroup(group);
+			synthGroup = AlgaGroup(group);
+			normGroup = AlgaGroup(group);
+			interpGroup = AlgaGroup(group);
 		});
 	}
 
