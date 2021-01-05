@@ -1854,7 +1854,7 @@ AlgaNode {
 			^this
 		});
 
-		//Can't connect AlgaNode to itself
+		//Can't connect AlgaNode to itself (yet)
 		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
 
 		if(mix, {

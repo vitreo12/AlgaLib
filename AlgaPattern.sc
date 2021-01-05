@@ -5,8 +5,6 @@ AlgaPattern : AlgaNode {
 	//The actual Pattern to be manipulated
 	var <pattern;
 
-	var <>patternInstantiated = false;
-
 	//Add the \algaNote event to Event
 	*initClass {
 		StartUp.add({ //StartUp.add is needed
@@ -16,11 +14,13 @@ AlgaPattern : AlgaNode {
 				var offset = ~timingOffset;
 				var lag = ~lag;
 
-				//AlgaPattern related stuff
+				//AlgaPattern related stuff.
+				//Perhaps, i can pass all these things from the outside, instead
+				//of retrieving them here (as these will not change on a per-event basis)!
 				var server = ~algaPattern.server;
 				var clock = ~algaPattern.algaScheduler.clock;
 				var controlNames = ~algaPattern.controlNames;
-				var synthBusIndex = ~out; //this is being passed explicitly
+				var synthBusIndex = ~algaPattern.synthBus.index;
 				var synthGroup = ~algaPattern.synthGroup;
 				var interpGroup = ~algaPattern.interpGroup;
 
@@ -45,7 +45,7 @@ AlgaPattern : AlgaNode {
 					var interpBussesAndSynths = IdentityDictionary(controlNames.size);
 					var synthArgs = [
 						\gate, 1,
-						\out, synthBusIndex //passed in from the AlgaPattern
+						\out, synthBusIndex
 					];
 					var patternSynth;
 
@@ -55,7 +55,9 @@ AlgaPattern : AlgaNode {
 						var paramName = controlName.name;
 						var paramRate = controlName.rate;
 						var paramNumChannels = controlName.numChannels;
-						var paramVal = ("~" ++ paramName.asString).compile.value; //get param value from Event context
+
+						//get param value from Event context (~freq, ~amp, etc..)
+						var paramVal = ("~" ++ paramName.asString).compile.value;
 
 						var interpBus;
 
@@ -88,6 +90,8 @@ AlgaPattern : AlgaNode {
 									paramVal = controlName.defaultValue;
 									("AlgaNode wasn't instantiated yet. Using default value for " ++ paramName).warn;
 								});
+							}, {
+								("AlgaPattern: Invalid parameter " ++ paramName.asString).error;
 							});
 						});
 
@@ -100,7 +104,14 @@ AlgaPattern : AlgaNode {
 							paramNumChannels
 						).asSymbol;
 
-						interpBus = AlgaBus(server, paramNumChannels, paramRate);
+						//Remember: interp busses must always have one extra channel for
+						//the interp envelope, even if the envelope is not used here (no normSynth)
+						//Otherwise, the envelope will write to other busses!
+						//Here, patternSynth, won't even look at that extra channel, but at least
+						//SuperCollider knows it's been written to.
+						//This, in fact, caused a huge bug when playing an AlgaPattern through
+						//other AlgaNodes!
+						interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
 
 						interpSynthArgs = [
 							\in, paramVal,
@@ -111,13 +122,14 @@ AlgaPattern : AlgaNode {
 						interpSynth = AlgaSynth(
 							interpSymbol,
 							interpSynthArgs,
-							interpGroup
+							interpGroup,
+							waitForInst: false
 						);
 
-						//add interpBus and interpSynth
+						//add interpBus and interpSynth to interpBussesAndSynths
 						interpBussesAndSynths[interpBus] = interpSynth;
 
-						//add paramName, interpBus to synth arguments
+						//add \paramName, interpBus.busArg to synth arguments
 						synthArgs = synthArgs.add(paramName).add(interpBus.busArg);
 					});
 
@@ -134,25 +146,21 @@ AlgaPattern : AlgaNode {
 					//What about mixing? Is mixing the default behaviour for this? (yes!!)
 					//out: (node: Pseq([a, b])
 
-					synthArgs.postln;
-
 					//This synth writes directly to synthBus
 					patternSynth = AlgaSynth(
 						instrumentName,
 						synthArgs,
-						synthGroup
+						synthGroup,
+						waitForInst: false
 					);
 
 					//Free all interpBusses and interpSynths on patternSynth's release
 					OSCFunc.newMatching({ | msg |
 						interpBussesAndSynths.keysValuesDo({ | interpBus, interpSynth |
-							interpBus.free;
 							interpSynth.free;
+							interpBus.free;
 						});
 					}, '/n_end', server.addr, argTemplate:[patternSynth.nodeID]).oneShot;
-
-					//Consider instantiated to be true at this point
-					~algaPattern.patternInstantiated = true;
 				});
 
 				//Send bundle to server using the same AlgaScheduler's clock.
@@ -229,9 +237,6 @@ AlgaPattern : AlgaNode {
 			^this
 		});
 
-		//Resets patternInstantiated
-		patternInstantiated = false;
-
 		//Generate outs (for outsMapping connectinons)
 		this.calculateOuts(replace, keepChannelsMapping);
 
@@ -305,14 +310,11 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
-		//Add \type, \algaNode, \algaPattern, \this and \out, synthBus.index
+		//Add \type, \algaNode, \algaPattern, this, and \out, synthBus.index
 		patternPairs = patternPairs.addAll([
 			\type, \algaNote,
-			\algaPattern, this,
-			\out, synthBus.index
+			\algaPattern, this
 		]);
-
-		//patternPairs.postln;
 
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);
@@ -322,7 +324,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//the interpolation function for AlgaPattern << Pattern / Number / Array
-	interpPattern { | param = \in, sender, time = 0 |
+	interpPattern { | param = \in, sender, time = 0, curves = \lin |
 		var interpSeg;
 		var paramConnectionTime = paramsConnectionTime[param];
 
@@ -336,7 +338,7 @@ AlgaPattern : AlgaNode {
 		time = time ? paramConnectionTime;
 
 		//Just \lin for now (just like the other interps)
-		interpSeg = Pseg([0, 1, 1], [time, inf], \lin);
+		interpSeg = Pseg([0, 1, 1], [time, inf], curves);
 
 		//Run interp by replacing the entry directly, using the .blend function
 		if(eventPairs[param] != nil, {
