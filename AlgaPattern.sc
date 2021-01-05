@@ -365,14 +365,25 @@ AlgaPattern : AlgaNode {
 
 	isAlgaPattern { ^true }
 
-	instantiated { ^patternInstantiated }
+	//Since I can't check each synth, just check if the necessary groups have been allocated
+	instantiated {
+		^(group.instantiated.and(
+			interpGroup.instantiated.and(
+				synthGroup.instantiated.and(
+					playGroup.instantiated
+				)
+			)
+		))
+	}
 }
 
+//Alias
 AP : AlgaPattern {}
 
 //Implements Pmono behaviour
 AlgaMonoPattern : AlgaPattern {}
 
+//Alias
 AMP : AlgaMonoPattern {}
 
 /*
