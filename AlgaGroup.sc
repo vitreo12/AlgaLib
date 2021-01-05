@@ -15,6 +15,8 @@ AlgaGroup : Group {
 		//oneshot function that waits for initialization
 		if(waitForInst, {
 			group.waitForInstantiation(group.nodeID);
+		}, {
+			group.instantiated = true
 		});
 
 		//actually send group to server

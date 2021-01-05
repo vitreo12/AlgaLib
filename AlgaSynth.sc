@@ -15,6 +15,8 @@ AlgaSynth : Synth {
 		//oneshot function that waits for initialization
 		if(waitForInst, {
 			synth.waitForInstantiation(synth.nodeID);
+		}, {
+			synth.instantiated = true;
 		});
 
 		//actually send synth to server
