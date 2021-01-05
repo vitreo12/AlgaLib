@@ -22,16 +22,17 @@ Alga.boot({
 });
 )
 
+
 (
 l = AlgaNode({\in.ar(0)}).play;
 e = AlgaNode({\in.ar(0)}).play;
 f = AlgaNode({\in.ar(0)}).play;
-c = AlgaNode({\in.ar(0)}).play;
+c = AlgaNode({\in.ar(0)}).play.it_(2);
 c << a;
 )
 
 s.scope
 
-c.interpBusses[\in][\default].numChannels
+c.group
 
-l.debug
+c.stop(2)
