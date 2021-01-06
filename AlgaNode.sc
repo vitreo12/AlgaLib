@@ -12,8 +12,8 @@ AlgaNode {
 	//This controls the fade in and out when .play / .stop
 	var <playTime = 0;
 
-	//The algaScheduler @ this server
-	var <algaScheduler;
+	//The AlgaScheduler @ this server
+	var <scheduler;
 
 	//This is the longestConnectionTime between all the outNodes.
 	//it's used when .replacing a node connected to something, in order for it to be kept alive
@@ -71,8 +71,8 @@ AlgaNode {
 		server = argServer ? Server.default;
 
 		//AlgaScheduler from specific server
-		algaScheduler = Alga.getScheduler(server);
-		if(algaScheduler == nil, {
+		scheduler = Alga.getScheduler(server);
+		if(scheduler == nil, {
 			(
 				"Can't retrieve correct AlgaScheduler for server " ++
 				server.name ++
@@ -1410,7 +1410,7 @@ AlgaNode {
 		if(whatSynth.instantiated, {
 			whatSynth.set(\gate, 0, \fadeTime, whatFadeTime);
 		}, {
-			algaScheduler.addAction({ whatSynth.instantiated }, {
+			scheduler.addAction({ whatSynth.instantiated }, {
 				whatSynth.set(\gate, 0, \fadeTime, whatFadeTime);
 			});
 		});
@@ -1505,7 +1505,7 @@ AlgaNode {
 			var currentDefaultNode = currentDefaultNodes[param];
 
 			//Make sure all of these are scheduled correctly to each other!
-			algaScheduler.addAction({ (normSynthAtParam.instantiated).and(interpSynthAtParam.instantiated) }, {
+			scheduler.addAction({ (normSynthAtParam.instantiated).and(interpSynthAtParam.instantiated) }, {
 				var notDefaultNode = false;
 
 				//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
@@ -1916,7 +1916,7 @@ AlgaNode {
 		replaceMix = false, senderChansMapping, scale, time |
 
 		if(this.cleared.not.and(sender.cleared.not).and(sender.toBeCleared.not), {
-			algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
+			scheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
 				this.makeConnectionInner(sender, param, replace, mix,
 					replaceMix, senderChansMapping, scale, time:time
 				);
@@ -2032,7 +2032,7 @@ AlgaNode {
 			^this;
 		});
 
-		algaScheduler.addAction({ (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
+		scheduler.addAction({ (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
 			var validPreviousSender = true;
 
 			//if not contained, it's invalid.
@@ -2061,7 +2061,7 @@ AlgaNode {
 	}
 
 	resetParam { | param = \in, previousSender = nil, time |
-		algaScheduler.addAction({ (this.instantiated).and(previousSender.instantiated) }, {
+		scheduler.addAction({ (this.instantiated).and(previousSender.instantiated) }, {
 			this.resetParamInner(param, previousSender, time:time);
 		});
 	}
@@ -2084,7 +2084,7 @@ AlgaNode {
 
 	//On .replace on an already running mix connection
 	replaceMixConnection { | param = \in, sender, senderChansMapping, scale, time |
-		algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
+		scheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
 			this.replaceMixConnectionInner(param, sender, senderChansMapping, scale, time);
 		});
 	}
@@ -2185,7 +2185,7 @@ AlgaNode {
 	replace { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
 		outsMapping, keepInScale = true, keepOutScale = true, time |
 
-		algaScheduler.addAction({ this.instantiated }, {
+		scheduler.addAction({ this.instantiated }, {
 			this.replaceInner(obj, args, keepChannelsMappingIn,
 				keepChannelsMappingOut, outsMapping,
 				keepInScale, keepOutScale, time:time
@@ -2284,7 +2284,7 @@ AlgaNode {
 			});
 		});
 
-		algaScheduler.addAction({ (this.instantiated).and(previousSender.instantiated) }, {
+		scheduler.addAction({ (this.instantiated).and(previousSender.instantiated) }, {
 			this.disconnectInner(param, previousSender, time:time);
 		});
 	}
@@ -2351,7 +2351,7 @@ AlgaNode {
 	}
 
 	clear { | time, interpTime |
-		algaScheduler.addAction({ this.instantiated }, {
+		scheduler.addAction({ this.instantiated }, {
 			this.clearInner(time, interpTime);
 		});
 	}
@@ -2459,7 +2459,7 @@ AlgaNode {
 
 	//Add option for fade time here!
 	play { | time, channelsToPlay |
-		algaScheduler.addAction({ this.instantiated }, {
+		scheduler.addAction({ this.instantiated }, {
 			this.playInner(time, channelsToPlay);
 		});
 	}
@@ -2470,12 +2470,16 @@ AlgaNode {
 
 	//Add option for fade time here!
 	stop { | time |
-		algaScheduler.addAction({ this.instantiated }, {
+		scheduler.addAction({ this.instantiated }, {
 			this.stopInner(time);
 		});
 	}
 
 	isAlgaNode { ^true }
+
+	clock {
+		^(scheduler.clock)
+	}
 
 	debug {
 		"connectionTime:".postln;

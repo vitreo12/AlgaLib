@@ -328,7 +328,7 @@ AlgaPattern : AlgaNode {
 		patternPairs = patternPairs.addAll([
 			\type, \algaNote,
 			\algaServer, this.server,
-			\algaClock, this.algaScheduler.clock,
+			\algaClock, this.scheduler.clock,
 			\algaControlNames, this.controlNames,
 			\algaSynthBusIndex, this.synthBus.index,
 			\algaSynthGroup, this.synthGroup,

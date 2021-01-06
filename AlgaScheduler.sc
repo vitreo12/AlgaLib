@@ -476,18 +476,18 @@ AlgaScheduler : AlgaThread {
 //Each event waits for the previous one to be completed.
 AlgaPatch {
 	*new { | func, server |
-		var algaScheduler;
+		var scheduler;
 		server = server ? Server.default;
-		algaScheduler = Alga.schedulers[server];
-		if(algaScheduler != nil, {
-			if(algaScheduler.cascadeMode, {
+		scheduler = Alga.schedulers[server];
+		if(scheduler != nil, {
+			if(scheduler.cascadeMode, {
 				//If already cascadeMode
-				algaScheduler.addAction(func: func);
+				scheduler.addAction(func: func);
 			}, {
 				//Make cascadeMode true and switch back to false when done
-				algaScheduler.cascadeMode = true;
-				algaScheduler.switchCascadeMode = true;
-				algaScheduler.addAction(func: func);
+				scheduler.cascadeMode = true;
+				scheduler.switchCascadeMode = true;
+				scheduler.addAction(func: func);
 			});
 		}, {
 			("Alga is not booted on server" + server.name).error;
