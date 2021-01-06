@@ -2,6 +2,9 @@ AlgaNode {
 	//Server where this node lives
 	var <server;
 
+	//The AlgaScheduler @ this server
+	var <scheduler;
+
 	//Index of the corresponding AlgaBlock in the AlgaBlocksDict.
 	//This is being set in AlgaBlock
 	var <>blockIndex = -1;
@@ -12,9 +15,6 @@ AlgaNode {
 	//This controls the fade in and out when .play / .stop
 	var <playTime = 0;
 
-	//The AlgaScheduler @ this server
-	var <scheduler;
-
 	//This is the longestConnectionTime between all the outNodes.
 	//It's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
@@ -23,6 +23,9 @@ AlgaNode {
 
 	//Keeps track of all the connectionTime of all nodes with this node as input
 	var <connectionTimeOutNodes;
+
+	//per-parameter connectionTime
+	var <paramsConnectionTime;
 
 	//The max between longestConnectionTime and playTime
 	var <longestWaitTime = 0;
@@ -40,9 +43,6 @@ AlgaNode {
 
 	//Spec of parameters (names, default values, channels, rate)
 	var <controlNames;
-
-	//per-parameter connectionTime
-	var <paramsConnectionTime;
 
 	//Number of channels and rate
 	var <numChannels, <rate;
@@ -70,7 +70,7 @@ AlgaNode {
 	//Keep track of current scaling for params
 	var <paramsScalings;
 
-	//Keep track ofcurrent chans mapping for params
+	//Keep track of current chans mapping for params
 	var <paramsChansMapping;
 
 	//General state queries
@@ -418,7 +418,7 @@ AlgaNode {
 			var paramRate = controlName.rate;
 			var paramNumChannels = controlName.numChannels;
 
-			//interpBusses have 1 more channel for the envelope shape
+			//This is crucial: interpBusses have 1 more channel for the interp envelope!
 			interpBusses[paramName][\default] = AlgaBus(server, paramNumChannels + 1, paramRate);
 			normBusses[paramName] = AlgaBus(server, paramNumChannels, paramRate);
 		});
@@ -719,12 +719,14 @@ AlgaNode {
 
 		//synth's \fadeTime is longestWaitTime. It could probably be removed here,
 		//as it will be set eventually in the case of .clear / etc...
-		var synthArgs = [\out, synthBus.index, \fadeTime, longestWaitTime];
+		var synthArgs = [
+			\out, synthBus.index,
+			\fadeTime, longestWaitTime
+		];
 
-		//connect each param with specific normBus
+		//connect each param with the already allocated normBus
 		normBusses.keysValuesDo({ | param, normBus |
-			synthArgs = synthArgs.add(param);
-			synthArgs = synthArgs.add(normBus.busArg);
+			synthArgs = synthArgs.add(param).add(normBus.busArg);
 		});
 
 		//create synth
@@ -1422,13 +1424,32 @@ AlgaNode {
 	}
 
 	//Eventually use this func to free all synths that use \gate and \fadeTime
-	freeSynthOnScheduler { | whatSynth, whatFadeTime |
-		if(whatSynth.instantiated, {
-			whatSynth.set(\gate, 0, \fadeTime, whatFadeTime);
+	freeSynthOnScheduler { | whatSynth, whatFadeTime, isInterpSynth = false |
+		var freeSynthFunc;
+
+		if(isInterpSynth, {
+			//used for interpSynths
+			freeSynthFunc = {
+				whatSynth.set(
+					\t_release, 1,
+					\fadeTime, whatFadeTime
+				);
+			};
 		}, {
-			scheduler.addAction({ whatSynth.instantiated }, {
-				whatSynth.set(\gate, 0, \fadeTime, whatFadeTime);
-			});
+			//used for other synths
+			freeSynthFunc = {
+				whatSynth.set(
+					\gate, 0,
+					\fadeTime, whatFadeTime
+				);
+			};
+		});
+
+		//If already instantiated, execute now ??
+		if(whatSynth.instantiated, {
+			freeSynthFunc.value;
+		}, {
+			scheduler.addAction({ whatSynth.instantiated }, freeSynthFunc);
 		});
 	}
 
@@ -1439,7 +1460,10 @@ AlgaNode {
 		if(now, {
 			if(synth != nil, {
 				//synth's fadeTime is longestWaitTime!
-				synth.set(\gate, 0, \fadeTime, if(useConnectionTime, { longestWaitTime }, { 0 }));
+				synth.set(
+					\gate, 0,
+					\fadeTime, if(useConnectionTime, { longestWaitTime }, { 0 })
+				);
 
 				//this.resetSynth;
 			});

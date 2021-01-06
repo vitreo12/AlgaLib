@@ -1,4 +1,14 @@
 AlgaPattern : AlgaNode {
+	/*
+	Todos and questions:
+	1) What about inNodes for an AlgaPattern?
+	   Are these set only through direct mapping and ListPatterns (Pseq, etc..)?
+
+	2) How to connect an AlgaNode to an AlgaPattern parameter? What about kr / ar?
+
+	3) Can an AlgaNode connect to \dur? (For now, I'd say no)
+	*/
+
 	//The actual Pattern to be manipulated
 	var <pattern;
 
@@ -348,14 +358,14 @@ AlgaPattern : AlgaNode {
 		var eventPairAtParam;
 		var paramConnectionTime = paramsConnectionTime[param];
 
-		//delta == dur
-		if(param == \delta, {
-			param = \dur
-		});
-
 		if((sender.isPattern.not).and(sender.isNumberOrArray.not), {
 			"AlgaPattern: interpPattern only works with Patterns, Numbers and Arrays".error;
 			^this;
+		});
+
+		//delta == dur
+		if(param == \delta, {
+			param = \dur
 		});
 
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
