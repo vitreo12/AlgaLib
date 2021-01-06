@@ -1,174 +1,183 @@
 AlgaPattern : AlgaNode {
-	//The building eventPairs
-	var <eventPairs;
-
 	//The actual Pattern to be manipulated
 	var <pattern;
 
+	//The eventPairs used in the Pattern
+	var <eventPairs;
+
 	//Add the \algaNote event to Event
 	*initClass {
-		StartUp.add({ //StartUp.add is needed
-			Event.addEventType(\algaNote, #{
-				var bundle;
+		//StartUp.add is needed: Event class must be compiled first
+		StartUp.add({
+			this.addAlgaNoteEventType;
+		});
+	}
 
-				var offset = ~timingOffset;
-				var lag = ~lag;
+	//Doesn't have args and outsMapping like AlgaNode
+	*new { | obj, connectionTime = 0, playTime = 0, server |
+		^super.new(
+			obj: obj,
+			connectionTime: connectionTime,
+			playTime: playTime,
+			server: server
+		)
+	}
 
-				//The name of the SynthDef
-				var synthDefName = ~synthDefName.valueEnvir;
+	//Add the \algaNote event type
+	*addAlgaNoteEventType {
+		Event.addEventType(\algaNote, #{
+			var bundle;
 
-				//AlgaPattern related stuff. Passed in from Pattern
-				var server = ~algaServer;
-				var clock = ~algaClock;
-				var controlNames = ~algaControlNames;
-				var synthBusIndex = ~algaSynthBusIndex;
-				var synthGroup = ~algaSynthGroup;
-				var interpGroup = ~algaInterpGroup;
+			var offset = ~timingOffset;
+			var lag = ~lag;
 
-				server.postln;
-				clock.postln;
-				controlNames.postln;
-				synthBusIndex.postln;
-				synthGroup.postln;
-				interpGroup.postln;
+			//The name of the SynthDef
+			var synthDefName = ~synthDefName.valueEnvir;
 
-				//Needed for Pattern syncing ?
-				~isPlaying = true;
+			//AlgaPattern related stuff. Passed in from Pattern
+			var server = ~algaServer;
+			var clock = ~algaClock;
+			var controlNames = ~algaControlNames;
+			var synthBusIndex = ~algaSynthBusIndex;
+			var synthGroup = ~algaSynthGroup;
+			var interpGroup = ~algaInterpGroup;
 
-				//Create all Synths and pack the bundle
-				bundle = server.makeBundle(false, {
-					var interpBussesAndSynths = IdentityDictionary(controlNames.size);
-					var synthArgs = [
-						\gate, 1,
-						\out, synthBusIndex
-					];
-					var patternSynth;
+			//Needed for Pattern syncing ?
+			~isPlaying = true;
 
-					//As of now, multi channel expansion doesn't work unless
-					//the parameter implements it. Implement it in the future
-					//with specific rules
-					controlNames.do({ | controlName |
-						var paramName = controlName.name;
-						var paramRate = controlName.rate;
-						var paramNumChannels = controlName.numChannels;
+			//Create all Synths and pack the bundle
+			bundle = server.makeBundle(false, {
+				var interpBussesAndSynths = IdentityDictionary(controlNames.size);
+				var synthArgs = [
+					\gate, 1,
+					\out, synthBusIndex
+				];
+				var patternSynth;
 
-						//get param value from the \algaNote Event context (~freq, ~amp, etc..)
-						var paramVal = ("~" ++ paramName.asString).compile.value;
+				//As of now, multi channel expansion doesn't work unless
+				//the parameter implements it. Implement it in the future
+				//with specific rules
+				controlNames.do({ | controlName |
+					var paramName = controlName.name;
+					var paramRate = controlName.rate;
+					var paramNumChannels = controlName.numChannels;
 
-						var interpBus;
+					//get param value from the \algaNote Event context (~freq, ~amp, etc..)
+					var paramVal = ("~" ++ paramName.asString).compile.value;
 
-						var senderRate;
-						var senderNumChannels;
-						var interpSymbol, interpSynthArgs, interpSynth;
+					var interpBus;
 
-						if(paramVal.isNumberOrArray, {
-							if(paramVal.isSequenceableCollection, {
-								//an array
-								senderNumChannels = paramVal.size;
-								senderRate = "control";
+					var senderRate;
+					var senderNumChannels;
+					var interpSymbol, interpSynthArgs, interpSynth;
+
+					if(paramVal.isNumberOrArray, {
+						if(paramVal.isSequenceableCollection, {
+							//an array
+							senderNumChannels = paramVal.size;
+							senderRate = "control";
+						}, {
+							//a num
+							senderNumChannels = 1;
+							senderRate = "control";
+						});
+					}, {
+						//Check if it's an algaNode
+						if(paramVal.isAlgaNode, {
+							if(paramVal.instantiated, {
+								//if instantiated, use the rate, numchannels and bus arg from the alga bus
+								senderRate = paramVal.rate;
+								senderNumChannels = paramVal.numChannels;
+								paramVal = paramVal.synthBus.busArg;
 							}, {
-								//a num
-								senderNumChannels = 1;
+								//otherwise, use default
 								senderRate = "control";
+								senderNumChannels = paramNumChannels;
+								paramVal = controlName.defaultValue;
+								("AlgaNode wasn't instantiated yet. Using default value for " ++ paramName).warn;
 							});
 						}, {
-							//Check if it's an algaNode
-							if(paramVal.isAlgaNode, {
-								if(paramVal.instantiated, {
-									//if instantiated, use the rate, numchannels and bus arg from the alga bus
-									senderRate = paramVal.rate;
-									senderNumChannels = paramVal.numChannels;
-									paramVal = paramVal.synthBus.busArg;
-								}, {
-									//otherwise, use default
-									senderRate = "control";
-									senderNumChannels = paramNumChannels;
-									paramVal = controlName.defaultValue;
-									("AlgaNode wasn't instantiated yet. Using default value for " ++ paramName).warn;
-								});
-							}, {
-								("AlgaPattern: Invalid parameter " ++ paramName.asString).error;
-							});
+							("AlgaPattern: Invalid parameter " ++ paramName.asString).error;
 						});
-
-						interpSymbol = (
-							"alga_interp_" ++
-							senderRate ++
-							senderNumChannels ++
-							"_" ++
-							paramRate ++
-							paramNumChannels
-						).asSymbol;
-
-						//Remember: interp busses must always have one extra channel for
-						//the interp envelope, even if the envelope is not used here (no normSynth)
-						//Otherwise, the envelope will write to other busses!
-						//Here, patternSynth, won't even look at that extra channel, but at least
-						//SuperCollider knows it's been written to.
-						//This, in fact, caused a huge bug when playing an AlgaPattern through
-						//other AlgaNodes!
-						interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
-
-						interpSynthArgs = [
-							\in, paramVal,
-							\out, interpBus.index,
-							\fadeTime, 0
-						];
-
-						interpSynth = AlgaSynth(
-							interpSymbol,
-							interpSynthArgs,
-							interpGroup,
-							waitForInst: false
-						);
-
-						//add interpBus and interpSynth to interpBussesAndSynths
-						interpBussesAndSynths[interpBus] = interpSynth;
-
-						//add \paramName, interpBus.busArg to synth arguments
-						synthArgs = synthArgs.add(paramName).add(interpBus.busArg);
 					});
 
-					//Specify an fx?
-					//fx: (def: Pseq([\delay, \tanh]), delayTime: Pseq([0.2, 0.4]))
-					//Things to do:
-					// 1) Check the def exists
-					// 2) Check it has an \in parameter
-					// 3) Check it can free itself (like with DetectSilence).
-					//    If not, it will be freed with interpSynths
-					// 4) Route synth's audio through it
+					interpSymbol = (
+						"alga_interp_" ++
+						senderRate ++
+						senderNumChannels ++
+						"_" ++
+						paramRate ++
+						paramNumChannels
+					).asSymbol;
 
-					//Connect to specific nodes? It would just connect to nodes with \in param.
-					//What about mixing? Is mixing the default behaviour for this? (yes!!)
-					//out: (node: Pseq([a, b])
+					//Remember: interp busses must always have one extra channel for
+					//the interp envelope, even if the envelope is not used here (no normSynth)
+					//Otherwise, the envelope will write to other busses!
+					//Here, patternSynth, won't even look at that extra channel, but at least
+					//SuperCollider knows it's been written to.
+					//This, in fact, caused a huge bug when playing an AlgaPattern through
+					//other AlgaNodes!
+					interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
 
-					//This synth writes directly to synthBus
-					patternSynth = AlgaSynth(
-						synthDefName,
-						synthArgs,
-						synthGroup,
+					interpSynthArgs = [
+						\in, paramVal,
+						\out, interpBus.index,
+						\fadeTime, 0
+					];
+
+					interpSynth = AlgaSynth(
+						interpSymbol,
+						interpSynthArgs,
+						interpGroup,
 						waitForInst: false
 					);
 
-					//Free all interpBusses and interpSynths on patternSynth's release
-					OSCFunc.newMatching({ | msg |
-						interpBussesAndSynths.keysValuesDo({ | interpBus, interpSynth |
-							interpSynth.free;
-							interpBus.free;
-						});
-					}, '/n_end', server.addr, argTemplate:[patternSynth.nodeID]).oneShot;
+					//add interpBus and interpSynth to interpBussesAndSynths
+					interpBussesAndSynths[interpBus] = interpSynth;
+
+					//add \paramName, interpBus.busArg to synth arguments
+					synthArgs = synthArgs.add(paramName).add(interpBus.busArg);
 				});
 
-				//Send bundle to server using the same AlgaScheduler's clock.
-				//Should this be moved to the AlgaScheduler altogether?
-				schedBundleArrayOnClock(
-					offset,
-					clock,
-					bundle,
-					lag,
-					server
+				//Specify an fx?
+				//fx: (def: Pseq([\delay, \tanh]), delayTime: Pseq([0.2, 0.4]))
+				//Things to do:
+				// 1) Check the def exists
+				// 2) Check it has an \in parameter
+				// 3) Check it can free itself (like with DetectSilence).
+				//    If not, it will be freed with interpSynths
+				// 4) Route synth's audio through it
+
+				//Connect to specific nodes? It would just connect to nodes with \in param.
+				//What about mixing? Is mixing the default behaviour for this? (yes!!)
+				//out: (node: Pseq([a, b])
+
+				//This synth writes directly to synthBus
+				patternSynth = AlgaSynth(
+					synthDefName,
+					synthArgs,
+					synthGroup,
+					waitForInst: false
 				);
+
+				//Free all interpBusses and interpSynths on patternSynth's release
+				OSCFunc.newMatching({ | msg |
+					interpBussesAndSynths.keysValuesDo({ | interpBus, interpSynth |
+						interpSynth.free;
+						interpBus.free;
+					});
+				}, '/n_end', server.addr, argTemplate:[patternSynth.nodeID]).oneShot;
 			});
+
+			//Send bundle to server using the same AlgaScheduler's clock.
+			//Should this be moved to the AlgaScheduler altogether?
+			schedBundleArrayOnClock(
+				offset,
+				clock,
+				bundle,
+				lag,
+				server
+			);
 		});
 	}
 
@@ -361,7 +370,8 @@ AlgaPattern : AlgaNode {
 
 		//Run interp by replacing the entry directly, using the .blend function
 		if(eventPairAtParam != nil, {
-			//Direct replacing in the IdentityDictionary
+			//Direct replacing in the IdentityDictionary. This is what
+			//is indexed and played by the Pattern.
 			eventPairs[param] = (
 				eventPairAtParam.blend(sender, interpSeg)
 			).asStream;
@@ -412,17 +422,17 @@ AMP : AlgaMonoPattern {}
 
 /*
 +Object {
-	blend { | that, blendFrac = 0.5 |
-		if(this.isAlgaNode, {
-			^(this.synthBus.bus.getSynchronous) + (blendFrac * (that - this.synthBus.bus.getSynchronous));
-		}, {
-			if(that.isAlgaNode, {
-				^(this + (blendFrac * (that.synthBus.bus.getSynchronous - this)));
-			});
-		});
+blend { | that, blendFrac = 0.5 |
+if(this.isAlgaNode, {
+^(this.synthBus.bus.getSynchronous) + (blendFrac * (that - this.synthBus.bus.getSynchronous));
+}, {
+if(that.isAlgaNode, {
+^(this + (blendFrac * (that.synthBus.bus.getSynchronous - this)));
+});
+});
 
-		//Standard behaviour
-		^this + (blendFrac * (that - this));
-	}
+//Standard behaviour
+^this + (blendFrac * (that - this));
+}
 }
 */
