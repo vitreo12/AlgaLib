@@ -14,30 +14,25 @@ AlgaPattern : AlgaNode {
 				var offset = ~timingOffset;
 				var lag = ~lag;
 
-				//AlgaPattern related stuff.
-				//Perhaps, i can pass all these things from the outside, instead
-				//of retrieving them here (as these will not change on a per-event basis)!
-				var server = ~algaPattern.server;
-				var clock = ~algaPattern.algaScheduler.clock;
-				var controlNames = ~algaPattern.controlNames;
-				var synthBusIndex = ~algaPattern.synthBus.index;
-				var synthGroup = ~algaPattern.synthGroup;
-				var interpGroup = ~algaPattern.interpGroup;
+				//The name of the SynthDef
+				var synthDefName = ~synthDefName.valueEnvir;
 
-				//this is a function that generates the array of args for the synth in the form:
-				//[\freq, ~freq, \amp, ~amp]
-				var msgFunc = ~getMsgFunc.valueEnvir;
+				//AlgaPattern related stuff. Passed in from Pattern
+				var server = ~algaServer;
+				var clock = ~algaClock;
+				var controlNames = ~algaControlNames;
+				var synthBusIndex = ~algaSynthBusIndex;
+				var synthGroup = ~algaSynthGroup;
+				var interpGroup = ~algaInterpGroup;
 
-				//The name of the synthdef
-				var instrumentName = ~synthDefName.valueEnvir;
+				server.postln;
+				clock.postln;
+				controlNames.postln;
+				synthBusIndex.postln;
+				synthGroup.postln;
+				interpGroup.postln;
 
-				//The name of the fxDef
-				var fx = ~fx;
-
-				//Retrieved from the synthdef
-				var sendGate = ~sendGate ? ~hasGate;
-
-				//Needed for Pattern syncing
+				//Needed for Pattern syncing ?
 				~isPlaying = true;
 
 				//Create all Synths and pack the bundle
@@ -49,14 +44,15 @@ AlgaPattern : AlgaNode {
 					];
 					var patternSynth;
 
-					//As of now, multi channel expansion doesn't work unless the parameter implements it
-					//Implement it in the future
+					//As of now, multi channel expansion doesn't work unless
+					//the parameter implements it. Implement it in the future
+					//with specific rules
 					controlNames.do({ | controlName |
 						var paramName = controlName.name;
 						var paramRate = controlName.rate;
 						var paramNumChannels = controlName.numChannels;
 
-						//get param value from Event context (~freq, ~amp, etc..)
+						//get param value from the \algaNote Event context (~freq, ~amp, etc..)
 						var paramVal = ("~" ++ paramName.asString).compile.value;
 
 						var interpBus;
@@ -148,7 +144,7 @@ AlgaPattern : AlgaNode {
 
 					//This synth writes directly to synthBus
 					patternSynth = AlgaSynth(
-						instrumentName,
+						synthDefName,
 						synthArgs,
 						synthGroup,
 						waitForInst: false
@@ -246,11 +242,9 @@ AlgaPattern : AlgaNode {
 		//Create busses
 		this.createAllBusses;
 
-		//Create the synth that AlgaPatterns will play to
-		this.createSynth;
-
 		//Create the actual pattern
 		this.createPattern(eventPairs);
+
 	}
 
 	//Support Function in the future
@@ -266,29 +260,40 @@ AlgaPattern : AlgaNode {
 
 	//Build the actual pattern
 	createPattern {
+		var foundDurOrDelta = false;
 		var patternPairs = Array.newClear(0);
 
 		//Turn every Pattern entry into a Stream
 		eventPairs.keysValuesDo({ | paramName, value |
+			if((paramName == \dur).or(paramName == \delta), {
+				foundDurOrDelta = true;
+			});
+
 			if(paramName != \def, {
 				//Behaviour for keys != \def
 				var valueAsStream = value.asStream;
+
+				//delta == dur
+				if(paramName == \delta, {
+					paramName = \dur;
+				});
 
 				//Update eventPairs with the Stream
 				eventPairs[paramName] = valueAsStream;
 
 				//Use Pfuncn on the Stream for parameters
-				patternPairs = patternPairs.addAll([
-					paramName,
-					Pfuncn( { eventPairs[paramName].next }, inf)
-				]);
+				patternPairs = patternPairs.add(paramName).add(
+					Pfuncn( { eventPairs[paramName].next }, inf )
+				);
 			}, {
 				//Add \def key as \instrument
-				patternPairs = patternPairs.addAll([
-					\instrument,
-					value
-				]);
+				patternPairs = patternPairs.add(\instrument).add(value);
 			});
+		});
+
+		//If no dur or delta, default to 1
+		if(foundDurOrDelta.not, {
+			patternPairs = patternPairs.add(\dur).add(1)
 		});
 
 		//Add all the default entries from SynthDef that the user hasn't set yet
@@ -303,17 +308,22 @@ AlgaPattern : AlgaNode {
 				eventPairs[paramName] = paramDefault.asStream;
 
 				//Use Pfuncn on the Stream for parameters
-				patternPairs = patternPairs.addAll([
-					paramName,
-					Pfuncn( { eventPairs[paramName].next }, inf)
-				]);
+				patternPairs = patternPairs.add(paramName).add(
+					Pfuncn( { eventPairs[paramName].next }, inf )
+				);
 			});
 		});
 
-		//Add \type, \algaNode, \algaPattern, this, and \out, synthBus.index
+		//Add \type, \algaNode, and all things related to
+		//the context of this AlgaPattern
 		patternPairs = patternPairs.addAll([
 			\type, \algaNote,
-			\algaPattern, this
+			\algaServer, this.server,
+			\algaClock, this.algaScheduler.clock,
+			\algaControlNames, this.controlNames,
+			\algaSynthBusIndex, this.synthBus.index,
+			\algaSynthGroup, this.synthGroup,
+			\algaInterpGroup, this.interpGroup
 		]);
 
 		//Create the Pattern by calling .next from the streams
@@ -326,7 +336,13 @@ AlgaPattern : AlgaNode {
 	//the interpolation function for AlgaPattern << Pattern / Number / Array
 	interpPattern { | param = \in, sender, time = 0, curves = \lin |
 		var interpSeg;
+		var eventPairAtParam;
 		var paramConnectionTime = paramsConnectionTime[param];
+
+		//delta == dur
+		if(param == \delta, {
+			param = \dur
+		});
 
 		if((sender.isPattern.not).and(sender.isNumberOrArray.not), {
 			"AlgaPattern: interpPattern only works with Patterns, Numbers and Arrays".error;
@@ -340,9 +356,15 @@ AlgaPattern : AlgaNode {
 		//Just \lin for now (just like the other interps)
 		interpSeg = Pseg([0, 1, 1], [time, inf], curves);
 
+		//retrieve it here so it also applies to delta == dur
+		eventPairAtParam = eventPairs[param];
+
 		//Run interp by replacing the entry directly, using the .blend function
-		if(eventPairs[param] != nil, {
-			eventPairs[param] = (eventPairs[param].blend(sender, interpSeg)).asStream;
+		if(eventPairAtParam != nil, {
+			//Direct replacing in the IdentityDictionary
+			eventPairs[param] = (
+				eventPairAtParam.blend(sender, interpSeg)
+			).asStream;
 		});
 	}
 
