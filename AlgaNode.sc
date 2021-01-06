@@ -39,7 +39,7 @@ AlgaNode {
 
 	var <numChannels, <rate;
 
-	var <outs;
+	var <outsMapping;
 
 	var <group, <playGroup, <synthGroup, <normGroup, <interpGroup;
 	var <playSynth, <synth, <normSynths, <interpSynths;
@@ -348,10 +348,6 @@ AlgaNode {
 		});
 	}
 
-	outsMapping {
-		^outs
-	}
-
 	createAllGroups {
 		if(group == nil, {
 			group = AlgaGroup(this.server);
@@ -520,6 +516,9 @@ AlgaNode {
 
 		//Symbol
 		if(objClass == Symbol, {
+			if(outsMapping != nil, {
+				"AlgaNode: outsMapping will not be considered when obj is an SynthDef.".warn;
+			});
 			this.dispatchSynthDef(obj, initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
 				keepScale:keepScale
@@ -572,16 +571,16 @@ AlgaNode {
 	}
 
 	//calculate the outs variable (the outs channel mapping)
-	calculateOuts { | replace = false, keepChannelsMapping = false |
+	calculateOutsMapping { | replace = false, keepChannelsMapping = false |
 		//Accumulate channelsMapping across .replace calls.
 		if(replace.and(keepChannelsMapping), {
-			var newOuts = IdentityDictionary(10);
+			var newOutsMapping = IdentityDictionary(10);
 
 			//copy previous ones
-			outs.keysValuesDo({ | key, value |
+			outsMapping.keysValuesDo({ | key, value |
 				//Delete out of bounds entries? Or keep them for future .replaces?
 				//if(value < numChannels, {
-				newOuts[key] = value;
+				newOutsMapping[key] = value;
 				//});
 			});
 
@@ -589,14 +588,14 @@ AlgaNode {
 			synthDef.outsMapping.keysValuesDo({ | key, value |
 				//Delete out of bounds entries? Or keep them for future .replaces?
 				//if(value < numChannels, {
-				newOuts[key] = value;
+				newOutsMapping[key] = value;
 				//});
 			});
 
-			outs = newOuts;
+			outsMapping = newOutsMapping;
 		}, {
 			//no replace: use synthDef's ones
-			outs = synthDef.outsMapping;
+			outsMapping = synthDef.outsMapping;
 		});
 	}
 
@@ -611,8 +610,8 @@ AlgaNode {
 		numChannels = synthDef.numChannels;
 		rate = synthDef.rate;
 
-		//Generate outs (for outsMapping connectinons)
-		this.calculateOuts(replace, keepChannelsMapping);
+		//Calculate correct outsMapping
+		this.calculateOutsMapping(replace, keepChannelsMapping);
 
 		//Create groups if needed
 		if(initGroups, { this.createAllGroups });
@@ -2494,8 +2493,8 @@ AlgaNode {
 		("\t" ++ inNodes.asString).postln;
 		"outNodes:".postln;
 		("\t" ++ outNodes.asString).postln;
-		"outs:".postln;
-		("\t" ++ outs.asString).postln;
+		"outsMapping:".postln;
+		("\t" ++ outsMapping.asString).postln;
 		"paramsChansMapping:".postln;
 		("\t" ++ paramsChansMapping.asString).postln;
 		"interpSynths:".postln;
