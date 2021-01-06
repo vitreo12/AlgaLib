@@ -16,47 +16,64 @@ AlgaNode {
 	var <scheduler;
 
 	//This is the longestConnectionTime between all the outNodes.
-	//it's used when .replacing a node connected to something, in order for it to be kept alive
+	//It's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
 	//longestConnectionTime will be moved to AlgaBlock and applied per-block!
-	var <connectionTimeOutNodes;
 	var <longestConnectionTime = 0;
+
+	//Keeps track of all the connectionTime of all nodes with this node as input
+	var <connectionTimeOutNodes;
 
 	//The max between longestConnectionTime and playTime
 	var <longestWaitTime = 0;
 
+	//Explicit args provided by the user
 	//This will be added: args passed in at creation to overwrite SynthDef's one,
 	//When using <|, then, these are the ones that will be restored!
 	var <objArgs;
 
+	//Class for obj
 	var <objClass;
+
+	//SynthDef, either explicit or internal (Function generated)
 	var <synthDef;
 
+	//Spec of parameters (names, default values, channels, rate)
 	var <controlNames;
 
 	//per-parameter connectionTime
 	var <paramsConnectionTime;
 
+	//Number of channels and rate
 	var <numChannels, <rate;
 
+	//Output channel mapping
 	var <outsMapping;
 
+	//All Groups / Synths / Busses
 	var <group, <playGroup, <synthGroup, <normGroup, <interpGroup;
 	var <playSynth, <synth, <normSynths, <interpSynths;
 	var <synthBus, <normBusses, <interpBusses;
 
+	//Currently active interpSynths per param.
+	//These are used when changing time on connections, and need to update already running
+	//interpSynths at specific param / sender combination. It's the whole core that allows
+	//to have dynamic fadeTimes
 	var <activeInterpSynths;
 
+	//Connected nodes
 	var <inNodes, <outNodes;
 
 	//keep track of current \default nodes
 	var <currentDefaultNodes;
 
-	//keep track of current scaling for params
+	//Keep track of current scaling for params
 	var <paramsScalings;
 
+	//Keep track ofcurrent chans mapping for params
 	var <paramsChansMapping;
 
+	//General state queries
 	var <isPlaying = false;
 	var <toBeCleared = false;
 	var <beingStopped = false;
@@ -108,7 +125,7 @@ AlgaNode {
 
 		//IdentityDictionary of IdentityDictonaries: (needed for mixing)
 		//\param -> IdentityDictionary(sender -> IdentitySet(interpSynth))
-		//there are used when changing time on connections, and need to update already running
+		//these are used when changing time on connections, and need to update already running
 		//interpSynths at specific param / sender combination. It's the whole core that allows
 		//to have dynamic fadeTimes
 		activeInterpSynths = IdentityDictionary(10);
