@@ -18,6 +18,7 @@
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
 	isPattern { ^false }
+	isListPattern { ^false }
 	instantiated { ^true }
 	cleared { ^false }
 	toBeCleared { ^false }
@@ -31,6 +32,10 @@
 
 +Pattern {
 	isPattern { ^true }
+}
+
++ListPattern {
+	isListPattern { ^true }
 }
 
 +List {
