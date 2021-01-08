@@ -255,8 +255,8 @@ AlgaPattern : AlgaNode {
 			^this
 		});
 
-		//Generate outs (for outsMapping connectinons)
-		this.calculateOuts(replace, keepChannelsMapping);
+		//Generate outsMapping (for outsMapping connectinons)
+		this.calculateOutsMapping(replace, keepChannelsMapping);
 
 		//Create groups if needed
 		if(initGroups, { this.createAllGroups });
