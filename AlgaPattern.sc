@@ -356,15 +356,11 @@ AlgaPattern : AlgaNode {
 	}
 
 	//the interpolation function for AlgaPattern << Pattern / Number / Array
-	interpPattern { | param = \in, sender, time = 0, curves = \lin |
+	interpPattern { | param = \in, sender, time = 0, scale, curves = \lin |
 		var interpSeg;
 		var eventPairAtParam;
+		var scaling;
 		var paramConnectionTime = paramsConnectionTime[param];
-
-		//delta == dur
-		if(param == \delta, {
-			param = \dur
-		});
 
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
@@ -375,6 +371,31 @@ AlgaPattern : AlgaNode {
 
 		//retrieve it here so it also applies to delta == dur
 		eventPairAtParam = eventPairs[param];
+
+		//calculate the scaling
+		scaling = this.calculateScaling(param, sender, nil, scale);
+
+		//One scale value (number)
+		case
+		{ scaling.size == 2 } {
+			sender = sender * scaling[1];
+		}
+
+		//Two scale values (-1.0 / 1.0 / highMin / highMax)
+		{ scaling.size == 6 } {
+			//linear (0)..there should be the option for curve
+			sender = sender.lincurve(
+				-1.0, 1.0, scaling[1], scaling[3], 0
+			);
+		}
+
+		//Four scale values (lowMin / lowMax / highMin / highMax)
+		{ scaling.size == 10 } {
+			//linear (0)..there should be the option for curve
+			sender = sender.lincurve(
+				scaling[1], scaling[3], scaling[5], scaling[7], 0
+			);
+		};
 
 		//Run interp by replacing the entry directly, using the .blend function
 		if(eventPairAtParam != nil, {
@@ -387,14 +408,29 @@ AlgaPattern : AlgaNode {
 	}
 
 	//the interpolation function for AlgaPattern << AlgaNode
-	interpAlgaNode { | param = \in, sender, time = 0, curves = \lin |
-		"AlgaPattern: interpAlgaNode not implemented yet".error;
+	interpAlgaNode { | param = \in, sender, time = 0, scale, curves = \lin |
+
+		//Figure out AlgaBlocks too
+
+		if(sender.rate == \control, {
+			//control rate AlgaNode: wrap in AlgaPkr and treat it as a Pattern
+			var limit;
+			if(param == \dur, { limit = 0.001 });
+			this.interpPattern(param, AlgaPkr(sender, limit), time, scale, curves);
+		}, {
+			if(param == \dur, {
+				"AlgaPattern: interpAlgaNode can't modulate 'dur' at audio rate".error;
+			});
+
+			//calculateScaling
+		});
+
 	}
 
 	//the interpolation function for AlgaPattern << ListPattern
 	//this is separated from interpPattern because there's the need to check
 	//for the presence of AlgaNodes in the list, to run specific interpolation magic
-	interpListPattern { | param = \in, sender, time = 0, curves = \lin |
+	interpListPattern { | param = \in, sender, time = 0, scale, curves = \lin |
 		var containsAlgaNodes = false;
 
 		//Check if it's a ListPattern that contains AlgaNodes
@@ -405,24 +441,33 @@ AlgaPattern : AlgaNode {
 		});
 
 		if(containsAlgaNodes, {
-			"AlgaPattern: interpListPattern with AlgaNodes not implemented yet".error;
+			//Figure out AlgaBlocks too
+			"AlgaPattern: interpListPattern with AlgaNodes isn't implemented yet".error;
 		}, {
 			^this.interpPattern(param, sender, time, curves);
 		});
 	}
 
 	//<<, <<+ and <|
-	makeConnection { | param = \in, sender, time = 0, curves = \lin |
+	makeConnection { | param = \in, sender, time = 0, scale, curves = \lin |
+		//delta == dur
+		if(param == \delta, {
+			param = \dur
+		});
+
 		case
 		{ sender.isAlgaNode } {
 			// <<.param AlgaNode
 			// <<+.param AlgaNode (not yet)
-			^this.interpAlgaNode(param, sender, time, curves);
+			scheduler.addAction({ this.instantiated.and(sender.instantiated) }, {
+				this.interpAlgaNode(param, sender, time, scale, curves);
+			});
+			^this;
 		}
 		{ sender.isListPattern } {
 			// <<.param ListPattern
 			// <<+.param ListPattern (not yet)
-			^this.interpListPattern(param, sender, time, curves);
+			^this.interpListPattern(param, sender, time, scale, curves);
 		}
 		{ (sender.isPattern.not).and(sender.isNumberOrArray.not) } {
 			"AlgaPattern: interpPattern only works with Patterns, Numbers and Arrays".error;
@@ -431,7 +476,7 @@ AlgaPattern : AlgaNode {
 
 		// <<.param Pattern
 		// <<+.param Pattern (not yet)
-		this.interpPattern(param, sender, time, curves);
+		this.interpPattern(param, sender, time, scale, curves);
 	}
 
 	// <<| \param (goes back to defaults)

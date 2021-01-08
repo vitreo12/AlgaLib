@@ -767,6 +767,9 @@ AlgaNode {
 
 	//Check correct array size for scale arguments
 	checkScaleParameterSize { | scaleEntry, name, param, paramNumChannels |
+		if(paramNumChannels == nil, {
+			^scaleEntry
+		});
 		if(scaleEntry.isSequenceableCollection, {
 			var scaleEntrySize = scaleEntry.size;
 			if(scaleEntry.size != paramNumChannels, {
