@@ -1,3 +1,16 @@
+//Alias to find interpolations with AlgaNodes
+AlgaVal {
+	var <val;
+
+	*new { | val |
+		^super.new.init(val)
+	}
+
+	init { | argVal |
+		val = argVal
+	}
+}
+
 AlgaPattern : AlgaNode {
 	/*
 	Todos and questions:
@@ -70,9 +83,13 @@ AlgaPattern : AlgaNode {
 				var patternSynth;
 
 				//As of now, multi channel expansion doesn't work unless
-				//the parameter implements it. Implement it in the future
-				//with specific rules
+				//the parameter implements it explicitly.
+				//Multi channel expansion would be a super cool addition,
+				//and not too hard to implement: gotta figure out the input
+				//with the highest number of channels, and create different synths accordingly
 				controlNames.do({ | controlName |
+					var validParam = true;
+
 					var paramName = controlName.name;
 					var paramNumChannels = controlName.numChannels;
 					var paramRate = controlName.rate;
@@ -82,6 +99,12 @@ AlgaPattern : AlgaNode {
 
 					var senderNumChannels, senderRate;
 					var interpBus, interpSymbol, interpSynthArgs, interpSynth;
+
+					//Interpolation needs to be happening!
+					if(paramVal.class == AlgaVal, {
+						"AlgaPattern: interpolation is happening!".warn;
+						paramVal.val.postln;
+					});
 
 					if(paramVal.isNumberOrArray, {
 						//num / array
@@ -111,45 +134,48 @@ AlgaPattern : AlgaNode {
 							});
 						}, {
 							("AlgaPattern: Invalid parameter " ++ paramName.asString).error;
+							validParam = false;
 						});
 					});
 
-					interpSymbol = (
-						"alga_interp_" ++
-						senderRate ++
-						senderNumChannels ++
-						"_" ++
-						paramRate ++
-						paramNumChannels
-					).asSymbol;
+					if(validParam, {
+						interpSymbol = (
+							"alga_interp_" ++
+							senderRate ++
+							senderNumChannels ++
+							"_" ++
+							paramRate ++
+							paramNumChannels
+						).asSymbol;
 
-					//Remember: interp busses must always have one extra channel for
-					//the interp envelope, even if the envelope is not used here (no normSynth)
-					//Otherwise, the envelope will write to other busses!
-					//Here, patternSynth, won't even look at that extra channel, but at least
-					//SuperCollider knows it's been written to.
-					//This, in fact, caused a huge bug when playing an AlgaPattern through
-					//other AlgaNodes!
-					interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+						//Remember: interp busses must always have one extra channel for
+						//the interp envelope, even if the envelope is not used here (no normSynth)
+						//Otherwise, the envelope will write to other busses!
+						//Here, patternSynth, won't even look at that extra channel, but at least
+						//SuperCollider knows it's been written to.
+						//This, in fact, caused a huge bug when playing an AlgaPattern through
+						//other AlgaNodes!
+						interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
 
-					interpSynthArgs = [
-						\in, paramVal,
-						\out, interpBus.index,
-						\fadeTime, 0
-					];
+						interpSynthArgs = [
+							\in, paramVal,
+							\out, interpBus.index,
+							\fadeTime, 0
+						];
 
-					interpSynth = AlgaSynth(
-						interpSymbol,
-						interpSynthArgs,
-						interpGroup,
-						waitForInst: false
-					);
+						interpSynth = AlgaSynth(
+							interpSymbol,
+							interpSynthArgs,
+							interpGroup,
+							waitForInst: false
+						);
 
-					//add interpBus and interpSynth to interpBussesAndSynths
-					interpBussesAndSynths[interpBus] = interpSynth;
+						//add interpBus and interpSynth to interpBussesAndSynths
+						interpBussesAndSynths[interpBus] = interpSynth;
 
-					//add \paramName, interpBus.busArg to synth arguments
-					synthArgs = synthArgs.add(paramName).add(interpBus.busArg);
+						//add \paramName, interpBus.busArg to synth arguments
+						synthArgs = synthArgs.add(paramName).add(interpBus.busArg);
+					});
 				});
 
 				//Specify an fx?
@@ -357,58 +383,65 @@ AlgaPattern : AlgaNode {
 
 	//the interpolation function for AlgaPattern << Pattern / Number / Array
 	interpPattern { | param = \in, sender, time = 0, scale, curves = \lin |
-		var interpSeg;
 		var eventPairAtParam;
-		var scaling;
 		var paramConnectionTime = paramsConnectionTime[param];
 
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
 
-		//Just \lin for now (just like the other interps)
-		interpSeg = Pseg([0, 1, 1], [time, inf], curves);
-
 		//retrieve it here so it also applies to delta == dur
 		eventPairAtParam = eventPairs[param];
 
-		//calculate the scaling
-		scaling = this.calculateScaling(param, sender, nil, scale);
-
-		//One scale value (number)
-		case
-		{ scaling.size == 2 } {
-			sender = sender * scaling[1];
-		}
-
-		//Two scale values (-1.0 / 1.0 / highMin / highMax)
-		{ scaling.size == 6 } {
-			//linear (0)..there should be the option for curve
-			sender = sender.lincurve(
-				-1.0, 1.0, scaling[1], scaling[3], 0
-			);
-		}
-
-		//Four scale values (lowMin / lowMax / highMin / highMax)
-		{ scaling.size == 10 } {
-			//linear (0)..there should be the option for curve
-			sender = sender.lincurve(
-				scaling[1], scaling[3], scaling[5], scaling[7], 0
-			);
-		};
-
 		//Run interp by replacing the entry directly, using the .blend function
 		if(eventPairAtParam != nil, {
-			//Direct replacing in the IdentityDictionary. This is what
-			//is indexed and played by the Pattern.
+			//Just \lin for now (just like the other interps)
+			var interpSeg = Pseg([0, 1, 1], [time, inf], curves);
+
+			//calculate the scaling
+			var scaling = this.calculateScaling(param, sender, nil, scale);
+
+			if(scaling != nil, {
+				//linear (0)..there should be the option for curve
+				var scaleCurve = 0;
+
+				case
+
+				//One scale value (number)
+				{ scaling.size == 2 } {
+					sender = sender * scaling[1];
+				}
+
+				//Two scale values (-1.0 / 1.0 / highMin / highMax)
+				{ scaling.size == 6 } {
+					sender = sender.lincurve(
+						-1.0, 1.0, scaling[1], scaling[3], scaleCurve
+					);
+				}
+
+				//Four scale values (lowMin / lowMax / highMin / highMax)
+				{ scaling.size == 10 } {
+					sender = sender.lincurve(
+						scaling[1], scaling[3], scaling[5], scaling[7], scaleCurve
+					);
+				};
+			});
+
+			//Direct replacing in the IdentityDictionary.
+			//This is what is indexed and played by the Pattern!
 			eventPairs[param] = (
 				eventPairAtParam.blend(sender, interpSeg)
 			).asStream;
+
+		}, {
+			("AlgaPattern: invalid param: " ++ param.asString).error;
 		});
 	}
 
 	//the interpolation function for AlgaPattern << AlgaNode
 	interpAlgaNode { | param = \in, sender, time = 0, scale, curves = \lin |
+
+		//Add inNodes / outNodes
 
 		//Figure out AlgaBlocks too
 
@@ -443,6 +476,11 @@ AlgaPattern : AlgaNode {
 		if(containsAlgaNodes, {
 			//Figure out AlgaBlocks too
 			"AlgaPattern: interpListPattern with AlgaNodes isn't implemented yet".error;
+
+			sender = AlgaVal(sender);
+
+			eventPairs[param] = sender.asStream;
+
 		}, {
 			^this.interpPattern(param, sender, time, curves);
 		});
@@ -528,20 +566,3 @@ AlgaMonoPattern : AlgaPattern {}
 
 //Alias
 AMP : AlgaMonoPattern {}
-
-/*
-+Object {
-blend { | that, blendFrac = 0.5 |
-if(this.isAlgaNode, {
-^(this.synthBus.bus.getSynchronous) + (blendFrac * (that - this.synthBus.bus.getSynchronous));
-}, {
-if(that.isAlgaNode, {
-^(this + (blendFrac * (that.synthBus.bus.getSynchronous - this)));
-});
-});
-
-//Standard behaviour
-^this + (blendFrac * (that - this));
-}
-}
-*/
