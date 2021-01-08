@@ -317,10 +317,12 @@ AlgaScheduler : AlgaThread {
 					//Individual sched for the action
 					sched = action[2];
 
-					//Found a sched
+					//Found a sched value (run in the future on the clock)
 					if(sched > 0, {
 						if(interruptOnSched, {
-							//Interrupt here until clock releases. New actions will be pushed to interruptOnSchedActions
+							//Interrupt here until clock releases.
+							//New actions will be pushed to interruptOnSchedActions
+
 							var actionIndex;
 
 							//Need to deep copy
@@ -334,13 +336,13 @@ AlgaScheduler : AlgaThread {
 							spinningActions.clear;
 
 							//Clear sched entry for the action that triggered the sched,
-							//so it will be executed right away after clock.sched()
+							//so it will be executed right away after the unhanging in clock.sched()
 							actionIndex = interruptOnSchedActions.indexOf(action);
 							if(actionIndex != nil, {
 								interruptOnSchedActions[actionIndex][2] = 0; //reset entry's sched
 							});
 
-							//Sched in the future the unhanging
+							//Sched the unhanging in the future
 							clock.sched(sched, {
 								//Copy all the actions back in.
 								//Use .add in case new actions were pushed to interruptOnSchedActions meanwhile
@@ -377,7 +379,7 @@ AlgaScheduler : AlgaThread {
 							});
 						});
 					}, {
-						//Actual loop function :)
+						//Actual loop function, sched == 0
 						this.loopFunc(action);
 					});
 				});
@@ -429,14 +431,6 @@ AlgaScheduler : AlgaThread {
 			^this;
 		});
 
-		/*
-		"\nBefore".postln;
-		actions.do({|bubu|
-			bubu[0].def.context.postln;
-		});
-		"".postln;
-		*/
-
 		//new action
 		action = [condition, func, sched];
 
@@ -453,14 +447,6 @@ AlgaScheduler : AlgaThread {
 			//Normal case: add action to bottom of the List
 			this.pushAction(action);
 		});
-
-		/*
-		"After".postln;
-		actions.do({|bubu|
-			bubu[0].def.context.postln;
-		});
-		"".postln;
-		*/
 
 		//set to 0 the accumulator of spinningActions
 		spinningActions[action] = 0;
