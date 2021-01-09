@@ -534,7 +534,7 @@ AlgaNode {
 		//Symbol
 		if(objClass == Symbol, {
 			if(outsMapping != nil, {
-				"AlgaNode: outsMapping will not be considered when obj is an SynthDef.".warn;
+				"AlgaNode: outsMapping will not be considered when obj is a SynthDef.".warn;
 			});
 			this.dispatchSynthDef(obj, initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
