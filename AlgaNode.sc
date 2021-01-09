@@ -936,15 +936,20 @@ AlgaNode {
 	}
 
 	//The actual empty function
-	removeActiveInterpSynthOnFree { | param, sender, interpSynth |
+	removeActiveInterpSynthOnFree { | param, sender, interpSynth, action |
 		interpSynth.onFree({
 			activeInterpSynths[param][sender].remove(interpSynth);
+
+			//This is used in AlgaPattern
+			if(action != nil, {
+				action.value;
+			});
 		});
 	}
 
 	//Use the .onFree node function to dynamically fill and empty the activeInterpSynths for
 	//each param / sender combination!
-	addActiveInterpSynthOnFree { | param, sender, interpSynth |
+	addActiveInterpSynthOnFree { | param, sender, interpSynth, action |
 		//Each sender has IdentitySet with all the active ones
 		if(activeInterpSynths[param][sender].class == IdentitySet, {
 			activeInterpSynths[param][sender].add(interpSynth)
@@ -954,7 +959,7 @@ AlgaNode {
 		});
 
 		//The actual function that empties
-		this.removeActiveInterpSynthOnFree(param, sender, interpSynth);
+		this.removeActiveInterpSynthOnFree(param, sender, interpSynth, action);
 	}
 
 	//Set proper fadeTime for all active interpSynths on param / sender combination

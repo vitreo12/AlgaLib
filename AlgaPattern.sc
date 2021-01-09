@@ -1,13 +1,25 @@
-//Alias to find interpolations with AlgaNodes
-AlgaVal {
-	var <val;
+//Keeps track of previous / current nodes (or patterns) and fadeTime changes
+AlgaPatternInterpState {
+	var <previous;
+	var <current;
+	var <fadeTime;
 
-	*new { | val |
-		^super.new.init(val)
+	*new { | current, fadeTime = 0 |
+		^super.new.init(current, fadeTime)
 	}
 
-	init { | argVal |
-		val = argVal
+	init { | argCurrent, argFadeTime = 0 |
+		current = argCurrent;
+		fadeTime = argFadeTime;
+	}
+
+	setCurrent { | val |
+		previous = current;
+		current  = val;
+	}
+
+	setFadeTime { | val |
+		fadeTime = val
 	}
 }
 
@@ -19,11 +31,19 @@ AlgaPattern : AlgaNode {
 
 	2) How to connect an AlgaNode to an AlgaPattern parameter? What about kr / ar?
 
-	3) Can an AlgaNode connect to \dur? (For now, I'd say no)
+	3) Can an AlgaNode connect to \dur? Only if it's \control rate (using AlgaPkr)
 	*/
 
 	//The actual Pattern to be manipulated
 	var <pattern;
+
+	//The group where the spawned "set" param synths coming from a Pattern live.
+	//This lives inside interpGroup
+	var <patternInterpGroup;
+
+	//The list of groups where the spawned "set" param synths coming from an AlgaNode live.
+	//These live inside interpGroup
+	var <nodesInterpGroups;
 
 	//The eventPairs used in the Pattern
 	var <eventPairs;
@@ -33,6 +53,15 @@ AlgaPattern : AlgaNode {
 		//StartUp.add is needed: Event class must be compiled first
 		StartUp.add({
 			this.addAlgaNoteEventType;
+
+			//testt
+			SynthDef(\algaPattern_interp, {
+				AlgaDynamicEnvGate.ar(
+					\t_release.tr(0),
+					\fadeTime.kr(0),
+					Done.freeGroup
+				);
+			}).add;
 		});
 	}
 
@@ -56,6 +85,7 @@ AlgaPattern : AlgaNode {
 			var synthDefName = ~synthDefName.valueEnvir;
 
 			//AlgaPattern related stuff. Passed in from Pattern
+			var algaPattern = ~algaPattern;
 			var server = ~algaServer;
 			var clock = ~algaClock;
 			var controlNames = ~algaControlNames;
@@ -100,10 +130,40 @@ AlgaPattern : AlgaNode {
 					var senderNumChannels, senderRate;
 					var interpBus, interpSymbol, interpSynthArgs, interpSynth;
 
-					//Interpolation needs to be happening!
-					if(paramVal.class == AlgaVal, {
-						"AlgaPattern: interpolation is happening!".warn;
-						paramVal.val.postln;
+					//AlgaPatternInterpState triggers interpolation (if needed to be)
+					if(paramVal.class == AlgaPatternInterpState, {
+						var sender = paramVal.current;
+						var previousInterpSynth = algaPattern.activeInterpSynths[paramName][sender];
+
+						if(previousInterpSynth == nil, {
+							var interpEnvSynth;
+							var dummyGroup = AlgaGroup(interpGroup);
+
+							interpEnvSynth = AlgaSynth(
+								\algaPattern_interp,
+								[\fadeTime, paramVal.fadeTime],
+								interpGroup,
+								\addToTail
+							);
+
+							/*
+							fork {
+								2.wait;
+								interpSynth.set(\t_release, 1);
+							};
+							*/
+
+							algaPattern.addActiveInterpSynthOnFree(
+								paramName,
+								sender,
+								interpEnvSynth, {
+									interpGroup.instantiated = false
+								}
+							)
+						});
+
+						//for further thingies
+						paramVal = sender;
 					});
 
 					if(paramVal.isNumberOrArray, {
@@ -130,7 +190,7 @@ AlgaPattern : AlgaNode {
 								senderRate = "control";
 								senderNumChannels = paramNumChannels;
 								paramVal = controlName.defaultValue;
-								("AlgaNode wasn't instantiated yet. Using default value for " ++ paramName).warn;
+								("AlgaPattern: AlgaNode wasn't instantiated yet. Using default value for " ++ paramName).warn;
 							});
 						}, {
 							("AlgaPattern: Invalid parameter " ++ paramName.asString).error;
@@ -291,8 +351,9 @@ AlgaPattern : AlgaNode {
 		this.createAllBusses;
 
 		//Create the actual pattern
+		//scheduler.addAction({ this.instantiated }, {
 		this.createPattern(eventPairs);
-
+		//});
 	}
 
 	//Support Function in the future
@@ -366,6 +427,7 @@ AlgaPattern : AlgaNode {
 		//the context of this AlgaPattern
 		patternPairs = patternPairs.addAll([
 			\type, \algaNote,
+			\algaPattern, this,
 			\algaServer, this.server,
 			\algaClock, this.scheduler.clock,
 			\algaControlNames, this.controlNames,
@@ -440,24 +502,36 @@ AlgaPattern : AlgaNode {
 
 	//the interpolation function for AlgaPattern << AlgaNode
 	interpAlgaNode { | param = \in, sender, time = 0, scale, curves = \lin |
+		var correctConnection = true;
 
-		//Add inNodes / outNodes
-
-		//Figure out AlgaBlocks too
-
-		if(sender.rate == \control, {
-			//control rate AlgaNode: wrap in AlgaPkr and treat it as a Pattern
-			var limit;
-			if(param == \dur, { limit = 0.001 });
-			this.interpPattern(param, AlgaPkr(sender, limit), time, scale, curves);
-		}, {
-			if(param == \dur, {
+		if(param == \dur, {
+			//Check if \dur and \control: use AlgaPkr...
+			//AlgaPkr can also be used for another mode where control AlgaNode
+			//are effectively sampled and held at the trigger of the event
+			if(sender.rate == \control, {
+				this.interpPattern(param, AlgaPkr(sender, 0.001), time, scale, curves);
+			}, {
 				"AlgaPattern: interpAlgaNode can't modulate 'dur' at audio rate".error;
+				correctConnection = false;
 			});
+		}, {
+			//Connecting to anything else than \dur
 
-			//calculateScaling
+
 		});
 
+		//Ok, good connections. Go on with adding inNodes / outNodes
+		//and setting block node ordering
+		if(correctConnection, {
+			//Add inNodes / outNodes
+			this.addInOutNodesDict(sender, param, false);
+
+			//Figure out AlgaBlocks too
+
+			if(param != \dur, {
+				eventPairs[param] = AlgaPatternInterpState(sender, time);
+			});
+		});
 	}
 
 	//the interpolation function for AlgaPattern << ListPattern
@@ -477,7 +551,7 @@ AlgaPattern : AlgaNode {
 			//Figure out AlgaBlocks too
 			"AlgaPattern: interpListPattern with AlgaNodes isn't implemented yet".error;
 
-			sender = AlgaVal(sender);
+			sender = AlgaPatternInterpState(sender);
 
 			eventPairs[param] = sender.asStream;
 

@@ -375,7 +375,7 @@ AlgaScheduler : AlgaThread {
 								spinningActions[action] = 0; //reset spin too
 
 								//Unhang
-								this.unhangSemaphore
+								this.unhangSemaphore;
 							});
 						});
 					}, {
