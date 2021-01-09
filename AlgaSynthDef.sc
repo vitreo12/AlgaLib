@@ -4,16 +4,14 @@ AlgaSynthDef : SynthDef {
 	var <>rate, <>numChannels;
 	var <>canReleaseSynth, <>canFreeSynth;
 
-	var <>outs;
+	var <>explicitFree;
+
+	var <>outsMapping;
 
 	//Use OffsetOut by default!
 	classvar <>sampleAccurate=true;
 
-	outsMapping {
-		^outs
-	}
-
-	*new { | name, func, rates, prependArgs, makeFadeEnv = false, channelOffset = 0,
+	*new { | name, func, rates, prependArgs, makeFadeEnv = true, channelOffset = 0,
 		chanConstraint, rateConstraint, outsMapping |
 
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
@@ -144,11 +142,15 @@ AlgaSynthDef : SynthDef {
 		def.canReleaseSynth = makeFadeEnv || hasOwnGate;
 		def.canFreeSynth = def.canReleaseSynth || canFree;
 
+		//this is used for AlgaPattern...
+		//makeFadeEnv = true can be deceiving.
+		def.explicitFree = canFree;
+
 		//Set outsMapping as \out1 -> 0, etc...
-		def.outs = IdentityDictionary(numChannels);
+		def.outsMapping = IdentityDictionary(numChannels);
 		numChannels.do({ | i |
 			var out = ("out" ++ (i + 1)).asSymbol;
-			def.outs[out] = i;
+			def.outsMapping[out] = i;
 		});
 
 		//Must be array.
@@ -166,21 +168,21 @@ AlgaSynthDef : SynthDef {
 						if(val.class == Array, {
 							val.do({ | arrayEntry, arrayIndex |
 								if(arrayEntry < numChannels, {
-									def.outs[name] = val;
+									def.outsMapping[name] = val;
 								}, {
 									(name ++ " accesses out of bound channels: " ++ val).error;
 								});
 							});
 						}, {
 							if(val < numChannels, {
-								def.outs[name] = val;
+								def.outsMapping[name] = val;
 							}, {
 								(name ++ " accesses an out of bound channel: " ++ val).error;
 							});
 						});
 					}, {
 
-						def.outs[name] = chanCount;
+						def.outsMapping[name] = chanCount;
 
 						chanCount = chanCount + 1;
 					});
