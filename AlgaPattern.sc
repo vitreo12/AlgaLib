@@ -57,15 +57,6 @@ AlgaPattern : AlgaNode {
 		//StartUp.add is needed: Event class must be compiled first
 		StartUp.add({
 			this.addAlgaNoteEventType;
-
-			//testt
-			SynthDef(\algaPattern_interp, {
-				AlgaDynamicEnvGate.ar(
-					\t_release.tr(0),
-					\fadeTime.kr(0),
-					Done.freeGroup
-				);
-			}).add;
 		});
 	}
 
@@ -85,10 +76,10 @@ AlgaPattern : AlgaNode {
 			//The final OSC bundle
 			var bundle;
 
-			//Current AlgaPattern and its server / clock
+			//AlgaPattern and its server / clock
 			var algaPattern = ~algaPattern;
-			var server = ~algaPatternServer;
-			var clock = ~algaPatternClock;
+			var algaPatternServer = ~algaPatternServer;
+			var algaPatternClock = ~algaPatternClock;
 
 			//Other things for pattern syncing / clocking / scheduling
 			var offset = ~timingOffset;
@@ -97,31 +88,30 @@ AlgaPattern : AlgaNode {
 			//Needed ?
 			~isPlaying = true;
 
-			//Create all Synths and pack the bundle
+			//Create the bundle with all needed Synths for this Event.
 			bundle = server.makeBundle(false, {
-				//Pass the event environment (where all the values coming from pattern exist)
+				//Pass the Event's environment (where all the values coming from pattern exist)
+				//This function will also take care of Pattern / AlgaNode interpolations
 				~algaPattern.createEventSynths(
 					currentEnvironment
 				)
 			});
 
-			bundle.asString.warn;
-
-			//Send bundle to server using the same AlgaScheduler's clock.
-			//Should this be moved to the AlgaScheduler altogether?
+			//Send bundle to server using the same server / clock as the AlgaPattern
+			//( AlgaScheduler ??? )
 			schedBundleArrayOnClock(
 				offset,
-				clock,
+				algaPatternClock,
 				bundle,
 				lag,
-				server
+				algaPatternServer
 			);
 		});
 	}
 
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
 	createEventSynths { | eventEnvironment |
-		//The SynthDef
+		//The SynthDef ( ~synthDefName in Event )
 		var synthDef = eventEnvironment[\synthDefName].valueEnvir;
 
 		//These will be populated and freed when the patternSynth is released
