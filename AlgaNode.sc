@@ -64,7 +64,7 @@ AlgaNode {
 	//Connected nodes
 	var <inNodes, <outNodes;
 
-	//keep track of current \default nodes
+	//keep track of current \default nodes (this is used for mix parameters)
 	var <currentDefaultNodes;
 
 	//Keep track of current scaling for params
@@ -155,6 +155,11 @@ AlgaNode {
 
 		//Keeps all the connectionTimes of the connected nodes
 		connectionTimeOutNodes = IdentityDictionary(10);
+
+		//AlgaPattern specific
+		if(this.isAlgaPattern, {
+			this.interpStates = IdentityDictionary(10);
+		});
 
 		^true;
 	}
@@ -367,11 +372,14 @@ AlgaNode {
 
 	createAllGroups {
 		if(group == nil, {
-			group = AlgaGroup(this.server);
+			group = AlgaGroup(server);
 			playGroup = AlgaGroup(group);
 			synthGroup = AlgaGroup(group);
 			normGroup = AlgaGroup(group);
 			interpGroup = AlgaGroup(group);
+			if(this.isAlgaPattern, {
+				this.patternInterpGroup = AlgaGroup(interpGroup);
+			});
 		});
 	}
 
