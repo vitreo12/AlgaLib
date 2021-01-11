@@ -158,8 +158,7 @@ AlgaNode {
 
 		//AlgaPattern specific
 		if(this.isAlgaPattern, {
-			this.interpStates = IdentityDictionary(10);
-			this.interpQueue   = IdentityDictionary(10);
+			this.interpStates = AlgaPatternInterpStates();
 		});
 
 		^true;

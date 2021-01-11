@@ -1,38 +1,78 @@
-//Keeps track of previous / current nodes (or patterns) and fadeTime changes
 AlgaPatternInterpState {
-	var <previous;
-	var <current;
-	var <fadeTime;
+	var <entry;
+	var <state = false;
 
-	*new { | current, fadeTime = 0 |
-		^super.new.init(current, fadeTime)
+	*new { | entry |
+		^super.new.init(entry)
 	}
 
-	init { | argCurrent, argFadeTime = 0 |
-		current = argCurrent;
-		if(argFadeTime == nil, { argFadeTime = 0 });
-		fadeTime = argFadeTime;
+	init { | argEntry |
+		entry = argEntry;
 	}
 
-	setCurrent { | val |
-		previous = current;
-		current  = val;
+	//Triggered interpolation synth
+	setStateFlag {
+		state = true;
 	}
 
-	setFadeTime { | val |
-		fadeTime = val
+	print {
+		("entry: " ++ entry.asString).postln;
+		("state: " ++ state.asString).postln;
 	}
 }
 
-AlgaPatternInterpSynth {
-	var interpSynth, group;
+//Keeps track of active Patterns / Nodes per param (used for interp)
+AlgaPatternInterpStates {
+	var <entries;
+	var <times;
 
 	*new {
-
+		^super.new.init;
 	}
 
-	onFree {
+	init {
+		entries = IdentityDictionary();
+		times   = IdentityDictionary();
+	}
 
+	add { | param = \in, entry, time = 0 |
+		var prevEntry = entries[param];
+
+		if(entry.isPattern, {
+			entry = \pattern;
+		});
+
+		if(prevEntry == nil, {
+			entries[param] = IdentitySet().add(
+				AlgaPatternInterpState(entry)
+			);
+		}, {
+			entries[param].add(
+				AlgaPatternInterpState(entry)
+			);
+		});
+
+		times[param] = time;
+	}
+
+	setStateFlag { | param = \in |
+		entries[param].do({ | entry |
+			entry.setStateFlag
+		})
+	}
+
+	remove { | param = \in |
+		entries.removeAt(param);
+		times.removeAt(param);
+	}
+
+	removeFromIdentitySet { | param = \in, what |
+		entries[param].remove(what);
+	}
+
+	print { | param = \in |
+		("param : " ++ param).warn;
+		entries[param].do({ | entry | entry.print });
 	}
 }
 
@@ -45,6 +85,8 @@ AlgaPattern : AlgaNode {
 	2) How to connect an AlgaNode to an AlgaPattern parameter? What about kr / ar?
 
 	3) Can an AlgaNode connect to \dur? Only if it's \control rate (using AlgaPkr)
+
+	4) Continuous or SAH interpolation (both in Patterns and AlgaNodes)
 	*/
 
 	//The actual Pattern to be manipulated
@@ -55,8 +97,6 @@ AlgaPattern : AlgaNode {
 
 	//The eventPairs used in the Pattern
 	var <eventPairs;
-
-	var <>interpQueue;
 
 	//Add the \algaNote event to Event
 	*initClass {
@@ -119,11 +159,11 @@ AlgaPattern : AlgaNode {
 	createInterpPatternSynth { | paramName, paramNumChannels, paramRate,
 		paramDefault, interpBus, eventEnvironment, interpBussesAndSynths |
 
+		var validParam = true;
+
 		//The value coming from eihter a Pattern or ListPattern
 		// ( ~freq, ~amp ... )
 		var paramVal = eventEnvironment[paramName];
-
-		var validParam = true;
 
 		var senderNumChannels, senderRate;
 
@@ -189,13 +229,6 @@ AlgaPattern : AlgaNode {
 		^nil;
 	}
 
-	addToInterpQueue { | what |
-		var interpQueueEntry = interpQueue[what];
-		if(interpQueueEntry == nil, {
-			interpQueue[what] = what;
-		});
-	}
-
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
 	createEventSynths { | eventEnvironment |
 		//The SynthDef ( ~synthDefName in Event )
@@ -219,7 +252,7 @@ AlgaPattern : AlgaNode {
 			var paramName = controlName.name;
 			var paramNumChannels = controlName.numChannels;
 			var paramRate = controlName.rate;
-			var paramDefault = controlName.default;
+			var paramDefault = controlName.defaultValue;
 
 			//Remember: interp busses must always have one extra channel for
 			//the interp envelope, even if the envelope is not used here (no normSynth)
@@ -240,7 +273,7 @@ AlgaPattern : AlgaNode {
 			interpBussesAndSynths.add(interpBus);
 
 			//append \paramName, interpBus to patternSynthArgs for correct connections
-			patternSynthArgs = patternSynthArgs.add(paramName).add(interpBus);
+			patternSynthArgs = patternSynthArgs.add(paramName).add(interpBus.busArg);
 		});
 
 		//Specify an fx?
@@ -361,11 +394,8 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Set current interp state
-	setCurrentInterpState { | param = \in, sender, time = 0 |
-		var currentInterpState = interpStates[param];
-		if(currentInterpState != nil, {
-			interpStates[param].setCurrent(sender).setFadeTime(time);
-		});
+	setInterpState { | param = \in, sender, time = 0 |
+		interpStates.add(param, sender, time);
 	}
 
 	//Build the actual pattern
@@ -382,7 +412,6 @@ AlgaPattern : AlgaNode {
 			if(paramName != \def, {
 				//Behaviour for keys != \def
 				var valueAsStream = value.asStream;
-
 				var paramConnectionTime = paramsConnectionTime[paramName];
 
 				//delta == dur
@@ -402,11 +431,7 @@ AlgaPattern : AlgaNode {
 				if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 
 				//Not .asStream
-				interpStates[paramName] = AlgaPatternInterpState(
-					value,
-					paramsConnectionTime[paramName]
-				);
-
+				this.setInterpState(paramName, value, paramConnectionTime);
 			}, {
 				//Add \def key as \instrument
 				patternPairs = patternPairs.add(\instrument).add(value);
@@ -440,10 +465,7 @@ AlgaPattern : AlgaNode {
 				if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 
 				//Not .asStream
-				interpStates[paramName] = AlgaPatternInterpState(
-					paramDefault,
-					paramConnectionTime
-				);
+				this.setInterpState(paramName, paramDefault, paramConnectionTime);
 			});
 		});
 
@@ -505,7 +527,7 @@ AlgaPattern : AlgaNode {
 			});
 
 			//Set correct interpState
-			this.setCurrentInterpState(param, sender, time);
+			this.setInterpState(param, sender, time);
 
 			//Direct replacing in the IdentityDictionary.
 			//This is what is indexed and played by the Pattern!
@@ -544,7 +566,7 @@ AlgaPattern : AlgaNode {
 			this.addInOutNodesDict(sender, param, false);
 
 			//Set correct interpState
-			this.setCurrentInterpState(param, sender, time);
+			this.setInterpState(param, sender, time);
 
 			//Figure out AlgaBlocks too
 
@@ -567,7 +589,7 @@ AlgaPattern : AlgaNode {
 		if(containsAlgaNodes, {
 			"AlgaPattern: interpListPattern with AlgaNodes isn't implemented yet".error;
 		}, {
-			^this.interpPattern(param, sender, time, curves);
+			^this.interpPattern(param, sender, time, scale, curves);
 		});
 	}
 
@@ -593,13 +615,15 @@ AlgaPattern : AlgaNode {
 
 			^this;
 		}
+
 		{ sender.isListPattern } {
 			// <<.param ListPattern
 			// <<+.param ListPattern (not yet)
 			^this.interpListPattern(param, sender, time, scale, curves);
 		}
+
 		{ (sender.isPattern.not).and(sender.isNumberOrArray.not) } {
-			"AlgaPattern: interpPattern only works with Patterns, Numbers and Arrays".error;
+			"AlgaPattern: makeConnection only works with AlgaNodes, Patterns, Numbers and Arrays".error;
 			^this;
 		};
 
