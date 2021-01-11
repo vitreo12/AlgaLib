@@ -159,6 +159,7 @@ AlgaNode {
 		//AlgaPattern specific
 		if(this.isAlgaPattern, {
 			this.interpStates = IdentityDictionary(10);
+			this.interpQueue   = IdentityDictionary(10);
 		});
 
 		^true;
@@ -377,9 +378,6 @@ AlgaNode {
 			synthGroup = AlgaGroup(group);
 			normGroup = AlgaGroup(group);
 			interpGroup = AlgaGroup(group);
-			if(this.isAlgaPattern, {
-				this.patternInterpGroup = AlgaGroup(interpGroup);
-			});
 		});
 	}
 
