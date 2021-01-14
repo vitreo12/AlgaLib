@@ -87,10 +87,17 @@ AlgaPattern : AlgaNode {
 	3) Can an AlgaNode connect to \dur? Only if it's \control rate (using AlgaPkr)
 
 	4) Continuous or SAH interpolation (both in Patterns and AlgaNodes)
+
+	5) \dur implementation: doesn't work cause it's not time accurate: there's no way
+	   of syncing multiple patterns, as the interpolation process with Pseg will end up out
+	   of phase. Right now, \dur just sets the requested value AFTER fadeTime.
 	*/
 
 	//The actual Pattern to be manipulated
 	var <pattern;
+
+	//The ReschedulingEventStreamPlayer
+	var <reschedulingEventStreamPlayer;
 
 	//Dict of per-param AlgaPatternInterpState
 	var <>interpStates;
@@ -475,19 +482,30 @@ AlgaPattern : AlgaNode {
 			\type, \algaNote,
 			\algaPattern, this,
 			\algaPatternServer, server,
-			\algaPatternClock, scheduler.clock
+			\algaPatternClock, this.clock
 		]);
 
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);
 
-		//start the pattern right away
-		pattern.play;
+		//start the pattern right away. quant?
+		reschedulingEventStreamPlayer = pattern.playRescheduling(this.clock);
 	}
 
 	//the interpolation function for AlgaPattern << Pattern / Number / Array
 	interpPattern { | param = \in, sender, time = 0, scale, curves = \lin |
 		var eventPairAtParam;
+
+		// \dur doesn't interpolate well for now
+		if(param == \dur, {
+			("AlgaPattern: interpolating \dur is still WIP. Changes will be abrupt after " ++ time ++ " seconds").warn;
+
+			//Overwrite \dur with sender after time
+			^reschedulingEventStreamPlayer.schedOnce(
+				time,
+				{ eventPairs[\dur] = sender }
+			);
+		});
 
 		//retrieve it here so it also applies to delta == dur
 		eventPairAtParam = eventPairs[param];

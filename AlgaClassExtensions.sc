@@ -19,6 +19,7 @@
 	isAlgaPattern { ^false }
 	isPattern { ^false }
 	isListPattern { ^false }
+	isTempoClock { ^false }
 	instantiated { ^true }
 	cleared { ^false }
 	toBeCleared { ^false }
