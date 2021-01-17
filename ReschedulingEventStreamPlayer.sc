@@ -18,6 +18,7 @@ ReschedulingEventStreamPlayer {
 	play { | argClock, doReset = false, quant |
 		player.play(argClock, doReset, quant)
 	}
+
 	stop { player.stop }
 	reset { player.reset }
 	refresh { player.refresh }
@@ -34,16 +35,8 @@ ReschedulingEventStreamPlayer {
 		this.rescheduleAbs(lastTime + when);
 	}
 
-	algaSchedAtQuantOnce { | quant, task, offset = 0.0000000000000569 |
-		player.clock.algaSchedAtQuantOnce(quant, task, offset);
-	}
-
 	algaSchedAtQuant { | quant, task, offset = 0.0000000000000569 |
 		player.clock.algaSchedAtQuant(quant, task, offset);
-	}
-
-	algaSchedOnce { | when, task, offset = 0.0000000000000569 |
-		player.clock.algaSchedOnce(when, task, offset);
 	}
 
 	algaSched { | when, task, offset = 0.0000000000000569 |
@@ -51,7 +44,7 @@ ReschedulingEventStreamPlayer {
 	}
 
 	stream { player.stream }
-	asEventStreamPlayer {}
+	asEventStreamPlayer { ^this }
 	canPause { ^player.canPause }
 	event { ^player.event }
 	event_ { | event | player.event_(event) }

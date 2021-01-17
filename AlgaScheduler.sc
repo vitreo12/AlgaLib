@@ -343,7 +343,7 @@ AlgaScheduler : AlgaThread {
 							});
 
 							//Sched the unhanging in the future
-							clock.algaSchedAtQuantOnce(sched, {
+							clock.algaSchedAtQuant(sched, {
 								//Copy all the actions back in.
 								//Use .add in case new actions were pushed to interruptOnSchedActions meanwhile
 								interruptOnSchedActions.do({ | interruptOnSchedAction |
@@ -370,7 +370,7 @@ AlgaScheduler : AlgaThread {
 							action[2] = 0;
 
 							//In sched time, add action again and trigger scheduler loop
-							clock.algaSchedAtQuantOnce(sched, {
+							clock.algaSchedAtQuant(sched, {
 								actions.add(action);
 								spinningActions[action] = 0; //reset spin too
 

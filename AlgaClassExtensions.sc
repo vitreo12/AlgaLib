@@ -102,27 +102,12 @@
 + Clock {
 	//offset allows to execute it slightly before quant!
 	//0.0000000000000569 is the smallest number i could find that works
-	algaSchedAtQuantOnce { | quant, task, offset = 0.0000000000000569 |
-		if(this.isTempoClock, {
-			this.algaTempoClockSchedAtQuant(quant - offset, { task.value; nil });
-		}, {
-			this.algaSchedOnce(quant, task, offset)
-		});
-	}
-
-	//offset allows to execute it slightly before quant!
-	//0.0000000000000569 is the smallest number i could find that works
 	algaSchedAtQuant { | quant, task, offset = 0.0000000000000569 |
 		if(this.isTempoClock, {
 			this.algaTempoClockSchedAtQuant(quant - offset, task);
 		}, {
 			this.algaSched(quant, task, offset)
 		});
-	}
-
-	algaSchedOnce { | when, task, offset = 0.0000000000000569 |
-		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
-		this.sched(when - offset, { task.value; nil });
 	}
 
 	algaSched { | when, task, offset = 0.0000000000000569 |
