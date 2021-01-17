@@ -8,6 +8,6 @@ p = Pbind(
 
 p.reschedule(2);
 
-p.schedAtQuantOnce(1, { "ye".postln; ~dur = 0.3 })
+p.algaSchedOnce(1, { "ye".postln; ~dur = 0.3 })
 
-p.schedOnce(0.1, { "ye".postln; ~dur = 0.5 })
+p.algaSchedOnce(0.1, { "ye".postln; ~dur = 0.5 })

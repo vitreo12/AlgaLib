@@ -498,10 +498,10 @@ AlgaPattern : AlgaNode {
 
 		// \dur doesn't interpolate well for now
 		if(param == \dur, {
-			("AlgaPattern: interpolating \dur is still WIP. Changes will be abrupt after " ++ time ++ " seconds").warn;
+			("AlgaPattern: interpolating \dur is still WIP. Changes will be applied after " ++ time ++ " seconds").warn;
 
 			//Overwrite \dur with sender after time
-			^reschedulingEventStreamPlayer.schedOnce(
+			^reschedulingEventStreamPlayer.algaSchedAtQuantOnce(
 				time,
 				{ eventPairs[\dur] = sender }
 			);

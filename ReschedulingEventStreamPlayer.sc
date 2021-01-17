@@ -1,3 +1,4 @@
+//https://scsynth.org/t/set-patterns-dur-right-away/3103/9
 ReschedulingEventStreamPlayer {
 	var <player;
 	var <lastTime;
@@ -33,34 +34,20 @@ ReschedulingEventStreamPlayer {
 		this.rescheduleAbs(lastTime + when);
 	}
 
-	schedAtQuantOnce { | quant, task |
-		var clock = player.clock;
-		if(clock.isTempoClock, {
-			clock.schedAtQuant(quant, { task.value; nil });
-		}, {
-			this.schedOnce(quant, task)
-		});
+	algaSchedAtQuantOnce { | quant, task, offset = 0.0000000000000569 |
+		player.clock.algaSchedAtQuantOnce(quant, task, offset);
 	}
 
-	schedAtQuant { | quant, task |
-		var clock = player.clock;
-		if(clock.isTempoClock, {
-			clock.schedAtQuant(quant, task);
-		}, {
-			this.sched(quant, task)
-		});
+	algaSchedAtQuant { | quant, task, offset = 0.0000000000000569 |
+		player.clock.algaSchedAtQuant(quant, task, offset);
 	}
 
-	schedOnce { | when, task |
-		var clock = player.clock;
-		if(clock.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
-		clock.sched(when, { task.value; nil });
+	algaSchedOnce { | when, task, offset = 0.0000000000000569 |
+		player.clock.algaSchedOnce(when, task, offset);
 	}
 
-	sched { | when, task |
-		var clock = player.clock;
-		if(clock.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
-		clock.sched(when, task);
+	algaSched { | when, task, offset = 0.0000000000000569 |
+		player.clock.algaSched(when, task, offset);
 	}
 
 	stream { player.stream }
@@ -82,8 +69,40 @@ ReschedulingEventStreamPlayer {
 	}
 }
 
++ Clock {
+	//offset allows to execute it slightly before quant!
+	//0.0000000000000569 is the smallest number i could find that works
+	algaSchedAtQuantOnce { | quant, task, offset = 0.0000000000000569 |
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedAtQuant(quant - offset, { task.value; nil });
+		}, {
+			this.algaSchedOnce(quant, task, offset)
+		});
+	}
+
+	//offset allows to execute it slightly before quant!
+	//0.0000000000000569 is the smallest number i could find that works
+	algaSchedAtQuant { | quant, task, offset = 0.0000000000000569 |
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedAtQuant(quant - offset, task);
+		}, {
+			this.algaSched(quant, task, offset)
+		});
+	}
+
+	algaSchedOnce { | when, task, offset = 0.0000000000000569 |
+		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
+		this.sched(when - offset, { task.value; nil });
+	}
+
+	algaSched { | when, task, offset = 0.0000000000000569 |
+		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
+		this.sched(when - offset, task);
+	}
+}
+
 + TempoClock {
-	schedAtQuant { | quant = 1, task |
+	algaTempoClockSchedAtQuant { | quant = 1, task |
 		this.schedAbs(quant.nextTimeOnGrid(this), task)
 	}
 
