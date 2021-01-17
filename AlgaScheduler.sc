@@ -5,7 +5,7 @@ AlgaThread {
 	*new { | server, clock, autostart = true |
 		var argServer = server ? Server.default;
 		var argName = argServer.name;
-		var argClock = clock ? SystemClock;
+		var argClock = clock ? TempoClock.default;
 		^super.newCopyArgs(argName, argServer, argClock).init(autostart);
 	}
 
@@ -61,7 +61,7 @@ AlgaThread {
 }
 
 AlgaScheduler : AlgaThread {
-	var <>interval = 0.01;
+	var <>interval = 0.001; //1ms ?
 	var <>maxSpinTime = 2;
 
 	var <cascadeMode = false;
@@ -84,7 +84,7 @@ AlgaScheduler : AlgaThread {
 	*new { | server, clock, cascadeMode = false, autostart = true |
 		var argServer = server ? Server.default;
 		var argName = argServer.name;
-		var argClock = clock ? SystemClock;
+		var argClock = clock ? TempoClock.default;
 		^super.newCopyArgs(argName, argServer, argClock).init(cascadeMode, autostart);
 	}
 

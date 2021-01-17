@@ -45,7 +45,7 @@ Alga {
 
 	*newScheduler { | server, clock, cascadeMode = true |
 		server = server ? Server.default;
-		clock = clock ? TempoClock; //use tempo clock as default
+		clock = clock ? TempoClock.default;
 		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
 	}
 
