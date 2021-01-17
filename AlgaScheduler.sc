@@ -343,7 +343,7 @@ AlgaScheduler : AlgaThread {
 							});
 
 							//Sched the unhanging in the future
-							clock.sched(sched, {
+							clock.algaSchedAtQuantOnce(sched, {
 								//Copy all the actions back in.
 								//Use .add in case new actions were pushed to interruptOnSchedActions meanwhile
 								interruptOnSchedActions.do({ | interruptOnSchedAction |
@@ -359,7 +359,7 @@ AlgaScheduler : AlgaThread {
 
 								//Unhang
 								this.unhangSemaphore;
-							});
+							}, offset:0);
 						}, {
 							//Only remove the one action and postpone it in the future.
 							//Other actions would still go on!
@@ -370,13 +370,13 @@ AlgaScheduler : AlgaThread {
 							action[2] = 0;
 
 							//In sched time, add action again and trigger scheduler loop
-							clock.sched(sched, {
+							clock.algaSchedAtQuantOnce(sched, {
 								actions.add(action);
 								spinningActions[action] = 0; //reset spin too
 
 								//Unhang
 								this.unhangSemaphore;
-							});
+							}, offset:0);
 						});
 					}, {
 						//Actual loop function, sched == 0
