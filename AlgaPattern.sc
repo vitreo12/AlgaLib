@@ -669,6 +669,11 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
+	//stop and reschedule in the future
+	reschedule { | sched = 0 |
+		reschedulingEventStreamPlayer.reschedule(sched);
+	}
+
 	// <<| \param (goes back to defaults)
 	//previousSender is the mix one, in case that will be implemented in the future
 	resetParam { | param = \in, previousSender = nil, time |
