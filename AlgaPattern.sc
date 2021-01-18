@@ -639,9 +639,7 @@ AlgaPattern : AlgaNode {
 		{ sender.isAlgaNode } {
 			// <<.param AlgaNode
 			// <<+.param AlgaNode (not yet)
-			this.interpAlgaNode(param, sender, time, scale, curves);
-
-			^this;
+			^this.interpAlgaNode(param, sender, time, scale, curves);
 		}
 
 		{ sender.isListPattern } {
