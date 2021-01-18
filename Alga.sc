@@ -45,7 +45,7 @@ Alga {
 
 	*newScheduler { | server, clock, cascadeMode = true |
 		server = server ? Server.default;
-		clock = clock ? TempoClock; //use tempo clock as default
+		clock = clock ? TempoClock.default;
 		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
 	}
 
@@ -99,8 +99,8 @@ Alga {
 		servers[server] = server;
 
 		//Create an AlgaScheduler on current server (using TempoClock for now...)
-		this.newScheduler(server, cascadeMode:true);
-		//this.newScheduler(server, cascadeMode:false);
+		this.newScheduler(server, cascadeMode:false);
+		//this.newScheduler(server, cascadeMode:true);
 
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {

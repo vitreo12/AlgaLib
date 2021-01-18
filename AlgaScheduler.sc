@@ -5,7 +5,7 @@ AlgaThread {
 	*new { | server, clock, autostart = true |
 		var argServer = server ? Server.default;
 		var argName = argServer.name;
-		var argClock = clock ? SystemClock;
+		var argClock = clock ? TempoClock.default;
 		^super.newCopyArgs(argName, argServer, argClock).init(autostart);
 	}
 
@@ -30,7 +30,7 @@ AlgaThread {
 
 	cmdPeriod {
 		this.clear; //stop and clear the previous task
-		this.init(true); //re-init the task
+		this.init(autostart: true); //re-init the task
 	}
 
 	start {
@@ -61,7 +61,7 @@ AlgaThread {
 }
 
 AlgaScheduler : AlgaThread {
-	var <>interval = 0.01;
+	var <>interval = 0.001; //1ms ?
 	var <>maxSpinTime = 2;
 
 	var <cascadeMode = false;
@@ -81,14 +81,14 @@ AlgaScheduler : AlgaThread {
 	var currentExecActionOffset = 0;
 	var spinningActionsCount = 0;
 
-	*new { | server, clock, cascadeMode = false, autostart = true |
+	*new { | server, clock, cascadeMode = false, autostart = true, interruptOnSched = false |
 		var argServer = server ? Server.default;
 		var argName = argServer.name;
-		var argClock = clock ? SystemClock;
-		^super.newCopyArgs(argName, argServer, argClock).init(cascadeMode, autostart);
+		var argClock = clock ? TempoClock.default;
+		^super.newCopyArgs(argName, argServer, argClock).init(cascadeMode, autostart, interruptOnSched);
 	}
 
-	init { | argCascadeMode = false, autostart = true |
+	init { | argCascadeMode = false, autostart = true, argInterruptOnSched = false |
 		if(actions == nil, {
 			actions = List(10);
 		});
@@ -102,6 +102,7 @@ AlgaScheduler : AlgaThread {
 		});
 
 		cascadeMode = argCascadeMode;
+		interruptOnSched = argInterruptOnSched;
 
 		super.init(autostart);
 	}
@@ -224,7 +225,7 @@ AlgaScheduler : AlgaThread {
 			);
 
 			//Sync server after each completed func ???
-			server.sync;
+			//server.sync;
 		}, {
 			//enter one of the two cascadeModes
 			if(cascadeMode, {
@@ -257,7 +258,7 @@ AlgaScheduler : AlgaThread {
 				})
 			}, {
 				//cascadeMode == false
-				//parallell spinning
+				//parallel spinning
 
 				//Just accumTime, while letting it go for successive actions.
 				//exceededMaxSpinTime is here nil
@@ -323,7 +324,8 @@ AlgaScheduler : AlgaThread {
 							//Interrupt here until clock releases.
 							//New actions will be pushed to interruptOnSchedActions
 
-							var actionIndex;
+							//Remove the scheduled action
+							this.removeAction(action);
 
 							//Need to deep copy
 							interruptOnSchedActions = actions.copy;
@@ -335,15 +337,14 @@ AlgaScheduler : AlgaThread {
 							actions.clear;
 							spinningActions.clear;
 
-							//Clear sched entry for the action that triggered the sched,
-							//so it will be executed right away after the unhanging in clock.sched()
-							actionIndex = interruptOnSchedActions.indexOf(action);
-							if(actionIndex != nil, {
-								interruptOnSchedActions[actionIndex][2] = 0; //reset entry's sched
-							});
-
 							//Sched the unhanging in the future
-							clock.sched(sched, {
+							clock.algaSchedAtQuant(sched, {
+								//Execute the scheduled action
+								this.executeFunc(
+									action,
+									action[1]
+								);
+
 								//Copy all the actions back in.
 								//Use .add in case new actions were pushed to interruptOnSchedActions meanwhile
 								interruptOnSchedActions.do({ | interruptOnSchedAction |
@@ -357,26 +358,25 @@ AlgaScheduler : AlgaThread {
 								//Release the reference to the GC (it will be updated with new copies anyway)
 								interruptOnSchedActions = nil;
 
-								//Unhang
+								//Unhang if needed
 								this.unhangSemaphore;
-							});
+							}, offset:0);
 						}, {
 							//Only remove the one action and postpone it in the future.
 							//Other actions would still go on!
 							this.removeAction(action);
 
-							//reset sched entry inside of action
-							//(so it will be executed right away after sched time)
-							action[2] = 0;
+							//In sched time, execute the function!
+							clock.algaSchedAtQuant(sched, {
+								//Execute the scheduled action
+								this.executeFunc(
+									action,
+									action[1]
+								);
 
-							//In sched time, add action again and trigger scheduler loop
-							clock.sched(sched, {
-								actions.add(action);
-								spinningActions[action] = 0; //reset spin too
-
-								//Unhang
+								//Unhang if needed
 								this.unhangSemaphore;
-							});
+							}, offset:0);
 						});
 					}, {
 						//Actual loop function, sched == 0

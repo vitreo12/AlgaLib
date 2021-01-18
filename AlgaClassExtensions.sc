@@ -19,6 +19,7 @@
 	isAlgaPattern { ^false }
 	isPattern { ^false }
 	isListPattern { ^false }
+	isTempoClock { ^false }
 	instantiated { ^true }
 	cleared { ^false }
 	toBeCleared { ^false }
@@ -32,6 +33,12 @@
 
 +Pattern {
 	isPattern { ^true }
+
+	playRescheduling { | clock, protoEvent, quant |
+		clock = clock ? TempoClock.default;
+		^ReschedulingEventStreamPlayer(this.asStream, protoEvent)
+		.play(clock, false, quant)
+	}
 }
 
 +ListPattern {
@@ -90,6 +97,31 @@
 //Add support for >> and >>+
 +SequenceableCollection {
 
+}
+
++ Clock {
+	//offset allows to execute it slightly before quant!
+	//0.0000000000000569 is the smallest number i could find that works
+	algaSchedAtQuant { | quant, task, offset = 0.0000000000000569 |
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedAtQuant(quant - offset, task);
+		}, {
+			this.algaSched(quant, task, offset)
+		});
+	}
+
+	algaSched { | when, task, offset = 0.0000000000000569 |
+		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
+		this.sched(when - offset, task);
+	}
+}
+
++ TempoClock {
+	algaTempoClockSchedAtQuant { | quant = 1, task |
+		this.schedAbs(quant.nextTimeOnGrid(this), task)
+	}
+
+	isTempoClock { ^true }
 }
 
 //Debug purposes (used in the s.bind calls in AlgaScheduler)

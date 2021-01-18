@@ -64,7 +64,7 @@ AlgaNode {
 	//Connected nodes
 	var <inNodes, <outNodes;
 
-	//keep track of current \default nodes
+	//keep track of current \default nodes (this is used for mix parameters)
 	var <currentDefaultNodes;
 
 	//Keep track of current scaling for params
@@ -79,8 +79,8 @@ AlgaNode {
 	var <beingStopped = false;
 	var <cleared = false;
 
-	*new { | obj, args, connectionTime = 0, playTime = 0, outsMapping, server |
-		^super.new.init(obj, args, connectionTime, playTime, outsMapping, server)
+	*new { | obj, args, connectionTime = 0, playTime = 0, outsMapping, server, sched = 0 |
+		^super.new.init(obj, args, connectionTime, playTime, outsMapping, server, sched)
 	}
 
 	initAllVariables { | argServer |
@@ -156,10 +156,16 @@ AlgaNode {
 		//Keeps all the connectionTimes of the connected nodes
 		connectionTimeOutNodes = IdentityDictionary(10);
 
+		//AlgaPattern specific
+		if(this.isAlgaPattern, {
+			this.interpStates = AlgaPatternInterpStates();
+		});
+
 		^true;
 	}
 
-	init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, argOutsMapping, argServer |
+	init { | argObj, argArgs, argConnectionTime = 0,
+		argPlayTime = 0, argOutsMapping, argServer, argSched = 0 |
 
 		//Check supported classes for argObj, so that things won't even init if wrong.
 		//Also check for AlgaPattern
@@ -189,7 +195,12 @@ AlgaNode {
 		this.playTime_(argPlayTime);
 
 		//Dispatch node creation
-		this.dispatchNode(argObj, argArgs, initGroups:true, outsMapping:argOutsMapping);
+		this.dispatchNode(
+			argObj, argArgs,
+			initGroups: true,
+			outsMapping: argOutsMapping,
+			sched: argSched
+		);
 	}
 
 	setParamsConnectionTime { | val, all = false, param |
@@ -367,7 +378,7 @@ AlgaNode {
 
 	createAllGroups {
 		if(group == nil, {
-			group = AlgaGroup(this.server);
+			group = AlgaGroup(server);
 			playGroup = AlgaGroup(group);
 			synthGroup = AlgaGroup(group);
 			normGroup = AlgaGroup(group);
@@ -505,7 +516,7 @@ AlgaNode {
 				if(param.class == Symbol, {
 					var iPlusOne = i + 1;
 					if(iPlusOne < args.size, {
-						var val = args[i+1];
+						var val = args[i + 1];
 						if((val.isNumberOrArray).or(val.isAlgaNode), {
 							objArgs[param] = val;
 						}, {
@@ -519,7 +530,7 @@ AlgaNode {
 
 	//dispatches controlnames / numChannels / rate according to obj class
 	dispatchNode { | obj, args, initGroups = false, replace = false,
-		keepChannelsMapping = false, outsMapping, keepScale = false |
+		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
 		objClass = obj.class;
 
@@ -538,7 +549,8 @@ AlgaNode {
 			});
 			this.dispatchSynthDef(obj, initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
-				keepScale:keepScale
+				keepScale:keepScale,
+				sched:sched
 			);
 		}, {
 			//Function
@@ -546,7 +558,8 @@ AlgaNode {
 				this.dispatchFunction(obj, initGroups, replace,
 					keepChannelsMapping:keepChannelsMapping,
 					outsMapping:outsMapping,
-					keepScale:keepScale
+					keepScale:keepScale,
+					sched:sched
 				);
 			}, {
 				("AlgaNode: class '" ++ objClass ++ "' is invalid").error;
@@ -618,7 +631,7 @@ AlgaNode {
 
 	//build all synths
 	buildFromSynthDef { | initGroups = false, replace = false,
-		keepChannelsMapping = false, keepScale = false |
+		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
 		//Retrieve controlNames from SynthDesc
 		var synthDescControlNames = synthDef.asSynthDesc.controls;
@@ -626,6 +639,8 @@ AlgaNode {
 
 		numChannels = synthDef.numChannels;
 		rate = synthDef.rate;
+
+		sched = sched ? 0;
 
 		//Calculate correct outsMapping
 		this.calculateOutsMapping(replace, keepChannelsMapping);
@@ -637,16 +652,18 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		this.createAllSynths(
-			replace,
-			keepChannelsMapping:keepChannelsMapping,
-			keepScale:keepScale
-		);
+		scheduler.addAction(func: {
+			this.createAllSynths(
+				replace,
+				keepChannelsMapping:keepChannelsMapping,
+				keepScale:keepScale
+			);
+		}, sched: sched);
 	}
 
 	//Dispatch a SynthDef (symbol)
 	dispatchSynthDef { | obj, initGroups = false, replace = false,
-		keepChannelsMapping = false, keepScale = false |
+		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
 		var synthDesc = SynthDescLib.global.at(obj);
 
@@ -665,13 +682,14 @@ AlgaNode {
 		this.buildFromSynthDef(
 			initGroups, replace,
 			keepChannelsMapping:keepChannelsMapping,
-			keepScale:keepScale
+			keepScale:keepScale,
+			sched:sched
 		);
 	}
 
 	//Dispatch a Function
 	dispatchFunction { | obj, initGroups = false, replace = false,
-		keepChannelsMapping = false, outsMapping, keepScale = false |
+		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
 		//Need to wait for server to receive the sdef
 		fork {
@@ -686,7 +704,8 @@ AlgaNode {
 			this.buildFromSynthDef(
 				initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
-				keepScale:keepScale
+				keepScale:keepScale,
+				sched:sched
 			);
 		};
 	}
@@ -2230,13 +2249,13 @@ AlgaNode {
 
 	//replace content of the node, re-making all the connections.
 	//If this was connected to a number / array, should I restore that value too or keep the new one?
-	replace { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
-		outsMapping, keepInScale = true, keepOutScale = true, time |
+	replace { | obj, args, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
+		outsMapping, keepInScale = true, keepOutScale = true |
 
 		scheduler.addAction({ this.instantiated }, {
-			this.replaceInner(obj, args, keepChannelsMappingIn,
-				keepChannelsMappingOut, outsMapping,
-				keepInScale, keepOutScale, time:time
+			this.replaceInner(obj:obj, args:args, time:time, keepChannelsMappingIn:keepChannelsMappingIn,
+				keepChannelsMappingOut:keepChannelsMappingOut, outsMapping:outsMapping,
+				keepInScale:keepInScale, keepOutScale:keepOutScale
 			);
 		});
 
@@ -2404,7 +2423,8 @@ AlgaNode {
 		});
 	}
 
-	//All synths must be instantiated (including interpolators and normalizers)
+	//All synths must be instantiated (including interpolators and normalizers)..
+	//Should I just check if synthBus != nil ?? In the end, that's what tells...
 	instantiated {
 		if(synth == nil, { ^false });
 
@@ -2424,6 +2444,10 @@ AlgaNode {
 		^synth.instantiated;
 	}
 
+	busInstantiated {
+		^(synthBus != nil)
+	}
+
 	//Move this node's group before another node's one
 	moveBefore { | node |
 		group.moveBefore(node.group);
@@ -2440,7 +2464,7 @@ AlgaNode {
 		if((isPlaying.not).or(beingStopped), {
 			var actualNumChannels, playSynthSymbol;
 
-			if(rate == \control, { "Cannot play a kr AlgaNode".error; ^nil; });
+			if(rate == \control, { "AlgaNode: cannot play a kr node".error; ^nil; });
 
 			if(channelsToPlay != nil, {
 				if(channelsToPlay.isSequenceableCollection, {
@@ -2507,7 +2531,7 @@ AlgaNode {
 
 	//Add option for fade time here!
 	play { | time, channelsToPlay |
-		scheduler.addAction({ this.instantiated }, {
+		scheduler.addAction({ this.busInstantiated }, {
 			this.playInner(time, channelsToPlay);
 		});
 	}
@@ -2518,7 +2542,7 @@ AlgaNode {
 
 	//Add option for fade time here!
 	stop { | time |
-		scheduler.addAction({ this.instantiated }, {
+		scheduler.addAction({ this.busInstantiated }, {
 			this.stopInner(time);
 		});
 	}
