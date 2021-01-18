@@ -114,12 +114,13 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Doesn't have args and outsMapping like AlgaNode
-	*new { | obj, connectionTime = 0, playTime = 0, server |
+	*new { | obj, connectionTime = 0, playTime = 0, server, sched = 0 |
 		^super.new(
 			obj: obj,
 			connectionTime: connectionTime,
 			playTime: playTime,
-			server: server
+			server: server,
+			sched: sched
 		);
 	}
 
@@ -315,7 +316,7 @@ AlgaPattern : AlgaNode {
 
 	//dispatchNode: first argument is an Event
 	dispatchNode { | obj, args, initGroups = false, replace = false,
-		keepChannelsMapping = false, outsMapping, keepScale = false |
+		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
 		//def: entry
 		var defEntry = obj[\def];
@@ -340,7 +341,8 @@ AlgaPattern : AlgaNode {
 		if(objClass == Symbol, {
 			this.dispatchSynthDef(defEntry, initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
-				keepScale:keepScale
+				keepScale:keepScale,
+				sched:sched
 			);
 		}, {
 			//Function
@@ -359,7 +361,7 @@ AlgaPattern : AlgaNode {
 
 	//Overloaded function
 	buildFromSynthDef { | initGroups = false, replace = false,
-		keepChannelsMapping = false, keepScale = false |
+		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
 		//Retrieve controlNames from SynthDesc
 		var synthDescControlNames = synthDef.asSynthDesc.controls;
@@ -367,6 +369,8 @@ AlgaPattern : AlgaNode {
 
 		numChannels = synthDef.numChannels;
 		rate = synthDef.rate;
+
+		sched = sched ? 0;
 
 		//Detect if AlgaSynthDef can be freed automatically. Otherwise, error!
 		if(synthDef.explicitFree.not, {
@@ -383,10 +387,10 @@ AlgaPattern : AlgaNode {
 		//Create busses
 		this.createAllBusses;
 
-		//Create the actual pattern
-		//scheduler.addAction({ this.instantiated }, {
-		this.createPattern(eventPairs);
-		//});
+		//Create the actual pattern, pushing to scheduler ???
+		scheduler.addAction(func: {
+			this.createPattern;
+		}, sched: sched);
 	}
 
 	//Support Function in the future
@@ -489,7 +493,9 @@ AlgaPattern : AlgaNode {
 		pattern = Pbind(*patternPairs);
 
 		//start the pattern right away. quant?
-		reschedulingEventStreamPlayer = pattern.playRescheduling(this.clock);
+		reschedulingEventStreamPlayer = pattern.playRescheduling(
+			clock: this.clock
+		);
 	}
 
 	//the interpolation function for AlgaPattern << Pattern / Number / Array
@@ -498,12 +504,18 @@ AlgaPattern : AlgaNode {
 
 		// \dur doesn't interpolate well for now
 		if(param == \dur, {
-			("AlgaPattern: interpolating \dur is still WIP. Changes will be applied after " ++ time ++ " seconds").warn;
+			var clock = this.clock;
+
+			if(clock.isTempoClock, {
+				("AlgaPattern: interpolating \dur is still WIP. Changes will be applied after " ++ time ++ " beats").warn;
+			}, {
+				("AlgaPattern: interpolating \dur is still WIP. Changes will be applied after " ++ time ++ " seconds").warn;
+			});
 
 			//Overwrite \dur with sender after time
-			^this.clock.algaSchedAtQuant(
+			^clock.algaSchedAtQuant(
 				time,
-				{ eventPairs[\dur] = sender }
+				{ eventPairs[\dur] = sender.asStream }
 			);
 		});
 
@@ -612,7 +624,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//<<, <<+ and <|
-	makeConnection { | param = \in, sender, time = 0, scale, curves = \lin |
+	makeConnectionInner { | param = \in, sender, time = 0, scale, curves = \lin |
 		var paramConnectionTime = paramsConnectionTime[param];
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
@@ -627,9 +639,7 @@ AlgaPattern : AlgaNode {
 		{ sender.isAlgaNode } {
 			// <<.param AlgaNode
 			// <<+.param AlgaNode (not yet)
-			scheduler.addAction({ this.instantiated.and(sender.instantiated) }, {
-				this.interpAlgaNode(param, sender, time, scale, curves);
-			});
+			this.interpAlgaNode(param, sender, time, scale, curves);
 
 			^this;
 		}
@@ -650,6 +660,15 @@ AlgaPattern : AlgaNode {
 		this.interpPattern(param, sender, time, scale, curves);
 	}
 
+	//<<, <<+ and <|
+	makeConnection { | param = \in, sender, time = 0, scale, curves = \lin |
+		if(this.cleared.not.and(sender.cleared.not).and(sender.toBeCleared.not), {
+			scheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
+				this.makeConnectionInner(param, sender, time, scale, curves)
+			})
+		});
+	}
+
 	// <<| \param (goes back to defaults)
 	//previousSender is the mix one, in case that will be implemented in the future
 	resetParam { | param = \in, previousSender = nil, time |
@@ -662,7 +681,13 @@ AlgaPattern : AlgaNode {
 	// 2) replace just the SynthDef with either a new SynthDef or a ListPattern with JUST SynthDefs.
 	//    This would be equivalent to <<.def \newSynthDef
 	//    OR <<.def Pseq([\newSynthDef1, \newSynthDef2])
-	replace { | obj, connectionTime = 0, playTime = 0, server |
+	replaceInner { | obj, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
+		keepInScale = true, keepOutScale = true |
+
+	}
+
+	replace { | obj, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
+		keepInScale = true, keepOutScale = true |
 
 	}
 
