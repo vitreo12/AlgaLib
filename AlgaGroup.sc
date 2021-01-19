@@ -1,6 +1,6 @@
 AlgaGroup : Group {
-	//Need the setter to "synth.instantiated = false" in *new, to reset state
-	var <>instantiated = false;
+	//Need the setter to "synth.algaInstantiated = false" in *new, to reset state
+	var <>algaInstantiated = false;
 
 	*new { arg target, addAction = \addToHead, waitForInst = true;
 		var group, server, addActionID;
@@ -10,13 +10,13 @@ AlgaGroup : Group {
 		addActionID = addActions[addAction];
 		group.group = if(addActionID < 2) { target } { target.group };
 
-		group.instantiated = false;
+		group.algaInstantiated = false;
 
 		//oneshot function that waits for initialization
 		if(waitForInst, {
 			group.waitForInstantiation(group.nodeID);
 		}, {
-			group.instantiated = true
+			group.algaInstantiated = true
 		});
 
 		//actually send group to server
@@ -30,12 +30,12 @@ AlgaGroup : Group {
 
 	waitForInstantiation { | nodeID |
 		var oscfunc = OSCFunc.newMatching({ | msg |
-			instantiated = true;
+			algaInstantiated = true;
 		}, '/n_go', this.server.addr, argTemplate:[nodeID]).oneShot;
 
 		//If fails to respond in 3 seconds, free the OSCFunc
 		SystemClock.sched(3, {
-			if(instantiated.not, {
+			if(algaInstantiated.not, {
 				oscfunc.free;
 			})
 		})

@@ -75,9 +75,9 @@ AlgaNode {
 
 	//General state queries
 	var <isPlaying = false;
-	var <toBeCleared = false;
 	var <beingStopped = false;
-	var <cleared = false;
+	var <algaToBeCleared = false;
+	var <algaCleared = false;
 
 	*new { | obj, args, connectionTime = 0, playTime = 0, outsMapping, server, sched = 0 |
 		^super.new.init(obj, args, connectionTime, playTime, outsMapping, server, sched)
@@ -387,7 +387,7 @@ AlgaNode {
 	}
 
 	resetGroups {
-		if(toBeCleared, {
+		if(algaToBeCleared, {
 			playGroup = nil;
 			group = nil;
 			synthGroup = nil;
@@ -397,10 +397,10 @@ AlgaNode {
 	}
 
 	//Groups (and state) will be reset only if they are nil AND they are set to be freed.
-	//the toBeCleared variable can be changed in real time, if AlgaNode.replace is called while
+	//the algaToBeCleared variable can be changed in real time, if AlgaNode.replace is called while
 	//clearing is happening!
 	freeAllGroups { | now = false |
-		if((group != nil).and(toBeCleared), {
+		if((group != nil).and(algaToBeCleared), {
 			if(now, {
 				//Free now
 				group.free;
@@ -534,10 +534,10 @@ AlgaNode {
 
 		objClass = obj.class;
 
-		//If there is a synth playing, set its instantiated status to false:
+		//If there is a synth playing, set its algaInstantiated status to false:
 		//this is mostly needed for .replace to work properly and wait for the new synth
-		//to be instantiated!
-		if(synth != nil, { synth.instantiated = false });
+		//to be algaInstantiated!
+		if(synth != nil, { synth.algaInstantiated = false });
 
 		//Create args dict
 		this.createObjArgs(args);
@@ -711,7 +711,7 @@ AlgaNode {
 	}
 
 	resetSynth {
-		if(toBeCleared, {
+		if(algaToBeCleared, {
 			//IdentitySet to nil (should it fork?)
 			synth = nil;
 			synthDef = nil;
@@ -723,7 +723,7 @@ AlgaNode {
 	}
 
 	resetInterpNormSynths {
-		if(toBeCleared, {
+		if(algaToBeCleared, {
 			//Just reset the Dictionaries entries
 			interpSynths.clear;
 			normSynths.clear;
@@ -1472,11 +1472,11 @@ AlgaNode {
 			};
 		});
 
-		//If already instantiated, execute now ??
-		if(whatSynth.instantiated, {
+		//If already algaInstantiated, execute now ??
+		if(whatSynth.algaInstantiated, {
 			freeSynthFunc.value;
 		}, {
-			scheduler.addAction({ whatSynth.instantiated }, freeSynthFunc);
+			scheduler.addAction({ whatSynth.algaInstantiated }, freeSynthFunc);
 		});
 	}
 
@@ -1495,7 +1495,7 @@ AlgaNode {
 				//this.resetSynth;
 			});
 		}, {
-			//Needs to be deep copied (a new synth could be instantiated meanwhile)
+			//Needs to be deep copied (a new synth could be algaInstantiated meanwhile)
 			var prevSynth = synth.copy;
 
 			fork {
@@ -1572,7 +1572,7 @@ AlgaNode {
 			var currentDefaultNode = currentDefaultNodes[param];
 
 			//Make sure all of these are scheduled correctly to each other!
-			scheduler.addAction({ (normSynthAtParam.instantiated).and(interpSynthAtParam.instantiated) }, {
+			scheduler.addAction({ (normSynthAtParam.algaInstantiated).and(interpSynthAtParam.algaInstantiated) }, {
 				var notDefaultNode = false;
 
 				//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
@@ -1601,11 +1601,11 @@ AlgaNode {
 						interpGroup
 					);
 
-					//This has to be surely instantiated before being freed
+					//This has to be surely algaInstantiated before being freed
 					normSynthAtParam.set(\gate, 0, \fadeTime, time);
 				});
 
-				//This has to be surely instantiated before being freed
+				//This has to be surely algaInstantiated before being freed
 				interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
 
 				//Set correct fadeTime for all active interp synths at param / sender combination
@@ -1780,7 +1780,7 @@ AlgaNode {
 
 	//Clear the dicts
 	resetInOutNodesDicts {
-		if(toBeCleared, {
+		if(algaToBeCleared, {
 			inNodes.clear;
 			outNodes.clear;
 		});
@@ -1982,14 +1982,14 @@ AlgaNode {
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time |
 
-		if(this.cleared.not.and(sender.cleared.not).and(sender.toBeCleared.not), {
-			scheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
+		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
+			scheduler.addAction({ (this.algaInstantiated).and(sender.algaInstantiated) }, {
 				this.makeConnectionInner(sender, param, replace, mix,
 					replaceMix, senderChansMapping, scale, time:time
 				);
 			});
 		}, {
-			"AlgaNode: can't makeConnection, sender has been cleared".error;
+			"AlgaNode: can't makeConnection, sender has been algaCleared".error;
 		});
 	}
 
@@ -2099,7 +2099,7 @@ AlgaNode {
 			^this;
 		});
 
-		scheduler.addAction({ (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
+		scheduler.addAction({ (this.algaInstantiated).and(previousSender.algaInstantiated).and(newSender.algaInstantiated) }, {
 			var validPreviousSender = true;
 
 			//if not contained, it's invalid.
@@ -2128,7 +2128,7 @@ AlgaNode {
 	}
 
 	resetParam { | param = \in, previousSender = nil, time |
-		scheduler.addAction({ (this.instantiated).and(previousSender.instantiated) }, {
+		scheduler.addAction({ (this.algaInstantiated).and(previousSender.algaInstantiated) }, {
 			this.resetParamInner(param, previousSender, time:time);
 		});
 	}
@@ -2151,7 +2151,7 @@ AlgaNode {
 
 	//On .replace on an already running mix connection
 	replaceMixConnection { | param = \in, sender, senderChansMapping, scale, time |
-		scheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
+		scheduler.addAction({ (this.algaInstantiated).and(sender.algaInstantiated) }, {
 			this.replaceMixConnectionInner(param, sender, senderChansMapping, scale, time);
 		});
 	}
@@ -2175,13 +2175,13 @@ AlgaNode {
 
 				//If it was a mixer connection, use replaceMixConnection
 				if(receiver.mixParamContainsSender(param, this), {
-					//use the scheduler version! don't know if receiver and this are both instantiated
+					//use the scheduler version! don't know if receiver and this are both algaInstantiated
 					receiver.replaceMixConnection(param, this,
 						senderChansMapping:oldParamsChansMapping,
 						scale:oldScale, time:time
 					);
 				}, {
-					//use the scheduler version! don't know if receiver and this are both instantiated
+					//use the scheduler version! don't know if receiver and this are both algaInstantiated
 					//Normal connection, use makeConnection to re-enstablish it
 					receiver.makeConnection(this, param,
 						replace:true, senderChansMapping:oldParamsChansMapping,
@@ -2201,7 +2201,7 @@ AlgaNode {
 		var initGroups = if(group == nil, { true }, { false });
 
 		//In case it has been set to true when clearing, then replacing before clear ends!
-		toBeCleared = false;
+		algaToBeCleared = false;
 
 		//If it was playing, free previous playSynth
 		if(isPlaying, {
@@ -2214,7 +2214,7 @@ AlgaNode {
 
 		//This doesn't work with feedbacks, as synths would be freed slightly before
 		//The new ones finish the rise, generating click. These should be freed
-		//When the new synths/busses are surely instantiated on the server!
+		//When the new synths/busses are surely algaInstantiated on the server!
 		//The cheap solution that it's in place now is to wait 0.5 longer than longestConnectionTime...
 		//Work out a better solution!
 		this.freeAllSynths(false, false);
@@ -2252,7 +2252,7 @@ AlgaNode {
 	replace { | obj, args, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
 		outsMapping, keepInScale = true, keepOutScale = true |
 
-		scheduler.addAction({ this.instantiated }, {
+		scheduler.addAction({ this.algaInstantiated }, {
 			this.replaceInner(obj:obj, args:args, time:time, keepChannelsMappingIn:keepChannelsMappingIn,
 				keepChannelsMappingOut:keepChannelsMappingOut, outsMapping:outsMapping,
 				keepInScale:keepInScale, keepOutScale:keepOutScale
@@ -2260,7 +2260,7 @@ AlgaNode {
 		});
 
 		//Not cleared
-		cleared = false;
+		algaCleared = false;
 	}
 
 	//Basically, this checks if the current sender that is being disconnected was the \default node.
@@ -2351,7 +2351,7 @@ AlgaNode {
 			});
 		});
 
-		scheduler.addAction({ (this.instantiated).and(previousSender.instantiated) }, {
+		scheduler.addAction({ (this.algaInstantiated).and(previousSender.algaInstantiated) }, {
 			this.disconnectInner(param, previousSender, time:time);
 		});
 	}
@@ -2391,7 +2391,7 @@ AlgaNode {
 		this.removeConnectionFromReceivers(time);
 
 		//This could be overwritten if .replace is called
-		toBeCleared = true;
+		algaToBeCleared = true;
 
 		//Stop playing (if it was playing at all)
 		this.stopInner(time, isClear:true);
@@ -2413,35 +2413,35 @@ AlgaNode {
 			objClass = nil;
 			objArgs = nil;
 
-			cleared = true;
+			algaCleared = true;
 		}
 	}
 
 	clear { | time, interpTime |
-		scheduler.addAction({ this.instantiated }, {
+		scheduler.addAction({ this.algaInstantiated }, {
 			this.clearInner(time, interpTime);
 		});
 	}
 
-	//All synths must be instantiated (including interpolators and normalizers)..
-	//Should I just check if synthBus != nil ?? In the end, that's what tells...
-	instantiated {
+	//All synths must be algaInstantiated (including interpolators and normalizers)
+	//to make new meaningful connections (shouldn't read from synthBus if no synths are writing to it!)
+	algaInstantiated {
 		if(synth == nil, { ^false });
 
 		interpSynths.do({ | interpSynthsAtParam |
 			interpSynthsAtParam.do({ | interpSynthAtParam |
-				if(interpSynthAtParam.instantiated.not, { ^false });
+				if(interpSynthAtParam.algaInstantiated.not, { ^false });
 			});
 		});
 
 		normSynths.do({ | normSynthsAtParam |
 			normSynthsAtParam.do({ | normSynthAtParam |
-				if(normSynthAtParam.instantiated.not, { ^false });
+				if(normSynthAtParam.algaInstantiated.not, { ^false });
 			});
 		});
 
 		//Lastly, the actual synth
-		^synth.instantiated;
+		^synth.algaInstantiated;
 	}
 
 	busInstantiated {

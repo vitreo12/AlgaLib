@@ -189,8 +189,8 @@ AlgaPattern : AlgaNode {
 		}, {
 			if(paramVal.isAlgaNode, {
 				//AlgaNode
-				if(paramVal.instantiated, {
-					//if instantiated, use the rate, numchannels and bus arg from the alga bus
+				if(paramVal.algaInstantiated, {
+					//if algaInstantiated, use the rate, numchannels and bus arg from the alga bus
 					senderRate = paramVal.rate;
 					senderNumChannels = paramVal.numChannels;
 					paramVal = paramVal.synthBus.busArg;
@@ -199,7 +199,7 @@ AlgaPattern : AlgaNode {
 					senderRate = "control";
 					senderNumChannels = paramNumChannels;
 					paramVal = paramDefault;
-					("AlgaPattern: AlgaNode wasn't instantiated yet. Using default value for " ++ paramName).warn;
+					("AlgaPattern: AlgaNode wasn't algaInstantiated yet. Using default value for " ++ paramName).warn;
 				});
 			}, {
 				("AlgaPattern: Invalid parameter " ++ paramName.asString).error;
@@ -332,10 +332,10 @@ AlgaPattern : AlgaNode {
 		//Store class of the synthEntry
 		objClass = defEntry.class;
 
-		//If there is a synth playing, set its instantiated status to false:
+		//If there is a synth playing, set its algaInstantiated status to false:
 		//this is mostly needed for .replace to work properly and wait for the new synth
-		//to be instantiated!
-		if(synth != nil, { synth.instantiated = false });
+		//to be algaInstantiated!
+		if(synth != nil, { synth.algaInstantiated = false });
 
 		//Symbol
 		if(objClass == Symbol, {
@@ -660,8 +660,8 @@ AlgaPattern : AlgaNode {
 
 	//<<, <<+ and <|
 	makeConnection { | param = \in, sender, time = 0, scale, curves = \lin |
-		if(this.cleared.not.and(sender.cleared.not).and(sender.toBeCleared.not), {
-			scheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
+		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
+			scheduler.addAction({ (this.algaInstantiated).and(sender.algaInstantiated) }, {
 				this.makeConnectionInner(param, sender, time, scale, curves)
 			})
 		});
@@ -707,11 +707,11 @@ AlgaPattern : AlgaNode {
 	isAlgaPattern { ^true }
 
 	//Since I can't check each synth, just check if the necessary groups have been allocated
-	instantiated {
-		^(group.instantiated.and(
-			interpGroup.instantiated.and(
-				synthGroup.instantiated.and(
-					playGroup.instantiated
+	algaInstantiated {
+		^(group.algaInstantiated.and(
+			interpGroup.algaInstantiated.and(
+				synthGroup.algaInstantiated.and(
+					playGroup.algaInstantiated
 				)
 			)
 		))

@@ -20,10 +20,12 @@
 	isPattern { ^false }
 	isListPattern { ^false }
 	isTempoClock { ^false }
-	instantiated { ^true }
-	cleared { ^false }
-	toBeCleared { ^false }
 	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
+
+	//AlgaNode / AlgaPattern support
+	algaInstantiated { ^true }
+	algaCleared { ^false }
+	algaToBeCleared { ^false }
 
 	//Fallback on AlgaSpinRoutine if anything goes wrong
 	addAction { | condition, func, sched = 0 |

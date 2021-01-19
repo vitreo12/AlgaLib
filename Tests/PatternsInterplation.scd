@@ -45,7 +45,7 @@ Event.addEventType(\algaNote, { | server |
 		var sine = Synth.after(setter, \sinePerc, [\freq, bus.asMap, \amp, ~amp]);
 
 		//Free the bus on Synth's end
-		var instantiated = OSCFunc.newMatching({ | msg |
+		var algaInstantiated = OSCFunc.newMatching({ | msg |
 			if(bus != nil, {
 				bus.free;
 			});
