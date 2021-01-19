@@ -27,9 +27,16 @@
 	algaCleared { ^false }
 	algaToBeCleared { ^false }
 
-	//Fallback on AlgaSpinRoutine if anything goes wrong
+	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
 	addAction { | condition, func, sched = 0 |
-		AlgaSpinRoutine.waitFor(condition, func);
+		if(sched > 0, {
+			"AlgaSpinRoutine: sched is not a valid argument".error;
+		});
+
+		AlgaSpinRoutine.waitFor(
+			condition:condition,
+			func:func
+		);
 	}
 }
 

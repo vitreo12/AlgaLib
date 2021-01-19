@@ -1,8 +1,8 @@
 AlgaSpinRoutine {
-	*waitFor { | condition, onComplete, interval = 0.01, maxTime = 3 |
+	*waitFor { | condition, func, interval = 0.001, maxTime = 2 |
 		//First, check if condition is true already, no need to go into a routine if that's the case
 		if(condition.value, {
-			onComplete.value;
+			func.value;
 		}, {
 			//Spin around condition, then execute onComplete, if not exceeding maximum wait time
 			fork {
@@ -20,7 +20,7 @@ AlgaSpinRoutine {
 				});
 
 				if(exceededMaxTime.not, {
-					onComplete.value;
+					func.value;
 				});
 			}
 		});
