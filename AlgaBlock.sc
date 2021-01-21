@@ -15,9 +15,6 @@ AlgaBlock {
 	//bottom most and top most nodes in this block
 	var <bottomOutNodes, <topInNodes;
 
-	//if the block has changed form (new nodes added, etc...)
-	var <>changed = true;
-
 	//the index for this block in the AlgaBlocksDict global dict
 	var <blockIndex;
 
@@ -31,8 +28,8 @@ AlgaBlock {
 
 		nodesDict      = IdentityDictionary(20);
 		statesDict     = IdentityDictionary(20);
-		bottomOutNodes = IdentityDictionary.new;
-		topInNodes     = IdentityDictionary.new;
+		bottomOutNodes = IdentityDictionary();
+		topInNodes     = IdentityDictionary();
 	}
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
@@ -235,7 +232,6 @@ AlgaBlocksDict {
 
 			//Make sure everything is synced with server!
 			fork {
-				server.sync;
 				entryInBlocksDict.rearrangeBlock(server);
 				server.sync;
 			}
@@ -260,7 +256,7 @@ AlgaBlocksDict {
 		senderBlock = blocksDict[senderBlockIndex];
 
 		if(receiver.server != sender.server, {
-			("Trying to create a block between two AlgaNodes on different servers").error;
+			("AlgaBlocksDict: Trying to create a block between two AlgaNodes on different servers").error;
 			^receiver;
 		});
 
@@ -366,8 +362,7 @@ AlgaBlocksDict {
 		//Actually reorder the block's nodes
 		newBlock = blocksDict[newBlockIndex];
 		if(newBlock != nil, {
-			newBlock.changed = true;
-			newBlock.rearrangeBlock();
+			newBlock.rearrangeBlock;
 		});
 	}
 }
