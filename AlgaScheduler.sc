@@ -338,7 +338,7 @@ AlgaScheduler : AlgaThread {
 							spinningActions.clear;
 
 							//Sched the unhanging in the future
-							clock.algaSchedOnceAtQuant(sched, {
+							clock.algaSchedAtQuantOnce(sched, {
 								//Execute the scheduled action
 								this.executeFunc(
 									action,
@@ -367,7 +367,7 @@ AlgaScheduler : AlgaThread {
 							this.removeAction(action);
 
 							//In sched time, execute the function!
-							clock.algaSchedOnceAtQuant(sched, {
+							clock.algaSchedAtQuantOnce(sched, {
 								//Execute the scheduled action
 								this.executeFunc(
 									action,

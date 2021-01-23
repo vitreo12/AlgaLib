@@ -514,7 +514,7 @@ AlgaPattern : AlgaNode {
 
 			//Overwrite \dur with sender after time. Put this at top priority,
 			//so that's executed before any other event!
-			^clock.algaSchedOnceAtQuantWithTopPriority(
+			^clock.algaSchedAtQuantOnceWithTopPriority(
 				time,
 				{ eventPairs[\dur] = sender.asStream }
 			);

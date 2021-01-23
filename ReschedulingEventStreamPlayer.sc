@@ -8,10 +8,7 @@ ReschedulingEventStreamPlayer {
 	}
 
 	init { | stream, event |
-		player = EventStreamPlayer(stream.collect { | event |
-			lastTime = thisThread.beats;
-			event
-		}, event);
+		player = EventStreamPlayer(stream, event);
 	}
 
 	// hmm, haven't handled dependent notifications here
@@ -23,52 +20,49 @@ ReschedulingEventStreamPlayer {
 	reset { player.reset }
 	refresh { player.refresh }
 
-	rescheduleAbs { | newBeats |
+	reschedule { | when = 0 |
+		var stream = player.stream;
+		var clock  = player.clock;
+
+		clock.algaSchedOnceWithTopPriority(when, {
+			player.stop;
+			this.init(stream, player.event);
+			player.play(clock, quant:0);
+		});
+	}
+
+	rescheduleAtQuant { | quant = 0 |
 		var stream = player.stream;
 		var clock = player.clock;
-		player.stop;
-		player = EventStreamPlayer(stream, player.event).refresh;
-		clock.schedAbs(newBeats, player);
+
+		clock.algaSchedAtQuantOnceWithTopPriority(quant, {
+			player.stop;
+			this.init(stream, player.event);
+			player.play(clock, quant:0);
+		});
 	}
 
-	reschedule { | when |
-		this.rescheduleAbs(lastTime + when);
-	}
+	rescheduleAbs { | when = 0 |
+		var stream = player.stream;
+		var clock  = player.clock;
 
-	algaSchedAtQuant { | quant, task |
-		player.clock.algaSchedAtQuant(quant, task);
-	}
+		//TempoClock's schedAbs still expect beats, I need seconds here
+		if(clock.isTempoClock, {
+			clock = SystemClock
+		});
 
-	algaSched { | when, task |
-		player.clock.algaSched(when, task);
-	}
+		//absolute scaling
+		when = clock.seconds + when;
 
-	algaSchedOnceAtQuant { | quant, task |
-		player.clock.algaSchedOnceAtQuant(quant, task);
-	}
-
-	algaSchedOnce { | when, task |
-		player.clock.algaSchedOnce(when, task);
-	}
-
-	algaSchedAtQuantWithTopPriority { | quant, task |
-		player.clock.algaSchedAtQuantWithTopPriority(quant, task);
-	}
-
-	algaSchedWithTopPriority { | when, task |
-		player.clock.algaSchedWithTopPriority(when, task);
-	}
-
-	algaSchedOnceAtQuantWithTopPriority { | quant, task |
-		player.clock.algaSchedOnceAtQuantWithTopPriority(quant, task);
-	}
-
-	algaSchedOnceWithTopPriority { | when, task |
-		player.clock.algaSchedOnceWithTopPriority(when, task);
+		clock.schedAbs(when, {
+			player.stop;
+			this.init(stream, player.event);
+			player.play(player.clock, quant:0); //still play on its former clock
+		});
 	}
 
 	stream { player.stream }
-	asEventStreamPlayer { ^this }
+	asEventStreamPlayer { ^player }
 	canPause { ^player.canPause }
 	event { ^player.event }
 	event_ { | event | player.event_(event) }

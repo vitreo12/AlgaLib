@@ -13,7 +13,7 @@
 
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
 	addAction { | condition, func, sched = 0 |
-		if(sched > 0, {
+		if(sched != 0, {
 			"AlgaSpinRoutine: sched is not a valid argument".error;
 		});
 
@@ -45,8 +45,10 @@
 
 	playRescheduling { | clock, protoEvent, quant |
 		clock = clock ? TempoClock.default;
-		^ReschedulingEventStreamPlayer(this.asStream, protoEvent)
-		.play(clock, false, quant)
+		^ReschedulingEventStreamPlayer(
+			this.asStream,
+			protoEvent
+		).play(clock, false, quant)
 	}
 }
 
@@ -122,7 +124,7 @@
 		this.sched(when, task);
 	}
 
-	algaSchedOnceAtQuant { | quant, task |
+	algaSchedAtQuantOnce { | quant, task |
 		var taskOnce = {task.value; nil};
 		if(this.isTempoClock, {
 			this.algaTempoClockSchedAtQuant(quant, taskOnce);
@@ -155,7 +157,7 @@
 		});
 	}
 
-	algaSchedOnceAtQuantWithTopPriority { | quant, task |
+	algaSchedAtQuantOnceWithTopPriority { | quant, task |
 		var taskOnce = {task.value; nil};
 		if(this.isTempoClock, {
 			this.algaTempoClockSchedAtQuantWithTopPriority(quant, taskOnce);
@@ -204,12 +206,12 @@
 		//entries at unique times
 		var entries = IdentityDictionary();
 
-		//loop over the queue
+		//loop over the queue, it appears just like a PriorityQueue object
 		forBy(1, queue.size-1, 3) { | i |
-			var currentEntry = queue[i + 1];
 			var currentTime  = queue[i];
+			var currentEntry = queue[i + 1]; //entries are at + 1 position. queue.postln if in doubt
 
-			//collect times, only on first occurence
+			//update the entries
 			if(indices[currentTime] == nil, {
 				indices[currentTime] = Array().add(i);
 				entries[currentTime] = Array().add(currentEntry);
@@ -219,7 +221,7 @@
 			});
 
 			//task will always be the last entry: it's just been added.
-			//test for EXACT equality (same function!)
+			//test for object equality (must be same exact entry!)
 			if(currentEntry === task, {
 				//Find the first occurrence of this time
 				var firstTimeIndex = indices[currentTime][0];
@@ -228,12 +230,12 @@
 				if(firstTimeIndex != i, {
 					var entriesSize = entries[currentTime].size;
 
-					//Order the entries by pushing them back
+					//Order the entries by pushing the last entry, task, to the first index
 					entries[currentTime] = entries[currentTime].move(
 						entriesSize - 1, 0
 					);
 
-					//Put them back in the queue, ordered, at the right indices
+					//Now re-order the queue entries according to the correct index / entry pairs
 					indices[currentTime].do({ | index, y |
 						queue[index + 1] = entries[currentTime][y];
 					});
