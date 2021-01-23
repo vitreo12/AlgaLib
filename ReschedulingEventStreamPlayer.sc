@@ -27,7 +27,7 @@ ReschedulingEventStreamPlayer {
 		clock.algaSchedOnceWithTopPriority(when, {
 			player.stop;
 			this.init(stream, player.event);
-			player.play(clock, quant:0);
+			player.play(clock, quant:0); //play has some overhead, find the leanest way
 		});
 	}
 
@@ -38,7 +38,7 @@ ReschedulingEventStreamPlayer {
 		clock.algaSchedAtQuantOnceWithTopPriority(quant, {
 			player.stop;
 			this.init(stream, player.event);
-			player.play(clock, quant:0);
+			player.play(clock, quant:0); //play has some overhead, find the leanest way
 		});
 	}
 
