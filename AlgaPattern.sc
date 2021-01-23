@@ -512,8 +512,9 @@ AlgaPattern : AlgaNode {
 				("AlgaPattern: interpolating \dur is still WIP. Changes will be applied after " ++ time ++ " seconds").warn;
 			});
 
-			//Overwrite \dur with sender after time
-			^clock.algaSchedAtQuant(
+			//Overwrite \dur with sender after time. Put this at top priority,
+			//so that's executed before any other event!
+			^clock.algaSchedOnceAtQuantWithTopPriority(
 				time,
 				{ eventPairs[\dur] = sender.asStream }
 			);

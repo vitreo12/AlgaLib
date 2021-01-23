@@ -338,7 +338,7 @@ AlgaScheduler : AlgaThread {
 							spinningActions.clear;
 
 							//Sched the unhanging in the future
-							clock.algaSchedAtQuant(sched, {
+							clock.algaSchedOnceAtQuant(sched, {
 								//Execute the scheduled action
 								this.executeFunc(
 									action,
@@ -360,14 +360,14 @@ AlgaScheduler : AlgaThread {
 
 								//Unhang if needed
 								this.unhangSemaphore;
-							}, offset:0);
+							});
 						}, {
 							//Only remove the one action and postpone it in the future.
 							//Other actions would still go on!
 							this.removeAction(action);
 
 							//In sched time, execute the function!
-							clock.algaSchedAtQuant(sched, {
+							clock.algaSchedOnceAtQuant(sched, {
 								//Execute the scheduled action
 								this.executeFunc(
 									action,
@@ -376,7 +376,7 @@ AlgaScheduler : AlgaThread {
 
 								//Unhang if needed
 								this.unhangSemaphore;
-							}, offset:0);
+							});
 						});
 					}, {
 						//Actual loop function, sched == 0

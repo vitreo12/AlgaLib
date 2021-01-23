@@ -35,12 +35,36 @@ ReschedulingEventStreamPlayer {
 		this.rescheduleAbs(lastTime + when);
 	}
 
-	algaSchedAtQuant { | quant, task, offset = 0.0000000000000569 |
-		player.clock.algaSchedAtQuant(quant, task, offset);
+	algaSchedAtQuant { | quant, task |
+		player.clock.algaSchedAtQuant(quant, task);
 	}
 
-	algaSched { | when, task, offset = 0.0000000000000569 |
-		player.clock.algaSched(when, task, offset);
+	algaSched { | when, task |
+		player.clock.algaSched(when, task);
+	}
+
+	algaSchedOnceAtQuant { | quant, task |
+		player.clock.algaSchedOnceAtQuant(quant, task);
+	}
+
+	algaSchedOnce { | when, task |
+		player.clock.algaSchedOnce(when, task);
+	}
+
+	algaSchedAtQuantWithTopPriority { | quant, task |
+		player.clock.algaSchedAtQuantWithTopPriority(quant, task);
+	}
+
+	algaSchedWithTopPriority { | when, task |
+		player.clock.algaSchedWithTopPriority(when, task);
+	}
+
+	algaSchedOnceAtQuantWithTopPriority { | quant, task |
+		player.clock.algaSchedOnceAtQuantWithTopPriority(quant, task);
+	}
+
+	algaSchedOnceWithTopPriority { | when, task |
+		player.clock.algaSchedOnceWithTopPriority(when, task);
 	}
 
 	stream { player.stream }

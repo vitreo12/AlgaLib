@@ -1,19 +1,3 @@
-+Dictionary {
-	//Loop over a Dict, unpacking Set. It's used in AlgaBlock to unpack inNodes of an AlgaNode
-	nodesLoop { | function |
-		this.keysValuesDo({
-			arg key, value, i;
-			if(value.class == IdentitySet, {
-				value.do({ | entry |
-					function.value(entry, i);
-				});
-			}, {
-				function.value(value, i);
-			});
-		});
-	}
-}
-
 +Object {
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
@@ -37,6 +21,22 @@
 			condition:condition,
 			func:func
 		);
+	}
+}
+
++Dictionary {
+	//Loop over a Dict, unpacking Set. It's used in AlgaBlock to unpack inNodes of an AlgaNode
+	nodesLoop { | function |
+		this.keysValuesDo({
+			arg key, value, i;
+			if(value.class == IdentitySet, {
+				value.do({ | entry |
+					function.value(entry, i);
+				});
+			}, {
+				function.value(value, i);
+			});
+		});
 	}
 }
 
@@ -108,26 +108,138 @@
 
 }
 
-+ Clock {
-	//offset allows to execute it slightly before quant!
-	//0.0000000000000569 is the smallest number i could find that works
-	algaSchedAtQuant { | quant, task, offset = 0.0000000000000569 |
++Clock {
+	algaSchedAtQuant { | quant, task |
 		if(this.isTempoClock, {
-			this.algaTempoClockSchedAtQuant(quant - offset, task);
+			this.algaTempoClockSchedAtQuant(quant, task);
 		}, {
-			this.algaSched(quant, task, offset)
+			this.algaSched(quant, task)
 		});
 	}
 
-	algaSched { | when, task, offset = 0.0000000000000569 |
+	algaSched { | when, task |
 		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
-		this.sched(when - offset, task);
+		this.sched(when, task);
+	}
+
+	algaSchedOnceAtQuant { | quant, task |
+		var taskOnce = {task.value; nil};
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedAtQuant(quant, taskOnce);
+		}, {
+			this.algaSched(quant, taskOnce)
+		});
+	}
+
+	algaSchedOnce { | when, task |
+		var taskOnce = {task.value; nil};
+		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
+		this.sched(when, taskOnce);
+	}
+
+	algaSchedAtQuantWithTopPriority { | quant, task |
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedAtQuantWithTopPriority(quant, task);
+		}, {
+			"Clock is not a TempoClock. Can't schedule with top priority".warn;
+			this.algaSched(quant, task)
+		});
+	}
+
+	algaSchedWithTopPriority { | when, task |
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedWithTopPriority(when, task);
+		}, {
+			"Clock is not a TempoClock. Can't schedule with top priority".warn;
+			this.algaSched(when, task)
+		});
+	}
+
+	algaSchedOnceAtQuantWithTopPriority { | quant, task |
+		var taskOnce = {task.value; nil};
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedAtQuantWithTopPriority(quant, taskOnce);
+		}, {
+			"Clock is not a TempoClock. Can't schedule with top priority".warn;
+			this.algaSched(quant, taskOnce)
+		});
+	}
+
+	algaSchedOnceWithTopPriority { | when, task |
+		var taskOnce = {task.value; nil};
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedWithTopPriority(when, taskOnce);
+		}, {
+			"Clock is not a TempoClock. Can't schedule with top priority".warn;
+			this.algaSched(when, taskOnce)
+		});
 	}
 }
 
-+ TempoClock {
++TempoClock {
 	algaTempoClockSchedAtQuant { | quant = 1, task |
 		this.schedAbs(quant.nextTimeOnGrid(this), task)
+	}
+
+	algaTempoClockSchedAtQuantWithTopPriority { | quant, task |
+		//add to clock
+		this.algaTempoClockSchedAtQuant(quant, task);
+
+		//schedule it at top priority
+		this.algaTempoClockSchedAtTopPriority(task);
+	}
+
+	algaTempoClockSchedWithTopPriority { | when, task |
+		//add to clock
+		this.algaSched(when, task);
+
+		//schedule it at top priority
+		this.algaTempoClockSchedAtTopPriority(task);
+	}
+
+	algaTempoClockSchedAtTopPriority { | task |
+		//indices for each of the unique times
+		var indices = IdentityDictionary();
+
+		//entries at unique times
+		var entries = IdentityDictionary();
+
+		//loop over the queue
+		forBy(1, queue.size-1, 3) { | i |
+			var currentEntry = queue[i + 1];
+			var currentTime  = queue[i];
+
+			//collect times, only on first occurence
+			if(indices[currentTime] == nil, {
+				indices[currentTime] = Array().add(i);
+				entries[currentTime] = Array().add(currentEntry);
+			}, {
+				indices[currentTime] = indices[currentTime].add(i);
+				entries[currentTime] = entries[currentTime].add(currentEntry);
+			});
+
+			//task will always be the last entry: it's just been added.
+			//test for EXACT equality (same function!)
+			if(currentEntry === task, {
+				//Find the first occurrence of this time
+				var firstTimeIndex = indices[currentTime][0];
+
+				//if not first occurance, push the entries back
+				if(firstTimeIndex != i, {
+					var entriesSize = entries[currentTime].size;
+
+					//Order the entries by pushing them back
+					entries[currentTime] = entries[currentTime].move(
+						entriesSize - 1, 0
+					);
+
+					//Put them back in the queue, ordered, at the right indices
+					indices[currentTime].do({ | index, y |
+						queue[index + 1] = entries[currentTime][y];
+					});
+				});
+			});
+		}
 	}
 
 	isTempoClock { ^true }
