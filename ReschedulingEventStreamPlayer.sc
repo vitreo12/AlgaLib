@@ -1,7 +1,6 @@
 //https://scsynth.org/t/set-patterns-dur-right-away/3103/9
 ReschedulingEventStreamPlayer {
 	var <player;
-	var <lastTime;
 
 	*new { | stream, event |
 		^super.new.init(stream, event)
@@ -11,7 +10,6 @@ ReschedulingEventStreamPlayer {
 		player = EventStreamPlayer(stream, event);
 	}
 
-	// hmm, haven't handled dependent notifications here
 	play { | argClock, doReset = false, quant |
 		player.play(argClock, doReset, quant)
 	}
@@ -33,7 +31,7 @@ ReschedulingEventStreamPlayer {
 
 	rescheduleAtQuant { | quant = 0 |
 		var stream = player.stream;
-		var clock = player.clock;
+		var clock  = player.clock;
 
 		clock.algaSchedAtQuantOnceWithTopPriority(quant, {
 			player.stop;
