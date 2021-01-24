@@ -25,7 +25,11 @@ ReschedulingEventStreamPlayer {
 		clock.algaSchedOnceWithTopPriority(when, {
 			player.stop;
 			this.init(stream, player.event);
-			player.play(clock, quant:0); //play has some overhead, find the leanest way
+			//play has some overhead, find the leanest way.
+			//Check TempoClockPriority.scd: the example with nested clock shows what happens here.
+			//timing is correct: even if in top priority, play will be pushed to bottom, as it has nested
+			//clock calls. However, it still is executed at the right precise timing
+			player.play(clock, quant:0);
 		});
 	}
 
@@ -36,7 +40,11 @@ ReschedulingEventStreamPlayer {
 		clock.algaSchedAtQuantOnceWithTopPriority(quant, {
 			player.stop;
 			this.init(stream, player.event);
-			player.play(clock, quant:0); //play has some overhead, find the leanest way
+			//play has some overhead, find the leanest way.
+			//Check TempoClockPriority.scd: the example with nested clock shows what happens here.
+			//timing is correct: even if in top priority, play will be pushed to bottom, as it has nested
+			//clock calls. However, it still is executed at the right precise timing
+			player.play(clock, quant:0);
 		});
 	}
 
@@ -55,6 +63,10 @@ ReschedulingEventStreamPlayer {
 		clock.schedAbs(when, {
 			player.stop;
 			this.init(stream, player.event);
+			//play has some overhead, find the leanest way.
+			//Check TempoClockPriority.scd: the example with nested clock shows what happens here.
+			//timing is correct: even if in top priority, play will be pushed to bottom, as it has nested
+			//clock calls. However, it still is executed at the right precise timing
 			player.play(player.clock, quant:0); //still play on its former clock
 		});
 	}
