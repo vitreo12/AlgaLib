@@ -24,8 +24,38 @@
 	}
 }
 
++ SynthDef {
+	//Like .store but without sending to server: algaStore is executed before Alga.boot
+	algaStore { | libname=\global, dir(synthDefDir), completionMsg, mdPlugin |
+		var lib = SynthDescLib.getLib(libname);
+		var file, path = dir ++ name ++ ".scsyndef";
+		if(metadata.falseAt(\shouldNotSend)) {
+			protect {
+				var bytes, desc;
+				file = File(path, "w");
+				bytes = this.asBytes;
+				file.putAll(bytes);
+				file.close;
+				lib.read(path);
+				desc = lib[this.name];
+				desc.metadata = metadata;
+				SynthDesc.populateMetadataFunc.value(desc);
+				desc.writeMetadata(path, mdPlugin);
+			} {
+				file.close
+			}
+		} {
+			lib.read(path);
+			lib.servers.do { arg server;
+				this.loadReconstructed(server, completionMsg);
+			};
+		};
+	}
+}
+
 +Dictionary {
-	//Loop over a Dict, unpacking Set. It's used in AlgaBlock to unpack inNodes of an AlgaNode
+	//Loop over a Dict, unpacking IdentitySet.
+	//It's used in AlgaBlock to unpack inNodes of an AlgaNode
 	nodesLoop { | function |
 		this.keysValuesDo({
 			arg key, value, i;
@@ -56,6 +86,7 @@
 	isListPattern { ^true }
 }
 
+//List extensions are used in AlgaScheduler to manage actions
 +List {
 	//object equality!
 	indexOf { | entry |
