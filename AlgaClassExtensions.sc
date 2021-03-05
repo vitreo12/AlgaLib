@@ -73,9 +73,9 @@
 +Pattern {
 	isPattern { ^true }
 
-	playRescheduling { | clock, protoEvent, quant |
+	playAlgaRescheduling { | clock, protoEvent, quant |
 		clock = clock ? TempoClock.default;
-		^ReschedulingEventStreamPlayer(
+		^AlgaReschedulingEventStreamPlayer(
 			this.asStream,
 			protoEvent
 		).play(clock, false, quant)

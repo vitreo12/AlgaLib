@@ -96,8 +96,8 @@ AlgaPattern : AlgaNode {
 	//The actual Pattern to be manipulated
 	var <pattern;
 
-	//The ReschedulingEventStreamPlayer
-	var <reschedulingEventStreamPlayer;
+	//The AlgaReschedulingEventStreamPlayer
+	var <algaReschedulingEventStreamPlayer;
 
 	//Dict of per-param AlgaPatternInterpState
 	var <>interpStates;
@@ -493,7 +493,7 @@ AlgaPattern : AlgaNode {
 		pattern = Pbind(*patternPairs);
 
 		//start the pattern right away. quant?
-		reschedulingEventStreamPlayer = pattern.playRescheduling(
+		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
 			clock: this.clock
 		);
 	}
@@ -670,7 +670,7 @@ AlgaPattern : AlgaNode {
 
 	//stop and reschedule in the future
 	reschedule { | sched = 0 |
-		reschedulingEventStreamPlayer.reschedule(sched);
+		algaReschedulingEventStreamPlayer.reschedule(sched);
 	}
 
 	// <<| \param (goes back to defaults)
