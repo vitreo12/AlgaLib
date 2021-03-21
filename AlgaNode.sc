@@ -924,6 +924,9 @@ AlgaNode {
 		//Connect with outMapping symbols. Retrieve it from the sender
 		if(actualSenderChansMapping.class == Symbol, {
 			actualSenderChansMapping = sender.outsMapping[actualSenderChansMapping];
+			if(actualSenderChansMapping == nil, {
+				("Invalid channel name '" ++ senderChansMapping ++ "'. Default will be used.").warn;
+			});
 		});
 
 		//Update entry in Dict with the non-modified one (used in .replace then)
@@ -1993,18 +1996,18 @@ AlgaNode {
 		});
 	}
 
-	from { | sender, param = \in, inChans, scale, time |
+	from { | sender, param = \in, chans, scale, time |
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param, senderChansMapping:inChans,
+			this.makeConnection(sender, param, senderChansMapping:chans,
 				scale:scale, time:time
 			);
 		}, {
 			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param, senderChansMapping:inChans,
+				this.makeConnection(sender, param, senderChansMapping:chans,
 					scale:scale, time:time
 				);
 			}, {
@@ -2018,13 +2021,13 @@ AlgaNode {
 		this.from(sender: sender, param: param);
 	}
 
-	to { | receiver, param = \in, outChans, scale, time |
+	to { | receiver, param = \in, chans, scale, time |
 		if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			receiver.makeConnection(this, param, senderChansMapping:outChans,
+			receiver.makeConnection(this, param, senderChansMapping:chans,
 				scale:scale, time:time
 			);
 		}, {
@@ -2037,18 +2040,18 @@ AlgaNode {
 		this.to(receiver: receiver, param: param);
 	}
 
-	mixFrom { | sender, param = \in, inChans, scale, time |
+	mixFrom { | sender, param = \in, chans, scale, time |
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param, mix:true, senderChansMapping:inChans,
+			this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
 				scale:scale, time:time
 			);
 		}, {
 			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param, mix:true, senderChansMapping:inChans,
+				this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
 					scale:scale, time:time
 				);
 			}, {
@@ -2062,13 +2065,13 @@ AlgaNode {
 		this.mixFrom(sender: sender, param: param);
 	}
 
-	mixTo { | receiver, param = \in, outChans, scale, time |
+	mixTo { | receiver, param = \in, chans, scale, time |
 		if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			receiver.makeConnection(this, param, mix:true, senderChansMapping:outChans,
+			receiver.makeConnection(this, param, mix:true, senderChansMapping:chans,
 				scale:scale, time:time
 			);
 		}, {
@@ -2220,11 +2223,11 @@ AlgaNode {
 		this.freeAllSynths(false, false);
 		this.freeAllBusses;
 
-		//RESET DICT ENTRIES? SHOULD IT BE DONE SOMEWHERE ELSE? SHOULD IT BE DONE AT ALL?
+		//Reset dict entries
 		this.resetInterpNormDicts;
 
 		//New one
-		//Just pass the entry, not the whole thingy
+		//Just pass the entry, not the whole thing
 		this.dispatchNode(obj, args,
 			initGroups:initGroups,
 			replace:true,
@@ -2444,10 +2447,6 @@ AlgaNode {
 		^synth.algaInstantiated;
 	}
 
-	busInstantiated {
-		^(synthBus != nil)
-	}
-
 	//Move this node's group before another node's one
 	moveBefore { | node |
 		group.moveBefore(node.group);
@@ -2495,13 +2494,13 @@ AlgaNode {
 				//Wrap around the indices entries (or delete out of bounds???)
 				channelsToPlay = channelsToPlay % numChannels;
 
-				playSynth = Synth(
+				playSynth = AlgaSynth(
 					playSynthSymbol,
 					[\in, synthBus.busArg, \indices, channelsToPlay, \gate, 1, \fadeTime, time],
 					playGroup
 				);
 			}, {
-				playSynth = Synth(
+				playSynth = AlgaSynth(
 					playSynthSymbol,
 					[\in, synthBus.busArg, \gate, 1, \fadeTime, time],
 					playGroup
@@ -2531,7 +2530,7 @@ AlgaNode {
 
 	//Add option for fade time here!
 	play { | time, channelsToPlay |
-		scheduler.addAction({ this.busInstantiated }, {
+		scheduler.addAction({ this.algaInstantiated }, {
 			this.playInner(time, channelsToPlay);
 		});
 	}
@@ -2542,7 +2541,7 @@ AlgaNode {
 
 	//Add option for fade time here!
 	stop { | time |
-		scheduler.addAction({ this.busInstantiated }, {
+		scheduler.addAction({ this.algaInstantiated }, {
 			this.stopInner(time);
 		});
 	}
