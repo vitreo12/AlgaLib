@@ -191,7 +191,7 @@ AlgaNode {
 		});
 
 		//starting connectionTime (using the setter so it also sets longestConnectionTime)
-		this.connectionTime_(argConnectionTime, true);
+		this.connectionTime_(argConnectionTime, all:true);
 		this.playTime_(argPlayTime);
 
 		//Dispatch node creation
@@ -203,7 +203,7 @@ AlgaNode {
 		);
 	}
 
-	setParamsConnectionTime { | val, all = false, param |
+	setParamsConnectionTime { | val, param, all = false |
 		//If all, set all paramConnectionTime regardless of their previous value
 		if(all, {
 			paramsConnectionTime.keysValuesChange({ val });
@@ -227,11 +227,11 @@ AlgaNode {
 	}
 
 	//connectionTime / connectTime / ct / interpolationTime / interpTime / it
-	connectionTime_ { | val, all = false, param |
+	connectionTime_ { | val, param, all = false |
 		if(val < 0, { val = 0 });
 		//this must happen before setting connectionTime, as it's been used to set
 		//paramConnectionTimes, checking against the previous connectionTime (before updating it)
-		this.setParamsConnectionTime(val, all, param);
+		this.setParamsConnectionTime(val, param, all);
 
 		//Only set global connectionTime if param is nil
 		if(param == nil, {
@@ -243,62 +243,66 @@ AlgaNode {
 
 	//Convenience wrappers
 	setAllConnectionTime { | val |
-		this.connectionTime_(val, true);
+		this.connectionTime_(val, all:true);
 	}
 
 	allct { | val |
-		this.connectionTime_(val, true);
+		this.connectionTime_(val, all:true);
 	}
 
 	allit { | val |
-		this.connectionTime_(val, true);
+		this.connectionTime_(val, all:true);
 	}
 
 	act { | val |
-		this.connectionTime_(val, true);
+		this.connectionTime_(val, all:true);
 	}
 
 	ait { | val |
-		this.connectionTime_(val, true);
+		this.connectionTime_(val, all:true);
 	}
 
 	setParamConnectionTime { | param, val |
-		this.connectionTime_(val, false, param);
+		this.connectionTime_(val, param, false);
 	}
 
 	paramct { | param, val |
-		this.connectionTime_(val, false, param);
+		this.connectionTime_(val, param, false);
 	}
 
 	pct { | param, val |
-		this.connectionTime_(val, false, param);
+		this.connectionTime_(val, param, false);
+	}
+
+	setParamInterpolationTime { | param, val |
+		this.connectionTime_(val, param, false);
 	}
 
 	paramit { | param, val |
-		this.connectionTime_(val, false, param);
+		this.connectionTime_(val, param, false);
 	}
 
 	pit { | param, val |
-		this.connectionTime_(val, false, param);
+		this.connectionTime_(val, param, false);
 	}
 
-	connectTime_ { | val, all = false, param | this.connectionTime_(val, all, param) }
+	connectTime_ { | val, param, all = false | this.connectionTime_(val, param, all) }
 
 	connectTime { ^connectionTime }
 
-	ct_ { | val, all = false, param | this.connectionTime_(val, all, param) }
+	ct_ { | val, param, all = false | this.connectionTime_(val, param, all) }
 
 	ct { ^connectionTime }
 
-	interpolationTime_ { | val, all = false, param | this.connectionTime_(val, all, param) }
+	interpolationTime_ { | val, param, all = false | this.connectionTime_(val, param, all) }
 
 	interpolationTime { ^connectionTime }
 
-	interpTime_ { | val, all = false, param | this.connectionTime_(val, all, param) }
+	interpTime_ { | val, param, all = false | this.connectionTime_(val, param, all) }
 
 	interpTime { ^connectionTime }
 
-	it_ { | val, all = false, param | this.connectionTime_(val, all, param) }
+	it_ { | val, param, all = false | this.connectionTime_(val, param, all) }
 
 	it { ^connectionTime }
 
@@ -2340,18 +2344,23 @@ AlgaNode {
 	}
 
 	//Remove individual mix entries at param
-	disconnect { | param = \in, previousSender, time |
-		if(previousSender.isAlgaNode.not, {
-			(previousSender.asString) ++ " is not an AlgaNode".error;
-			^this;
-		});
-
+	disconnect { | param = \in, previousSender = nil, time |
 		//If it wasn't a mix param, but the only entry, run <| instead
 		if(inNodes[param].size == 1, {
 			if(inNodes[param].findMatch(previousSender) != nil, {
 				"AlgaNode was the only entry. Running <| instead".warn;
 				^this.resetParam(param, previousSender, time:time);
 			});
+
+			if(previousSender == nil, {
+				^this.resetParam(param, previousSender, time:time);
+			});
+		});
+
+		//Else, mix param
+		if(previousSender.isAlgaNode.not, {
+			(previousSender.asString) ++ " is not an AlgaNode".error;
+			^this;
 		});
 
 		scheduler.addAction({ (this.algaInstantiated).and(previousSender.algaInstantiated) }, {
@@ -2360,8 +2369,8 @@ AlgaNode {
 	}
 
 	//alias for disconnect: remove a mix entry
-	removeMix { | param = \in, previousSender |
-		this.disconnect(param, previousSender);
+	removeMix { | param = \in, previousSender, time |
+		this.disconnect(param, previousSender, time);
 	}
 
 	//Find out if specific param / sender combination is in the mix
