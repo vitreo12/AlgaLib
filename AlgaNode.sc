@@ -424,7 +424,9 @@ AlgaNode {
 	}
 
 	createSynthBus {
-		synthBus = AlgaBus(server, numChannels, rate);
+		if((numChannels != nil).and(rate != nil), {
+			synthBus = AlgaBus(server, numChannels, rate);
+		});
 	}
 
 	createInterpNormBusses {
@@ -2537,8 +2539,13 @@ AlgaNode {
 		this.createPlaySynth(time, channelsToPlay);
 	}
 
-	//Add option for fade time here!
 	play { | time, channelsToPlay |
+		/*
+		if(synthBus == nil, {
+			this.createSynthBus
+		});
+		*/
+
 		scheduler.addAction({ this.algaInstantiated }, {
 			this.playInner(time, channelsToPlay);
 		});
@@ -2548,9 +2555,8 @@ AlgaNode {
 		this.freePlaySynth(time, isClear);
 	}
 
-	//Add option for fade time here!
 	stop { | time |
-		scheduler.addAction({ this.algaInstantiated }, {
+		scheduler.addAction({ this.isPlaying }, {
 			this.stopInner(time);
 		});
 	}
