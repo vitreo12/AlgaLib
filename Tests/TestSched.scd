@@ -1,9 +1,9 @@
 (
 s.latency = 0.5;
-//AlgaScheduler.verbose = true;
+AlgaScheduler.verbose = true;
 Alga.boot({
 	AlgaSynthDef(\t, { SinOsc.ar(Rand(220, 2000)) * EnvGen.ar(Env.perc) * 0.1 } ).add;
-	AlgaSynthDef(\t_const, { SinOsc.ar(Rand(220, 2000)) * 0.1 } ).add;
+	AlgaSynthDef(\t_const, { SinOsc.ar(Rand(220, 2000)) * 0.01 } ).add;
 });
 )
 
@@ -14,12 +14,35 @@ Alga.boot({
 //This in fact works as expected
 100.do { AN(\t, sched:1).play };
 
+s.plotTree
 
 (
-a = AN({ \in.ar }).play;
-2.do { |i| b = AN(\t_const); a.mixFrom(b); fork { loop { ("a" ++ i ++ ": " ++ a.algaInstantiated).postln; ("b" ++ i ++ ": " ++ b.algaInstantiated).postln; 0.1.wait } } };
+s.latency = 1;
+//AlgaScheduler.verbose = true;
+Alga.boot({
+	AlgaSynthDef(\t, { SinOsc.ar(Rand(220, 2000)) * EnvGen.ar(Env.perc) * 0.1 } ).add;
+	AlgaSynthDef(\t_const, { SinOsc.ar(Rand(220, 2000)) * 0.01 } ).add;
+	AlgaSynthDef(\bpass, { \in.ar } ).add;
+	//s.plotTree;
+});
 )
+
+//Causes problems
+(
+a = AN({ \in.ar }).play;
+5.do { |i| b = AN(\t_const); a.mixFrom(b, time:1); };
+)
+
+//Works fine
+(
+a = AN(\bpass).play;
+100.do { |i| b = AN(\t_const); a.mixFrom(b, time:1); };
+)
+
+100.do { b = AN(\t_const); }
 
 //Todo:
 // 1) algaInstantiated with param
-// 2) better condition for .play / .stop 
+// 2) better condition for .play / .stop
+
+s.options.maxNodes

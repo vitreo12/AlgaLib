@@ -61,8 +61,8 @@ AlgaThread {
 }
 
 AlgaScheduler : AlgaThread {
-	var <>interval = 0.001; //1ms
-	var <>maxSpinTime = 5;
+	var <>interval = 0.5; //5ms tick
+	var <>maxSpinTime = 5;  //5s before erroring out
 
 	var <cascadeMode = false;
 	var <switchCascadeMode = false;
@@ -238,6 +238,12 @@ AlgaScheduler : AlgaThread {
 						condition,
 						exceededMaxSpinTime
 					);
+
+					/*
+					if(verbose, {
+						("Hanging at func" + condition.def.context).postln;
+					});
+					*/
 
 					if(exceededMaxSpinTime[0], {
 						condition = true; //exit the while loop

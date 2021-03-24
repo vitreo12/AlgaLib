@@ -755,7 +755,7 @@ AlgaNode {
 		});
 
 		//create synth
-		synth = AlgaSynth.new(
+		synth = AlgaSynth(
 			defName,
 			synthArgs,
 			synthGroup
@@ -1170,14 +1170,14 @@ AlgaNode {
 
 				//Instantiated right away, with no \fadeTime, as it will directly be connected to
 				//synth's parameter. Synth will read its params from all the normBusses
-				var normSynth = AlgaSynth.new(
+				var normSynth = AlgaSynth(
 					normSymbol,
 					[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
 					normGroup
 				);
 
 				//use paramDefault: no replace or no senders in sendersSet
-				var interpSynth = AlgaSynth.new(
+				var interpSynth = AlgaSynth(
 					interpSymbol,
 					[\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
 					interpGroup
@@ -1239,7 +1239,7 @@ AlgaNode {
 			//interpBus has always one more channel for the envelope
 			interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
 
-			normSynth = AlgaSynth.new(
+			normSynth = AlgaSynth(
 				normSymbol,
 				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
 				normGroup
@@ -1375,7 +1375,7 @@ AlgaNode {
 					paramNumChannels
 				).asSymbol;
 
-				AlgaSynth.new(
+				AlgaSynth(
 					fadeInSymbol,
 					[
 						\out, interpBus.index,
@@ -1400,7 +1400,7 @@ AlgaNode {
 			});
 
 			//Read \in from the sender's synthBus
-			interpSynth = AlgaSynth.new(
+			interpSynth = AlgaSynth(
 				interpSymbol,
 				interpSynthArgs,
 				interpGroup
@@ -1436,7 +1436,7 @@ AlgaNode {
 				});
 			});
 
-			interpSynth = AlgaSynth.new(
+			interpSynth = AlgaSynth(
 				interpSymbol,
 				interpSynthArgs,
 				interpGroup
@@ -1601,7 +1601,7 @@ AlgaNode {
 						(interpBusAtParam.numChannels - 1) //it has one more for env. need to remove that from symbol
 					).asSymbol;
 
-					AlgaSynth.new(
+					AlgaSynth(
 						fadeOutSymbol,
 						[
 							\out, interpBusAtParam.index,
@@ -1992,7 +1992,7 @@ AlgaNode {
 		replaceMix = false, senderChansMapping, scale, time |
 
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
-			scheduler.addAction({ (this.algaInstantiated).and(sender.algaInstantiated) }, {
+			scheduler.addAction({ (this.algaInstantiatedAsReceiver(param, sender, mix)).and(sender.algaInstantiatedAsSender) }, {
 				this.makeConnectionInner(sender, param, replace, mix,
 					replaceMix, senderChansMapping, scale, time:time
 				);
@@ -2437,27 +2437,6 @@ AlgaNode {
 		});
 	}
 
-	//All synths must be algaInstantiated (including interpolators and normalizers)
-	//to make new meaningful connections (shouldn't read from synthBus if no synths are writing to it!)
-	algaInstantiated {
-		if(synth == nil, { ^false });
-
-		interpSynths.do({ | interpSynthsAtParam |
-			interpSynthsAtParam.do({ | interpSynthAtParam |
-				if(interpSynthAtParam.algaInstantiated.not, { ^false });
-			});
-		});
-
-		normSynths.do({ | normSynthsAtParam |
-			normSynthsAtParam.do({ | normSynthAtParam |
-				if(normSynthAtParam.algaInstantiated.not, { ^false });
-			});
-		});
-
-		//Lastly, the actual synth
-		^synth.algaInstantiated;
-	}
-
 	//Move this node's group before another node's one
 	moveBefore { | node |
 		group.moveBefore(node.group);
@@ -2540,13 +2519,11 @@ AlgaNode {
 	}
 
 	play { | time, channelsToPlay |
-		/*
 		if(synthBus == nil, {
 			this.createSynthBus
 		});
-		*/
 
-		scheduler.addAction({ this.algaInstantiated }, {
+		scheduler.addAction({ synthBus != nil }, {
 			this.playInner(time, channelsToPlay);
 		});
 	}
@@ -2559,6 +2536,64 @@ AlgaNode {
 		scheduler.addAction({ this.isPlaying }, {
 			this.stopInner(time);
 		});
+	}
+
+	algaInstantiatedAsSender {
+		if(synth == nil, { ^false });
+		(synthBus != nil).asString.warn;
+		^(synthBus != nil);
+	}
+
+	algaInstantiatedAsReceiver { | param = \in, sender, mix = false |
+		var interpBussesAtParam;
+
+		interpBussesAtParam = interpSynths[param];
+
+		interpBussesAtParam.asString.warn;
+		inNodes.asString.warn;
+
+		if((interpBussesAtParam != nil).and(interpBussesAtParam.size > 0), {
+			//Normal connection (to / from)
+			if(mix.not.and(interpBussesAtParam.size == 1), {
+				if(interpBussesAtParam[\default].algaInstantiated, {
+					"normal - true".postln;
+					^true
+				});
+			}, {
+				//Mix connection (mixTo / mixFrom)
+				var isFirst = false;
+
+				if(interpBussesAtParam[\default].algaInstantiated, {
+					"normal mix first - true".postln;
+					^true
+				});
+
+				//First mix connection, treat it like a normal connection (to / from)
+				if((inNodes[param] == nil).or(interpBussesAtParam.size == 1), {
+					var interpSynthDefault = interpBussesAtParam[\default];
+					if(interpSynthDefault != nil, {
+						isFirst = true;
+						if(interpSynthDefault.algaInstantiated, {
+							"normal mix first - true".postln;
+							^true
+						});
+					});
+				});
+
+				//normal mix
+				if(isFirst.not, {
+					if(interpBussesAtParam[sender] == nil, {
+						"normal mix - true".postln;
+						^true
+					}, {
+						//replace mix ?
+					});
+				});
+			});
+		});
+
+		"invalid - false".postln;
+		^false
 	}
 
 	isAlgaNode { ^true }
