@@ -68,6 +68,7 @@ Alga {
 		server.options.numBuffers = algaServerOptions.numBuffers;
 		server.options.numAudioBusChannels = algaServerOptions.numAudioBusChannels;
 		server.options.numControlBusChannels = algaServerOptions.numControlBusChannels;
+		server.options.maxNodes = algaServerOptions.maxNodes;
 		server.options.maxSynthDefs = algaServerOptions.maxSynthDefs;
 		server.options.numWireBufs = algaServerOptions.numWireBufs;
 		server.options.numInputBusChannels = algaServerOptions.numInputBusChannels;
@@ -75,6 +76,7 @@ Alga {
 		if(algaServerOptions.supernova, {Server.supernova}, {Server.scsynth});
 		server.options.threads = algaServerOptions.supernovaThreads;
 		server.options.useSystemClock = algaServerOptions.supernovaUseSystemClock;
+		server.options.protocol = algaServerOptions.protocol;
 		server.latency = algaServerOptions.latency;
 
 		//Check AlgaSynthDef folder exists...

@@ -33,11 +33,16 @@ AlgaSynth : Synth {
 			algaInstantiated = true;
 		}, '/n_go', this.server.addr, argTemplate:[nodeID]).oneShot;
 
-		//If fails to respond in 3 seconds, free the OSCFunc
-		SystemClock.sched(3, {
-			if(algaInstantiated.not, {
-				oscfunc.free;
+		//If fails to respond in 1, assume it's instantiated...
+		//This unfortunaly happens due to SC's weak OSC responding with \udp
+		//Alga uses \tdp by default!
+		if(server.options.protocol == \udp, {
+			SystemClock.sched(1, {
+				if(algaInstantiated.not, {
+					algaInstantiated = true;
+					oscfunc.free;
+				})
 			})
-		})
+		});
 	}
 }
