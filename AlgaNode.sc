@@ -2548,16 +2548,17 @@ AlgaNode {
 	//is needed to be surely insantiated
 	algaInstantiatedAsReceiver { | param = \in, sender, mix = false |
 		var interpSynthsAtParam = interpSynths[param];
+		var inNodesAtParam = inNodes[param];
 
 		//First connection
-		if((interpSynthsAtParam.size == 1).and(inNodes.size == 0), {
+		if((interpSynthsAtParam.size == 1).and(inNodesAtParam.size == 0), {
 			if(interpSynthsAtParam[\default].algaInstantiated, {
 				^true
 			});
 		});
 
 		//Subsequent connections
-		if((interpSynthsAtParam.size > 0).and(inNodes.size > 0), {
+		if((interpSynthsAtParam.size > 0).and(inNodesAtParam.size > 0), {
 			//.replaceMix
 			if(mix.and(interpSynthsAtParam[sender] != nil), {
 				if(interpSynthsAtParam[sender].algaInstantiated, {
