@@ -595,11 +595,15 @@ AlgaNode {
 				});
 
 				//Create IdentityDictionaries for everything needed
-				paramsChansMapping[paramName] = IdentityDictionary();
 				interpSynths[paramName] = IdentityDictionary();
 				normSynths[paramName] = IdentityDictionary();
 				interpBusses[paramName] = IdentityDictionary();
 				activeInterpSynths[paramName] = IdentityDictionary();
+
+				//These need to be kept across .replace calls!
+				if(paramsChansMapping[paramName] == nil, {
+					paramsChansMapping[paramName] = IdentityDictionary();
+				});
 			});
 		});
 	}
@@ -2207,23 +2211,23 @@ AlgaNode {
 		//re-init groups if clear was used
 		var initGroups = if(group == nil, { true }, { false });
 
+		//calc temporary time
+		time = this.calculateTemporaryLongestWaitTime(time, time);
+
 		//In case it has been set to true when clearing, then replacing before clear ends!
 		algaToBeCleared = false;
 
 		//If it was playing, free previous playSynth
 		if(isPlaying, {
-			this.stop;
+			this.stop; //Should it be time here? or should time just be for connections?
 			wasPlaying = true;
 		});
 
-		//calc temporary time
-		time = this.calculateTemporaryLongestWaitTime(time, time);
-
-		//This doesn't work with feedbacks, as synths would be freed slightly before
+		//This doesn't work with feedbacks on its own, as synths would be freed slightly before
 		//The new ones finish the rise, generating click. These should be freed
 		//When the new synths/busses are surely algaInstantiated on the server!
-		//The cheap solution that it's in place now is to wait 0.5 longer than longestConnectionTime...
-		//Work out a better solution!
+		//The cheap solution that it's in place now is to wait 1.0 longer than longestConnectionTime.
+		//Work out a better solution now that AlgaScheduler is well tested!
 		this.freeAllSynths(false, false);
 		this.freeAllBusses;
 
@@ -2248,7 +2252,7 @@ AlgaNode {
 
 		//If node was playing, or .replace has been called while .stop / .clear, play again
 		if(wasPlaying.or(beingStopped), {
-			this.play;
+			this.play; //Should it be time here? or should time just be for connections?
 		})
 	}
 
@@ -2539,7 +2543,7 @@ AlgaNode {
 
 	//Add option for fade time here!
 	play { | time, channelsToPlay |
-		scheduler.addAction({ this.algaInstantiated }, {
+		scheduler.addAction({ (synth != nil).and(synth.algaInstantiated) }, {
 			this.playInner(time, channelsToPlay);
 		});
 	}
@@ -2550,7 +2554,7 @@ AlgaNode {
 
 	//Add option for fade time here!
 	stop { | time |
-		scheduler.addAction({ this.algaInstantiated }, {
+		scheduler.addAction({ this.isPlaying }, {
 			this.stopInner(time);
 		});
 	}
