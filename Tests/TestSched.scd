@@ -17,8 +17,8 @@ Alga.boot({
 s.plotTree
 
 (
-s.latency = 1;
-//AlgaScheduler.verbose = true;
+s.latency = 0.3;
+AlgaScheduler.verbose = true;
 Alga.boot({
 	AlgaSynthDef(\t, { SinOsc.ar(Rand(220, 2000)) * EnvGen.ar(Env.perc) * 0.1 } ).add;
 	AlgaSynthDef(\t_const, { SinOsc.ar(Rand(220, 2000)) * 0.01 } ).add;
@@ -27,10 +27,15 @@ Alga.boot({
 });
 )
 
+(
+a = AN(\bpass).play;
+3.do { |i| b = AN(\t_const); a.from(b, time:1); };
+)
+
 //Causes problems
 (
 a = AN({ \in.ar }).play;
-5.do { |i| b = AN(\t_const); a.mixFrom(b, time:1); };
+100.do { |i| b = AN(\t_const); a.mixFrom(b, time:0.3); };
 )
 
 //Works fine

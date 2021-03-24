@@ -2538,62 +2538,38 @@ AlgaNode {
 		});
 	}
 
+	//To send signal, only the synthBus is needed to be surely insantiated
 	algaInstantiatedAsSender {
 		if(synth == nil, { ^false });
-		(synthBus != nil).asString.warn;
 		^(synthBus != nil);
 	}
 
+	//To receive signals, and perform interpolation, the specific interpSynth(s)
+	//is needed to be surely insantiated
 	algaInstantiatedAsReceiver { | param = \in, sender, mix = false |
-		var interpBussesAtParam;
+		var interpSynthsAtParam = interpSynths[param];
 
-		interpBussesAtParam = interpSynths[param];
-
-		interpBussesAtParam.asString.warn;
-		inNodes.asString.warn;
-
-		if((interpBussesAtParam != nil).and(interpBussesAtParam.size > 0), {
-			//Normal connection (to / from)
-			if(mix.not.and(interpBussesAtParam.size == 1), {
-				if(interpBussesAtParam[\default].algaInstantiated, {
-					"normal - true".postln;
-					^true
-				});
-			}, {
-				//Mix connection (mixTo / mixFrom)
-				var isFirst = false;
-
-				if(interpBussesAtParam[\default].algaInstantiated, {
-					"normal mix first - true".postln;
-					^true
-				});
-
-				//First mix connection, treat it like a normal connection (to / from)
-				if((inNodes[param] == nil).or(interpBussesAtParam.size == 1), {
-					var interpSynthDefault = interpBussesAtParam[\default];
-					if(interpSynthDefault != nil, {
-						isFirst = true;
-						if(interpSynthDefault.algaInstantiated, {
-							"normal mix first - true".postln;
-							^true
-						});
-					});
-				});
-
-				//normal mix
-				if(isFirst.not, {
-					if(interpBussesAtParam[sender] == nil, {
-						"normal mix - true".postln;
-						^true
-					}, {
-						//replace mix ?
-					});
-				});
+		//First connection
+		if((interpSynthsAtParam.size == 1).and(inNodes.size == 0), {
+			if(interpSynthsAtParam[\default].algaInstantiated, {
+				^true
 			});
 		});
 
-		"invalid - false".postln;
-		^false
+		//Subsequent connections
+		if((interpSynthsAtParam.size > 0).and(inNodes.size > 0), {
+			//.replaceMix
+			if(mix.and(interpSynthsAtParam[sender] != nil), {
+				if(interpSynthsAtParam[sender].algaInstantiated, {
+					^true
+				});
+			});
+
+			//Normal from/ to and mixFrom / mixTo
+			^true
+		});
+
+		^false;
 	}
 
 	isAlgaNode { ^true }
