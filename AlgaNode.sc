@@ -705,6 +705,11 @@ AlgaNode {
 	dispatchFunction { | obj, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
+		//Note that this forking mechanism is not robust on \udp
+		if(server.options.protocol == \udp, {
+			"Using a server with UDP protocol. The handling of 'server.sync' can be lost if multiple packets are sent together. It's suggested to use Alga with a server booted with the TCP protocol instead.".warn;
+		});
+
 		//Need to wait for server to receive the sdef
 		fork {
 			synthDef = AlgaSynthDef(
