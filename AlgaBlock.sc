@@ -217,25 +217,12 @@ AlgaBlock {
 	}
 }
 
-//Have a global one, so that NodeNodes can be shared across VNdef, VNNode and VPSpace...
+//Have a global one. No need to make one per server, as server identity is checked already.
 AlgaBlocksDict {
 	classvar <blocksDict;
 
 	*initClass {
 		blocksDict = IdentityDictionary(50);
-	}
-
-	*reorderBlock { | blockIndex, server |
-		var entryInBlocksDict = blocksDict[blockIndex];
-
-		if(entryInBlocksDict != nil, {
-
-			//Make sure everything is synced with server!
-			fork {
-				entryInBlocksDict.rearrangeBlock(server);
-				server.sync;
-			}
-		});
 	}
 
 	*createNewBlockIfNeeded { | receiver, sender |
@@ -250,15 +237,17 @@ AlgaBlocksDict {
 		//This happens when patching a simple number or array in to set a param
 		if((receiver.isAlgaNode.not).or(sender.isAlgaNode.not), { ^nil });
 
-		receiverBlockIndex = receiver.blockIndex;
-		senderBlockIndex = sender.blockIndex;
-		receiverBlock = blocksDict[receiverBlockIndex];
-		senderBlock = blocksDict[senderBlockIndex];
-
+		//Can't connect nodes from two different servers together
 		if(receiver.server != sender.server, {
 			("AlgaBlocksDict: Trying to create a block between two AlgaNodes on different servers").error;
 			^receiver;
 		});
+
+		//Unpack things
+		receiverBlockIndex = receiver.blockIndex;
+		senderBlockIndex = sender.blockIndex;
+		receiverBlock = blocksDict[receiverBlockIndex];
+		senderBlock = blocksDict[senderBlockIndex];
 
 		//Create new block if both connections didn't have any
 		if((receiverBlockIndex == -1).and(senderBlockIndex == -1), {

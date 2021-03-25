@@ -71,12 +71,12 @@ Alga {
 	*boot { | onBoot, server, algaServerOptions |
 		var prevServerQuit = [false]; //pass by reference: use Array
 
+		server = server ? Server.default;
+		algaServerOptions = algaServerOptions ? AlgaServerOptions();
+
 		if(algaServerOptions.class != AlgaServerOptions, {
 			"Use an AlgaServerOptions instance as the algaServerOptions argument".error;
 		});
-
-		server = server ? Server.default;
-		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
 		//AlgaServerOptions
 		server.options.sampleRate = algaServerOptions.sampleRate;
