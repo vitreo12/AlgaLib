@@ -448,10 +448,14 @@ AlgaNode {
 
 	freeSynthBus { | now = false |
 		if(now, {
-			if(synthBus != nil, { synthBus.free });
+			if(synthBus != nil, {
+				synthBus.free;
+				synthBus = nil; //Necessary for correct .play behaviour!
+			});
 		}, {
-			//if forking, this.synthBus could have changed, that's why this is needed
+			//if forking, this.synthBus could change, that's why this is needed
 			var prevSynthBus = synthBus.copy;
+			synthBus = nil;  //Necessary for correct .play behaviour!
 
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
@@ -597,11 +601,15 @@ AlgaNode {
 				});
 
 				//Create IdentityDictionaries for everything needed
-				paramsChansMapping[paramName] = IdentityDictionary();
 				interpSynths[paramName] = IdentityDictionary();
 				normSynths[paramName] = IdentityDictionary();
 				interpBusses[paramName] = IdentityDictionary();
 				activeInterpSynths[paramName] = IdentityDictionary();
+
+				//These need to be kept across .replace calls!
+				if(paramsChansMapping[paramName] == nil, {
+					paramsChansMapping[paramName] = IdentityDictionary();
+				});
 			});
 		});
 	}
@@ -1113,7 +1121,8 @@ AlgaNode {
 						normSynth = AlgaSynth(
 							normSymbol,
 							[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-							normGroup
+							normGroup,
+							waitForInst:false
 						);
 
 						if(onlyEntry, {
@@ -1173,7 +1182,8 @@ AlgaNode {
 				var normSynth = AlgaSynth(
 					normSymbol,
 					[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-					normGroup
+					normGroup,
+					waitForInst:false
 				);
 
 				//use paramDefault: no replace or no senders in sendersSet
@@ -1242,7 +1252,8 @@ AlgaNode {
 			normSynth = AlgaSynth(
 				normSymbol,
 				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-				normGroup
+				normGroup,
+				waitForInst:false
 			);
 
 			interpBusses[param][sender] = interpBus;
@@ -1381,7 +1392,8 @@ AlgaNode {
 						\out, interpBus.index,
 						\fadeTime, time,
 					],
-					interpGroup
+					interpGroup,
+					waitForInst:false
 				);
 			});
 
@@ -1481,7 +1493,6 @@ AlgaNode {
 			};
 		});
 
-		//If already algaInstantiated, execute now ??
 		if(whatSynth.algaInstantiated, {
 			freeSynthFunc.value;
 		}, {
@@ -1581,7 +1592,7 @@ AlgaNode {
 			var currentDefaultNode = currentDefaultNodes[param];
 
 			//Make sure all of these are scheduled correctly to each other!
-			scheduler.addAction({ (normSynthAtParam.algaInstantiated).and(interpSynthAtParam.algaInstantiated) }, {
+			scheduler.addAction({ /*(normSynthAtParam.algaInstantiated).and*/ (interpSynthAtParam.algaInstantiated) }, {
 				var notDefaultNode = false;
 
 				//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
@@ -1607,7 +1618,8 @@ AlgaNode {
 							\out, interpBusAtParam.index,
 							\fadeTime, time,
 						],
-						interpGroup
+						interpGroup,
+						waitForInst:false
 					);
 
 					//This has to be surely algaInstantiated before being freed
@@ -2108,7 +2120,11 @@ AlgaNode {
 			^this;
 		});
 
-		scheduler.addAction({ (this.algaInstantiated).and(previousSender.algaInstantiated).and(newSender.algaInstantiated) }, {
+		scheduler.addAction({
+			(this.algaInstantiatedAsReceiver(param, previousSender, true)).and(
+				previousSender.algaInstantiatedAsSender).and(
+				newSender.algaInstantiatedAsSender)
+		}, {
 			var validPreviousSender = true;
 
 			//if not contained, it's invalid.
@@ -2137,7 +2153,7 @@ AlgaNode {
 	}
 
 	resetParam { | param = \in, previousSender = nil, time |
-		scheduler.addAction({ (this.algaInstantiated).and(previousSender.algaInstantiated) }, {
+		scheduler.addAction({ (this.algaInstantiatedAsReceiver(param, previousSender, false)).and(previousSender.algaInstantiatedAsSender) }, {
 			this.resetParamInner(param, previousSender, time:time);
 		});
 	}
@@ -2160,7 +2176,7 @@ AlgaNode {
 
 	//On .replace on an already running mix connection
 	replaceMixConnection { | param = \in, sender, senderChansMapping, scale, time |
-		scheduler.addAction({ (this.algaInstantiated).and(sender.algaInstantiated) }, {
+		scheduler.addAction({ (this.algaInstantiatedAsReceiver(param, sender, true)).and(sender.algaInstantiatedAsSender) }, {
 			this.replaceMixConnectionInner(param, sender, senderChansMapping, scale, time);
 		});
 	}
@@ -2209,8 +2225,18 @@ AlgaNode {
 		//re-init groups if clear was used
 		var initGroups = if(group == nil, { true }, { false });
 
+		//Trying to .replace on a cleared AlgaNode
+		if(algaCleared, {
+			"Trying to .replace on a cleared AlgaNode. Running AlgaNode.new instead.".warn;
+			algaCleared = false;
+			^this.init(obj, args, connectionTime, playTime, outsMapping, server, 0);
+		});
+
 		//In case it has been set to true when clearing, then replacing before clear ends!
 		algaToBeCleared = false;
+
+		//calc temporary time
+		time = this.calculateTemporaryLongestWaitTime(time, time);
 
 		//If it was playing, free previous playSynth
 		if(isPlaying, {
@@ -2218,14 +2244,11 @@ AlgaNode {
 			wasPlaying = true;
 		});
 
-		//calc temporary time
-		time = this.calculateTemporaryLongestWaitTime(time, time);
-
 		//This doesn't work with feedbacks, as synths would be freed slightly before
 		//The new ones finish the rise, generating click. These should be freed
 		//When the new synths/busses are surely algaInstantiated on the server!
-		//The cheap solution that it's in place now is to wait 0.5 longer than longestConnectionTime...
-		//Work out a better solution!
+		//The cheap solution that it's in place now is to wait 1.0 longer than longestConnectionTime.
+		//Work out a better solution now that AlgaScheduler is well tested!
 		this.freeAllSynths(false, false);
 		this.freeAllBusses;
 
@@ -2261,6 +2284,7 @@ AlgaNode {
 	replace { | obj, args, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
 		outsMapping, keepInScale = true, keepOutScale = true |
 
+		//Check global algaInstantiated
 		scheduler.addAction({ this.algaInstantiated }, {
 			this.replaceInner(obj:obj, args:args, time:time, keepChannelsMappingIn:keepChannelsMappingIn,
 				keepChannelsMappingOut:keepChannelsMappingOut, outsMapping:outsMapping,
@@ -2365,7 +2389,7 @@ AlgaNode {
 			^this;
 		});
 
-		scheduler.addAction({ (this.algaInstantiated).and(previousSender.algaInstantiated) }, {
+		scheduler.addAction({ (this.algaInstantiatedAsReceiver(param, previousSender, true)).and(previousSender.algaInstantiatedAsSender) }, {
 			this.disconnectInner(param, previousSender, time:time);
 		});
 	}
@@ -2487,13 +2511,15 @@ AlgaNode {
 				playSynth = AlgaSynth(
 					playSynthSymbol,
 					[\in, synthBus.busArg, \indices, channelsToPlay, \gate, 1, \fadeTime, time],
-					playGroup
+					playGroup,
+					waitForInst:false
 				);
 			}, {
 				playSynth = AlgaSynth(
 					playSynthSymbol,
 					[\in, synthBus.busArg, \gate, 1, \fadeTime, time],
-					playGroup
+					playGroup,
+					waitForInst:false
 				);
 			});
 
@@ -2519,10 +2545,8 @@ AlgaNode {
 	}
 
 	play { | time, channelsToPlay |
-		if(synthBus == nil, {
-			this.createSynthBus
-		});
-
+		//Check only for synthBus, it makes more sense than also checking for synth.algaIstantiated,
+		//As it allows meanwhile to create the play synth while synth is getting instantiated
 		scheduler.addAction({ synthBus != nil }, {
 			this.playInner(time, channelsToPlay);
 		});
@@ -2538,10 +2562,21 @@ AlgaNode {
 		});
 	}
 
-	//To send signal, only the synthBus is needed to be surely insantiated
+	//Global init: all interp synths and synth are correct
+	algaInstantiated {
+		interpSynths.do({ | interpSynthsAtParam |
+			interpSynthsAtParam.do( { | interpSynthAtParam |
+				if(interpSynthAtParam.algaInstantiated.not, { ^false })
+			});
+		});
+
+		^(synth.algaInstantiated);
+	}
+
+	//To send signal, only the synth and synthBus are needed to be surely insantiated
 	algaInstantiatedAsSender {
 		if(synth == nil, { ^false });
-		^(synthBus != nil);
+		^((synth.algaInstantiated).and(synthBus != nil));
 	}
 
 	//To receive signals, and perform interpolation, the specific interpSynth(s)
@@ -2570,6 +2605,7 @@ AlgaNode {
 			^true
 		});
 
+		//Fallback
 		^false;
 	}
 
