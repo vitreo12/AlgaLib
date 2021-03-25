@@ -39,7 +39,7 @@ AlgaGroup : Group {
 		if(server.options.protocol == \udp, {
 			SystemClock.sched(3, {
 				if(algaInstantiated.not, {
-					("Using an UDP server. Instantiation packet for AlgaSynth " ++ nodeID ++ " have been lost. Setting algaInstantiated to true").warn;
+					("Using a server with the UDP protocol, use the TCP one instead. Instantiation packet for AlgaGroup " ++ nodeID ++ " has been lost. Setting algaInstantiated to true").warn;
 					algaInstantiated = true;
 					oscfunc.free;
 				})
