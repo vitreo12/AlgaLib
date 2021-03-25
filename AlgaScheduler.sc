@@ -61,7 +61,7 @@ AlgaThread {
 }
 
 AlgaScheduler : AlgaThread {
-	var <>interval = 0.5; //5ms tick
+	var <>interval = 0.05; //5ms tick
 	var <>maxSpinTime = 5;  //5s before erroring out
 
 	var <cascadeMode = false;
