@@ -11,6 +11,14 @@ Alga {
 		servers = IdentityDictionary(1);
 	}
 
+	*maxIO {
+		^AlgaStartup.algaMaxIO;
+	}
+
+	*maxIO_ { | value |
+		AlgaStartup.algaMaxIO = value
+	}
+
 	*clearScheduler { | server |
 		var scheduler = schedulers[server];
 		if(scheduler != nil, {

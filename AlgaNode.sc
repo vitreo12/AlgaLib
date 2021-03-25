@@ -591,6 +591,13 @@ AlgaNode {
 
 				var paramName = controlName.name;
 
+				var paramNumChannels = controlName.numChannels;
+				if(paramNumChannels > AlgaStartup.algaMaxIO, {
+					("Trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' whose parameter '" ++ paramName ++ "' has more channels(" ++ paramNumChannels ++ ") than 'Alga.maxIO'(" ++ AlgaStartup.algaMaxIO ++ "). Change 'Alga.maxIO' to fit your needs and run 'Alga.boot' again.").error;
+					this.clear;
+					^false
+				});
+
 				//Create controlNames
 				controlNames[paramName] = controlName;
 
@@ -612,6 +619,8 @@ AlgaNode {
 				});
 			});
 		});
+
+		^true;
 	}
 
 	//calculate the outs variable (the outs channel mapping)
@@ -649,9 +658,15 @@ AlgaNode {
 
 		//Retrieve controlNames from SynthDesc
 		var synthDescControlNames = synthDef.asSynthDesc.controls;
-		this.createControlNamesAndParamsConnectionTime(synthDescControlNames);
+		if(this.createControlNamesAndParamsConnectionTime(synthDescControlNames).not, { ^this });
 
 		numChannels = synthDef.numChannels;
+		if(numChannels > AlgaStartup.algaMaxIO, {
+			("Trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' which has more outputs(" ++ numChannels ++ ") than 'Alga.maxIO'(" ++ AlgaStartup.algaMaxIO ++ "). Change 'Alga.maxIO' to fit your needs and run 'Alga.boot' again.").error;
+			this.clear;
+			^this
+		});
+
 		rate = synthDef.rate;
 
 		sched = sched ? 0;
