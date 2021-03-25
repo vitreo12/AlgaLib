@@ -8,6 +8,8 @@
 
 	//AlgaNode / AlgaPattern support
 	algaInstantiated { ^true }
+	algaInstantiatedAsSender { ^true }
+	algaInstantiatedAsReceiver { | param, sender, mix | ^true }
 	algaCleared { ^false }
 	algaToBeCleared { ^false }
 
