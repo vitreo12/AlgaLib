@@ -51,7 +51,7 @@ Alga {
 		});
 	}
 
-	*newScheduler { | server, clock, cascadeMode = true |
+	*newScheduler { | server, clock, cascadeMode = false |
 		server = server ? Server.default;
 		clock = clock ? TempoClock.default;
 		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
@@ -76,6 +76,7 @@ Alga {
 
 		if(algaServerOptions.class != AlgaServerOptions, {
 			"Use an AlgaServerOptions instance as the algaServerOptions argument".error;
+			^this;
 		});
 
 		//AlgaServerOptions
@@ -115,7 +116,7 @@ Alga {
 		this.clearServer(server, prevServerQuit);
 
 		//Create an AlgaScheduler @ the server (using TempoClock for now...)
-		this.newScheduler(server, cascadeMode:false);
+		this.newScheduler(server);
 
 		//Add the server
 		this.newServer(server);

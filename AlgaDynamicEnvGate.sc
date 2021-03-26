@@ -1,3 +1,4 @@
+//Like EnvGate, but it allows to change \fadeTime dynamically during the release phase.
 AlgaDynamicEnvGate {
 	*ar { | t_release, fadeTime, doneAction = 2 |
 		var selectRelease;

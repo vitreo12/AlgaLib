@@ -9,10 +9,18 @@ AlgaStartup {
 		algaSynthDefIOPath = (algaSynthDefPath ++ "/IO_" ++ algaMaxIO ++ "/").asString;
 	}
 
-	*algaMaxIO_ { | val |
-		if(val.isNumber.not, { "AlgaStartup: algaMaxIO must be a number".error; ^this });
-		algaMaxIO = val;
+	*algaMaxIO_ { | value |
+		if(value.isNumber.not, { "AlgaStartup: algaMaxIO must be a number".error; ^this });
+		algaMaxIO = value;
 		this.updateAlgaSynthDefIOPath;
+	}
+
+	*maxIO {
+		^algaMaxIO
+	}
+
+	*maxIO_ { | value |
+		this.algaMaxIO_(value)
 	}
 
 	*updateAlgaSynthDefIOPath {
