@@ -52,8 +52,6 @@ Alga {
 	}
 
 	*newScheduler { | server, clock, cascadeMode = false |
-		server = server ? Server.default;
-		clock = clock ? TempoClock.default;
 		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
 	}
 
@@ -68,7 +66,7 @@ Alga {
 		^scheduler;
 	}
 
-	*boot { | onBoot, server, algaServerOptions |
+	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
 
 		server = server ? Server.default;
@@ -116,7 +114,7 @@ Alga {
 		this.clearServer(server, prevServerQuit);
 
 		//Create an AlgaScheduler @ the server (using TempoClock for now...)
-		this.newScheduler(server);
+		this.newScheduler(server, clock);
 
 		//Add the server
 		this.newServer(server);

@@ -24,9 +24,7 @@ AlgaThread {
 	}
 
 	//Overwrite this (if needed)
-	clearFunc {
-
-	}
+	clearFunc { }
 
 	cmdPeriod {
 		this.clear; //stop and clear the previous task
@@ -84,7 +82,7 @@ AlgaScheduler : AlgaThread {
 	*new { | server, clock, cascadeMode = false, autostart = true, interruptOnSched = false |
 		var argServer = server ? Server.default;
 		var argName = argServer.name;
-		var argClock = clock ? TempoClock.default;
+		var argClock = clock ? TempoClock(1, queueSize:16834).permanent_(true); //big queue size
 		^super.newCopyArgs(argName, argServer, argClock).init(cascadeMode, autostart, interruptOnSched);
 	}
 
@@ -239,12 +237,6 @@ AlgaScheduler : AlgaThread {
 						exceededMaxSpinTime
 					);
 
-					/*
-					if(verbose, {
-						("Hanging at func" + condition.def.context).postln;
-					});
-					*/
-
 					if(exceededMaxSpinTime[0], {
 						condition = true; //exit the while loop
 					});
@@ -271,12 +263,6 @@ AlgaScheduler : AlgaThread {
 					condition,
 					nil
 				);
-
-				/*
-				if(verbose, {
-					("Hanging at func" + condition.def.context).postln;
-				});
-				*/
 
 				//Or, this action is spinning
 				spinningActionsCount = spinningActionsCount + 1;
@@ -352,7 +338,7 @@ AlgaScheduler : AlgaThread {
 										action[1]
 									);
 								}, {
-									//Else, push it to list with sched 0
+									//Else, push it to list with sched 0 (== execute ASAP)
 									this.addAction(action[0], action[1], 0);
 								});
 
@@ -386,7 +372,7 @@ AlgaScheduler : AlgaThread {
 										action[1]
 									);
 								}, {
-									//Else, push it to list with sched 0
+									//Else, push it to list with sched 0 (== execute ASAP)
 									this.addAction(action[0], action[1], 0);
 								});
 
