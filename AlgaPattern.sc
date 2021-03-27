@@ -86,10 +86,9 @@ AlgaPatternInterpStates {
 AlgaPattern : AlgaNode {
 	/*
 	Todos and questions:
-	1) What about inNodes for an AlgaPattern?
-	   Are these set only through direct mapping and ListPatterns (Pseq, etc..)?
+	1) What about inNodes for an AlgaPattern, especially with ListPatterns as \def ?
 
-	2) How to connect an AlgaNode to an AlgaPattern parameter? What about kr / ar?
+	2) How to connect an AlgaNode to an AlgaPattern parameter? What about kr / ar? (WIP)
 
 	3) Can an AlgaNode connect to \dur? Only if it's \control rate (using AlgaPkr)
 
@@ -170,9 +169,16 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Create all pattern synths per-param
+	//Create all pattern synths per-param ...
+	//What about multi-channel expansion? As of now, multichannel works with the
+	//same conversion rules as AlgaNode, but perhaps it's more ideomatic to implement
+	//native channel expansion. It should be easy: just pop new synths and route them
+	//to the same patternParamBus.
+	//However, mind of the overhead of \alga_pattern_ ... functions, which are expensive
+	//due to scalings, etc... Perhaps they should be reworked to just "bypass" the input
+	//and route it correctly to the bus that interpolation will be using.
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
-		paramDefault, patternParamBus, patternBussesAndSynths |
+		paramDefault, paramPatternEnvBus, patternParamBus, patternBussesAndSynths |
 
 		var interpStatesAtParam = interpStates[paramName];
 
@@ -235,6 +241,7 @@ AlgaPattern : AlgaNode {
 
 					var patternParamSynthArgs = [
 						\in, paramVal,
+						\env, paramPatternEnvBus.busArg,
 						\out, patternParamBus.index,
 						\fadeTime, 0
 					];
@@ -281,19 +288,28 @@ AlgaPattern : AlgaNode {
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
 
+			//Get the bus where interpolation envelope is written to...
+			//REMEMBER that for AlgaPattern, interpSynths are actually JUST the
+			//interpolation envelope, which is then passed through this individual synths!
+			//NO MIXING FOR NOW (getting \default only)
+			var paramPatternEnvBus = interpBusses[paramName][\default];
+
+			//HOW TO NORMALIZE ???
+
+			//New bus to write interpolation result to
 			var paramPatternBus = AlgaBus(server, paramNumChannels, paramRate);
 
-			//Create all interp synths for current param, including interpolated ones!
+			//Create all interp synths for current param
 			this.createPatternParamSynths(
 				paramName, paramNumChannels, paramRate,
-				paramDefault, paramPatternBus, patternBussesAndSynths
+				paramDefault, paramPatternEnvBus, paramPatternBus, patternBussesAndSynths
 			);
 
-			//add interpBus to interpBussesAndSynths
-			patternBussesAndSynths.add(paramPatternBus);
-
-			//append \paramName, interpBus to patternSynthArgs for correct connections
+			//Read from interpBusAtParam
 			patternSynthArgs = patternSynthArgs.add(paramName).add(paramPatternBus.busArg);
+
+			//Register bus to be freed
+			patternBussesAndSynths.add(paramPatternBus);
 		});
 
 		//Specify an fx?
@@ -481,6 +497,9 @@ AlgaPattern : AlgaNode {
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);
 
+		//Create \default interpSynths / normSynths
+		this.createInterpNormSynths;
+
 		//start the pattern right away. quant?
 		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
 			clock: this.clock
@@ -526,7 +545,8 @@ AlgaPattern : AlgaNode {
 	}
 
 	//<<, <<+ and <|
-	makeConnection { | param = \in, sender, time = 0, scale, sched = 0 |
+	makeConnection { | sender, param = \in, replace = false, mix = false,
+		replaceMix = false, senderChansMapping, scale, time, sched = 0 |
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			scheduler.addAction(
 				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
@@ -573,7 +593,7 @@ AlgaPattern : AlgaNode {
 		"AlgaPattern: mixTo is not supported yet".error;
 	}
 
-	//Since can't check each synth, just check if the group is instantiated
+	//Since can't check synth, just check if the group is instantiated
 	algaInstantiated {
 		^(group.algaInstantiated);
 	}
@@ -583,10 +603,7 @@ AlgaPattern : AlgaNode {
 		^((this.algaInstantiated).and(synthBus != nil));
 	}
 
-	//To receive signals (test this better)
-	algaInstantiatedAsReceiver { | param = \in, sender, mix = false |
-		^this.algaInstantiated;
-	}
+	//algaInstantiatedAsReceiver is the same as AlgaNode
 
 	isAlgaPattern { ^true }
 }

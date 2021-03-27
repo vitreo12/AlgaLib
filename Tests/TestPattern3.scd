@@ -17,6 +17,10 @@ Alga.boot({
 });
 )
 
-a.makeConnection(\freq, Pseq([Pseq([100, [100, 300]]), 2000], inf))
+a.from(Pseq([Pseq([100, [100, 300]]), 2000], inf), \freq)
 
 s.scope
+
+a.interpSynths
+
+Alga.initSynthDefs

@@ -1177,29 +1177,40 @@ AlgaNode {
 
 			//interpSynths and normSynths are a IdentityDict of IdentityDicts
 			if(replace.not.or(noSenders), {
-				//e.g. \alga_interp_audio1_control1
-				var interpSymbol = (
-					"alga_interp_" ++
-					paramRate ++
-					paramNumChannels ++
-					"_" ++
-					paramRate ++
-					paramNumChannels
-				).asSymbol;
+				var interpSymbol, interpBus, interpSynth;
+				var normSymbol, normSynth;
+
+				if(this.isAlgaPattern.not, {
+					//AlgaNode: \alga_interp_audio1_control1
+					interpSymbol = (
+						"alga_interp_" ++
+						paramRate ++
+						paramNumChannels ++
+						"_" ++
+						paramRate ++
+						paramNumChannels
+					).asSymbol;
+				}, {
+					//AlgaPattern \alga_interp_env_audio
+					interpSymbol = (
+						"alga_pattern_interp_env_" ++
+						paramRate
+					).asSymbol;
+				});
 
 				//e.g. \alga_norm_audio1
-				var normSymbol = (
+				normSymbol = (
 					"alga_norm_" ++
 					paramRate ++
 					paramNumChannels
 				).asSymbol;
 
 				//default interpBus
-				var interpBus = interpBusses[paramName][\default];
+				interpBus = interpBusses[paramName][\default];
 
 				//Instantiated right away, with no \fadeTime, as it will directly be connected to
 				//synth's parameter. Synth will read its params from all the normBusses
-				var normSynth = AlgaSynth(
+				normSynth = AlgaSynth(
 					normSymbol,
 					[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
 					normGroup,
@@ -1207,7 +1218,7 @@ AlgaNode {
 				);
 
 				//use paramDefault: no replace or no senders in sendersSet
-				var interpSynth = AlgaSynth(
+				interpSynth = AlgaSynth(
 					interpSymbol,
 					[\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
 					interpGroup
@@ -2016,23 +2027,21 @@ AlgaNode {
 	}
 
 	from { | sender, param = \in, chans, scale, time, sched = 0 |
-		if(sender.isAlgaNode, {
+		case
+		{ sender.isAlgaNode } {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
-			);
-		}, {
-			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param, senderChansMapping:chans,
-					scale:scale, time:time, sched:sched
-				);
-			}, {
-				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
-			});
-		});
+		}
+		{ (sender.isNumberOrArray.not).and(sender.isPattern.not) } {
+			("Trying to enstablish a connection from an invalid class: " ++ sender.class).error;
+			^this;
+		};
+
+		this.makeConnection(sender, param, senderChansMapping:chans,
+			scale:scale, time:time, sched:sched
+		);
 	}
 
 	//arg is the sender. it can also be a number / array to set individual values
@@ -2050,7 +2059,7 @@ AlgaNode {
 				scale:scale, time:time, sched:sched
 			);
 		}, {
-			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
+			("Trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
 		});
 	}
 
@@ -2060,23 +2069,22 @@ AlgaNode {
 	}
 
 	mixFrom { | sender, param = \in, chans, scale, time, sched = 0 |
-		if(sender.isAlgaNode, {
+		case
+		{ sender.isAlgaNode } {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
-			);
-		}, {
-			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
-					scale:scale, time:time, sched:sched
-				);
-			}, {
-				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
-			});
-		});
+		}
+		{ (sender.isNumberOrArray.not).and(sender.isPattern.not) } {
+			("Trying to enstablish a connection from an invalid class: " ++ sender.class).error;
+			^this;
+		};
+
+		this.makeConnection(sender, param, mix:true,
+			senderChansMapping:chans, scale:scale,
+			time:time, sched:sched
+		);
 	}
 
 	//add to already running nodes (mix)
@@ -2090,11 +2098,12 @@ AlgaNode {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			receiver.makeConnection(this, param, mix:true, senderChansMapping:chans,
+			receiver.makeConnection(this, param, mix:true,
+				senderChansMapping:chans,
 				scale:scale, time:time, sched:sched
 			);
 		}, {
-			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
+			("Trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
 		});
 	}
 

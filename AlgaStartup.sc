@@ -46,6 +46,7 @@ AlgaStartup {
 					this.initAlgaInterp;
 					this.initAlgaNorm;
 					this.initAlgaMixFades;
+					this.initAlgaPatternInterp;
 					"-> Done!".postln;
 				}, {
 					("Could not create path: " ++ algaSynthDefIOPath).error;
@@ -134,18 +135,22 @@ Limiter.ar(input) * AlgaEnvGate.ar
 
 			var arrayOfZeros_in;
 
+			/*
 			var pattern_interp_name_ar, pattern_interp_name_kr;
 			var result_pattern_interp_ar, result_pattern_interp_kr;
 			var outs_pattern;
+			*/
 
 			i = i + 1;
 
 			if(i == 1, {
 				arrayOfZeros_in = "0";
-				outs_pattern = "outs[0] = out;"
+
+				//outs_pattern = "outs[0] = out;"
 			}, {
 				arrayOfZeros_in = "[";
-				outs_pattern = i.asString ++ ".do({ | i | outs[i] = out[i]});";
+
+				//outs_pattern = i.asString ++ ".do({ | i | outs[i] = out[i]});";
 
 				//[0, 0, 0...
 				i.do({
@@ -156,6 +161,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 				arrayOfZeros_in = arrayOfZeros_in[0..(arrayOfZeros_in.size - 2)] ++ "]";
 			});
 
+			/*
 			pattern_interp_name_ar = "\\alga_pattern_interp_audio" ++ i;
 			pattern_interp_name_kr = "\\alga_pattern_interp_control" ++ i;
 
@@ -187,6 +193,7 @@ outs;
 ";
 			result_pattern_interp_ar.interpret;
 			result_pattern_interp_kr.interpret;
+			*/
 
 			algaMaxIO.do({ | y |
 
@@ -224,6 +231,8 @@ outs;
 					var outs = "outs[0] = out;";
 					var indices_ar = "in;";
 					var indices_kr = "in;";
+					var env_pattern_ar = "\\env.ar(0);";
+					var env_pattern_kr = "\\env.kr(0);";
 
 					//constant multiplier. this is set when mix's scale argument is a single Number
 					var multiplier = "\\outMultiplier.ir(1);";
@@ -241,7 +250,7 @@ outs;
 					[\ar_ar, \kr_kr, \ar_kr, \kr_ar].do({ | rate |
 						var result;
 						var name, in, indices, env, scaling;
-						var name_pattern;
+						var name_pattern, env_pattern;
 
 						if(rate == \ar_ar, {
 							name = "\\alga_interp_audio" ++ i ++ "_audio" ++ y;
@@ -250,6 +259,7 @@ outs;
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));";
+							env_pattern = env_pattern_ar;
 						});
 
 						if(rate == \kr_kr, {
@@ -259,6 +269,7 @@ outs;
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));";
+							env_pattern = env_pattern_kr;
 						});
 
 						if(rate == \ar_kr, {
@@ -268,6 +279,7 @@ outs;
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));";
+							env_pattern = env_pattern_kr;
 						});
 
 						if(rate == \kr_ar, {
@@ -277,6 +289,7 @@ outs;
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));";
+							env_pattern = env_pattern_ar;
 						});
 
 						result = "
@@ -302,9 +315,9 @@ outs[" ++ y ++ "] = env;
 outs;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 
-//Same but with no AlgaDynamicEnvGate. This also allows to set per-pattern tick scale values.
+//Env comes from outside
 AlgaSynthDef(" ++ name_pattern ++ ", { | scaleCurve = 0 |
-var in, out, outMultiplier, outScale;
+var in, env, out, outMultiplier, outScale;
 in = " ++ in ++ "
 out = " ++ indices ++ "
 outMultiplier = " ++ multiplier ++ "
@@ -317,6 +330,8 @@ scaleCurve,
 );
 out = " ++ scaling ++ "
 out = out * outMultiplier;
+env = " ++ env_pattern ++ "
+out = out * env;
 out;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
@@ -448,5 +463,18 @@ val;
 			fadeout_kr.interpret;
 			fadeout_ar.interpret;
 		});
+	}
+
+	*initAlgaPatternInterp {
+		var result = "
+AlgaSynthDef(\\alga_pattern_interp_env_audio, {
+AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+
+AlgaSynthDef(\\alga_pattern_interp_env_control, {
+AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+";
+		result.interpret;
 	}
 }
