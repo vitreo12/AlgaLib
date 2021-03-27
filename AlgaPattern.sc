@@ -152,7 +152,7 @@ AlgaPattern : AlgaNode {
 			});
 
 			//Send bundle to server using the same server / clock as the AlgaPattern
-			//( AlgaScheduler ??? )
+			//Note that this does not go through the AlgaScheduler directly, but it uses its same clock!
 			schedBundleArrayOnClock(
 				offset,
 				algaPatternClock,
@@ -388,9 +388,10 @@ AlgaPattern : AlgaNode {
 		this.createAllBusses;
 
 		//Create the actual pattern, pushing to scheduler ???
-		scheduler.addAction(func: {
-			this.createPattern;
-		}, sched: sched);
+		scheduler.addAction(
+			func: { this.createPattern },
+			sched: sched
+		);
 	}
 
 	//Support Function in the future
@@ -500,128 +501,19 @@ AlgaPattern : AlgaNode {
 
 	//the interpolation function for AlgaPattern << Pattern / Number / Array
 	interpPattern { | param = \in, sender, time = 0, scale, curves = \lin |
-		var eventPairAtParam;
 
-		// \dur doesn't interpolate well for now
-		if(param == \dur, {
-			var clock = this.clock;
-
-			if(clock.isTempoClock, {
-				("AlgaPattern: interpolating \dur is still WIP. Changes will be applied after " ++ time ++ " beats").warn;
-			}, {
-				("AlgaPattern: interpolating \dur is still WIP. Changes will be applied after " ++ time ++ " seconds").warn;
-			});
-
-			//Overwrite \dur with sender after time. Put this at top priority,
-			//so that's executed before any other event!
-			^clock.algaSchedAtQuantOnceWithTopPriority(
-				time,
-				{ eventPairs[\dur] = sender.asStream }
-			);
-		});
-
-		//retrieve it here so it also applies to delta == dur
-		eventPairAtParam = eventPairs[param];
-
-		//Run interp by replacing the entry directly, using the .blend function
-		if(eventPairAtParam != nil, {
-			//Just \lin for now (just like the other interps)
-			var interpSeg = Pseg([0, 1, 1], [time, inf], curves);
-
-			//calculate the scaling
-			var scaling = this.calculateScaling(param, sender, nil, scale);
-
-			if(scaling != nil, {
-				//linear (0)..there should be the option for curve
-				var scaleCurve = 0;
-
-				case
-
-				//One scale value (number)
-				{ scaling.size == 2 } {
-					sender = sender * scaling[1];
-				}
-
-				//Two scale values (-1.0 / 1.0 / highMin / highMax)
-				{ scaling.size == 6 } {
-					sender = sender.lincurve(
-						-1.0, 1.0, scaling[1], scaling[3], scaleCurve
-					);
-				}
-
-				//Four scale values (lowMin / lowMax / highMin / highMax)
-				{ scaling.size == 10 } {
-					sender = sender.lincurve(
-						scaling[1], scaling[3], scaling[5], scaling[7], scaleCurve
-					);
-				};
-			});
-
-			//Set correct interpState
-			this.setInterpState(param, sender, time);
-
-			//Direct replacing in the IdentityDictionary.
-			//This is what is indexed and played by the Pattern!
-			eventPairs[param] = (
-				eventPairAtParam.blend(sender, interpSeg)
-			).asStream;
-
-		}, {
-			("AlgaPattern: invalid param: " ++ param.asString).error;
-		});
 	}
 
 	//the interpolation function for AlgaPattern << AlgaNode
 	interpAlgaNode { | param = \in, sender, time = 0, scale, curves = \lin |
-		var correctConnection = true;
 
-		if(param == \dur, {
-			//Check if \dur and \control: use AlgaPkr...
-			//AlgaPkr can also be used for another mode where control AlgaNode
-			//are effectively sampled and held at the trigger of the event
-			if(sender.rate == \control, {
-				this.interpPattern(param, AlgaPkr(sender, 0.001), time, scale, curves);
-			}, {
-				"AlgaPattern: interpAlgaNode can't modulate 'dur' at audio rate".error;
-				correctConnection = false;
-			});
-		}, {
-			//Connecting to anything else than \dur
-
-		});
-
-		//Ok, good connections. Go on with adding inNodes / outNodes
-		//and setting block node ordering
-		if(correctConnection, {
-			//Add inNodes / outNodes
-			this.addInOutNodesDict(sender, param, false);
-
-			//Set correct interpState
-			this.setInterpState(param, sender, time);
-
-			//Figure out AlgaBlocks too
-
-		});
 	}
 
 	//the interpolation function for AlgaPattern << ListPattern
 	//this is separated from interpPattern because there's the need to check
 	//for the presence of AlgaNodes in the list, to run specific interpolation magic
 	interpListPattern { | param = \in, sender, time = 0, scale, curves = \lin |
-		var containsAlgaNodes = false;
 
-		//Check if it's a ListPattern that contains AlgaNodes
-		sender.list.do({ | element |
-			if(element.isAlgaNode, {
-				containsAlgaNodes = true
-			});
-		});
-
-		if(containsAlgaNodes, {
-			"AlgaPattern: interpListPattern with AlgaNodes isn't implemented yet".error;
-		}, {
-			^this.interpPattern(param, sender, time, scale, curves);
-		});
 	}
 
 	//<<, <<+ and <|
@@ -660,11 +552,13 @@ AlgaPattern : AlgaNode {
 	}
 
 	//<<, <<+ and <|
-	makeConnection { | param = \in, sender, time = 0, scale, curves = \lin |
+	makeConnection { | param = \in, sender, time = 0, scale, curves = \lin, sched = 0 |
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
-			scheduler.addAction({ (this.algaInstantiated).and(sender.algaInstantiated) }, {
-				this.makeConnectionInner(param, sender, time, scale, curves)
-			})
+			scheduler.addAction(
+				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
+				func: { this.makeConnectionInner(param, sender, time, scale, curves) },
+				sched: sched
+			)
 		});
 	}
 
@@ -707,15 +601,9 @@ AlgaPattern : AlgaNode {
 
 	isAlgaPattern { ^true }
 
-	//Since I can't check each synth, just check if the necessary groups have been allocated
+	//Since I can't check each synth, just check if the group is instantiated
 	algaInstantiated {
-		^(group.algaInstantiated.and(
-			interpGroup.algaInstantiated.and(
-				synthGroup.algaInstantiated.and(
-					playGroup.algaInstantiated
-				)
-			)
-		))
+		^(group.algaInstantiated);
 	}
 }
 
