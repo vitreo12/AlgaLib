@@ -1,5 +1,5 @@
 AlgaStartup {
-	classvar <algaMaxIO = 16;
+	classvar <algaMaxIO = 8;
 
 	classvar <algaSynthDefPath;
 	classvar <algaSynthDefIOPath;
@@ -134,12 +134,18 @@ Limiter.ar(input) * AlgaEnvGate.ar
 
 			var arrayOfZeros_in;
 
+			var pattern_interp_name_ar, pattern_interp_name_kr;
+			var result_pattern_interp_ar, result_pattern_interp_kr;
+			var outs_pattern;
+
 			i = i + 1;
 
 			if(i == 1, {
 				arrayOfZeros_in = "0";
+				outs_pattern = "outs[0] = out;"
 			}, {
 				arrayOfZeros_in = "[";
+				outs_pattern = i.asString ++ ".do({ | i | outs[i] = out[i]});";
 
 				//[0, 0, 0...
 				i.do({
@@ -149,6 +155,38 @@ Limiter.ar(input) * AlgaEnvGate.ar
 				//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
 				arrayOfZeros_in = arrayOfZeros_in[0..(arrayOfZeros_in.size - 2)] ++ "]";
 			});
+
+			pattern_interp_name_ar = "\\alga_pattern_interp_audio" ++ i;
+			pattern_interp_name_kr = "\\alga_pattern_interp_control" ++ i;
+
+			//Interpolation without scaling
+			result_pattern_interp_ar = "
+AlgaSynthDef(" ++ pattern_interp_name_ar ++ ", {
+var in, env, out, outs;
+in = \\in.ar(" ++ arrayOfZeros_in ++ ");
+env = AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
+out = in * env;
+outs = Array.newClear(" ++ (i + 1) ++ ");
+" ++ outs_pattern ++ "
+outs[" ++ i ++ "] = env;
+outs;
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+";
+
+			result_pattern_interp_kr = "
+AlgaSynthDef(" ++ pattern_interp_name_kr ++ ", {
+var in, env, out, outs;
+in = \\in.kr(" ++ arrayOfZeros_in ++ ");
+env = AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));
+out = in * env;
+outs = Array.newClear(" ++ (i + 1) ++ ");
+" ++ outs_pattern ++ "
+outs[" ++ i ++ "] = env;
+outs;
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+";
+			result_pattern_interp_ar.interpret;
+			result_pattern_interp_kr.interpret;
 
 			algaMaxIO.do({ | y |
 
@@ -203,9 +241,11 @@ Limiter.ar(input) * AlgaEnvGate.ar
 					[\ar_ar, \kr_kr, \ar_kr, \kr_ar].do({ | rate |
 						var result;
 						var name, in, indices, env, scaling;
+						var name_pattern;
 
 						if(rate == \ar_ar, {
 							name = "\\alga_interp_audio" ++ i ++ "_audio" ++ y;
+							name_pattern = "\\alga_pattern_audio" ++ i ++ "_audio" ++ y;
 							in = "\\in.ar(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
@@ -214,6 +254,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 
 						if(rate == \kr_kr, {
 							name = "\\alga_interp_control" ++ i ++ "_control" ++ y;
+							name_pattern = "\\alga_pattern_control" ++ i ++ "_control" ++ y;
 							in = "\\in.kr(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
@@ -222,6 +263,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 
 						if(rate == \ar_kr, {
 							name = "\\alga_interp_audio" ++ i ++ "_control" ++ y;
+							name_pattern = "\\alga_pattern_audio" ++ i ++ "_control" ++ y;
 							in = "A2K.kr(\\in.ar(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
@@ -230,6 +272,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 
 						if(rate == \kr_ar, {
 							name = "\\alga_interp_control" ++ i ++ "_audio" ++ y;
+							name_pattern = "\\alga_pattern_control" ++ i ++ "_audio" ++ y;
 							in = "K2A.ar(\\in.kr(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
@@ -257,7 +300,26 @@ outs = Array.newClear(" ++ (y + 1) ++ ");
 " ++ outs ++ "
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+
+//Same but with no AlgaDynamicEnvGate. This also allows to set per-pattern tick scale values.
+AlgaSynthDef(" ++ name_pattern ++ ", { | scaleCurve = 0 |
+var in, out, outMultiplier, outScale;
+in = " ++ in ++ "
+out = " ++ indices ++ "
+outMultiplier = " ++ multiplier ++ "
+outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++ "),
+scaleCurve,
+);
+out = " ++ scaling ++ "
+out = out * outMultiplier;
+out;
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+";
 
 						result.interpret;
 

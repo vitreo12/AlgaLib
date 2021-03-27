@@ -170,13 +170,13 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Create all interpSynths
-	createInterpPatternSynths { | paramName, paramNumChannels, paramRate,
-		paramDefault, interpBus, interpBussesAndSynths |
+	//Create all pattern synths per-param
+	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
+		paramDefault, patternParamBus, patternBussesAndSynths |
 
 		var interpStatesAtParam = interpStates[paramName];
 
-		//Core of the interpolation behaviour for AlgaPattern
+		//Core of the interpolation behaviour for AlgaPattern !!
 		if(interpStatesAtParam != nil, {
 			interpStatesAtParam.do({ | interpStateAtParam |
 				var validParam = false;
@@ -224,8 +224,8 @@ AlgaPattern : AlgaNode {
 				};
 
 				if(validParam, {
-					var interpSymbol = (
-						"alga_interp_" ++
+					var patternParamSymbol = (
+						"alga_pattern_" ++
 						senderRate ++
 						senderNumChannels ++
 						"_" ++
@@ -233,21 +233,22 @@ AlgaPattern : AlgaNode {
 						paramNumChannels
 					).asSymbol;
 
-					var interpSynthArgs = [
+					var patternParamSynthArgs = [
 						\in, paramVal,
-						\out, interpBus.index,
+						\out, patternParamBus.index,
 						\fadeTime, 0
 					];
 
-					var interpSynth = AlgaSynth(
-						interpSymbol,
-						interpSynthArgs,
+					var patternParamSynth = AlgaSynth(
+						patternParamSymbol,
+						patternParamSynthArgs,
 						interpGroup,
+						\addToTail,
 						waitForInst: false
 					);
 
-					//add interpSynth to interpBussesAndSynths
-					interpBussesAndSynths.add(interpSynth);
+					//add patternParamSynth to patternBussesAndSynths
+					patternBussesAndSynths.add(patternParamSynth);
 				}, {
 					("AlgaPattern: Invalid class " ++ paramVal.class ++ ". Invalid parameter " ++ paramName.asString).error;
 				});
@@ -261,7 +262,7 @@ AlgaPattern : AlgaNode {
 		var synthDef = eventEnvironment[\synthDefName].valueEnvir;
 
 		//These will be populated and freed when the patternSynth is released
-		var interpBussesAndSynths = IdentitySet(controlNames.size * 2);
+		var patternBussesAndSynths = IdentitySet(controlNames.size * 2);
 
 		//args to patternSynth
 		var patternSynthArgs = [
@@ -280,25 +281,19 @@ AlgaPattern : AlgaNode {
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
 
-			//Remember: interp busses must always have one extra channel for
-			//the interp envelope, even if the envelope is not used here (no normSynth)
-			//Otherwise, the envelope will write to other busses!
-			//Here, patternSynth, won't even look at that extra channel, but at least
-			//SuperCollider knows it's been written to.
-			//This, in fact, caused a huge bug when playing an AlgaPattern through other AlgaNodes!
-			var interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+			var paramPatternBus = AlgaBus(server, paramNumChannels, paramRate);
 
-			//Create all interp synths for current param
-			this.createInterpPatternSynths(
+			//Create all interp synths for current param, including interpolated ones!
+			this.createPatternParamSynths(
 				paramName, paramNumChannels, paramRate,
-				paramDefault, interpBus, interpBussesAndSynths
+				paramDefault, paramPatternBus, patternBussesAndSynths
 			);
 
 			//add interpBus to interpBussesAndSynths
-			interpBussesAndSynths.add(interpBus);
+			patternBussesAndSynths.add(paramPatternBus);
 
 			//append \paramName, interpBus to patternSynthArgs for correct connections
-			patternSynthArgs = patternSynthArgs.add(paramName).add(interpBus.busArg);
+			patternSynthArgs = patternSynthArgs.add(paramName).add(paramPatternBus.busArg);
 		});
 
 		//Specify an fx?
@@ -323,12 +318,12 @@ AlgaPattern : AlgaNode {
 		);
 
 		//Free all interpBusses and interpSynths on patternSynth's release
-		OSCFunc.newMatching({ | msg |
-			interpBussesAndSynths.do({ | entry |
+		patternSynth.onFree( {
+			patternBussesAndSynths.do({ | entry |
 				//.free works both for AlgaSynths and AlgaBusses
 				entry.free;
 			});
-		}, '/n_end', server.addr, argTemplate:[patternSynth.nodeID]).oneShot;
+		});
 	}
 
 	//dispatchNode: first argument is an Event
@@ -447,6 +442,8 @@ AlgaPattern : AlgaNode {
 				//Add to interpStates (asStream)
 				if(paramName != \dur, {
 					interpStates.add(paramName, value.asStream, 0);
+				}, {
+					patternPairs = patternPairs.add(\dur).add(value);
 				});
 			}, {
 				//Add \def key as \instrument

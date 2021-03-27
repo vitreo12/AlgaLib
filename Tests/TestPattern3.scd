@@ -9,7 +9,7 @@ Alga.boot({
 
 	a = AlgaPattern((
 		def: \test,
-		dur: 1,
+		dur: 0.5,
 		freq: Pwhite(400, 1000)
 	)).play;
 
@@ -17,4 +17,6 @@ Alga.boot({
 });
 )
 
-a.makeConnection(\freq, Pseq([Pseq([100, 200]), 2000], inf))
+a.makeConnection(\freq, Pseq([Pseq([100, [100, 300]]), 2000], inf))
+
+s.scope
