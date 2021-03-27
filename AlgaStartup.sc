@@ -135,22 +135,12 @@ Limiter.ar(input) * AlgaEnvGate.ar
 
 			var arrayOfZeros_in;
 
-			/*
-			var pattern_interp_name_ar, pattern_interp_name_kr;
-			var result_pattern_interp_ar, result_pattern_interp_kr;
-			var outs_pattern;
-			*/
-
 			i = i + 1;
 
 			if(i == 1, {
 				arrayOfZeros_in = "0";
-
-				//outs_pattern = "outs[0] = out;"
 			}, {
 				arrayOfZeros_in = "[";
-
-				//outs_pattern = i.asString ++ ".do({ | i | outs[i] = out[i]});";
 
 				//[0, 0, 0...
 				i.do({
@@ -160,40 +150,6 @@ Limiter.ar(input) * AlgaEnvGate.ar
 				//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
 				arrayOfZeros_in = arrayOfZeros_in[0..(arrayOfZeros_in.size - 2)] ++ "]";
 			});
-
-			/*
-			pattern_interp_name_ar = "\\alga_pattern_interp_audio" ++ i;
-			pattern_interp_name_kr = "\\alga_pattern_interp_control" ++ i;
-
-			//Interpolation without scaling
-			result_pattern_interp_ar = "
-AlgaSynthDef(" ++ pattern_interp_name_ar ++ ", {
-var in, env, out, outs;
-in = \\in.ar(" ++ arrayOfZeros_in ++ ");
-env = AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
-out = in * env;
-outs = Array.newClear(" ++ (i + 1) ++ ");
-" ++ outs_pattern ++ "
-outs[" ++ i ++ "] = env;
-outs;
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
-";
-
-			result_pattern_interp_kr = "
-AlgaSynthDef(" ++ pattern_interp_name_kr ++ ", {
-var in, env, out, outs;
-in = \\in.kr(" ++ arrayOfZeros_in ++ ");
-env = AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));
-out = in * env;
-outs = Array.newClear(" ++ (i + 1) ++ ");
-" ++ outs_pattern ++ "
-outs[" ++ i ++ "] = env;
-outs;
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
-";
-			result_pattern_interp_ar.interpret;
-			result_pattern_interp_kr.interpret;
-			*/
 
 			algaMaxIO.do({ | y |
 
@@ -315,7 +271,7 @@ outs[" ++ y ++ "] = env;
 outs;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 
-//Env comes from outside
+//Env comes from outside. Can be sampled and hold too.
 AlgaSynthDef(" ++ name_pattern ++ ", { | scaleCurve = 0 |
 var in, env, out, outMultiplier, outScale;
 in = " ++ in ++ "
@@ -408,9 +364,6 @@ out;
 			//Evaluate the generated code
 			result_audio.interpret;
 			result_control.interpret;
-
-			//result_audio.postln;
-			//result_control.postln;
 
 		});
 	}
