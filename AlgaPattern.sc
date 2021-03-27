@@ -136,6 +136,9 @@ AlgaPattern : AlgaNode {
 			//The final OSC bundle
 			var bundle;
 
+			//The AlgaSynthDef
+			var algaSynthDef = ~synthDefName;
+
 			//AlgaPattern and its server / clock
 			var algaPattern = ~algaPattern;
 			var algaPatternServer = ~algaPatternServer;
@@ -150,10 +153,8 @@ AlgaPattern : AlgaNode {
 
 			//Create the bundle with all needed Synths for this Event.
 			bundle = algaPatternServer.makeBundle(false, {
-				//Pass the Event's environment (where all the values coming from pattern exist)
-				//This function will also take care of Pattern / AlgaNode interpolations
 				~algaPattern.createEventSynths(
-					currentEnvironment
+					algaSynthDef
 				)
 			});
 
@@ -194,6 +195,7 @@ AlgaPattern : AlgaNode {
 					paramVal = paramVal.next;
 				});
 
+				//Valid values from a pattern are Numbers / Arrays / AlgaNodes
 				case
 
 				//Number / Array
@@ -257,17 +259,14 @@ AlgaPattern : AlgaNode {
 					//add patternParamSynth to patternBussesAndSynths
 					patternBussesAndSynths.add(patternParamSynth);
 				}, {
-					("AlgaPattern: Invalid class " ++ paramVal.class ++ ". Invalid parameter " ++ paramName.asString).error;
+					("AlgaPattern: Invalid class " ++ paramVal.class ++ " input for parameter " ++ paramName.asString).error;
 				});
 			});
 		});
 	}
 
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
-	createEventSynths { | eventEnvironment |
-		//The SynthDef ( ~synthDefName in Event )
-		var synthDef = eventEnvironment[\synthDefName].valueEnvir;
-
+	createEventSynths { | synthDef |
 		//These will be populated and freed when the patternSynth is released
 		var patternBussesAndSynths = IdentitySet(controlNames.size * 2);
 
@@ -291,7 +290,9 @@ AlgaPattern : AlgaNode {
 			//Get the bus where interpolation envelope is written to...
 			//REMEMBER that for AlgaPattern, interpSynths are actually JUST the
 			//interpolation envelope, which is then passed through this individual synths!
-			//NO MIXING FOR NOW (getting \default only)
+			// ... Now, I need to keep track of all the active interpBusses instead, not retrievin
+			//from interpBusses, which gets replaced in language, but should implement the same
+			//behaviour of activeInterpSynths and get busses from there.
 			var paramPatternEnvBus = interpBusses[paramName][\default];
 
 			//HOW TO NORMALIZE ???
@@ -598,12 +599,10 @@ AlgaPattern : AlgaNode {
 		^(group.algaInstantiated);
 	}
 
-	//To send signal
+	//To send signal ... algaInstantiatedAsReceiver is the same as AlgaNode
 	algaInstantiatedAsSender {
 		^((this.algaInstantiated).and(synthBus != nil));
 	}
-
-	//algaInstantiatedAsReceiver is the same as AlgaNode
 
 	isAlgaPattern { ^true }
 }
