@@ -6,7 +6,7 @@ AlgaPatternInterpStreams {
 	}
 
 	init {
-		entries = IdentityDictionary();
+		entries = IdentityDictionary(10);
 	}
 
 	add { | param = \in, entry |
@@ -35,7 +35,7 @@ AlgaPatternInterpStreams {
 		entries[param].remove(entry);
 	}
 
-	removeEntryAtParamOnFree { | synth, param = \in, entry |
+	removeEntryAtParamOnSynthFree { | synth, param = \in, entry |
 		synth.onFree({
 			this.removeEntryAtParam(param, entry);
 		});
@@ -44,18 +44,41 @@ AlgaPatternInterpStreams {
 
 AlgaPattern : AlgaNode {
 	/*
-	Todos and questions:
-	1) What about inNodes for an AlgaPattern, especially with ListPatterns as \def ?
+	Todos:
+
+	1) What about inNodes for an AlgaPattern, especially with ListPatterns as \def? (WIP)
 
 	2) How to connect an AlgaNode to an AlgaPattern parameter? What about kr / ar? (WIP)
 
-	3) Can an AlgaNode connect to \dur? Only if it's \control rate (using AlgaPkr)
+	3) Continuous or SAH interpolation (both in Patterns and AlgaNodes) (WIP)
 
-	4) Continuous or SAH interpolation (both in Patterns and AlgaNodes) (WIP)
-
-	5) \dur implementation: doesn't work cause it's not time accurate: there's no way
+	4) \dur implementation: doesn't work cause it's not time accurate: there's no way
 	   of syncing multiple patterns, as the interpolation process with Pseg will end up out
 	   of phase. Right now, \dur just sets the requested value AFTER time.
+
+	5) Can an AlgaNode connect to \dur? Only if it's \control rate (using AlgaPkr)
+	*/
+
+	/*
+	Maybes:
+
+	1) fx: (def: Pseq([\delay, \tanh]), delayTime: Pseq([0.2, 0.4]))
+
+	// Things to do:
+	// 1) Check the def exists
+	// 2) Check it has an \in parameter
+	// 3) Check it can free itself (like with DetectSilence).
+	//    If not, it will be freed with interpSynths
+	// 4) Route synth's audio through it
+	// 5) Use the "wet" result as output
+	// 6) Can't be interpolated
+
+	2) out: (node: Pseq([a, b], time: 1, scale: 1)
+
+	// Things to do:
+	// 1) Check if it is an AlgaNode or a ListPattern of AlgaNodes
+	// 2) It would just connect to nodes with \in param, mixing ( mixTo / mixFrom )
+	// 3) Can't be interpolated (but the connection itself can)
 	*/
 
 	//The actual Patterns to be manipulated
@@ -271,19 +294,6 @@ AlgaPattern : AlgaNode {
 			//Register bus to be freed
 			patternBussesAndSynths.add(paramPatternBus);
 		});
-
-		//Specify an fx?
-		//fx: (def: Pseq([\delay, \tanh]), delayTime: Pseq([0.2, 0.4]))
-		//Things to do:
-		// 1) Check the def exists
-		// 2) Check it has an \in parameter
-		// 3) Check it can free itself (like with DetectSilence).
-		//    If not, it will be freed with interpSynths
-		// 4) Route synth's audio through it
-
-		//Connect to specific nodes? It would just connect to nodes with \in param.
-		//What about mixing? Is mixing the default behaviour for this? (yes!!)
-		//out: (node: Pseq([a, b])
 
 		//This synth writes directly to synthBus
 		patternSynth = AlgaSynth(

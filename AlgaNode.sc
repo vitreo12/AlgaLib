@@ -58,7 +58,7 @@ AlgaNode {
 	//Currently active interpSynths per param.
 	//These are used when changing time on connections, and need to update already running
 	//interpSynths at specific param / sender combination. It's the whole core that allows
-	//to have dynamic fadeTimes
+	//to have dynamic interpolation fades at any time!!
 	var <activeInterpSynths;
 
 	//Connected nodes
@@ -2437,8 +2437,6 @@ AlgaNode {
 	//Find out if specific param / sender combination is in the mix
 	mixParamContainsSender { | param = \in, sender |
 		^(interpSynths[param][sender] != nil)
-		//Or this?
-		//^(inNodes[param].findMatch(sender) != nil);
 	}
 
 	//When clear, run disconnections to nodes connected to this
