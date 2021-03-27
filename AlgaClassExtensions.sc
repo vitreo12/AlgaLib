@@ -2,6 +2,7 @@
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
 	isPattern { ^false }
+	isStream { ^false }
 	isListPattern { ^false }
 	isTempoClock { ^false }
 	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
@@ -82,6 +83,10 @@
 			protoEvent
 		).play(clock, false, quant)
 	}
+}
+
++Stream {
+	isStream { ^true }
 }
 
 +ListPattern {
