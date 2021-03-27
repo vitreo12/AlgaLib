@@ -1,30 +1,5 @@
-AlgaPatternInterpState {
-	var <value;
-	var <interpState = false;
-
-	*new { | value |
-		^super.new.init(value)
-	}
-
-	init { | argValue |
-		value = argValue;
-	}
-
-	//Triggered interpolation synth
-	setStateFlag {
-		interpState = true;
-	}
-
-	print {
-		("value: " ++ value.asString).postln;
-		("interpState: " ++ interpState.asString).postln;
-	}
-}
-
-//Keeps track of active Patterns / Nodes per param (used for interp)
-AlgaPatternInterpStates {
+AlgaPatternInterpStreams {
 	var <entries;
-	var <times;
 
 	*new {
 		^super.new.init;
@@ -32,54 +7,38 @@ AlgaPatternInterpStates {
 
 	init {
 		entries = IdentityDictionary();
-		times   = IdentityDictionary();
 	}
 
-	add { | param = \in, entry, time = 0 |
+	add { | param = \in, entry |
 		var prevEntry = entries[param];
 
 		if(prevEntry == nil, {
 			entries[param] = IdentitySet().add(
-				AlgaPatternInterpState(entry)
+				entry.asStream;
 			);
 		}, {
 			entries[param].add(
-				AlgaPatternInterpState(entry)
+				entry.asStream;
 			);
 		});
-
-		times[param] = time;
 	}
 
 	at { | param |
 		^(entries[param]);
 	}
 
-	setStateFlag { | param = \in |
-		entries[param].do({ | entry |
-			entry.setStateFlag
-		})
-	}
-
 	remove { | param = \in |
 		entries.removeAt(param);
-		times.removeAt(param);
 	}
 
-	removeFromIdentitySet { | param = \in, what |
-		entries[param].remove(what);
+	removeEntryAtParam { | param = \in, entry |
+		entries[param].remove(entry);
 	}
 
-	print { | param = \in |
-		("param : " ++ param).warn;
-		entries[param].do({ | entry | entry.print });
-	}
-
-	debug {
-		entries.keysValuesDo({ | param, entry |
-			this.print(param);
+	removeEntryAtParamOnFree { | synth, param = \in, entry |
+		synth.onFree({
+			this.removeEntryAtParam(param, entry);
 		});
-		"".postln;
 	}
 }
 
@@ -92,11 +51,11 @@ AlgaPattern : AlgaNode {
 
 	3) Can an AlgaNode connect to \dur? Only if it's \control rate (using AlgaPkr)
 
-	4) Continuous or SAH interpolation (both in Patterns and AlgaNodes)
+	4) Continuous or SAH interpolation (both in Patterns and AlgaNodes) (WIP)
 
 	5) \dur implementation: doesn't work cause it's not time accurate: there's no way
 	   of syncing multiple patterns, as the interpolation process with Pseg will end up out
-	   of phase. Right now, \dur just sets the requested value AFTER fadeTime.
+	   of phase. Right now, \dur just sets the requested value AFTER time.
 	*/
 
 	//The actual Patterns to be manipulated
@@ -108,8 +67,8 @@ AlgaPattern : AlgaNode {
 	//The AlgaReschedulingEventStreamPlayer
 	var <algaReschedulingEventStreamPlayer;
 
-	//Dict of per-param AlgaPatternInterpState
-	var <>interpStates;
+	//Dict of all interpolation streams
+	var <>interpStreams;
 
 	//Add the \algaNote event to Event
 	*initClass {
@@ -137,7 +96,7 @@ AlgaPattern : AlgaNode {
 			var bundle;
 
 			//The AlgaSynthDef
-			var algaSynthDef = ~synthDefName;
+			var algaSynthDef = ~synthDefName.valueEnvir;
 
 			//AlgaPattern and its server / clock
 			var algaPattern = ~algaPattern;
@@ -181,16 +140,16 @@ AlgaPattern : AlgaNode {
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
 		paramDefault, paramPatternEnvBus, patternParamBus, patternBussesAndSynths |
 
-		var interpStatesAtParam = interpStates[paramName];
+		var interpStreamsAtParam = interpStreams[paramName];
 
 		//Core of the interpolation behaviour for AlgaPattern !!
-		if(interpStatesAtParam != nil, {
-			interpStatesAtParam.do({ | interpStateAtParam |
+		if(interpStreamsAtParam != nil, {
+			interpStreamsAtParam.do({ | interpStreamAtParam |
 				var validParam = false;
-				var paramVal = interpStateAtParam.value;
+				var paramVal = interpStreamAtParam.value;
 				var senderNumChannels, senderRate;
 
-				//Unpack Pattern, which is saved as a Stream
+				//Unpack Pattern value
 				if(paramVal.isStream, {
 					paramVal = paramVal.next;
 				});
@@ -266,7 +225,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
-	createEventSynths { | synthDef |
+	createEventSynths { | algaSynthDef |
 		//These will be populated and freed when the patternSynth is released
 		var patternBussesAndSynths = IdentitySet(controlNames.size * 2);
 
@@ -328,7 +287,7 @@ AlgaPattern : AlgaNode {
 
 		//This synth writes directly to synthBus
 		patternSynth = AlgaSynth(
-			synthDef,
+			algaSynthDef,
 			patternSynthArgs,
 			synthGroup,
 			waitForInst: false
@@ -434,11 +393,6 @@ AlgaPattern : AlgaNode {
 		"AlgaPattern: ListPatterns are not supported yet".error;
 	}
 
-	//Set current interp state
-	setInterpState { | param = \in, sender, time = 0 |
-		interpStates.add(param, sender, time);
-	}
-
 	//Build the actual pattern
 	createPattern {
 		var foundDurOrDelta = false;
@@ -456,9 +410,9 @@ AlgaPattern : AlgaNode {
 					paramName = \dur;
 				});
 
-				//Add to interpStates (asStream)
+				//Add to interpStreams
 				if(paramName != \dur, {
-					interpStates.add(paramName, value.asStream, 0);
+					interpStreams.add(paramName, value, 0);
 				}, {
 					patternPairs = patternPairs.add(\dur).add(value);
 				});
@@ -482,7 +436,7 @@ AlgaPattern : AlgaNode {
 				var paramDefault = this.getDefaultOrArg(controlName, paramName).asStream;
 
 				//Add to interpStates
-				interpStates.add(paramName, paramDefault, 0);
+				interpStreams.add(paramName, paramDefault, 0);
 			});
 		});
 
@@ -507,16 +461,6 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//the interpolation function for AlgaPattern << Pattern / Number / Array
-	interpPattern { | param = \in, sender, time = 0, scale |
-		interpStates.add(param, sender.asStream, time);
-	}
-
-	//the interpolation function for AlgaPattern << AlgaNode
-	interpAlgaNode { | param = \in, sender, time = 0, scale  |
-
-	}
-
 	//<<, <<+ and <|
 	makeConnectionInner { | param = \in, sender, time = 0, scale  |
 		var paramConnectionTime = paramsConnectionTime[param];
@@ -529,20 +473,19 @@ AlgaPattern : AlgaNode {
 			param = \dur
 		});
 
-		if(sender.isAlgaNode, {
-			// <<.param AlgaNode
-			// <<+.param AlgaNode (not yet)
-			^this.interpAlgaNode(param, sender, time, scale);
-		});
-
-		if((sender.isPattern.not).and(sender.isNumberOrArray.not), {
+		if((sender.isAlgaNode.not).and(sender.isPattern.not).and(sender.isNumberOrArray.not), {
 			"AlgaPattern: makeConnection only works with AlgaNodes, Patterns, Numbers and Arrays".error;
 			^this;
 		});
 
-		// <<.param Pattern
-		// <<+.param Pattern (not yet)
-		this.interpPattern(param, sender, time, scale);
+		//Special case, \dur
+		if(param == \dur, {
+			"to be implemented...".warn;
+			^this;
+		});
+
+		//Push the entry to interpStreams
+		interpStreams.add(param, sender, time);
 	}
 
 	//<<, <<+ and <|
