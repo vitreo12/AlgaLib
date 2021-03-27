@@ -1,5 +1,5 @@
 //https://scsynth.org/t/set-patterns-dur-right-away/3103/9
-AlgaReschedulingStreamPlayer {
+AlgaReschedulingEventStreamPlayer {
 	var <player;
 
 	*new { | stream, event |
