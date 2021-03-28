@@ -382,8 +382,8 @@ AlgaPattern : AlgaNode {
 		//Create groups if needed
 		if(initGroups, { this.createAllGroups });
 
-		//Create busses
-		this.createAllBusses;
+		//Create synthBus (interpBusses are taken care of in createPatternInterpSynthAndBus)
+		this.createSynthBus;
 
 		//Create the actual pattern, pushing to scheduler ???
 		scheduler.addAction(
@@ -401,6 +401,33 @@ AlgaPattern : AlgaNode {
 	//only if expressed with ListPattern subclasses (like Pseq, Prand, etc...)
 	dispatchListPattern {
 		"AlgaPattern: ListPatterns are not supported yet".error;
+	}
+
+	//Create interpSynth / interpBus.
+	createPatternInterpSynthAndBus { | controlName |
+		var interpBus, interpSynth;
+		var paramName = controlName.name;
+		var paramRate = controlName.rate;
+		var paramNumChannels = controlName.numChannels;
+
+		var interpSymbol = (
+			"alga_pattern_interp_env_" ++
+			paramRate
+		).asSymbol;
+
+		interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+
+		interpSynth = AlgaSynth(
+			interpSymbol,
+			[\out, interpBus.index, \fadeTime, 0],
+			interpGroup
+		);
+
+		interpBusses[paramName][\default] = interpBus;
+		interpSynths[paramName][\default] = interpSynth;
+
+		//Add interpSynth to the current active ones for specific param / sender combination
+		this.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
 	}
 
 	//Build the actual pattern
@@ -448,6 +475,9 @@ AlgaPattern : AlgaNode {
 				//Add to interpStates
 				interpStreams.add(paramName, paramDefault, 0);
 			});
+
+			//Create \default interpSynth / interpBus
+			this.createPatternInterpSynthAndBus(controlName);
 		});
 
 		//Add \type, \algaNode, and all things related to
@@ -461,9 +491,6 @@ AlgaPattern : AlgaNode {
 
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);
-
-		//Create \default interpSynths / normSynths
-		this.createInterpNormSynths;
 
 		//start the pattern right away. quant?
 		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(

@@ -1180,23 +1180,15 @@ AlgaNode {
 				var interpSymbol, interpBus, interpSynth;
 				var normSymbol, normSynth;
 
-				if(this.isAlgaPattern.not, {
-					//AlgaNode: \alga_interp_audio1_control1
-					interpSymbol = (
-						"alga_interp_" ++
-						paramRate ++
-						paramNumChannels ++
-						"_" ++
-						paramRate ++
-						paramNumChannels
-					).asSymbol;
-				}, {
-					//AlgaPattern \alga_interp_env_audio
-					interpSymbol = (
-						"alga_pattern_interp_env_" ++
-						paramRate
-					).asSymbol;
-				});
+				//AlgaNode: \alga_interp_audio1_control1
+				interpSymbol = (
+					"alga_interp_" ++
+					paramRate ++
+					paramNumChannels ++
+					"_" ++
+					paramRate ++
+					paramNumChannels
+				).asSymbol;
 
 				//e.g. \alga_norm_audio1
 				normSymbol = (
