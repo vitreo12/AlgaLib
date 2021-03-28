@@ -291,7 +291,7 @@ AlgaPattern : AlgaNode {
 					// ... Now, I need to keep track of all the active interpBusses instead, not retrievin
 					//from interpBusses, which gets replaced in language, but should implement the same
 					//behaviour of activeInterpSynths and get busses from there.
-					var paramPatternEnvBus = interpStreams.interpBusses[paramName][uniqueID];
+					var paternParamEnvBus = interpStreams.interpBusses[paramName][uniqueID];
 
 					var patternParamSymbol = (
 						"alga_pattern_" ++
@@ -304,7 +304,7 @@ AlgaPattern : AlgaNode {
 
 					var patternParamSynthArgs = [
 						\in, paramVal,
-						\env, paramPatternEnvBus.busArg,
+						\env, patternParamEnvBus.busArg,
 						\out, patternParamBus.index,
 						\fadeTime, 0
 					];
@@ -317,7 +317,7 @@ AlgaPattern : AlgaNode {
 						waitForInst: false
 					);
 
-					//add patternParamSynth to patternBussesAndSynths
+					//Register patternParamSynth to be freed
 					patternBussesAndSynths.add(patternParamSynth);
 				}, {
 					("AlgaPattern: Invalid class " ++ paramVal.class ++ " input for parameter " ++ paramName.asString).error;
@@ -349,19 +349,19 @@ AlgaPattern : AlgaNode {
 			var paramDefault = controlName.defaultValue;
 
 			//New bus to write interpolation result to
-			var paramPatternBus = AlgaBus(server, paramNumChannels, paramRate);
+			var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
 
 			//Create all interp synths for current param
 			this.createPatternParamSynths(
 				paramName, paramNumChannels, paramRate,
-				paramDefault, paramPatternBus, patternBussesAndSynths
+				paramDefault, patternParamBus, patternBussesAndSynths
 			);
 
 			//Read from interpBusAtParam
-			patternSynthArgs = patternSynthArgs.add(paramName).add(paramPatternBus.busArg);
+			patternSynthArgs = patternSynthArgs.add(paramName).add(patternParamBus.busArg);
 
-			//Register bus to be freed
-			patternBussesAndSynths.add(paramPatternBus);
+			//Register paramPatternBus to be freed
+			patternBussesAndSynths.add(patternParamBus);
 		});
 
 		//This synth writes directly to synthBus
@@ -459,7 +459,7 @@ AlgaPattern : AlgaNode {
 
 	//Support Function in the future
 	dispatchFunction {
-		"AlgaPattern: Functions are not supported yet".error;
+		"AlgaPattern: Functions as \def are not supported yet".error;
 	}
 
 	//Support multiple SynthDefs in the future,
@@ -469,7 +469,7 @@ AlgaPattern : AlgaNode {
 	//to correctly instantiate the interpStreams... I know it's quite the overhead,
 	//but, for now, it's just the easier solution.
 	dispatchListPattern {
-		"AlgaPattern: ListPatterns are not supported yet".error;
+		"AlgaPattern: ListPatterns as \def are not supported yet".error;
 	}
 
 	//Build the actual pattern
@@ -555,11 +555,11 @@ AlgaPattern : AlgaNode {
 
 		//Special case, \dur
 		if(param == \dur, {
-			"to be implemented...".warn;
+			"AlgaPattern: \dur interpolation is not supported yet".error;
 			^this;
 		});
 
-		//Push the entry to interpStreams
+		//Add to interpStreams (which also creates interpBus / interpSynth)
 		interpStreams.add(sender, controlNames[param]);
 	}
 
@@ -575,15 +575,10 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//stop and reschedule in the future
-	reschedule { | sched = 0 |
-		algaReschedulingEventStreamPlayer.reschedule(sched);
-	}
-
 	// <<| \param (goes back to defaults)
 	//previousSender is the mix one, in case that will be implemented in the future
 	resetParam { | param = \in, previousSender = nil, time |
-
+        "AlgaPattern: resetParam is not supported yet".error;
 	}
 
 	//replace entries.
@@ -592,14 +587,9 @@ AlgaPattern : AlgaNode {
 	// 2) replace just the SynthDef with either a new SynthDef or a ListPattern with JUST SynthDefs.
 	//    This would be equivalent to <<.def \newSynthDef
 	//    OR <<.def Pseq([\newSynthDef1, \newSynthDef2])
-	replaceInner { | obj, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
-		keepInScale = true, keepOutScale = true |
-
-	}
-
 	replace { | obj, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
 		keepInScale = true, keepOutScale = true |
-
+        "AlgaPattern: replace is not supported yet".error;
 	}
 
 	//Don't support <<+ for now
@@ -610,6 +600,11 @@ AlgaPattern : AlgaNode {
 	//Don't support >>+ for now
 	mixTo { | receiver, param = \in, outChans, scale, time |
 		"AlgaPattern: mixTo is not supported yet".error;
+	}
+
+	//stop and reschedule in the future
+	reschedule { | sched = 0 |
+		algaReschedulingEventStreamPlayer.reschedule(sched);
 	}
 
 	//Since can't check synth, just check if the group is instantiated
