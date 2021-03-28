@@ -158,7 +158,7 @@ AlgaNode {
 
 		//AlgaPattern specific
 		if(this.isAlgaPattern, {
-			this.interpStreams = AlgaPatternInterpStreams();
+			this.interpStreams = AlgaPatternInterpStreams(this);
 		});
 
 		^true;

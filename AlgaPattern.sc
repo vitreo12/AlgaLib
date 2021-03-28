@@ -1,38 +1,93 @@
 AlgaPatternInterpStreams {
+	var <algaPattern;
+	var <server;
+
 	var <entries;
+	var <interpSynths;
+	var <interpBusses;
 
-	*new {
-		^super.new.init;
+	*new { | algaPattern |
+		^super.new.init(algaPattern)
 	}
 
-	init {
-		entries = IdentityDictionary(10);
+	init { | argAlgaPattern |
+		entries      = IdentityDictionary(10);
+		interpSynths = IdentityDictionary(10);
+		interpBusses = IdentityDictionary(10);
+		algaPattern  = argAlgaPattern;
+		server       = algaPattern.server;
 	}
 
-	add { | param = \in, entry |
-		var prevEntry = entries[param];
+	createPatternInterpSynthAndBus { | paramName, paramRate, paramNumChannels, entry |
+		var interpGroup = algaPattern.interpGroup;
+		var interpBus, interpSynth;
 
-		if(prevEntry == nil, {
-			entries[param] = IdentitySet().add(
-				entry.asStream;
-			);
+		var interpSymbol = (
+			"alga_pattern_interp_env_" ++
+			paramRate
+		).asSymbol;
+
+		var interpSynthsAtParam = interpSynths[paramName];
+
+		interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+
+		interpSynth = AlgaSynth(
+			interpSymbol,
+			[\out, interpBus.index, \fadeTime, 0],
+			interpGroup
+		);
+
+		if(interpSynthsAtParam == nil, {
+			interpSynths[paramName] = IdentityDictionary().put(entry, interpSynth);
+			interpBusses[paramName] = IdentityDictionary().put(entry, interpBus);
 		}, {
-			entries[param].add(
-				entry.asStream;
-			);
+			interpSynths[paramName].put(entry, interpSynth);
+			interpBusses[paramName].put(entry, interpBus);
 		});
+
+		interpBusses[entry] = interpBus;
+		interpSynths[entry] = interpSynth;
+
+		//Add interpSynth to the current active ones for specific param / sender combination
+		//algaPattern.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
+
+		//interpBus should have a similar mechanism here !!!
+
+		//How to normalize ???
+
+		//Add entries to algaPattern too ... These are needed for algaInstantiatedAsReceiver
+		algaPattern.interpSynths[paramName][\default] = interpSynth;
+		algaPattern.interpBusses[paramName][\default] = interpBus;
 	}
 
-	at { | param |
-		^(entries[param]);
+	add { | entry, controlName |
+		var paramName = controlName.name;
+		var paramRate = controlName.rate;
+		var paramNumChannels = controlName.numChannels;
+
+		var entriesAtParam = entries[paramName];
+
+		entry = entry.asStream;
+
+		if(entriesAtParam == nil, {
+			entries[paramName] = IdentitySet().add(entry);
+		}, {
+			entries[paramName].add(entry);
+		});
+
+		this.createPatternInterpSynthAndBus(paramName, paramRate, paramNumChannels, entry);
 	}
 
 	remove { | param = \in |
 		entries.removeAt(param);
+		interpSynths.removeAt(param);
+		interpBusses.removeAt(param);
 	}
 
 	removeEntryAtParam { | param = \in, entry |
 		entries[param].remove(entry);
+		interpSynths[param].remove(entry);
+		interpBusses[param].remove(entry);
 	}
 
 	removeEntryAtParamOnSynthFree { | synth, param = \in, entry |
@@ -161,15 +216,15 @@ AlgaPattern : AlgaNode {
 	//due to scalings, etc... Perhaps they should be reworked to just "bypass" the input
 	//and route it correctly to the bus that interpolation will be using.
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
-		paramDefault, paramPatternEnvBus, patternParamBus, patternBussesAndSynths |
+		paramDefault, patternParamBus, patternBussesAndSynths |
 
-		var interpStreamsAtParam = interpStreams[paramName];
+		var interpStreamsAtParam = interpStreams.entries[paramName];
 
 		//Core of the interpolation behaviour for AlgaPattern !!
 		if(interpStreamsAtParam != nil, {
 			interpStreamsAtParam.do({ | interpStreamAtParam |
 				var validParam = false;
-				var paramVal = interpStreamAtParam.value;
+				var paramVal = interpStreamAtParam;
 				var senderNumChannels, senderRate;
 
 				//Unpack Pattern value
@@ -214,6 +269,14 @@ AlgaPattern : AlgaNode {
 				};
 
 				if(validParam, {
+					//Get the bus where interpolation envelope is written to...
+					//REMEMBER that for AlgaPattern, interpSynths are actually JUST the
+					//interpolation envelope, which is then passed through this individual synths!
+					// ... Now, I need to keep track of all the active interpBusses instead, not retrievin
+					//from interpBusses, which gets replaced in language, but should implement the same
+					//behaviour of activeInterpSynths and get busses from there.
+					var paramPatternEnvBus = interpStreams.interpBusses[paramName][interpStreamAtParam];
+
 					var patternParamSymbol = (
 						"alga_pattern_" ++
 						senderRate ++
@@ -269,23 +332,13 @@ AlgaPattern : AlgaNode {
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
 
-			//Get the bus where interpolation envelope is written to...
-			//REMEMBER that for AlgaPattern, interpSynths are actually JUST the
-			//interpolation envelope, which is then passed through this individual synths!
-			// ... Now, I need to keep track of all the active interpBusses instead, not retrievin
-			//from interpBusses, which gets replaced in language, but should implement the same
-			//behaviour of activeInterpSynths and get busses from there.
-			var paramPatternEnvBus = interpBusses[paramName][\default];
-
-			//HOW TO NORMALIZE ???
-
 			//New bus to write interpolation result to
 			var paramPatternBus = AlgaBus(server, paramNumChannels, paramRate);
 
 			//Create all interp synths for current param
 			this.createPatternParamSynths(
 				paramName, paramNumChannels, paramRate,
-				paramDefault, paramPatternEnvBus, paramPatternBus, patternBussesAndSynths
+				paramDefault, paramPatternBus, patternBussesAndSynths
 			);
 
 			//Read from interpBusAtParam
@@ -403,33 +456,6 @@ AlgaPattern : AlgaNode {
 		"AlgaPattern: ListPatterns are not supported yet".error;
 	}
 
-	//Create interpSynth / interpBus.
-	createPatternInterpSynthAndBus { | controlName |
-		var interpBus, interpSynth;
-		var paramName = controlName.name;
-		var paramRate = controlName.rate;
-		var paramNumChannels = controlName.numChannels;
-
-		var interpSymbol = (
-			"alga_pattern_interp_env_" ++
-			paramRate
-		).asSymbol;
-
-		interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
-
-		interpSynth = AlgaSynth(
-			interpSymbol,
-			[\out, interpBus.index, \fadeTime, 0],
-			interpGroup
-		);
-
-		interpBusses[paramName][\default] = interpBus;
-		interpSynths[paramName][\default] = interpSynth;
-
-		//Add interpSynth to the current active ones for specific param / sender combination
-		this.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
-	}
-
 	//Build the actual pattern
 	createPattern {
 		var foundDurOrDelta = false;
@@ -447,10 +473,8 @@ AlgaPattern : AlgaNode {
 					paramName = \dur;
 				});
 
-				//Add to interpStreams
-				if(paramName != \dur, {
-					interpStreams.add(paramName, value, 0);
-				}, {
+				//Add \dur to array
+				if(paramName == \dur, {
 					patternPairs = patternPairs.add(\dur).add(value);
 				});
 			}, {
@@ -467,17 +491,15 @@ AlgaPattern : AlgaNode {
 		//Add all the default entries from SynthDef that the user hasn't set yet
 		controlNames.do({ | controlName |
 			var paramName = controlName.name;
+			var paramValue = eventPairs[paramName];
 
 			//if not set explicitly yet
-			if(eventPairs[paramName] == nil, {
-				var paramDefault = this.getDefaultOrArg(controlName, paramName).asStream;
-
-				//Add to interpStates
-				interpStreams.add(paramName, paramDefault, 0);
+			if(paramValue == nil, {
+				paramValue = this.getDefaultOrArg(controlName, paramName);
 			});
 
-			//Create \default interpSynth / interpBus
-			this.createPatternInterpSynthAndBus(controlName);
+			//Add to interpStreams (which also creates interpBus / interpSynth)
+			interpStreams.add(paramValue, controlName, this);
 		});
 
 		//Add \type, \algaNode, and all things related to
@@ -522,7 +544,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Push the entry to interpStreams
-		interpStreams.add(param, sender, time);
+		interpStreams.add(sender, controlNames[param]);
 	}
 
 	//<<, <<+ and <|
@@ -579,7 +601,7 @@ AlgaPattern : AlgaNode {
 		^(group.algaInstantiated);
 	}
 
-	//To send signal ... algaInstantiatedAsReceiver is the same as AlgaNode
+	//To send signal... algaInstantiatedAsReceiver is same as AlgaNode
 	algaInstantiatedAsSender {
 		^((this.algaInstantiated).and(synthBus != nil));
 	}
