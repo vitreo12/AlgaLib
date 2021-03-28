@@ -18,7 +18,7 @@ AlgaPatternInterpStreams {
 		server       = algaPattern.server;
 	}
 
-	createPatternInterpSynthAndBus { | paramName, paramRate, paramNumChannels, entry |
+	createPatternInterpSynthAndBus { | paramName, paramRate, paramNumChannels, entry, uniqueID |
 		var interpGroup = algaPattern.interpGroup;
 		var interpBus, interpSynth;
 
@@ -42,11 +42,11 @@ AlgaPatternInterpStreams {
 		//However, pattern synths are created on the fly, so these things need to be re-used until
 		//interpolation has finished
 		if(interpSynthsAtParam == nil, {
-			interpSynths[paramName] = IdentityDictionary().put(entry, interpSynth);
-			interpBusses[paramName] = IdentityDictionary().put(entry, interpBus);
+			interpSynths[paramName] = IdentityDictionary().put(uniqueID, interpSynth);
+			interpBusses[paramName] = IdentityDictionary().put(uniqueID, interpBus);
 		}, {
-			interpSynths[paramName].put(entry, interpSynth);
-			interpBusses[paramName].put(entry, interpBus);
+			interpSynths[paramName].put(uniqueID, interpSynth);
+			interpBusses[paramName].put(uniqueID, interpBus);
 		});
 
 		//Add interpSynth to the current active ones for specific param / sender combination
@@ -63,6 +63,7 @@ AlgaPatternInterpStreams {
 
 	add { | entry, controlName |
 		var paramName, paramRate, paramNumChannels;
+		var uniqueID;
 		var entriesAtParam;
 
 		if(controlName == nil, {
@@ -74,16 +75,19 @@ AlgaPatternInterpStreams {
 		paramNumChannels = controlName.numChannels;
 
 		entriesAtParam = entries[paramName];
-
 		entry = entry.asStream;
 
+		//Use an unique id as index as it's more reliable than entry:
+		//entry could very well be a number, screwin things up in identityDict
+		uniqueID = UniqueID.next;
+
 		if(entriesAtParam == nil, {
-			entries[paramName] = IdentitySet().add(entry);
+			entries[paramName] = IdentityDictionary().put(uniqueID, entry);
 		}, {
-			entries[paramName].add(entry);
+			entries[paramName].put(uniqueID,entry);
 		});
 
-		this.createPatternInterpSynthAndBus(paramName, paramRate, paramNumChannels, entry);
+		this.createPatternInterpSynthAndBus(paramName, paramRate, paramNumChannels, entry, uniqueID);
 	}
 
 	remove { | param = \in |
@@ -230,7 +234,7 @@ AlgaPattern : AlgaNode {
 
 		//Core of the interpolation behaviour for AlgaPattern !!
 		if(interpStreamsAtParam != nil, {
-			interpStreamsAtParam.do({ | interpStreamAtParam |
+			interpStreamsAtParam.keysValuesDo({ | uniqueID, interpStreamAtParam |
 				var validParam = false;
 				var paramVal = interpStreamAtParam;
 				var senderNumChannels, senderRate;
@@ -283,7 +287,7 @@ AlgaPattern : AlgaNode {
 					// ... Now, I need to keep track of all the active interpBusses instead, not retrievin
 					//from interpBusses, which gets replaced in language, but should implement the same
 					//behaviour of activeInterpSynths and get busses from there.
-					var paramPatternEnvBus = interpStreams.interpBusses[paramName][interpStreamAtParam];
+					var paramPatternEnvBus = interpStreams.interpBusses[paramName][uniqueID];
 
 					var patternParamSymbol = (
 						"alga_pattern_" ++
