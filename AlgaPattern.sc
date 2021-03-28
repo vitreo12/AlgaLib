@@ -56,7 +56,8 @@ AlgaPatternInterpStreams {
 
 		//How to normalize ???
 
-		//Add entries to algaPattern too ... These are needed for algaInstantiatedAsReceiver
+		//Add entries to algaPattern too ... These are needed for algaInstantiatedAsReceiver ...
+		//This does not take in account mixing yet!
 		algaPattern.interpSynths[paramName][\default] = interpSynth;
 		algaPattern.interpBusses[paramName][\default] = interpBus;
 	}
@@ -78,7 +79,7 @@ AlgaPatternInterpStreams {
 		entry = entry.asStream;
 
 		//Use an unique id as index as it's more reliable than entry:
-		//entry could very well be a number, screwin things up in identityDict
+		//entry could very well be a number, screwing things up in IdentityDict
 		uniqueID = UniqueID.next;
 
 		if(entriesAtParam == nil, {
@@ -87,7 +88,10 @@ AlgaPatternInterpStreams {
 			entries[paramName].put(uniqueID,entry);
 		});
 
-		this.createPatternInterpSynthAndBus(paramName, paramRate, paramNumChannels, entry, uniqueID);
+		this.createPatternInterpSynthAndBus(
+			paramName, paramRate, paramNumChannels,
+			entry, uniqueID
+		);
 	}
 
 	remove { | param = \in |
