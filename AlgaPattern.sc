@@ -291,7 +291,7 @@ AlgaPattern : AlgaNode {
 					// ... Now, I need to keep track of all the active interpBusses instead, not retrievin
 					//from interpBusses, which gets replaced in language, but should implement the same
 					//behaviour of activeInterpSynths and get busses from there.
-					var paternParamEnvBus = interpStreams.interpBusses[paramName][uniqueID];
+					var patternParamEnvBus = interpStreams.interpBusses[paramName][uniqueID];
 
 					var patternParamSymbol = (
 						"alga_pattern_" ++
