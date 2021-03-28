@@ -37,6 +37,10 @@ AlgaPatternInterpStreams {
 			interpGroup
 		);
 
+		//Each param / entry combination has its own interpSynth and interpBus!
+		//This behaviour is different from AlgaNode, which dynamically replaces the previous one.
+		//However, pattern synths are created on the fly, so these things need to be re-used until
+		//interpolation has finished
 		if(interpSynthsAtParam == nil, {
 			interpSynths[paramName] = IdentityDictionary().put(entry, interpSynth);
 			interpBusses[paramName] = IdentityDictionary().put(entry, interpBus);
@@ -44,9 +48,6 @@ AlgaPatternInterpStreams {
 			interpSynths[paramName].put(entry, interpSynth);
 			interpBusses[paramName].put(entry, interpBus);
 		});
-
-		interpBusses[entry] = interpBus;
-		interpSynths[entry] = interpSynth;
 
 		//Add interpSynth to the current active ones for specific param / sender combination
 		//algaPattern.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
@@ -61,11 +62,18 @@ AlgaPatternInterpStreams {
 	}
 
 	add { | entry, controlName |
-		var paramName = controlName.name;
-		var paramRate = controlName.rate;
-		var paramNumChannels = controlName.numChannels;
+		var paramName, paramRate, paramNumChannels;
+		var entriesAtParam;
 
-		var entriesAtParam = entries[paramName];
+		if(controlName == nil, {
+			"AlgaPatternInterpStreams: Invalid controlName".error
+		});
+
+		paramName = controlName.name;
+		paramRate = controlName.rate;
+		paramNumChannels = controlName.numChannels;
+
+		entriesAtParam = entries[paramName];
 
 		entry = entry.asStream;
 
@@ -438,7 +446,7 @@ AlgaPattern : AlgaNode {
 		//Create synthBus (interpBusses are taken care of in createPatternInterpSynthAndBus)
 		this.createSynthBus;
 
-		//Create the actual pattern, pushing to scheduler ???
+		//Create the actual pattern, pushing action to scheduler
 		scheduler.addAction(
 			func: { this.createPattern },
 			sched: sched
