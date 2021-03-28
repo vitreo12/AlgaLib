@@ -404,26 +404,22 @@ AlgaPattern : AlgaNode {
 		//to be algaInstantiated!
 		if(synth != nil, { synth.algaInstantiated = false });
 
-		//Symbol
-		if(objClass == Symbol, {
-			this.dispatchSynthDef(defEntry, initGroups, replace,
+		case
+		{ objClass == Symbol } {
+			^this.dispatchSynthDef(defEntry, initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
 				keepScale:keepScale,
 				sched:sched
 			);
-		}, {
-			//Function
-			if(objClass == Function, {
-				this.dispatchFunction;
-			}, {
-				//ListPattern (Pseq, Pser, Prand...)
-				if(objClass.superclass == ListPattern, {
-					this.dispatchListPattern;
-				}, {
-					("AlgaPattern: class '" ++ objClass ++ "' is invalid").error;
-				});
-			});
-		});
+		}
+		{ obj.isListPattern } {
+			^this.dispatchListPattern;
+		}
+		{ objClass == Function } {
+			^this.dispatchFunction;
+		};
+
+		("AlgaPattern: class '" ++ objClass ++ "' is invalid as a \def").error;
 	}
 
 	//Overloaded function
@@ -467,7 +463,11 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Support multiple SynthDefs in the future,
-	//only if expressed with ListPattern subclasses (like Pseq, Prand, etc...)
+	//only if expressed with ListPattern subclasses (like Pseq, Prand, etc...):
+	//(def: Pseq([\synthDef1, Pseq([\synthDef2, \synthDef3]))
+	//This will collect ALL controlnames for each of the synthDefs in order
+	//to correctly instantiate the interpStreams... I know it's quite the overhead,
+	//but, for now, it's just the easier solution.
 	dispatchListPattern {
 		"AlgaPattern: ListPatterns are not supported yet".error;
 	}
