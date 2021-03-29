@@ -21,9 +21,7 @@ AlgaBus {
 	}
 
 	free { | clear = false |
-		if(bus != nil, {
-			bus.free(clear);
-		});
+		if(bus != nil, { bus.free(clear) });
 		bus  = nil;
 		rate = nil;
 		numChannels = 0;

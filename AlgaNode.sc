@@ -2055,7 +2055,7 @@ AlgaNode {
 					scale:scale, time:time, sched:sched
 				);
 			}, {
-				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
+				("Trying to enstablish a connection from an invalid class: " ++ sender.class).error;
 			});
 		});
 	}
@@ -2075,7 +2075,7 @@ AlgaNode {
 				scale:scale, time:time, sched:sched
 			);
 		}, {
-			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
+			("Trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
 		});
 	}
 
@@ -2099,7 +2099,7 @@ AlgaNode {
 					scale:scale, time:time, sched:sched
 				);
 			}, {
-				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
+				("Trying to enstablish a connection from an invalid class: " ++ sender.class).error;
 			});
 		});
 	}
@@ -2119,7 +2119,7 @@ AlgaNode {
 				scale:scale, time:time, sched:sched
 			);
 		}, {
-			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
+			("Trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
 		});
 	}
 
