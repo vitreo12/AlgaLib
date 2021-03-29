@@ -7,20 +7,16 @@ Alga.boot({
 
 	s.sync;
 
-	b = AlgaNode({SinOsc.kr([1, 2]).range(10, 1000)});
 	a = AlgaPattern((
 		def: \test,
-		dur: 1,
+		dur: 0.5,
 		freq: Pwhite(400, 1000)
 	)).play;
 
-	s.plotTree
+	//s.plotTree
 });
 )
 
-a.makeConnection(\freq, b)
-a.makeConnection(\freq, Pseq([0.1, 1]), 2, 1000)
+a.from(Pseq([Pseq([100, [100, 300]]), 2000], inf), \freq)
 
-a.makeConnection(\dur, 0.1, 3)
-
-a.inNodes
+s.scope

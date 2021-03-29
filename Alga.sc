@@ -11,6 +11,14 @@ Alga {
 		servers = IdentityDictionary(1);
 	}
 
+	*maxIO {
+		^AlgaStartup.algaMaxIO;
+	}
+
+	*maxIO_ { | value |
+		AlgaStartup.algaMaxIO = value
+	}
+
 	*clearScheduler { | server |
 		var scheduler = schedulers[server];
 		if(scheduler != nil, {
@@ -43,10 +51,13 @@ Alga {
 		});
 	}
 
-	*newScheduler { | server, clock, cascadeMode = true |
-		server = server ? Server.default;
-		clock = clock ? TempoClock.default;
+	*newScheduler { | server, clock, cascadeMode = false |
 		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
+	}
+
+	*newServer { | server |
+		server = server ? Server.default;
+		servers[server] = server;
 	}
 
 	*getScheduler { | server |
@@ -55,26 +66,33 @@ Alga {
 		^scheduler;
 	}
 
-	*boot { | onBoot, server, algaServerOptions |
+	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
 
 		server = server ? Server.default;
 		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
-		//set options
+		if(algaServerOptions.class != AlgaServerOptions, {
+			"Use an AlgaServerOptions instance as the algaServerOptions argument".error;
+			^this;
+		});
+
+		//AlgaServerOptions
 		server.options.sampleRate = algaServerOptions.sampleRate;
 		server.options.blockSize = algaServerOptions.blockSize;
 		server.options.memSize = algaServerOptions.memSize;
 		server.options.numBuffers = algaServerOptions.numBuffers;
 		server.options.numAudioBusChannels = algaServerOptions.numAudioBusChannels;
 		server.options.numControlBusChannels = algaServerOptions.numControlBusChannels;
+		server.options.maxNodes = algaServerOptions.maxNodes;
 		server.options.maxSynthDefs = algaServerOptions.maxSynthDefs;
 		server.options.numWireBufs = algaServerOptions.numWireBufs;
 		server.options.numInputBusChannels = algaServerOptions.numInputBusChannels;
 		server.options.numOutputBusChannels = algaServerOptions.numOutputBusChannels;
-		if(algaServerOptions.supernova, {Server.supernova}, {Server.scsynth});
+		if(algaServerOptions.supernova, { Server.supernova }, { Server.scsynth });
 		server.options.threads = algaServerOptions.supernovaThreads;
 		server.options.useSystemClock = algaServerOptions.supernovaUseSystemClock;
+		server.options.protocol = algaServerOptions.protocol;
 		server.latency = algaServerOptions.latency;
 
 		//Check AlgaSynthDef folder exists...
@@ -95,17 +113,16 @@ Alga {
 		//clear server @server if present, also quit it
 		this.clearServer(server, prevServerQuit);
 
-		//Add the server
-		servers[server] = server;
+		//Create an AlgaScheduler @ the server (using TempoClock for now...)
+		this.newScheduler(server, clock);
 
-		//Create an AlgaScheduler on current server (using TempoClock for now...)
-		this.newScheduler(server, cascadeMode:false);
-		//this.newScheduler(server, cascadeMode:true);
+		//Add the server
+		this.newServer(server);
 
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
-				//Make sure to init everything
+				//Make sure to init groups
 				server.initTree;
 
 				//Execute onBoot function

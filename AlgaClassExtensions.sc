@@ -2,12 +2,15 @@
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
 	isPattern { ^false }
+	isStream { ^false }
 	isListPattern { ^false }
 	isTempoClock { ^false }
 	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
 
 	//AlgaNode / AlgaPattern support
 	algaInstantiated { ^true }
+	algaInstantiatedAsSender { ^true }
+	algaInstantiatedAsReceiver { | param, sender, mix | ^true }
 	algaCleared { ^false }
 	algaToBeCleared { ^false }
 
@@ -82,6 +85,10 @@
 	}
 }
 
++Stream {
+	isStream { ^true }
+}
+
 +ListPattern {
 	isListPattern { ^true }
 }
@@ -134,6 +141,14 @@
 
 }
 
++SystemClock {
+	//If using a SystemClock in AlgaScheduler, just schedule as if quant is time
+	*algaSchedAtQuantOnce { | quant, task |
+		var taskOnce = { task.value; nil };
+		this.sched(quant, taskOnce)
+	}
+}
+
 +Clock {
 	algaSchedAtQuant { | quant, task |
 		if(this.isTempoClock, {
@@ -149,7 +164,7 @@
 	}
 
 	algaSchedAtQuantOnce { | quant, task |
-		var taskOnce = {task.value; nil};
+		var taskOnce = { task.value; nil };
 		if(this.isTempoClock, {
 			this.algaTempoClockSchedAtQuant(quant, taskOnce);
 		}, {
@@ -158,7 +173,7 @@
 	}
 
 	algaSchedOnce { | when, task |
-		var taskOnce = {task.value; nil};
+		var taskOnce = { task.value; nil };
 		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
 		this.sched(when, taskOnce);
 	}
@@ -182,7 +197,7 @@
 	}
 
 	algaSchedAtQuantOnceWithTopPriority { | quant, task |
-		var taskOnce = {task.value; nil};
+		var taskOnce = { task.value; nil };
 		if(this.isTempoClock, {
 			this.algaTempoClockSchedAtQuantWithTopPriority(quant, taskOnce);
 		}, {
@@ -192,7 +207,7 @@
 	}
 
 	algaSchedOnceWithTopPriority { | when, task |
-		var taskOnce = {task.value; nil};
+		var taskOnce = { task.value; nil };
 		if(this.isTempoClock, {
 			this.algaTempoClockSchedWithTopPriority(when, taskOnce);
 		}, {
@@ -204,7 +219,25 @@
 
 +TempoClock {
 	algaTempoClockSchedAtQuant { | quant = 1, task |
-		this.schedAbs(quant.nextTimeOnGrid(this), task)
+		// Below one is beat-timing. Sync to the closest one
+		var time;
+		if(quant < 1, {
+			time = this.nextTimeOnGrid(quant)
+		}, {
+			// Above one is bar-timing. Sync to closest one depending on current beat time
+			// quant = 1.25
+			// this.beats = 43.2345
+			// time = 44.25
+
+			// should it be .ceil for this case ?
+			// quant = 1.25
+			// this.beats = 43.62345
+			// time = 44.25
+
+			time = this.beats.floor + quant;
+		});
+		time.asString.warn;
+		this.schedAbs(time, task)
 	}
 
 	algaTempoClockSchedAtQuantWithTopPriority { | quant, task |

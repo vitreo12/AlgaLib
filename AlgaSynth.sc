@@ -33,11 +33,17 @@ AlgaSynth : Synth {
 			algaInstantiated = true;
 		}, '/n_go', this.server.addr, argTemplate:[nodeID]).oneShot;
 
-		//If fails to respond in 3 seconds, free the OSCFunc
-		SystemClock.sched(3, {
-			if(algaInstantiated.not, {
-				oscfunc.free;
+		//If fails to respond in 3 seconds, assume it's instantiated...
+		//This unfortunaly happens due to SC's weak OSC responding with \udp
+		//Alga uses \tdp by default!
+		if(server.options.protocol == \udp, {
+			SystemClock.sched(3, {
+				if(algaInstantiated.not, {
+					("Using a server with the UDP protocol, use the TCP one instead. Instantiation packet for AlgaSynth " ++ nodeID ++ " has been lost. Setting algaInstantiated to true").warn;
+					algaInstantiated = true;
+					oscfunc.free;
+				})
 			})
-		})
+		});
 	}
 }

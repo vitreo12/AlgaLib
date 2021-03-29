@@ -1,5 +1,5 @@
 AlgaSpinRoutine {
-	*waitFor { | condition, func, interval = 0.001, maxTime = 2 |
+	*waitFor { | condition, func, interval = 0.005, maxTime = 5 |
 		//First, check if condition is true already, no need to go into a routine if that's the case
 		if(condition.value, {
 			func.value;

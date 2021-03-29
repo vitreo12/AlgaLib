@@ -1,5 +1,5 @@
 AlgaStartup {
-	classvar <algaMaxIO = 16;
+	classvar <algaMaxIO = 8;
 
 	classvar <algaSynthDefPath;
 	classvar <algaSynthDefIOPath;
@@ -9,10 +9,18 @@ AlgaStartup {
 		algaSynthDefIOPath = (algaSynthDefPath ++ "/IO_" ++ algaMaxIO ++ "/").asString;
 	}
 
-	*algaMaxIO_ { | val |
-		if(val.isNumber.not, { "AlgaStartup: algaMaxIO must be a number".error; ^this });
-		algaMaxIO = val;
+	*algaMaxIO_ { | value |
+		if(value.isNumber.not, { "AlgaStartup: algaMaxIO must be a number".error; ^this });
+		algaMaxIO = value;
 		this.updateAlgaSynthDefIOPath;
+	}
+
+	*maxIO {
+		^algaMaxIO
+	}
+
+	*maxIO_ { | value |
+		this.algaMaxIO_(value)
 	}
 
 	*updateAlgaSynthDefIOPath {
@@ -38,6 +46,7 @@ AlgaStartup {
 					this.initAlgaInterp;
 					this.initAlgaNorm;
 					this.initAlgaMixFades;
+					this.initAlgaPatternInterp;
 					"-> Done!".postln;
 				}, {
 					("Could not create path: " ++ algaSynthDefIOPath).error;
@@ -178,6 +187,8 @@ Limiter.ar(input) * AlgaEnvGate.ar
 					var outs = "outs[0] = out;";
 					var indices_ar = "in;";
 					var indices_kr = "in;";
+					var env_pattern_ar = "\\env.ar(0);";
+					var env_pattern_kr = "\\env.kr(0);";
 
 					//constant multiplier. this is set when mix's scale argument is a single Number
 					var multiplier = "\\outMultiplier.ir(1);";
@@ -195,37 +206,46 @@ Limiter.ar(input) * AlgaEnvGate.ar
 					[\ar_ar, \kr_kr, \ar_kr, \kr_ar].do({ | rate |
 						var result;
 						var name, in, indices, env, scaling;
+						var name_pattern, env_pattern;
 
 						if(rate == \ar_ar, {
 							name = "\\alga_interp_audio" ++ i ++ "_audio" ++ y;
+							name_pattern = "\\alga_pattern_audio" ++ i ++ "_audio" ++ y;
 							in = "\\in.ar(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));";
+							env_pattern = env_pattern_ar;
 						});
 
 						if(rate == \kr_kr, {
 							name = "\\alga_interp_control" ++ i ++ "_control" ++ y;
+							name_pattern = "\\alga_pattern_control" ++ i ++ "_control" ++ y;
 							in = "\\in.kr(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));";
+							env_pattern = env_pattern_kr;
 						});
 
 						if(rate == \ar_kr, {
 							name = "\\alga_interp_audio" ++ i ++ "_control" ++ y;
+							name_pattern = "\\alga_pattern_audio" ++ i ++ "_control" ++ y;
 							in = "A2K.kr(\\in.ar(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));";
+							env_pattern = env_pattern_kr;
 						});
 
 						if(rate == \kr_ar, {
 							name = "\\alga_interp_control" ++ i ++ "_audio" ++ y;
+							name_pattern = "\\alga_pattern_control" ++ i ++ "_audio" ++ y;
 							in = "K2A.ar(\\in.kr(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));";
+							env_pattern = env_pattern_ar;
 						});
 
 						result = "
@@ -249,7 +269,28 @@ outs = Array.newClear(" ++ (y + 1) ++ ");
 " ++ outs ++ "
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+
+//Env comes from outside. Can be sampled and hold too.
+AlgaSynthDef(" ++ name_pattern ++ ", { | scaleCurve = 0 |
+var in, env, out, outMultiplier, outScale;
+in = " ++ in ++ "
+out = " ++ indices ++ "
+outMultiplier = " ++ multiplier ++ "
+outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++ "),
+scaleCurve,
+);
+out = " ++ scaling ++ "
+out = out * outMultiplier;
+env = " ++ env_pattern ++ "
+out = out * env;
+out;
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+";
 
 						result.interpret;
 
@@ -324,9 +365,6 @@ out;
 			result_audio.interpret;
 			result_control.interpret;
 
-			//result_audio.postln;
-			//result_control.postln;
-
 		});
 	}
 
@@ -378,5 +416,18 @@ val;
 			fadeout_kr.interpret;
 			fadeout_ar.interpret;
 		});
+	}
+
+	*initAlgaPatternInterp {
+		var result = "
+AlgaSynthDef(\\alga_pattern_interp_env_audio, {
+AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+
+AlgaSynthDef(\\alga_pattern_interp_env_control, {
+AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+";
+		result.interpret;
 	}
 }

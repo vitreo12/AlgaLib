@@ -24,9 +24,7 @@ AlgaThread {
 	}
 
 	//Overwrite this (if needed)
-	clearFunc {
-
-	}
+	clearFunc { }
 
 	cmdPeriod {
 		this.clear; //stop and clear the previous task
@@ -61,8 +59,8 @@ AlgaThread {
 }
 
 AlgaScheduler : AlgaThread {
-	var <>interval = 0.001; //1ms ?
-	var <>maxSpinTime = 2;
+	var <>interval = 0.05; //5ms tick
+	var <>maxSpinTime = 5;  //5s before erroring out
 
 	var <cascadeMode = false;
 	var <switchCascadeMode = false;
@@ -84,7 +82,7 @@ AlgaScheduler : AlgaThread {
 	*new { | server, clock, cascadeMode = false, autostart = true, interruptOnSched = false |
 		var argServer = server ? Server.default;
 		var argName = argServer.name;
-		var argClock = clock ? TempoClock.default;
+		var argClock = clock ? TempoClock(1, queueSize:16834).permanent_(true); //big queue size
 		^super.newCopyArgs(argName, argServer, argClock).init(cascadeMode, autostart, interruptOnSched);
 	}
 
@@ -224,8 +222,6 @@ AlgaScheduler : AlgaThread {
 				func,
 			);
 
-			//Sync server after each completed func ???
-			//server.sync;
 		}, {
 			//enter one of the two cascadeModes
 			if(cascadeMode, {
@@ -267,10 +263,6 @@ AlgaScheduler : AlgaThread {
 					condition,
 					nil
 				);
-
-				if(verbose, {
-					("Hanging at func" + condition.def.context).postln;
-				});
 
 				//Or, this action is spinning
 				spinningActionsCount = spinningActionsCount + 1;
@@ -339,11 +331,16 @@ AlgaScheduler : AlgaThread {
 
 							//Sched the unhanging in the future
 							clock.algaSchedAtQuantOnce(sched, {
-								//Execute the scheduled action
-								this.executeFunc(
-									action,
-									action[1]
-								);
+								//If condition is met, execute the scheduled action
+								if(action[0].value, {
+									this.executeFunc(
+										action,
+										action[1]
+									);
+								}, {
+									//Else, push it to list with sched 0 (== execute ASAP)
+									this.addAction(action[0], action[1], 0);
+								});
 
 								//Copy all the actions back in.
 								//Use .add in case new actions were pushed to interruptOnSchedActions meanwhile
@@ -368,11 +365,16 @@ AlgaScheduler : AlgaThread {
 
 							//In sched time, execute the function!
 							clock.algaSchedAtQuantOnce(sched, {
-								//Execute the scheduled action
-								this.executeFunc(
-									action,
-									action[1]
-								);
+								//If condition is met, execute the scheduled action
+								if(action[0].value, {
+									this.executeFunc(
+										action,
+										action[1]
+									);
+								}, {
+									//Else, push it to list with sched 0 (== execute ASAP)
+									this.addAction(action[0], action[1], 0);
+								});
 
 								//Unhang if needed
 								this.unhangSemaphore;
