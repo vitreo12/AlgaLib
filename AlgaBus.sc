@@ -11,21 +11,20 @@ AlgaBus {
 	init { | argServer, argNumChannels = 1, argRate = \audio |
 		server = argServer;
 		this.newBus(argNumChannels, argRate);
-		//("alloc: " ++ this.index).postln;
 	}
 
 	newBus { | argNumChannels = 1, argRate = \audio |
 		rate = argRate;
 		numChannels = argNumChannels;
-		bus = Bus.alloc(rate, server, numChannels); //Should I wait on this alloc?
+		bus = Bus.alloc(rate, server, numChannels);
 		this.makeBusArg;
 	}
 
 	free { | clear = false |
-		//("free: " ++ this.index).postln;
 		if(bus != nil, {
 			bus.free(clear);
 		});
+		bus  = nil;
 		rate = nil;
 		numChannels = 0;
 		busArg = nil;
@@ -37,7 +36,7 @@ AlgaBus {
 	//This allows multichannel bus to be used when patching them with .busArg !
 	makeBusArg {
 		var index, prefix;
-		if(bus.isNil) { ^busArg = "" }; // still neutral
+		if(bus == nil) { ^busArg = "" }; // still neutral
 		prefix = if(rate == \audio) { "\a" } { "\c" };
 		index = bus.index;
 		^busArg = if(numChannels == 1) {
@@ -52,10 +51,12 @@ AlgaBus {
 	}
 
 	asUGenInput {
+		if(bus == nil, { ^nil });
 		^bus.index;
 	}
 
 	index {
+		if(bus == nil, { ^nil });
 		^bus.index;
 	}
 
@@ -65,7 +66,7 @@ AlgaBus {
 	}
 }
 
-+ Bus {
++Bus {
 	busArg {
 		^mapSymbol ?? {
 			if(index.isNil) { MethodError("bus not allocated.", this).throw };
