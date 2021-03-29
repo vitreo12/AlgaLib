@@ -4,7 +4,7 @@ categories:: Alga>Classes
 related:: Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaServerOptions
 
 DESCRIPTION::
-emphasis::Alga:: is a new live coding language whose focus is not on pattern manipulation, but on describing connections. By linking link::Classes/AlgaNode::s together, it is possible to create a fluid, complex network of sonic interactions. What makes emphasis::Alga:: different from other environments is its interpolation capabilities. In fact, the nature of the connections between  link::Classes/AlgaNode::s arises from continuous processes of interpolation between the current states of the system and future ones, over specified windows of time.
+emphasis::Alga:: is a new live coding language whose focus is not on pattern manipulation, but on describing dynamic connections between nodes. By linking link::Classes/AlgaNode::s together, it is possible to create a fluid, complex network of sonic interactions. What makes emphasis::Alga:: different from other environments is its interpolation capabilities. In fact, the nature of the connections between link::Classes/AlgaNode::s arises from continuous processes of interpolation between the current states of the system and future ones, over specified windows of time.
 
 CLASSMETHODS::
 
@@ -21,7 +21,9 @@ The emphasis::Clock:: for the internal link::Classes/AlgaScheduler::. If not spe
 
 EXAMPLES::
 code::
-//Boot Alga
+//Boot Alga. The first time it's booted, it will take some time
+//as it needs to generate various AlgaSynthDefs that are essential for
+//the system to work.
 (
 Alga.boot({
 	AlgaSynthDef(\mySineOsc, {
@@ -33,7 +35,7 @@ Alga.boot({
 //Declare a node and play to output
 a = AlgaNode(\mySineOsc, connectionTime:2).play;
 
-//Change \freq parameter. Note how it interpolates to new value
+//Change \freq parameter. Note how it interpolates to new value over 2 seconds
 a <<.freq 220;
 
 //Declare a square oscillator with variable frequency 1 to 100
@@ -48,7 +50,7 @@ c = AlgaNode(\mySineOsc, [\freq, 2]);
 
 //Also connect c to a's \freq, mixing with what was already there.
 //This will use a's connectionTime, 2
-a.mixFrom(c, \freq, scale: [-100, 100]);
+a.mixFrom(c, \freq, scale:[-100, 100]);
 
 //Clear over 3 seconds. Note how the interpolation will bring us back
 //to just having b modulating a's frequency parameter
