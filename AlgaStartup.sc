@@ -6,17 +6,25 @@ AlgaStartup {
 
 	*initClass {
 		algaSynthDefPath = SynthDef.synthDefDir ++ "AlgaSynthDefs";
-		algaSynthDefIOPath = (algaSynthDefPath ++ "/IO_" ++ algaMaxIO).asString;
+		algaSynthDefIOPath = (algaSynthDefPath ++ "/IO_" ++ algaMaxIO ++ "/").asString;
 	}
 
-	*algaMaxIO_ { | val |
-		if(val.isNumber.not, { "AlgaStartup: algaMaxIO must be a number".error; ^this });
-		algaMaxIO = val;
+	*algaMaxIO_ { | value |
+		if(value.isNumber.not, { "AlgaStartup: algaMaxIO must be a number".error; ^this });
+		algaMaxIO = value;
 		this.updateAlgaSynthDefIOPath;
 	}
 
+	*maxIO {
+		^algaMaxIO
+	}
+
+	*maxIO_ { | value |
+		this.algaMaxIO_(value)
+	}
+
 	*updateAlgaSynthDefIOPath {
-		algaSynthDefIOPath = (algaSynthDefPath ++ "/IO_" ++ algaMaxIO).asString;
+		algaSynthDefIOPath = (algaSynthDefPath ++ "/IO_" ++ algaMaxIO ++ "/").asString;
 	}
 
 	*initSynthDefs {
@@ -33,7 +41,7 @@ AlgaStartup {
 				var algaSynthDefIOFolderCreated = File.mkdir(algaSynthDefIOPath);
 
 				if(algaSynthDefIOFolderCreated, {
-					"-> Creating all Alga SynthDefs, it may take a while...".postln;
+					("-> Generating all Alga SynthDefs for a max of " ++ algaMaxIO ++ " I/O count, it may take a while...").postln;
 					this.initAlgaPlay;
 					this.initAlgaInterp;
 					this.initAlgaNorm;
@@ -106,7 +114,7 @@ AlgaSynthDef(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
 var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
 Limiter.ar(input) * AlgaEnvGate.ar
-}).writeDefFile(AlgaStartup.algaSynthDefIOPath);
+}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
 
 						sdef.interpret;
@@ -179,10 +187,14 @@ Limiter.ar(input) * AlgaEnvGate.ar
 					var indices_ar = "in;";
 					var indices_kr = "in;";
 
+					//constant multiplier. this is set when mix's scale argument is a single Number
+					var multiplier = "\\outMultiplier.ir(1);";
+
 					if(y > 1, {
 						outs = y.asString ++ ".do({ | i | outs[i] = out[i]});";
 					});
 
+					//keep in; for i == 0
 					if(i > 1, {
 						indices_ar = "Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), in);";
 						indices_kr = "Select.kr(\\indices.ir(" ++ arrayOfIndices ++ "), in);";
@@ -197,7 +209,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 							in = "\\in.ar(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicEnvGate.ar(t_release:t_release, fadeTime:fadeTime);";
+							env = "AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));";
 						});
 
 						if(rate == \kr_kr, {
@@ -205,7 +217,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 							in = "\\in.kr(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicEnvGate.kr(t_release:t_release, fadeTime:fadeTime);";
+							env = "AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));";
 						});
 
 						if(rate == \ar_kr, {
@@ -213,7 +225,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 							in = "A2K.kr(\\in.ar(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicEnvGate.kr(t_release:t_release, fadeTime:fadeTime);";
+							env = "AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));";
 						});
 
 						if(rate == \kr_ar, {
@@ -221,14 +233,15 @@ Limiter.ar(input) * AlgaEnvGate.ar
 							in = "K2A.ar(\\in.kr(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicEnvGate.ar(t_release:t_release, fadeTime:fadeTime);";
+							env = "AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));";
 						});
 
 						result = "
-AlgaSynthDef(" ++ name ++ ", { | scaleCurve = 0, t_release = 0, fadeTime = 0 |
-var in, env, out, outScale, outs;
+AlgaSynthDef(" ++ name ++ ", { | scaleCurve = 0 |
+var in, env, out, outMultiplier, outScale, outs;
 in = " ++ in ++ "
 out = " ++ indices ++ "
+outMultiplier = " ++ multiplier ++ "
 outScale = out.lincurve(
 \\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
 \\lowMax.ir(" ++ arrayOfOnes ++ "),
@@ -238,12 +251,13 @@ scaleCurve,
 );
 out = " ++ scaling ++ "
 env = " ++ env ++ "
+out = out * outMultiplier;
 out = out * env;
 outs = Array.newClear(" ++ (y + 1) ++ ");
 " ++ outs ++ "
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 						result.interpret;
 
@@ -276,7 +290,7 @@ var val = args[0];
 var env = args[1];
 var out = Sanitize.ar(val / env);
 out;
-}).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 				result_control = "AlgaSynthDef(\\alga_norm_control1, {
 var args = \\args.kr([0, 0]);
@@ -284,7 +298,7 @@ var val = args[0];
 var env = args[1];
 var out = Sanitize.kr(val / env);
 out;
-}).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			}, {
 
@@ -302,7 +316,7 @@ var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
 var out = Sanitize.ar(val / env);
 out;
-}).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 				result_control = "AlgaSynthDef(\\alga_norm_control" ++ i.asString ++ ", {
 var args = \\args.kr(" ++ arrayOfZeros ++ ");
@@ -310,7 +324,7 @@ var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
 var out = Sanitize.kr(val / env);
 out;
-}).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			});
 
@@ -338,7 +352,7 @@ val[i] = 0;
 });
 val[" ++ i ++ "] = EnvGen.kr(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
 val;
-}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			fadein_ar = "AlgaSynthDef(\\alga_fadeIn_audio" ++ i.asString ++ ", { | curve = \\sin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
@@ -347,7 +361,7 @@ val[i] = DC.ar(0);
 });
 val[" ++ i ++ "] = EnvGen.ar(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
 val;
-}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			fadeout_kr = "AlgaSynthDef(\\alga_fadeOut_control" ++ i.asString ++ ", { | curve = \\lin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
@@ -356,7 +370,7 @@ val[i] = 0;
 });
 val[" ++ i ++ "] = EnvGen.kr(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
 val;
-}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			fadeout_ar = "AlgaSynthDef(\\alga_fadeOut_audio" ++ i.asString ++ ", { | curve = \\sin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
@@ -365,7 +379,7 @@ val[i] = DC.ar(0);
 });
 val[" ++ i ++ "] = EnvGen.ar(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
 val;
-}, makeFadeEnv:false).writeDefFile(AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			fadein_kr.interpret;
 			fadein_ar.interpret;

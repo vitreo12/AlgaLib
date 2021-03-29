@@ -15,9 +15,6 @@ AlgaBlock {
 	//bottom most and top most nodes in this block
 	var <bottomOutNodes, <topInNodes;
 
-	//if the block has changed form (new nodes added, etc...)
-	var <>changed = true;
-
 	//the index for this block in the AlgaBlocksDict global dict
 	var <blockIndex;
 
@@ -31,8 +28,8 @@ AlgaBlock {
 
 		nodesDict      = IdentityDictionary(20);
 		statesDict     = IdentityDictionary(20);
-		bottomOutNodes = IdentityDictionary.new;
-		topInNodes     = IdentityDictionary.new;
+		bottomOutNodes = IdentityDictionary();
+		topInNodes     = IdentityDictionary();
 	}
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
@@ -220,26 +217,12 @@ AlgaBlock {
 	}
 }
 
-//Have a global one, so that NodeNodes can be shared across VNdef, VNNode and VPSpace...
+//Have a global one. No need to make one per server, as server identity is checked already.
 AlgaBlocksDict {
 	classvar <blocksDict;
 
 	*initClass {
 		blocksDict = IdentityDictionary(50);
-	}
-
-	*reorderBlock { | blockIndex, server |
-		var entryInBlocksDict = blocksDict[blockIndex];
-
-		if(entryInBlocksDict != nil, {
-
-			//Make sure everything is synced with server!
-			fork {
-				server.sync;
-				entryInBlocksDict.rearrangeBlock(server);
-				server.sync;
-			}
-		});
 	}
 
 	*createNewBlockIfNeeded { | receiver, sender |
@@ -254,15 +237,17 @@ AlgaBlocksDict {
 		//This happens when patching a simple number or array in to set a param
 		if((receiver.isAlgaNode.not).or(sender.isAlgaNode.not), { ^nil });
 
+		//Can't connect nodes from two different servers together
+		if(receiver.server != sender.server, {
+			("AlgaBlocksDict: Trying to create a block between two AlgaNodes on different servers").error;
+			^receiver;
+		});
+
+		//Unpack things
 		receiverBlockIndex = receiver.blockIndex;
 		senderBlockIndex = sender.blockIndex;
 		receiverBlock = blocksDict[receiverBlockIndex];
 		senderBlock = blocksDict[senderBlockIndex];
-
-		if(receiver.server != sender.server, {
-			("Trying to create a block between two AlgaNodes on different servers").error;
-			^receiver;
-		});
 
 		//Create new block if both connections didn't have any
 		if((receiverBlockIndex == -1).and(senderBlockIndex == -1), {
@@ -366,8 +351,7 @@ AlgaBlocksDict {
 		//Actually reorder the block's nodes
 		newBlock = blocksDict[newBlockIndex];
 		if(newBlock != nil, {
-			newBlock.changed = true;
-			newBlock.rearrangeBlock();
+			newBlock.rearrangeBlock;
 		});
 	}
 }

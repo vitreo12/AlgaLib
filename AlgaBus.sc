@@ -11,6 +11,7 @@ AlgaBus {
 	init { | argServer, argNumChannels = 1, argRate = \audio |
 		server = argServer;
 		this.newBus(argNumChannels, argRate);
+		//("alloc: " ++ this.index).postln;
 	}
 
 	newBus { | argNumChannels = 1, argRate = \audio |
@@ -20,9 +21,10 @@ AlgaBus {
 		this.makeBusArg;
 	}
 
-	free {
+	free { | clear = false |
+		//("free: " ++ this.index).postln;
 		if(bus != nil, {
-			bus.free(true);
+			bus.free(clear);
 		});
 		rate = nil;
 		numChannels = 0;
@@ -75,5 +77,4 @@ AlgaBus {
 			}
 		}
 	}
-
 }

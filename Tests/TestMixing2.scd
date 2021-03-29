@@ -68,7 +68,7 @@ a <<.f b;
 
 a <<+.f b;
 
-a.algaScheduler.actions
+a.scheduler.actions
 
 
 

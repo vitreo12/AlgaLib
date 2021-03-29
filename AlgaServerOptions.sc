@@ -1,40 +1,42 @@
 AlgaServerOptions {
 	var <>sampleRate, <>blockSize, <>memSize, <>numBuffers;
-	var <>numAudioBusChannels, <>numControlBusChannels, <>maxSynthDefs;
-	var <>numWireBufs, <>numInputBusChannels, <>numOutputBusChannels, <>supernova;
-	var <>supernovaThreads, <>supernovaUseSystemClock, <>latency;
+	var <>numAudioBusChannels, <>numControlBusChannels, <>maxNodes;
+	var <>maxSynthDefs, <>numWireBufs, <>numInputBusChannels, <>numOutputBusChannels;
+	var <>supernova, <>supernovaThreads, <>supernovaUseSystemClock, <>protocol, <>latency;
 
-	*new { | sampleRate=48000, blockSize=64, memSize=524288/*8192*64*/, numBuffers=(1024*24),
-		numAudioBusChannels=(1024*24), numControlBusChannels=(1024*24), maxSynthDefs=16384,
-		numWireBufs=8192, numInputBusChannels=2, numOutputBusChannels=2,
-		supernova=false, supernovaThreads=8, supernovaUseSystemClock=true, latency=0.1 |
+	*new { | sampleRate, blockSize, memSize=(8192*64), numBuffers=(1024*24),
+		numAudioBusChannels=(1024*24), numControlBusChannels=(1024*24), maxNodes=32768,
+		maxSynthDefs=32768, numWireBufs=32768, numInputBusChannels, numOutputBusChannels,
+		supernova=false, supernovaThreads, supernovaUseSystemClock=true, protocol = \tcp, latency |
 
 		^super.new.init(
 			sampleRate, blockSize, memSize, numBuffers,
-			numAudioBusChannels, numControlBusChannels,  maxSynthDefs, numWireBufs,
+			numAudioBusChannels, numControlBusChannels, maxNodes, maxSynthDefs, numWireBufs,
 			numInputBusChannels, numOutputBusChannels, supernova, supernovaThreads,
-			supernovaUseSystemClock, latency
+			supernovaUseSystemClock, protocol, latency
 		);
 	}
 
-	init { | argSampleRate=48000, argBlockSize=64, argMemSize=524288/*8192*64*/, argNumBuffers=(1024*24),
-		argNumAudioBusChannels=(1024*24), argNumControlBusChannels=(1024*24), argMaxSynthDefs=16384,
-		argNumWireBufs=8192, argNumInputBusChannels=2, argNumOutputBusChannels=2,
-		argSupernova=false, argSupernovaThreads=8, argSupernovaUseSystemClock=true, argLatency=0.1 |
+	init { | argSampleRate, argBlockSize, argMemSize=(8192*64), argNumBuffers=(1024*24),
+		argNumAudioBusChannels=(1024*24), argNumControlBusChannels=(1024*24), argMaxNodes=32768,
+		argMaxSynthDefs=32768, argNumWireBufs=32768, argNumInputBusChannels, argNumOutputBusChannels,
+		argSupernova=false, argSupernovaThreads, argSupernovaUseSystemClock=true, argProtocol = \tcp, argLatency |
 
-		sampleRate = argSampleRate;
-		blockSize = argBlockSize;
+		sampleRate = argSampleRate ? Server.default.options.sampleRate;
+		blockSize = argBlockSize ? Server.default.options.blockSize;
 		memSize = argMemSize;
 		numBuffers = argNumBuffers;
 		numAudioBusChannels = argNumAudioBusChannels;
 		numControlBusChannels = argNumControlBusChannels;
+		maxNodes = argMaxNodes;
 		maxSynthDefs = argMaxSynthDefs;
 		numWireBufs = argNumWireBufs;
-		numInputBusChannels = argNumInputBusChannels;
-		numOutputBusChannels = argNumOutputBusChannels;
+		numInputBusChannels = argNumInputBusChannels ? Server.default.options.numInputBusChannels;
+		numOutputBusChannels = argNumOutputBusChannels ? Server.default.options.numOutputBusChannels;
 		supernova = argSupernova;
-		supernovaThreads = argSupernovaThreads;
+		supernovaThreads = argSupernovaThreads ? Server.default.options.threads;
 		supernovaUseSystemClock = argSupernovaUseSystemClock;
-		latency = argLatency;
+		protocol = argProtocol;
+		latency = argLatency ? Server.default.latency;
 	}
 }
