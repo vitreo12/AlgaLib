@@ -1,5 +1,5 @@
 AlgaStartup {
-	classvar <algaMaxIO = 16;
+	classvar <algaMaxIO = 8;
 
 	classvar <algaSynthDefPath;
 	classvar <algaSynthDefIOPath;
