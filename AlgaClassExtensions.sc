@@ -26,7 +26,13 @@
 	}
 }
 
-+ SynthDef {
+//Fundamental for bug-prone trying to index a nil 'nil[0]'
+//for example when dealing with nested IdentityDictionaries
++Nil {
+    at { | index | ^nil }
+}
+
++SynthDef {
 	//Like .store but without sending to server: algaStore is executed before Alga.boot
 	algaStore { | libname=\global, dir(synthDefDir), completionMsg, mdPlugin |
 		var lib = SynthDescLib.getLib(libname);

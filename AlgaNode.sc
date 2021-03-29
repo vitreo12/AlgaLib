@@ -365,6 +365,7 @@ AlgaNode {
 			if(val > longestConnectionTime, { longestConnectionTime = val });
 		});
 
+		//Calculate longestWaitTime
 		this.calculateLongestWaitTime;
 
 		//Only run this on the nodes that are strictly connected to the one
@@ -411,9 +412,12 @@ AlgaNode {
 
 				//this.resetGroups;
 			}, {
+				//Lock longestWaitTime
+				var time = longestWaitTime;
+
 				//Wait longestWaitTime, then free
 				fork {
-					(longestWaitTime + 1.0).wait;
+					(time + 1.0).wait;
 
 					group.free;
 
@@ -453,6 +457,9 @@ AlgaNode {
 				synthBus = nil; //Necessary for correct .play behaviour!
 			});
 		}, {
+			//Lock longestWaitTime
+			var time = longestWaitTime;
+
 			//if forking, this.synthBus could change, that's why this is needed
 			var prevSynthBus = synthBus.copy;
 			synthBus = nil;  //Necessary for correct .play behaviour!
@@ -461,7 +468,7 @@ AlgaNode {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestConnectionTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestWaitTime + 1.0).wait;
+				(time + 1.0).wait;
 
 				if(prevSynthBus != nil, { prevSynthBus.free });
 			}
@@ -483,6 +490,9 @@ AlgaNode {
 				});
 			});
 		}, {
+			//Lock longestWaitTime
+			var time = longestWaitTime;
+
 			//Dictionary need to be deepcopied
 			var prevNormBusses = normBusses.copy;
 			var prevInterpBusses = interpBusses.copy;
@@ -492,7 +502,7 @@ AlgaNode {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestConnectionTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestWaitTime + 1.0).wait;
+				(time + 1.0).wait;
 
 				if(prevNormBusses != nil, {
 					prevNormBusses.do({ | normBus |
@@ -800,17 +810,20 @@ AlgaNode {
 	//Either retrieve default value from controlName or from args
 	getDefaultOrArg { | controlName, param = \in |
 		var defaultOrArg = controlName.defaultValue;
+		var objArg;
 
-		var objArg = objArgs[param];
+		if(objArgs != nil, {
+			objArg = objArgs[param];
 
-		//If objArgs has entry, use that one as default instead
-		if(objArg != nil, {
-			if(objArg.isNumberOrArray, {
-				defaultOrArg = objArg;
-			}, {
-				if(objArg.isAlgaNode, {
-					//Schedule connection with the algaNode
-					this.makeConnection(objArg, param);
+			//If objArgs has entry, use that one as default instead
+			if(objArg != nil, {
+				if(objArg.isNumberOrArray, {
+					defaultOrArg = objArg;
+				}, {
+					if(objArg.isAlgaNode, {
+						//Schedule connection with the algaNode
+						this.makeConnection(objArg, param);
+					});
 				});
 			});
 		});
@@ -1506,6 +1519,9 @@ AlgaNode {
 				//this.resetSynth;
 			});
 		}, {
+			//Lock longestWaitTime
+			var time = longestWaitTime;
+
 			//Needs to be deep copied (a new synth could be algaInstantiated meanwhile)
 			var prevSynth = synth.copy;
 
@@ -1513,7 +1529,7 @@ AlgaNode {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestWaitTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestWaitTime + 1.0).wait;
+				(time + 1.0).wait;
 
 				if(prevSynth != nil, {
 					prevSynth.set(\gate, 0, \fadeTime, 0);
@@ -1540,6 +1556,9 @@ AlgaNode {
 
 			//this.resetInterpNormSynths;
 		}, {
+			//Lock longestWaitTime
+			var time = longestWaitTime;
+
 			//Dictionaries need to be deep copied
 			var prevInterpSynths = interpSynths.copy;
 			var prevNormSynths = normSynths.copy;
@@ -1548,7 +1567,7 @@ AlgaNode {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestWaitTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestWaitTime + 1.0).wait;
+				(time + 1.0).wait;
 
 				prevInterpSynths.do({ | interpSynthsAtParam |
 					interpSynthsAtParam.do({ | interpSynth |
@@ -1751,25 +1770,31 @@ AlgaNode {
 	}
 
 	removeInOutNodeAtParam { | sender, param = \in |
-		//Just remove one param from sender's set at this entry
-		sender.outNodes[this].remove(param);
+		var inNodesAtParam       = inNodes[param];
+		var senderOutNodesAtThis = sender.outNodes[this];
 
-		//If IdentitySet is now empty, remove it entirely
-		if(sender.outNodes[this].size == 0, {
-			sender.outNodes.removeAt(this);
+		if(senderOutNodesAtThis != nil, {
+			//Just remove one param from sender's set at this entry
+			senderOutNodesAtThis.remove(param);
+
+			//If IdentitySet is now empty, remove it entirely
+			if(senderOutNodesAtThis.size == 0, {
+				sender.outNodes.removeAt(this);
+			});
 		});
 
-		//Remove the specific param / sender combination from inNodes
-		inNodes[param].remove(sender);
+		if(inNodesAtParam != nil, {
+			//Remove the specific param / sender combination from inNodes
+			inNodesAtParam.remove(sender);
 
-		//If IdentitySet is now empty, remove it entirely
-		if(inNodes[param].size == 0, {
-			inNodes.removeAt(param);
+			//If IdentitySet is now empty, remove it entirely
+			if(inNodesAtParam.size == 0, {
+				inNodes.removeAt(param);
+			});
 		});
 
 		//Recalculate longestConnectionTime too...
-		//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
-		//(Right now, this happens before creating new synths)
+		//This should also take in account eventual multiple sender / param combinations
 		sender.connectionTimeOutNodes[this] = 0;
 		sender.calculateLongestConnectionTime(0);
 	}
@@ -2427,9 +2452,9 @@ AlgaNode {
 
 	//Find out if specific param / sender combination is in the mix
 	mixParamContainsSender { | param = \in, sender |
-		^(interpSynths[param][sender] != nil)
-		//Or this?
-		//^(inNodes[param].findMatch(sender) != nil);
+		var interpSynthsAtParam = interpSynths[param];
+		if(interpSynthsAtParam == nil, { ^false });
+		^(interpSynthsAtParam[sender] != nil)
 	}
 
 	//When clear, run disconnections to nodes connected to this
@@ -2462,7 +2487,7 @@ AlgaNode {
 
 		fork {
 			//Wait time before clearing groups and busses...
-			(longestWaitTime + 1.0).wait;
+			(time + 1.0).wait;
 
 			//this.freeInterpNormSynths(false, true);
 			this.freeAllGroups(true); //I can just remove the groups, as they contain the synths
