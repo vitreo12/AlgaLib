@@ -31,8 +31,6 @@ d.replace({\in.ar(0).range(-100.12312, 10.23)})
 
 c.ct = 3;
 
-c.connectionTimeOutNodes
-
 a.ct = 5
 
 c.replace({\in.ar(0).range(-30, rrand(10, 10))});
@@ -83,3 +81,9 @@ a.replace({SinOsc.ar(100 + \fm.ar(0))})
 ~delay.clear(2)
 
 a.clear(2)
+
+c.clear
+
+d.clear
+
+o.clear
