@@ -713,6 +713,11 @@ AlgaNode {
 			"Using a server with UDP protocol. The handling of 'server.sync' can be lost if multiple packets are sent together. It's suggested to use Alga with a server booted with the TCP protocol instead.".warn;
 		});
 
+		//It's broken due to server.sync
+		if(scheduler.cascadeMode == true, {
+			"Using a scheduler with cascadeMode set to true is currently broken when using AlgaNodes built with a UGen Function. Wrap it in an AlgaSynthDef and use that instead.".warn;
+		});
+
 		//Need to wait for server to receive the sdef
 		fork {
 			synthDef = AlgaSynthDef(

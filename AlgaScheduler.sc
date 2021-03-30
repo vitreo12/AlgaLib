@@ -461,7 +461,9 @@ AlgaScheduler : AlgaThread {
 }
 
 //Run things concurrently in the scheduler.
-//Each event waits for the previous one to be completed.
+//Each event waits for the previous one to be completed...
+//NOTE that this behaviour is broken when using an AlgaNode with a Function,
+//as the server.sync call screws up the ordering of its buildFromSynthDef call
 AlgaPatch {
 	*new { | func, server |
 		var scheduler;
