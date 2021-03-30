@@ -2494,10 +2494,10 @@ AlgaNode {
 	}
 
 	//for clear, check algaInstantiated and not isPlaying
-	clear { | time, interpTime, sched = 0 |
+	clear { | time, sched = 0 |
 		scheduler.addAction(
 			condition: { this.algaInstantiated },
-			func: { this.clearInner(time, interpTime) },
+			func: { this.clearInner(time) },
 			sched: sched
 		);
 	}
