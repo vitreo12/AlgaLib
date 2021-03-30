@@ -156,33 +156,16 @@ AlgaNode {
 		//Keeps all the connectionTimes of the connected nodes
 		connectionTimeOutNodes = IdentityDictionary(10);
 
-		//AlgaPattern specific
-		if(this.isAlgaPattern, {
-			this.interpStates = AlgaPatternInterpStates();
-		});
-
 		^true;
 	}
 
 	init { | argObj, argArgs, argConnectionTime = 0,
 		argPlayTime = 0, argOutsMapping, argServer, argSched = 0 |
 
-		//Check supported classes for argObj, so that things won't even init if wrong.
-		//Also check for AlgaPattern
-		if(this.isAlgaPattern, {
-			//AlgaPattern init
-			if(argObj.class != Event, {
-				"AlgaPattern: first argument must be an Event describing the pattern".error;
-				^this;
-			});
-		}, {
-			//AlgaNode init
-			if((argObj.class != Symbol).and(
-				argObj.class != Function), {
-				"AlgaNode: first argument must be either a Symbol or a Function".error;
-				^this;
-			});
-		});
+        if((argObj.class != Symbol).and(argObj.class != Function), {
+            "AlgaNode: first argument must be either a Symbol or a Function".error;
+            ^this;
+        });
 
 		//initialize all IdentityDictionaries. Check if init went through correctly,
 		//otherwise, don't go through with anything
