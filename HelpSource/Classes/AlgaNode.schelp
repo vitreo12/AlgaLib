@@ -40,31 +40,38 @@ Just like any other link::Classes/AlgaNode:: method, the current function can be
 INSTANCEMETHODS::
 
 METHOD:: play
-a
+Play the link::Classes/AlgaNode:: to SuperCollider's output.
+ARGUMENT:: time
+Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
+ARGUMENT:: chans
+Specify an link::Classes/Array:: of output channels to play.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+
 
 METHOD:: stop
-a
+Stop the output to speakers.
 
 METHOD:: clear
-a
+Clear the link::Classes/AlgaNode::, dropping all connections in place (with appropriate interpolation) as well as the output to speakers.
 
 METHOD:: connectionTime
-a
+Specify a new time that the connections to any of the parameters will use to perform interpolations.
 
 METHOD:: ct
-a
+Shortcut for emphasis::connectionTime::.
 
 method:: paramConnectionTime
-a
+Specify a new time that the connections to the specific emphasis::param:: will use to perform interpolations.
 
 method:: pct
-a
+Shortcut for emphasis::paramConnectionTime::.
 
 METHOD:: playTime
-a
+Specify fade in / fade out times when calling emphasis::play:: and emphasis::stop::.
 
 METHOD:: pt
-a
+Shortcut for emphasis::playTime::.
 
 METHOD:: replace
 Replace the current content of the link::Classes/AlgaNode::. This method also takes care of restoring all running connections, applying the correct connection times and rate / channels conversions.
@@ -145,3 +152,175 @@ Same as emphasis::disconnect:: where no emphasis::oldSender:: is specified: rese
 
 METHOD:: <|
 Shortcut for emphasis::reset::.
+
+EXAMPLES::
+code::
+//Boot Alga. The first time it's booted, it will take some time
+//as it needs to generate various AlgaSynthDefs that are essential for
+//the system to work.
+(
+Alga.boot({
+	AlgaSynthDef(\mySineOsc, {
+		SinOsc.ar(\freq.ar(440)).dup
+	}).add;
+});
+)
+
+//Declare a node and play to output
+a = AlgaNode(\mySineOsc, connectionTime:2).play;
+
+//Change \freq parameter. Note how it interpolates to new value over 2 seconds
+a <<.freq 220;
+
+//Declare a square oscillator with variable frequency 1 to 100
+b = AlgaNode({ Pulse.ar(LFNoise1.kr(1).range(1, 100)) });
+
+//Map the b node to a's \freq parameter, scaling the -1 to 1 range to 100 to 1000.
+//The interpolation will take 5 seconds to complete
+a.from(b, \freq, scale: [100, 1000], time:5);
+
+//Declare a new Sine oscillator to use as LFO
+c = AlgaNode(\mySineOsc, [\freq, 2]);
+
+//Also connect c to a's \freq, mixing with what was already there.
+//This will use a's connectionTime, 2
+a.mixFrom(c, \freq, scale:[-100, 100]);
+
+//Clear over 3 seconds. Note how the interpolation will bring us back
+//to just having b modulating a's frequency parameter
+c.clear(3);
+
+//Clear over 5 seconds. No more connections:
+//now we'll interpolate back to a's \freq default value, 440
+b.clear(5);
+
+//Bye bye
+a.clear(3);
+::
+
+private:: activeInterpSynths
+private:: addActiveInterpSynthOnFree
+private:: addInNode
+private:: addInOutNodesDict
+private:: addOutNode
+private:: addScaling
+private:: algaCleared
+private:: algaInstantiated
+private:: algaInstantiatedAsReceiver
+private:: algaInstantiatedAsSender
+private:: algaToBeCleared
+private:: beingStopped
+private:: blockIndex
+private:: buildFromSynthDef
+private:: calculateLongestConnectionTime
+private:: calculateLongestWaitTime
+private:: calculateOutsMapping
+private:: calculateScaling
+private:: calculateSenderChansMappingArray
+private:: calculateTemporaryLongestWaitTime
+private:: checkForUpdateToDefaultNodeAtParam
+private:: checkScaleParameterSize
+private:: cleanupMixBussesAndSynths
+private:: clearInner
+private:: clock
+private:: connectionTimeOutNodes
+private:: controlNames
+private:: createAllBusses
+private:: createAllGroups
+private:: createAllSynths
+private:: createControlNamesAndParamsConnectionTime
+private:: createInterpNormBusses
+private:: createInterpNormSynths
+private:: createInterpSynthAtParam
+private:: createMixInterpSynthInterpBusBusNormSynthAtParam
+private:: createObjArgs
+private:: createPlaySynth
+private:: createSynth
+private:: createSynthBus
+private:: currentDefaultNodes
+private:: debug
+private:: disconnectInner
+private:: dispatchFunction
+private:: dispatchNode
+private:: dispatchSynthDef
+private:: freeAllBusses
+private:: freeAllGroups
+private:: freeAllSynths
+private:: freeInterpNormBusses
+private:: freeInterpNormSynths
+private:: freeInterpSynthAtParam
+private:: freeMixNodeAtParam
+private:: freePlaySynth
+private:: freeSynth
+private:: freeSynthBus
+private:: getDefaultOrArg
+private:: getParamChansMapping
+private:: getParamScaling
+private:: group
+private:: inNodes
+private:: initAllVariables
+private:: interpBusses
+private:: interpGroup
+private:: interpSynths
+private:: interpolationTime
+private:: interpolationTime
+private:: isAlgaNode
+private:: isPlaying
+private:: it
+private:: it
+private:: longestConnectionTime
+private:: longestWaitTime
+private:: makeConnection
+private:: makeConnectionInner
+private:: mixParamContainsSender
+private:: moveAfter
+private:: moveBefore
+private:: moveDefaultNodeToMix
+private:: newInterpConnectionAtParam
+private:: newMixConnectionAtParam
+private:: normBusses
+private:: normGroup
+private:: normSynths
+private:: numChannels
+private:: objArgs
+private:: objClass
+private:: outNodes
+private:: outsMapping
+private:: paramInterpolationTime
+private:: paramsChansMapping
+private:: paramsConnectionTime
+private:: paramsScalings
+private:: pit
+private:: playGroup
+private:: playInner
+private:: playSynth
+private:: rate
+private:: removeActiveInterpSynthOnFree
+private:: removeConnectionFromReceivers
+private:: removeInOutNodeAtParam
+private:: removeInOutNodesDict
+private:: removeInterpConnectionAtParam
+private:: removeMix
+private:: removeScaling
+private:: replaceConnections
+private:: replaceInner
+private:: replaceMix
+private:: replaceMixConnection
+private:: replaceMixConnectionInner
+private:: replaceMixInner
+private:: resetGroups
+private:: resetInOutNodesDicts
+private:: resetInterpNormDicts
+private:: resetInterpNormSynths
+private:: resetParam
+private:: resetParamInner
+private:: resetSynth
+private:: scheduler
+private:: server
+private:: setFadeTimeForAllActiveInterpSynths
+private:: setParamsConnectionTime
+private:: stopInner
+private:: synth
+private:: synthBus
+private:: synthDef
+private:: synthGroup

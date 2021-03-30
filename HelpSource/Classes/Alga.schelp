@@ -6,6 +6,8 @@ related:: Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaServerOptions
 DESCRIPTION::
 emphasis::Alga:: is a new live coding language whose focus is not on pattern manipulation, but on describing dynamic connections between nodes. By linking link::Classes/AlgaNode::s together, it is possible to create a fluid, complex network of sonic interactions. What makes emphasis::Alga:: different from other environments is its interpolation capabilities. In fact, the nature of the connections between link::Classes/AlgaNode::s arises from continuous processes of interpolation between the current states of the system and future ones, over specified windows of time.
 
+Check the link::Classes/AlgaNode:: help file for examples and usage.
+
 CLASSMETHODS::
 
 METHOD:: boot
@@ -23,58 +25,15 @@ METHOD:: maxIO
 Change the maximum number of IO connections between link::Classes/AlgaNode::s. This requires the emphasis::initSynthDefs:: method to re-compile all the necessary link::Classes/AlgaSynthDef::s. The default value is 8.
 ARGUMENT:: value
 The new value. Must be an link::Classes/Integer::.
-code::
-//maximum of 12 channels connections for both inputs and outputs
-Alga.maxIO = 12;
-::
 
 METHOD:: initSynthDefs
 Force the recompilation of all link::Classes/AlgaSynthDef::s necessary for link::Classes/Alga::'s runtime. This needs to be executed only once anytime the value of emphasis::maxIO:: changes. Before emphasis::boot::, link::Classes/Alga:: already checks that everything is correct.
-code::
-Alga.initSynthDefs;
-::
 
-EXAMPLES::
-code::
-//Boot Alga. The first time it's booted, it will take some time
-//as it needs to generate various AlgaSynthDefs that are essential for
-//the system to work.
-(
-Alga.boot({
-	AlgaSynthDef(\mySineOsc, {
-		SinOsc.ar(\freq.ar(440)).dup
-	}).add;
-});
-)
-
-//Declare a node and play to output
-a = AlgaNode(\mySineOsc, connectionTime:2).play;
-
-//Change \freq parameter. Note how it interpolates to new value over 2 seconds
-a <<.freq 220;
-
-//Declare a square oscillator with variable frequency 1 to 100
-b = AlgaNode({ Pulse.ar(LFNoise1.kr(1).range(1, 100)) });
-
-//Map the b node to a's \freq parameter, scaling the -1 to 1 range to 100 to 1000.
-//The interpolation will take 5 seconds to complete
-a.from(b, \freq, scale: [100, 1000], time:5);
-
-//Declare a new Sine oscillator to use as LFO
-c = AlgaNode(\mySineOsc, [\freq, 2]);
-
-//Also connect c to a's \freq, mixing with what was already there.
-//This will use a's connectionTime, 2
-a.mixFrom(c, \freq, scale:[-100, 100]);
-
-//Clear over 3 seconds. Note how the interpolation will bring us back
-//to just having b modulating a's frequency parameter
-c.clear(3);
-
-//Clear over 5 seconds. No more connections:
-//now we'll interpolate back to a's \freq default value, 440
-b.clear(5);
-
-//Bye bye
-a.clear(3);
-::
+private:: clearAllSchedulers
+private:: clearScheduler
+private:: clearServer
+private:: getScheduler
+private:: newScheduler
+private:: newServer
+private:: schedulers
+private:: servers
