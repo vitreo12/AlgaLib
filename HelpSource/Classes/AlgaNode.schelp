@@ -25,55 +25,123 @@ Create a new link::Classes/AlgaNode::.
 ARGUMENT:: obj
 Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::
 ARGUMENT:: args
-Optional argument. Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. Note that these will be applied in regards to emphasis::connectionTime::.
+Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. Note that these will be applied in regards to emphasis::connectionTime::.
 ARGUMENT:: connectionTime
-Optional argument. Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaNode::.
+Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaNode::.
 ARGUMENT:: playTime
-Optional argument. Specify the fading in / fading out time that it takes for this link::Classes/AlgaNode:: to play through speakers. These values are applied when calling the emphasis::play:: or emphasis::stop:: functions.
+Specify the fading in / fading out time that it takes for this link::Classes/AlgaNode:: to play through speakers. These values are applied when calling the emphasis::play:: or emphasis::stop:: functions.
 ARGUMENT:: outsMapping
-Optional argument. It works just like link::Classes/AlgaSynthDef::'s emphasis::outsMapping:: argument, but for the case of using an emphasis::UGen function:: as the emphasis::obj:: argument. Specify new mappings by an array that maps symbols to specific output channels.
+It works just like link::Classes/AlgaSynthDef::'s emphasis::outsMapping:: argument, but for the case of using an emphasis::UGen function:: as the emphasis::obj:: argument. Specify new mappings by an array that maps symbols to specific output channels.
 ARGUMENT:: server
-Optional argument. Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaNode:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
+Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaNode:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
 ARGUMENT:: sched
-Optional argument. Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
 INSTANCEMETHODS::
 
-METHOD:: replace
+METHOD:: play
 a
+
+METHOD:: stop
+a
+
+METHOD:: clear
+a
+
+METHOD:: connectionTime
+a
+
+METHOD:: ct
+a
+
+method:: paramConnectionTime
+a
+
+method:: pct
+a
+
+METHOD:: playTime
+a
+
+METHOD:: pt
+a
+
+METHOD:: replace
+Replace the current content of the link::Classes/AlgaNode::. This method also takes care of restoring all running connections, applying the correct connection times and rate / channels conversions.
+ARGUMENT:: obj
+Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::
+ARGUMENT:: args
+Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. Note that these will be applied in regards to emphasis::connectionTime::.
+ARGUMENT:: time
+Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+ARGUMENT:: outsMapping
+It works just like link::Classes/AlgaSynthDef::'s emphasis::outsMapping:: argument, but for the case of using an emphasis::UGen function:: as the emphasis::obj:: argument. Specify new mappings by an array that maps symbols to specific output channels.
+ARGUMENT:: keepOutsMappingIn
+Specify whether the current emphasis::output channels mapping:: of the link::Classes/AlgaNode::s connected to the inputs of this one should be maintained.
+ARGUMENT:: keepOutsMappingOut
+Specify whether the current emphasis::output channels mapping:: of the link::Classes/AlgaNode::s connected to the outputs of this one should be maintained.
+ARGUMENT:: keepScalesIn
+Specify whether the emphasis::scales:: of all the link::Classes/AlgaNode::s connected to the inputs of this one should be maintained.
+ARGUMENT:: keepScalesOut
+Specify whether the emphasis::scales:: of all the link::Classes/AlgaNode::s connected to the outputs of this one should be maintained.
 
 METHOD:: from
-a
+Connect the specific input parameter of this link::Classes/AlgaNode:: to the output of another link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+ARGUMENT:: sender
+An link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+ARGUMENT:: param
+Which parameter to connect to.
+ARGUMENT:: chans
+An optional link::Classes/Array:: to specify the emphasis::channels mapping:: to take from the output of the emphasis::sender::. If not specified, all channels will be used.
+ARGUMENT:: scale
+An optional link::Classes/Number:: or link::Classes/Array::. If it is a number, the value works as a multiplier of the output of the emphasis::sender::. If it is an array, it can be specified in two different ways:
+NUMBEREDLIST::
+## 4 elements, specify a emphasis::linlin:: connection: code::[-1, 1, 0, 10]::.
+## 2 elements, specify a emphasis::linlin:: connection but assume that the input range is -1 to 1: code::[0, 10]::.
+::
+Note that all the values can be specified as arrays, in which case they map for specific channels. For example, code::[-1, [1, 2], 0, [10, 20]]:: will scale the first channel to code::[-1, 1, 0, 10]::, and the second one to code::[-1, 2, 0, 20]::.
+ARGUMENT:: time
+Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+
 
 METHOD:: <<
-a
+Shortcut for emphasis::from::, where, due to syntax restrictions, only emphasis::sender:: and emphasis::param:: can be specified.
+Connect the specific input parameter of this link::Classes/AlgaNode:: to the output of another link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+ARGUMENT:: sender
+An link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+ARGUMENT:: param
+Which parameter to connect to.
 
 METHOD:: to
-a
+Same as emphasis::from::, where the emphasis::receiver:: argument is the link::Classes/AlgaNode:: that the connection is applied to.
 
 METHOD:: >>
-a
+Shortcut for emphasis::to::, where, due to syntax restrictions, only emphasis::receiver:: and emphasis::param:: can be specified.
 
 METHOD:: mixFrom
-a
+Same as emphasis::from::, but all active connections to the parameter are maintained. Essentially, this adds another connection to the specific parameter, adding the values of all the connections together.
 
 METHOD:: <<+
-a
+Shortcut for emphasis::mixFrom::, where, due to syntax restrictions, only emphasis::sender:: and emphasis::param:: can be specified.
 
 METHOD:: mixTo
-a
+Same as emphasis::mixFrom::, where the emphasis::receiver:: argument is the link::Classes/AlgaNode:: that the connection is applied to.
 
 METHOD:: >>+
-a
+Shortcut for emphasis::mixTo::, where, due to syntax restrictions, only emphasis::receiver:: and emphasis::param:: can be specified.
 
 METHOD:: mixSwap
-a
+Replace a connection in the mix of a specific parameter: emphasis::newSender:: replaces emphasis::oldSender::. All the other arguments work the same as the other connection methods.
 
 METHOD:: disconnect
-a
+If emphasis::oldSender:: is specified, disconnect that specific entry in the mix of a specific parameter. Otherwise, reset the entire parameter to its default value.
 
 METHOD:: reset
-a
+Same as emphasis::disconnect:: where no emphasis::oldSender:: is specified: reset the parameter to its default value, disconnecting all mix entries.
 
 METHOD:: <|
-a
+Shortcut for emphasis::reset::.
