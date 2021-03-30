@@ -2137,6 +2137,11 @@ AlgaNode {
 		);
 	}
 
+	//Alias for replaceMix (which must be deprecated, collides name with .replace)
+	mixSwap { | param = \in, previousSender, newSender, inChans, scale, time, sched = 0 |
+		^this.replaceMix(param, previousSender, newSender, inChans, scale, time, sched);
+	}
+
 	//Replace a mix entry at param... Practically just freeing the old one and triggering the new one.
 	//This will be useful in the future if wanting to implement some kind of system to retrieve individual
 	//mix entries (like, \in1, \in2). No need it for now
@@ -2180,6 +2185,11 @@ AlgaNode {
 		}, {
 			this.removeInterpConnectionAtParam(nil, param, time:time);
 		})
+	}
+
+	//same as resetParam, which must be deprecated (bad naming)
+	reset { | param = \in, previousSender = nil, time, sched = 0 |
+		^this.resetParam(param, previousSender, time, sched);
 	}
 
 	resetParam { | param = \in, previousSender = nil, time, sched = 0 |
