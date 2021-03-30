@@ -1,1 +1,0 @@
-AlgaTempoClock : TempoClock {}
