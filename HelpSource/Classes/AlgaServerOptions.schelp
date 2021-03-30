@@ -1,0 +1,7 @@
+TITLE:: AlgaServerOptions
+summary:: ServerOptions for Alga
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode
+
+DESCRIPTION::
+Convenience wrapper around link::Classes/ServerOptions:: to work nicely when using link::Classes/Alga::.

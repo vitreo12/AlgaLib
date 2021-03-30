@@ -1,0 +1,7 @@
+TITLE:: AlgaSynthDef
+summary:: SynthDef for Alga
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode
+
+DESCRIPTION::
+Similar to link::Classes/ProxySynthDef::, it also allows to specify output mappings.

@@ -87,7 +87,8 @@ AlgaSynthDef : SynthDef {
 			};
 
 			//the AlgaEnvGate will take care of freeing the synth, even if not used to multiply
-			//with output!
+			//with output! This is fundamental for the \fadeTime mechanism in Alga to work,
+			//freeing synths at the right time.
 			envgen = if(makeFadeEnv, {
 				AlgaEnvGate.kr(i_level: 0, doneAction:2);
 			}, {
@@ -143,8 +144,9 @@ AlgaSynthDef : SynthDef {
 		def.canReleaseSynth = makeFadeEnv || hasOwnGate;
 		def.canFreeSynth = def.canReleaseSynth || canFree;
 
-		//this is used for AlgaPattern...
+		//this is used for AlgaPattern.
 		//makeFadeEnv = true can be deceiving.
+		//AlgaPatterns' AlgaSynthDefs should just set it to false
 		def.explicitFree = canFree;
 
 		//Set outsMapping as \out1 -> 0, etc...
@@ -191,7 +193,6 @@ AlgaSynthDef : SynthDef {
 			});
 		});
 
-		//[\defcanReleaseSynth, def.canReleaseSynth, \defcanFreeSynth, def.canFreeSynth].debug;
 		^def
 	}
 }
