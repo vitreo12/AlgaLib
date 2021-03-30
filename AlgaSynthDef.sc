@@ -1,4 +1,5 @@
 //Same as ProxySynthDef, but with AlgaEnvGate only used to free the synth, not multiplying output.
+//Additionally, outsMapping is implemented.
 AlgaSynthDef : SynthDef {
 
 	var <>rate, <>numChannels;
