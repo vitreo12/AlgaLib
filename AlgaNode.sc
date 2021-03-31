@@ -1999,7 +1999,7 @@ AlgaNode {
 
 			//trying to <<+ instead of << on first connection
 			if((currentDefaultNodeAtParam == nil), {
-				("AlgaNode: first connection. Running << instead.").warn;
+				("AlgaNode: first connection. Running 'from' instead.").warn;
 				mix = false;
 			});
 
@@ -2483,7 +2483,7 @@ AlgaNode {
 		//If it wasn't a mix param, but the only entry, run <| instead
 		if(inNodes[param].size == 1, {
 			if(inNodes[param].findMatch(oldSender) != nil, {
-				"AlgaNode: oldSender was the only entry. Running <| instead".warn;
+				"AlgaNode: oldSender was the only entry. Running 'reset' instead".warn;
 				^this.resetParam(param, oldSender, time:time);
 			});
 		});
