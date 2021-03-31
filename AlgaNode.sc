@@ -115,7 +115,7 @@ AlgaNode {
 		scheduler = Alga.getScheduler(server);
 		if(scheduler == nil, {
 			(
-				"Can't retrieve correct AlgaScheduler for server " ++
+				"AlgaNode: can't retrieve correct AlgaScheduler for server " ++
 				server.name ++
 				". Has Alga.boot been called on it?"
 			).error;
@@ -227,7 +227,7 @@ AlgaNode {
 				if(paramConnectionTime != nil, {
 					paramsConnectionTime[param] = value;
 				}, {
-					("Invalid param to set connection time for: " ++ param).error;
+					("AlgaNode: invalid param to set connection time for: \\" ++ param).error;
 				});
 			}, {
 				//This will just change the
@@ -535,7 +535,7 @@ AlgaNode {
 							defArgs[param] = value;
 							explicitArgs[param] = true;
 						}, {
-							("AlgaNode: args at param " ++ param ++ " must be a number, array or AlgaNode").error;
+							("AlgaNode: args at param \\" ++ param ++ " must be a number, array or AlgaNode").error;
 						});
 					});
 				});
@@ -598,7 +598,7 @@ AlgaNode {
 
 				var paramNumChannels = controlName.numChannels;
 				if(paramNumChannels > AlgaStartup.algaMaxIO, {
-					("Trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' whose parameter '" ++ paramName ++ "' has more channels(" ++ paramNumChannels ++ ") than 'Alga.maxIO'(" ++ AlgaStartup.algaMaxIO ++ "). Change 'Alga.maxIO' to fit your needs and run 'Alga.boot' again.").error;
+					("AlgaNode: trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' whose parameter '" ++ paramName ++ "' has more channels(" ++ paramNumChannels ++ ") than 'Alga.maxIO'(" ++ AlgaStartup.algaMaxIO ++ "). Change 'Alga.maxIO' to fit your needs and run 'Alga.boot' again.").error;
 					this.clear;
 					^false
 				});
@@ -667,14 +667,14 @@ AlgaNode {
 
 		numChannels = synthDef.numChannels;
 		if(numChannels > AlgaStartup.algaMaxIO, {
-			("Trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' which has more outputs(" ++ numChannels ++ ") than 'Alga.maxIO'(" ++ AlgaStartup.algaMaxIO ++ "). Change 'Alga.maxIO' to fit your needs and run 'Alga.boot' again.").error;
+			("AlgaNode: trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' which has more outputs(" ++ numChannels ++ ") than 'Alga.maxIO'(" ++ AlgaStartup.algaMaxIO ++ "). Change 'Alga.maxIO' to fit your needs and run 'Alga.boot' again.").error;
 			this.clear;
 			^this
 		});
 
 		//If explicit free, can't use in AlgaNode
 		if(synthDef.explicitFree, {
-			("Trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' which can free its synth. This is not supported for AlgaNodes, but it will be for AlgaPatterns.").error;
+			("AlgaNode: trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' which can free its synth. This is not supported for AlgaNodes, but it will be for AlgaPatterns.").error;
 			this.clear;
 			^this;
 		});
@@ -734,12 +734,12 @@ AlgaNode {
 
 		//Note that this forking mechanism is not robust on \udp
 		if(server.options.protocol == \udp, {
-			"Using a server with UDP protocol. The handling of 'server.sync' can be lost if multiple packets are sent together. It's suggested to use Alga with a server booted with the TCP protocol instead.".warn;
+			"AlgaNode: using a server with UDP protocol. The handling of 'server.sync' can be lost if multiple packets are sent together. It's suggested to use Alga with a server booted with the TCP protocol instead.".warn;
 		});
 
 		//It's broken due to server.sync
 		if(scheduler.cascadeMode == true, {
-			"Using a scheduler with cascadeMode set to true is currently broken when using AlgaNodes built with a UGen Function. Wrap it in an AlgaSynthDef and use that instead.".warn;
+			"AlgaNode: using a scheduler with cascadeMode set to true is currently broken when using AlgaNodes built with a UGen Function. Wrap it in an AlgaSynthDef and use that instead.".warn;
 		});
 
 		//Need to wait for server to receive the sdef
@@ -994,7 +994,7 @@ AlgaNode {
 		if(actualSenderChansMapping.class == Symbol, {
 			actualSenderChansMapping = sender.outsMapping[actualSenderChansMapping];
 			if(actualSenderChansMapping == nil, {
-				("Invalid channel name '" ++ senderChansMapping ++ "'. Default will be used.").warn;
+				("AlgaNode: invalid channel name '" ++ senderChansMapping ++ "'. Default will be used.").warn;
 			});
 		});
 
@@ -1020,7 +1020,7 @@ AlgaNode {
 			if(actualSenderChansMapping.isNumber, {
 				^(Array.fill(paramNumChans, { actualSenderChansMapping }));
 			}, {
-				"senderChansMapping must be a number or an array. Using default one.".error;
+				"AlgaNode: senderChansMapping must be a number or an array. Using default one.".error;
 				^(Array.series(paramNumChans));
 			});
 		});
@@ -1324,7 +1324,7 @@ AlgaNode {
 		}, {
 			//the alga node is already mixed. run replaceMix with itself
 			//this is useful in case scale parameter has been changed by user
-			"The AlgaNode was already mixed. Running 'replaceMix' with itself instead".warn;
+			"AlgaNode: sender was already mixed. Running 'replaceMix' with itself instead".warn;
 			this.replaceMixInner(param, sender, sender, senderChansMapping, scale, time:time);
 		});
 	}
@@ -1367,7 +1367,7 @@ AlgaNode {
 		paramConnectionTime = paramsConnectionTime[param];
 
 		if((controlName.isNil).or(paramConnectionTime.isNil), {
-			("Invalid param for interp synth to free: " ++ param).error;
+			("AlgaNode: invalid param for interp synth to free: \\" ++ param).error;
 			^this
 		});
 
@@ -1402,7 +1402,7 @@ AlgaNode {
 
 		//get interp bus ident dict at specific param
 		interpBusAtParam = interpBusses[param];
-		if(interpBusAtParam == nil, { ("Invalid interp bus at param " ++ param).error; ^this });
+		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param \\" ++ param).error; ^this });
 
 		//Try to get sender one.
 		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
@@ -1411,7 +1411,7 @@ AlgaNode {
 			interpBus = interpBusAtParam[\default];
 			if(interpBus == nil, {
 				(
-					"Invalid interp bus at param " ++
+					"AlgaNode: invalid interp bus at param \\" ++
 					param ++ " and node " ++ senderSym.asString
 				).error;
 				^this
@@ -1484,7 +1484,7 @@ AlgaNode {
 				if(sender.isNumberOrArray,  {
 					paramVal = sender;
 				}, {
-					"Invalid paramVal for AlgaNode".error;
+					"AlgaNode: invalid paramVal for AlgaNode".error;
 					^nil;
 				});
 			});
@@ -1827,7 +1827,7 @@ AlgaNode {
 	//Remove entries from inNodes / outNodes / connectionTimeOutNodes for all involved nodes
 	removeInOutNodesDict { | oldSender = nil, param = \in |
 		var oldSenders = inNodes[param];
-		if(oldSenders == nil, { ( "No previous connection enstablished at param: " ++ param).error; ^this; });
+		if(oldSenders == nil, { ( "AlgaNode: no previous connection enstablished at param \\" ++ param).error; ^this; });
 
 		oldSenders.do({ | sender |
 			var sendersParamsSet = sender.outNodes[this];
@@ -1862,7 +1862,7 @@ AlgaNode {
 
 		var controlName = controlNames[param];
 		if(controlName == nil, {
-			("Invalid param to create a new interp synth for: " ++ param).error;
+			("AlgaNode: invalid param to create a new interp synth for: \\" ++ param).error;
 			^this;
 		});
 
@@ -1892,7 +1892,7 @@ AlgaNode {
 
 		var controlName = controlNames[param];
 		if(controlName == nil, {
-			("Invalid param to create a new interp synth for: " ++ param).error;
+			("AlgaNode: invalid param to create a new interp synth for: \\" ++ param).error;
 			^this;
 		});
 
@@ -1923,7 +1923,7 @@ AlgaNode {
 	removeInterpConnectionAtParam { | oldSender = nil, param = \in, time |
 		var controlName = controlNames[param];
 		if(controlName == nil, {
-			("Invalid param to reset: " ++ param).error;
+			("AlgaNode: invalid param to reset: \\" ++ param).error;
 			^this;
 		});
 
@@ -1987,39 +1987,39 @@ AlgaNode {
 		replaceMix = false, senderChansMapping, scale, time |
 
 		if((sender.isAlgaNode.not).and(sender.isNumberOrArray.not), {
-			"Can't connect to something that's not an AlgaNode, a Number or an Array".error;
+			"AlgaNode: can't connect to something that's not an AlgaNode, a Number or an Array".error;
 			^this
 		});
 
 		//Can't connect AlgaNode to itself (yet)
-		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
+		if(this === sender, { "AlgaNode: can't connect an AlgaNode to itself".error; ^this });
 
 		if(mix, {
 			var currentDefaultNodeAtParam = currentDefaultNodes[param];
 
 			//trying to <<+ instead of << on first connection
 			if((currentDefaultNodeAtParam == nil), {
-				("First connection. Running << instead.").warn;
+				("AlgaNode: first connection. Running << instead.").warn;
 				mix = false;
 			});
 
 			//can't add to a num. just replace it.. It would be impossible to keep track of all
 			//the numbers. Instead, one should use nodes with DC.kr/ar
 			if(currentDefaultNodeAtParam.isNumberOrArray, {
-				("Trying to add to a non-AlgaNode: " ++ currentDefaultNodeAtParam.asString ++ ". Replacing it.").warn;
+				("AlgaNode: trying to mix values to a non-AlgaNode: " ++ currentDefaultNodeAtParam.asString ++ ". Replacing it.").warn;
 				mix = false;
 			});
 
 			//can't <<+
 			if((sender == nil), {
-				("Mixing only works for explicit AlgaNodes.").error;
+				("AlgaNode: mixing only works for explicit AlgaNodes.").error;
 				^this;
 			});
 
 			//trying to run replaceMix / mixFrom / mixTo when sender is the only entry!
 			if(inNodes[param].size == 1, {
 				if(inNodes[param].findMatch(sender) != nil, {
-					"AlgaNode was the only entry. Running makeConnection instead".warn;
+					"AlgaNode: sender was the only entry. Running 'makeConnection' instead".warn;
 					mix = false;
 				});
 			});
@@ -2061,7 +2061,7 @@ AlgaNode {
 
 		//Check parameter in controlNames
 		if(this.checkParamExists(param).not, {
-			("\\" ++ param ++ " is not a valid parameter, it is not defined in the def.").error;
+			("AlgaNode: \\" ++ param ++ " is not a valid parameter, it is not defined in the def.").error;
 			^this
 		});
 
@@ -2077,7 +2077,7 @@ AlgaNode {
 				},
 				sched: sched
 			);
-		}, { "AlgaNode: can't makeConnection, sender has been algaCleared".error; }
+		}, { "AlgaNode: can't makeConnection, sender has been cleared".error; }
 		);
 	}
 
@@ -2086,13 +2086,13 @@ AlgaNode {
 		if(sender.isKindOf(Buffer), {
 			var senderBufNum = sender.bufnum;
 			var args = [ param, senderBufNum ];
-			"Changing a Buffer. This will trigger .replace.".warn;
+			"AlgaNode: changing a Buffer. This will trigger 'replace'.".warn;
 			^this.replace(synthDef.name, args, time, sched);
 		});
 
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
-				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
 			this.makeConnection(sender, param, senderChansMapping:chans,
@@ -2104,7 +2104,7 @@ AlgaNode {
 					scale:scale, time:time, sched:sched
 				);
 			}, {
-				("Trying to enstablish a connection from an invalid class: " ++ sender.class).error;
+				("AlgaNode: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
 			});
 		});
 	}
@@ -2117,14 +2117,14 @@ AlgaNode {
 	to { | receiver, param = \in, chans, scale, time, sched |
 		if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
-				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
 			receiver.makeConnection(this, param, senderChansMapping:chans,
 				scale:scale, time:time, sched:sched
 			);
 		}, {
-			("Trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
+			("AlgaNode: trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
 		});
 	}
 
@@ -2135,13 +2135,13 @@ AlgaNode {
 
 	mixFrom { | sender, param = \in, chans, scale, time, sched |
 		if(sender.isKindOf(Buffer), {
-			"Buffers cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
+			"AlgaNode: Buffers cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
 			^this.from(sender, param, chans, scale, time, sched);
 		});
 
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
-				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
 			this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
@@ -2153,7 +2153,7 @@ AlgaNode {
 					scale:scale, time:time, sched:sched
 				);
 			}, {
-				("Trying to enstablish a connection from an invalid class: " ++ sender.class).error;
+				("AlgaNode: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
 			});
 		});
 	}
@@ -2166,14 +2166,14 @@ AlgaNode {
 	mixTo { | receiver, param = \in, chans, scale, time, sched |
 		if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
-				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
 			receiver.makeConnection(this, param, mix:true, senderChansMapping:chans,
 				scale:scale, time:time, sched:sched
 			);
 		}, {
-			("Trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
+			("AlgaNode: trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
 		});
 	}
 
@@ -2201,7 +2201,7 @@ AlgaNode {
 	//mix entries (like, \in1, \in2). No need it for now
 	replaceMix { | param = \in, oldSender, newSender, chans, scale, time, sched |
 		if(newSender.isAlgaNode.not, {
-			(newSender.asString) ++ " is not an AlgaNode".error;
+			("AlgaNode: " ++ (newSender.class.asString) ++ " is not an AlgaNode").error;
 			^this;
 		});
 
@@ -2216,7 +2216,7 @@ AlgaNode {
 
 				//if not contained, it's invalid.
 				if(this.mixParamContainsSender(param, oldSender).not, {
-					(oldSender.asString ++ " was not present in the mix for param " ++ param.asString).error;
+					("AlgaNode: " ++ oldSender.asString ++ " was not present in the mix for param \\" ++ param.asString).error;
 					validOldSender = false;
 				});
 
@@ -2234,7 +2234,7 @@ AlgaNode {
 			if(oldSender.isAlgaNode, {
 				this.removeInterpConnectionAtParam(oldSender, param, time:time);
 			}, {
-				("Trying to remove a connection to an invalid AlgaNode: " ++ oldSender).error;
+				("AlgaNode: trying to remove a connection to an invalid AlgaNode: " ++ oldSender.asString).error;
 			})
 		}, {
 			this.removeInterpConnectionAtParam(nil, param, time:time);
@@ -2332,7 +2332,7 @@ AlgaNode {
 
 		//Trying to .replace on a cleared AlgaNode
 		if(algaCleared, {
-			"Trying to .replace on a cleared AlgaNode. Running AlgaNode.new instead.".warn;
+			"AlgaNode: trying to 'replace' on a cleared AlgaNode. Running 'AlgaNode.new' instead.".warn;
 			algaCleared = false;
 			^this.init(def, args, connectionTime, playTime, outsMapping, server, 0);
 		});
@@ -2434,7 +2434,7 @@ AlgaNode {
 	//Remove individual mix entries at param (called from replaceMix too)
 	disconnectInner { | param = \in, oldSender, replaceMix = false, time |
 		if(this.mixParamContainsSender(param, oldSender).not, {
-			(oldSender.asString ++ " was not present in the mix for param " ++ param.asString).error;
+			("AlgaNode: " ++ oldSender.asString ++ " was not present in the mix for param " ++ param.asString).error;
 			^this;
 		});
 
@@ -2483,7 +2483,7 @@ AlgaNode {
 		//If it wasn't a mix param, but the only entry, run <| instead
 		if(inNodes[param].size == 1, {
 			if(inNodes[param].findMatch(oldSender) != nil, {
-				"AlgaNode was the only entry. Running <| instead".warn;
+				"AlgaNode: oldSender was the only entry. Running <| instead".warn;
 				^this.resetParam(param, oldSender, time:time);
 			});
 		});
@@ -2494,7 +2494,7 @@ AlgaNode {
 
 		//Else, mix param
 		if(oldSender.isAlgaNode.not, {
-			(oldSender.asString) ++ " is not an AlgaNode".error;
+			("AlgaNode: " ++ (oldSender.class.asString) ++ " is not an AlgaNode").error;
 			^this;
 		});
 
