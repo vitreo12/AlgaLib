@@ -437,6 +437,7 @@ AlgaScheduler : AlgaThread {
 
 		condition = condition ? { true };
 
+		sched = sched ? 0;
 		if(sched < 0, { sched = 0 });
 
 		if((condition.isFunction.not).or(func.isFunction.not), {

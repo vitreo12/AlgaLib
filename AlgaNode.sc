@@ -49,18 +49,18 @@ AlgaNode {
 	//Explicit args provided by the user
 	//This will be added: args passed in at creation to overwrite SynthDef's one,
 	//When using <|, then, these are the ones that will be restored!
-	var <objArgs;
+	var <defArgs;
 
 	//Whenever args have just been set, record their state in order for .replace to correctly replace
 	//the right values ... Check TestBuffers.scd for it in action
 	var <explicitArgs;
 
 	//When setting a number and running .replace, these values will be considered, unless
-	//the user EXPLICITLY set objArgs ... Check TestBuffers.scd for it in action
+	//the user EXPLICITLY set defArgs ... Check TestBuffers.scd for it in action
 	var <replaceArgs;
 
-	//Class for obj
-	var <objClass;
+	//Class for def
+	var <defClass;
 
 	//SynthDef, either explicit or internal (Function generated)
 	var <synthDef;
@@ -103,8 +103,8 @@ AlgaNode {
 	var <algaToBeCleared = false;
 	var <algaCleared = false;
 
-	*new { | def, args, connectionTime = 0, playTime = 0, outsMapping, server, sched = 0 |
-		^super.new.init(def, args, connectionTime, playTime, outsMapping, server, sched)
+	*new { | def, args, connectionTime, playTime, sched, outsMapping, server |
+		^super.new.init(def, args, connectionTime, playTime, sched, outsMapping, server)
 	}
 
 	initAllVariables { | argServer |
@@ -126,7 +126,7 @@ AlgaNode {
 		controlNames = IdentityDictionary(10);
 
 		//param -> value
-		objArgs = IdentityDictionary(10);
+		defArgs = IdentityDictionary(10);
 
 		//param -> value
 		replaceArgs = IdentityDictionary(10);
@@ -189,10 +189,10 @@ AlgaNode {
 		^true;
 	}
 
-	init { | argObj, argArgs, argConnectionTime = 0,
-		argPlayTime = 0, argOutsMapping, argServer, argSched = 0 |
+	init { | argDef, argArgs, argConnectionTime = 0,
+		argPlayTime = 0, argSched = 0, argOutsMapping, argServer |
 
-        if((argObj.class != Symbol).and(argObj.class != Function), {
+        if((argDef.class != Symbol).and(argDef.class != Function), {
             "AlgaNode: first argument must be either a Symbol or a Function".error;
             ^this;
         });
@@ -209,7 +209,7 @@ AlgaNode {
 
 		//Dispatch node creation
 		this.dispatchNode(
-			argObj, argArgs,
+			argDef, argArgs,
 			initGroups: true,
 			outsMapping: argOutsMapping,
 			sched: argSched
@@ -242,6 +242,7 @@ AlgaNode {
 	//connectionTime / ct / interpolationTime / it
 	//If all, set all paramConnectionTime regardless of their previous value
 	connectionTime_ { | value, param, all = false |
+		value = value ? 0;
 		if(value < 0, { value = 0 });
 		//this must happen before setting connectionTime, as it's been used to set
 		//paramConnectionTimes, checking against the previous connectionTime (before updating it)
@@ -299,6 +300,7 @@ AlgaNode {
 
 	//playTime
 	playTime_ { | value |
+		value = value ? 0;
 		if(value < 0, { value = 0 });
 		playTime = value;
 		this.calculateLongestWaitTime;
@@ -518,7 +520,7 @@ AlgaNode {
 	}
 
 	//This will also be kept across replaces, as it's just updating the dict
-	createObjArgs { | args |
+	createDefArgs { | args |
 		if(args != nil, {
 			if(args.isSequenceableCollection.not, { "AlgaNode: args must be an array".error; ^this });
 			if((args.size) % 2 != 0, { "AlgaNode: args' size must be a power of two".error; ^this });
@@ -530,7 +532,7 @@ AlgaNode {
 						var value = args[i + 1];
 						if(value.isKindOf(Buffer), { value = value.bufnum });
 						if((value.isNumberOrArray).or(value.isAlgaNode), {
-							objArgs[param] = value;
+							defArgs[param] = value;
 							explicitArgs[param] = true;
 						}, {
 							("AlgaNode: args at param " ++ param ++ " must be a number, array or AlgaNode").error;
@@ -541,11 +543,11 @@ AlgaNode {
 		});
 	}
 
-	//dispatches controlnames / numChannels / rate according to obj class
-	dispatchNode { | obj, args, initGroups = false, replace = false,
+	//dispatches controlnames / numChannels / rate according to def class
+	dispatchNode { | def, args, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
-		objClass = obj.class;
+		defClass = def.class;
 
 		//If there is a synth playing, set its algaInstantiated status to false:
 		//this is mostly needed for .replace to work properly and wait for the new synth
@@ -553,29 +555,29 @@ AlgaNode {
 		if(synth != nil, { synth.algaInstantiated = false });
 
 		//Create args dict
-		this.createObjArgs(args);
+		this.createDefArgs(args);
 
 		//Symbol
-		if(objClass == Symbol, {
+		if(defClass == Symbol, {
 			if(outsMapping != nil, {
-				"AlgaNode: outsMapping will not be considered when obj is a SynthDef.".warn;
+				"AlgaNode: outsMapping will not be considered when def is a SynthDef.".warn;
 			});
-			this.dispatchSynthDef(obj, initGroups, replace,
+			this.dispatchSynthDef(def, initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
 				keepScale:keepScale,
 				sched:sched
 			);
 		}, {
 			//Function
-			if(objClass == Function, {
-				this.dispatchFunction(obj, initGroups, replace,
+			if(defClass == Function, {
+				this.dispatchFunction(def, initGroups, replace,
 					keepChannelsMapping:keepChannelsMapping,
 					outsMapping:outsMapping,
 					keepScale:keepScale,
 					sched:sched
 				);
 			}, {
-				("AlgaNode: class '" ++ objClass ++ "' is invalid").error;
+				("AlgaNode: class '" ++ defClass ++ "' is invalid").error;
 			});
 		});
 	}
@@ -701,20 +703,20 @@ AlgaNode {
 	}
 
 	//Dispatch a SynthDef (symbol)
-	dispatchSynthDef { | obj, initGroups = false, replace = false,
+	dispatchSynthDef { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
-		var synthDesc = SynthDescLib.global.at(obj);
+		var synthDesc = SynthDescLib.global.at(def);
 
 		if(synthDesc == nil, {
-			("AlgaNode: Invalid AlgaSynthDef: '" ++ obj.asString ++ "'").error;
+			("AlgaNode: Invalid AlgaSynthDef: '" ++ def.asString ++ "'").error;
 			^this;
 		});
 
 		synthDef = synthDesc.def;
 
 		if(synthDef.class != AlgaSynthDef, {
-			("AlgaNode: Invalid AlgaSynthDef: '" ++ obj.asString ++"'").error;
+			("AlgaNode: Invalid AlgaSynthDef: '" ++ def.asString ++"'").error;
 			^this;
 		});
 
@@ -727,7 +729,7 @@ AlgaNode {
 	}
 
 	//Dispatch a Function
-	dispatchFunction { | obj, initGroups = false, replace = false,
+	dispatchFunction { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
 		//Note that this forking mechanism is not robust on \udp
@@ -744,7 +746,7 @@ AlgaNode {
 		fork {
 			synthDef = AlgaSynthDef(
 				("alga_" ++ UniqueID.next).asSymbol,
-				obj,
+				def,
 				outsMapping:outsMapping
 			).send(server);
 
@@ -815,34 +817,34 @@ AlgaNode {
 	//Either retrieve default value from controlName or from args
 	getDefaultOrArg { | controlName, param = \in, replace = false |
 		var defaultOrArg = controlName.defaultValue;
-		var objArg;
+		var defArg;
 		var explicitArg = explicitArgs[param];
 
-		if(objArgs != nil, {
+		if(defArgs != nil, {
 			if(replace, {
 				//replaceArgs are all the numbers that are set while coding.
 				//On replace I wanna restore the current value I'm using, not the default value...
 				//Unless I explicily set a new args:
-				objArg = replaceArgs[param];
+				defArg = replaceArgs[param];
 			});
 
 			//No values provided in replaceArgs, or new explicit args: have been just set
-			if((objArg == nil).or(explicitArg), {
-				objArg = objArgs[param];
+			if((defArg == nil).or(explicitArg), {
+				defArg = defArgs[param];
 				explicitArgs[param] = false; //reset state
 				replaceArgs.removeAt(param); //reset replaceArg
 			});
 
-			//If objArgs has entry, use that one as default instead
-			if(objArg != nil, {
-				if(objArg.isNumberOrArray, {
+			//If defArgs has entry, use that one as default instead
+			if(defArg != nil, {
+				if(defArg.isNumberOrArray, {
 					//If it's a number, embed it directly! No interpolation, as it's just setting defaults.
 					//Also this works perfectly with replacing Buffer entries
-					defaultOrArg = objArg;
+					defaultOrArg = defArg;
 				}, {
-					if(objArg.isAlgaNode, {
+					if(defArg.isAlgaNode, {
 						//Schedule connection with the algaNode
-						this.makeConnection(objArg, param);
+						this.makeConnection(defArg, param);
 					});
 				});
 			});
@@ -2079,7 +2081,7 @@ AlgaNode {
 		);
 	}
 
-	from { | sender, param = \in, chans, scale, time, sched = 0 |
+	from { | sender, param = \in, chans, scale, time, sched |
 		//If buffer, use .bufnum and .replace
 		if(sender.isKindOf(Buffer), {
 			var senderBufNum = sender.bufnum;
@@ -2112,7 +2114,7 @@ AlgaNode {
 		this.from(sender: sender, param: param);
 	}
 
-	to { | receiver, param = \in, chans, scale, time, sched = 0 |
+	to { | receiver, param = \in, chans, scale, time, sched |
 		if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
@@ -2131,7 +2133,7 @@ AlgaNode {
 		this.to(receiver: receiver, param: param);
 	}
 
-	mixFrom { | sender, param = \in, chans, scale, time, sched = 0 |
+	mixFrom { | sender, param = \in, chans, scale, time, sched |
 		if(sender.isKindOf(Buffer), {
 			"Buffers cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
 			^this.from(sender, param, chans, scale, time, sched);
@@ -2161,7 +2163,7 @@ AlgaNode {
 		this.mixFrom(sender: sender, param: param);
 	}
 
-	mixTo { | receiver, param = \in, chans, scale, time, sched = 0 |
+	mixTo { | receiver, param = \in, chans, scale, time, sched |
 		if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
@@ -2190,14 +2192,14 @@ AlgaNode {
 	}
 
 	//Alias for replaceMix (which must be deprecated, collides name with .replace)
-	mixSwap { | param = \in, oldSender, newSender, chans, scale, time, sched = 0 |
+	mixSwap { | param = \in, oldSender, newSender, chans, scale, time, sched |
 		^this.replaceMix(param, oldSender, newSender, chans, scale, time, sched);
 	}
 
 	//Replace a mix entry at param... Practically just freeing the old one and triggering the new one.
 	//This will be useful in the future if wanting to implement some kind of system to retrieve individual
 	//mix entries (like, \in1, \in2). No need it for now
-	replaceMix { | param = \in, oldSender, newSender, chans, scale, time, sched = 0 |
+	replaceMix { | param = \in, oldSender, newSender, chans, scale, time, sched |
 		if(newSender.isAlgaNode.not, {
 			(newSender.asString) ++ " is not an AlgaNode".error;
 			^this;
@@ -2239,7 +2241,7 @@ AlgaNode {
 		})
 	}
 
-	resetParam { | param = \in, oldSender = nil, time, sched = 0 |
+	resetParam { | param = \in, oldSender = nil, time, sched |
 		scheduler.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, oldSender, false)).and(oldSender.algaInstantiatedAsSender)
@@ -2252,7 +2254,7 @@ AlgaNode {
 	}
 
 	//same as resetParam, which must be deprecated (bad naming)
-	reset { | param = \in, time, sched = 0 |
+	reset { | param = \in, time, sched |
 		^this.resetParam(param, nil, time, sched);
 	}
 
@@ -2320,7 +2322,7 @@ AlgaNode {
 		});
 	}
 
-	replaceInner { | obj, args, time, outsMapping, keepOutsMappingIn = true,
+	replaceInner { | def, args, time, outsMapping, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
 		var wasPlaying = false;
@@ -2332,7 +2334,7 @@ AlgaNode {
 		if(algaCleared, {
 			"Trying to .replace on a cleared AlgaNode. Running AlgaNode.new instead.".warn;
 			algaCleared = false;
-			^this.init(obj, args, connectionTime, playTime, outsMapping, server, 0);
+			^this.init(def, args, connectionTime, playTime, outsMapping, server, 0);
 		});
 
 		//In case it has been set to true when clearing, then replacing before clear ends!
@@ -2360,7 +2362,7 @@ AlgaNode {
 
 		//New one
 		//Just pass the entry, not the whole thing
-		this.dispatchNode(obj, args,
+		this.dispatchNode(def, args,
 			initGroups:initGroups,
 			replace:true,
 			keepChannelsMapping:keepOutsMappingIn, outsMapping:outsMapping,
@@ -2382,14 +2384,14 @@ AlgaNode {
 
 	//replace content of the node, re-making all the connections.
 	//If this was connected to a number / array, should I restore that value too or keep the new one?
-	replace { | def, args, time, sched = 0, outsMapping, keepOutsMappingIn = true,
+	replace { | def, args, time, sched, outsMapping, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
 		//Check global algaInstantiated
 		scheduler.addAction(
 			condition: { this.algaInstantiated },
 			func: {
-				this.replaceInner(obj:def, args:args, time:time,
+				this.replaceInner(def:def, args:args, time:time,
 					keepOutsMappingIn:keepOutsMappingIn,
 					keepOutsMappingOut:keepOutsMappingOut,
 					outsMapping:outsMapping,
@@ -2477,7 +2479,7 @@ AlgaNode {
 	}
 
 	//Remove individual mix entries at param
-	disconnect { | param = \in, oldSender = nil, time, sched = 0 |
+	disconnect { | param = \in, oldSender = nil, time, sched |
 		//If it wasn't a mix param, but the only entry, run <| instead
 		if(inNodes[param].size == 1, {
 			if(inNodes[param].findMatch(oldSender) != nil, {
@@ -2506,7 +2508,7 @@ AlgaNode {
 	}
 
 	//alias for disconnect: remove a mix entry
-	removeMix { | param = \in, oldSender, time, sched = 0 |
+	removeMix { | param = \in, oldSender, time, sched |
 		this.disconnect(param, oldSender, time, sched);
 	}
 
@@ -2559,15 +2561,15 @@ AlgaNode {
 			this.resetGroups;
 			this.resetInOutNodesDicts;
 
-			objClass = nil;
-			objArgs = nil;
+			defClass = nil;
+			defArgs = nil;
 
 			algaCleared = true;
 		}
 	}
 
 	//for clear, check algaInstantiated and not isPlaying
-	clear { | time, sched = 0 |
+	clear { | time, sched |
 		scheduler.addAction(
 			condition: { this.algaInstantiated },
 			func: { this.clearInner(time) },
@@ -2658,7 +2660,7 @@ AlgaNode {
 		this.createPlaySynth(time, channelsToPlay);
 	}
 
-	play { | time, chans, sched = 0 |
+	play { | time, chans, sched |
 		//Check only for synthBus, it makes more sense than also checking for synth.algaIstantiated,
 		//As it allows meanwhile to create the play synth while synth is getting instantiated
 		scheduler.addAction(
@@ -2672,7 +2674,7 @@ AlgaNode {
 		this.freePlaySynth(time, isClear);
 	}
 
-	stop { | time, sched = 0 |
+	stop { | time, sched |
 		scheduler.addAction(
 			condition: { this.isPlaying },
 			func: { this.stopInner(time) },
