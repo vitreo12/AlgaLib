@@ -654,6 +654,13 @@ AlgaNode {
 			^this
 		});
 
+		//If explicit free, can't use in AlgaNode
+		if(synthDef.explicitFree, {
+			("Trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' which can free its synth. This is not supported for AlgaNodes, but it will be for AlgaPatterns.").error;
+			this.clear;
+			^this;
+		});
+
 		rate = synthDef.rate;
 
 		sched = sched ? 0;

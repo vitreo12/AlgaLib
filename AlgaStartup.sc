@@ -126,11 +126,11 @@ AlgaStartup {
 						//Note: Using AlgaEnvGate.ar here instead of AlgaDynamicEnvGate.
 						//no need for dynamic fade times for play / stop, and AlgaEnvGate is cheaper!
 						sdef = "
-AlgaSynthDef(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
+AlgaSynthDef.new_inner(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
 var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
-Limiter.ar(input) * AlgaEnvGate.ar
-}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+Limiter.ar(input) * AlgaEnvGate.kr
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
 
 						sdef.interpret;
@@ -253,7 +253,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 						});
 
 						result = "
-AlgaSynthDef(" ++ name ++ ", { | scaleCurve = 0 |
+AlgaSynthDef.new_inner(" ++ name ++ ", { | scaleCurve = 0 |
 var in, env, out, outMultiplier, outScale, outs;
 in = " ++ in ++ "
 out = " ++ indices ++ "
@@ -300,7 +300,7 @@ outs;
 
 			if(i == 1, {
 
-				result_audio = "AlgaSynthDef(\\alga_norm_audio1, {
+				result_audio = "AlgaSynthDef.new_inner(\\alga_norm_audio1, {
 var args = \\args.ar([0, 0]);
 var val = args[0];
 var env = args[1];
@@ -308,7 +308,7 @@ var out = Sanitize.ar(val / env);
 out;
 }, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
-				result_control = "AlgaSynthDef(\\alga_norm_control1, {
+				result_control = "AlgaSynthDef.new_inner(\\alga_norm_control1, {
 var args = \\args.kr([0, 0]);
 var val = args[0];
 var env = args[1];
@@ -326,7 +326,7 @@ out;
 				//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
 				arrayOfZeros = arrayOfZeros[0..(arrayOfZeros.size - 2)] ++ "]";
 
-				result_audio = "AlgaSynthDef(\\alga_norm_audio" ++ i.asString ++ ", {
+				result_audio = "AlgaSynthDef.new_inner(\\alga_norm_audio" ++ i.asString ++ ", {
 var args = \\args.ar(" ++ arrayOfZeros ++ ");
 var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
@@ -334,7 +334,7 @@ var out = Sanitize.ar(val / env);
 out;
 }, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
-				result_control = "AlgaSynthDef(\\alga_norm_control" ++ i.asString ++ ", {
+				result_control = "AlgaSynthDef.new_inner(\\alga_norm_control" ++ i.asString ++ ", {
 var args = \\args.kr(" ++ arrayOfZeros ++ ");
 var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
@@ -361,7 +361,7 @@ out;
 
 			i = i + 1;
 
-			fadein_kr = "AlgaSynthDef(\\alga_fadeIn_control" ++ i.asString ++ ", { | curve = \\lin |
+			fadein_kr = "AlgaSynthDef.new_inner(\\alga_fadeIn_control" ++ i.asString ++ ", { | curve = \\lin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = 0;
@@ -370,7 +370,7 @@ val[" ++ i ++ "] = EnvGen.kr(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \
 val;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
-			fadein_ar = "AlgaSynthDef(\\alga_fadeIn_audio" ++ i.asString ++ ", { | curve = \\sin |
+			fadein_ar = "AlgaSynthDef.new_inner(\\alga_fadeIn_audio" ++ i.asString ++ ", { | curve = \\sin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = DC.ar(0);
@@ -379,7 +379,7 @@ val[" ++ i ++ "] = EnvGen.ar(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \
 val;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
-			fadeout_kr = "AlgaSynthDef(\\alga_fadeOut_control" ++ i.asString ++ ", { | curve = \\lin |
+			fadeout_kr = "AlgaSynthDef.new_inner(\\alga_fadeOut_control" ++ i.asString ++ ", { | curve = \\lin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = 0;
@@ -388,7 +388,7 @@ val[" ++ i ++ "] = EnvGen.kr(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \
 val;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
-			fadeout_ar = "AlgaSynthDef(\\alga_fadeOut_audio" ++ i.asString ++ ", { | curve = \\sin |
+			fadeout_ar = "AlgaSynthDef.new_inner(\\alga_fadeOut_audio" ++ i.asString ++ ", { | curve = \\sin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = DC.ar(0);

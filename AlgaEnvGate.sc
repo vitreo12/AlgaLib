@@ -14,10 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//This class is probably useless: the difference between .ar and .kr is not anything relevant,
-//I could just use the standard EnvGate (which uses .kr method)
+//Just like EnvGate, but with split .ar and .kr
+//It's used internally in AlgaSynthDef for makeFadeEnv and in alga_play synth
 AlgaEnvGate {
-  //Don't give default values to gate and fadeTime, or it would screw the namedcontrol business 
 	*ar { | i_level=0, gate, fadeTime, doneAction=2, curve='sin' |
 		var synthGate = gate ?? { NamedControl.kr(\gate, 1.0) }; //This retrieves \gate from upper AlgaSynthDef
 		var synthFadeTime = fadeTime ?? { NamedControl.kr(\fadeTime, 0) }; //This retrieves \fadeTime from upper AlgaSynthDef
@@ -27,8 +26,7 @@ AlgaEnvGate {
 		)
 	}
 
-  //Don't give default values to gate and fadeTime, or it would screw the namedcontrol business 
-	*kr { | i_level=0, gate, fadeTime, doneAction=2, curve='sin' |
+	*kr { | i_level=0, gate, fadeTime, doneAction=2, curve='lin' |
 		var synthGate = gate ?? { NamedControl.kr(\gate, 1.0) }; //This retrieves \gate from upper AlgaSynthDef
 		var synthFadeTime = fadeTime ?? { NamedControl.kr(\fadeTime, 0) }; //This retrieves \fadeTime from upper AlgaSynthDef
 		^EnvGen.kr(
