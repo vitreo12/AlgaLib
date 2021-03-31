@@ -27,7 +27,7 @@ Create a new link::Classes/AlgaNode::.
 ARGUMENT:: obj
 Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::
 ARGUMENT:: args
-Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. Note that these will be applied in regards to emphasis::connectionTime::.
+Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. If the entry is another link::Classes/AlgaNode::, the connection will be applied in regards to emphasis::connectionTime::, or emphasis::time::, if defined.
 ARGUMENT:: connectionTime
 Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaNode::.
 ARGUMENT:: playTime
