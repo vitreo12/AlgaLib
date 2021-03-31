@@ -4,4 +4,58 @@ categories:: Alga
 related:: Classes/Alga, Classes/AlgaNode
 
 DESCRIPTION::
-Similar to link::Classes/ProxySynthDef::, it also allows to specify output mappings.
+Hybrid between link::Classes/SynthDef:: and link::Classes/ProxySynthDef::, with the additional option of defining emphasis::outsMapping:: as an link::Classes/Array:: of emphasis::symbols and numbers/arrays:: pairs.
+
+CLASSMETHODS::
+
+METHOD:: new
+Build a new link::Classes/AlgaSynthDef::. The arguments are the same as a normal link::Classes/SynthDef::, with the exception of the emphasis::outsMapping:: one.
+ARGUMENT:: name
+See link::Classes/SynthDef::.
+ARGUMENT:: func
+Same as link::Classes/SynthDef::, with two caveats.
+NUMBEREDLIST::
+## The function should end with a link::Classes/UGen:: or an link::Classes/Array:: of link::Classes/UGen::s. Unlike link::Classes/SynthDef::, an link::Classes/Out:: (or link::Classes/OffsetOut::, depending on the emphasis::sampleAccurate:: value) link::Classes/UGen:: will automatically be created according to the number of channels of the last element of the function.
+## The function should not use the code::\gate:: or code::\out:: arguments, as they are declared and used internally.
+::
+Basically, the function should only describe the actual link::Classes/UGen:: graph.
+ARGUMENT:: rates
+See link::Classes/SynthDef::.
+ARGUMENT:: prependArgs
+See link::Classes/SynthDef::.
+ARGUMENT:: outsMapping
+Specify an link::Classes/Array:: of emphasis::symbols and numbers/arrays:: pairs to describe combinations of output names and channels. Futhermore, all the channels will automatically be paired with a symbol in the form of code::[\out1, 0, \out2, 1, etc... ]::. You can define as many mappings as you want, as long as they refer to existing number of channels. See the link::Classes/AlgaNode:: help file to see how to use these mappings when connecting nodes together.
+code::
+// \one will have 2 channels,  [0, 1]
+// \two will have 2 channels,  [2, 3]
+// \three will have 1 channel, [2]
+// \four will have 1 channel,  [3]
+// \five will have 1 channel,  [0]
+a = AlgaSynthDef(\fourSines,
+	{ SinOsc.ar([220, 440, 880, 1760]) },
+	outsMapping: [\one, [0, 1], \two, [2, 3], \three, 2, \four, 3, \five, 0]
+).add;
+
+//All the mappings are stored in an IdentityDictionary.
+a.outsMapping.postln;
+::
+ARGUMENT:: variants
+See link::Classes/SynthDef::.
+ARGUMENT:: metadata
+See link::Classes/SynthDef::.
+
+METHOD:: sampleAccurate
+Internally use link::Classes/OffsetOut:: instead of the standard link::Classes/Out::.
+ARGUMENT:: value
+Boolean
+
+private:: new_inner
+
+INSTANCEMETHODS::
+
+private:: canFreeSynth
+private:: canReleaseSynth
+private:: explicitFree
+private:: numChannels
+private:: outsMapping
+private:: rate

@@ -103,7 +103,20 @@ An link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
 ARGUMENT:: param
 Which parameter to connect to.
 ARGUMENT:: chans
-An optional link::Classes/Array:: to specify the emphasis::channels mapping:: to take from the output of the emphasis::sender::. If not specified, all channels will be used.
+An optional link::Classes/Symbol:: or link::Classes/Array:: to specify which of the emphasis::output channels mapping:: to take from the output of the emphasis::sender::. If not specified, all channels will be used.
+code::
+(
+a = AlgaNode(
+    { SinOsc.ar([220, 440, 880, 1760])},
+    outsMapping: [\one, [0, 1], \two, [2, 3], \three, 2, \four, 3]
+)
+)
+
+b = AlgaNode({ \in.ar([0, 0]) }).play  //a simple 2 channel bypass
+b.from(a, chans: \one)   //connects \one == [0, 1]
+b.from(a, chans: \two)   //connects \two == [2, 3]
+b.from(a, chans: [0, 3]) //connects [0, 3], a custom channels mapping
+::
 ARGUMENT:: scale
 An optional link::Classes/Number:: or link::Classes/Array::. If it is a number, the value works as a multiplier of the output of the emphasis::sender::. If it is an array, it can be specified in two different ways:
 NUMBEREDLIST::
