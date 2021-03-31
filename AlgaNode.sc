@@ -51,6 +51,14 @@ AlgaNode {
 	//When using <|, then, these are the ones that will be restored!
 	var <objArgs;
 
+	//Whenever args have just been set, record their state in order for .replace to correctly replace
+	//the right values ... Check TestBuffers.scd for it in action
+	var <explicitArgs;
+
+	//When setting a number and running .replace, these values will be considered, unless
+	//the user EXPLICITLY set objArgs ... Check TestBuffers.scd for it in action
+	var <replaceArgs;
+
 	//Class for obj
 	var <objClass;
 
@@ -119,6 +127,12 @@ AlgaNode {
 
 		//param -> value
 		objArgs = IdentityDictionary(10);
+
+		//param -> value
+		replaceArgs = IdentityDictionary(10);
+
+		//param -> value
+		explicitArgs = IdentityDictionary(10);
 
 		//param -> connectionTime
 		paramsConnectionTime = IdentityDictionary(10);
@@ -514,8 +528,10 @@ AlgaNode {
 					var iPlusOne = i + 1;
 					if(iPlusOne < args.size, {
 						var value = args[i + 1];
+						if(value.isKindOf(Buffer), { value = value.bufnum });
 						if((value.isNumberOrArray).or(value.isAlgaNode), {
 							objArgs[param] = value;
+							explicitArgs[param] = true;
 						}, {
 							("AlgaNode: args at param " ++ param ++ " must be a number, array or AlgaNode").error;
 						});
@@ -797,16 +813,31 @@ AlgaNode {
 	}
 
 	//Either retrieve default value from controlName or from args
-	getDefaultOrArg { | controlName, param = \in |
+	getDefaultOrArg { | controlName, param = \in, replace = false |
 		var defaultOrArg = controlName.defaultValue;
 		var objArg;
+		var explicitArg = explicitArgs[param];
 
 		if(objArgs != nil, {
-			objArg = objArgs[param];
+			if(replace, {
+				//replaceArgs are all the numbers that are set while coding.
+				//On replace I wanna restore the current value I'm using, not the default value...
+				//Unless I explicily set a new args:
+				objArg = replaceArgs[param];
+			});
+
+			//No values provided in replaceArgs, or new explicit args: have been just set
+			if((objArg == nil).or(explicitArg), {
+				objArg = objArgs[param];
+				explicitArgs[param] = false; //reset state
+				replaceArgs.removeAt(param); //reset replaceArg
+			});
 
 			//If objArgs has entry, use that one as default instead
 			if(objArg != nil, {
 				if(objArg.isNumberOrArray, {
+					//If it's a number, embed it directly! No interpolation, as it's just setting defaults.
+					//Also this works perfectly with replacing Buffer entries
 					defaultOrArg = objArg;
 				}, {
 					if(objArg.isAlgaNode, {
@@ -1036,7 +1067,7 @@ AlgaNode {
 			var paramNumChannels = controlName.numChannels;
 
 			var paramRate = controlName.rate;
-			var paramDefault = this.getDefaultOrArg(controlName, paramName);
+			var paramDefault = this.getDefaultOrArg(controlName, paramName, replace);
 
 			var noSenders = false;
 
@@ -1730,6 +1761,9 @@ AlgaNode {
 			}, {
 				inNodes[param].add(sender);
 			})
+		}, {
+			//Number ... Always replace as mixing is not supported for numbers
+			replaceArgs[param] = sender;
 		});
 	}
 
@@ -1807,6 +1841,9 @@ AlgaNode {
 				})
 			})
 		});
+
+		//Remove replaceArgs
+		replaceArgs.removeAt(param);
 	}
 
 	//Clear the dicts
@@ -1964,14 +2001,15 @@ AlgaNode {
 				mix = false;
 			});
 
-			//can't add to a num. just replace it
+			//can't add to a num. just replace it.. It would be impossible to keep track of all
+			//the numbers. Instead, one should use nodes with DC.kr/ar
 			if(currentDefaultNodeAtParam.isNumberOrArray, {
 				("Trying to add to a non-AlgaNode: " ++ currentDefaultNodeAtParam.asString ++ ". Replacing it.").warn;
 				mix = false;
 			});
 
-			//can't <<+ with numbers or arrays. There would be no way to track them, unless DC.kr/ar
-			if((sender == nil).or(sender.isNumberOrArray), {
+			//can't <<+
+			if((sender == nil), {
 				("Mixing only works for explicit AlgaNodes.").error;
 				^this;
 			});
@@ -2010,9 +2048,20 @@ AlgaNode {
 		});
 	}
 
+	checkParamExists { | param = \in |
+		if(controlNames[param] == nil, { ^false });
+		^true;
+	}
+
 	//Wrapper for scheduler
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time, sched = 0 |
+
+		//Check parameter in controlNames
+		if(this.checkParamExists(param).not, {
+			("\\" ++ param ++ " is not a valid parameter, it is not defined in the def.").error;
+			^this
+		});
 
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			scheduler.addAction(
@@ -2031,6 +2080,14 @@ AlgaNode {
 	}
 
 	from { | sender, param = \in, chans, scale, time, sched = 0 |
+		//If buffer, use .bufnum and .replace
+		if(sender.isKindOf(Buffer), {
+			var senderBufNum = sender.bufnum;
+			var args = [ param, senderBufNum ];
+			"Changing a Buffer. This will trigger .replace.".warn;
+			^this.replace(synthDef.name, args, time, sched);
+		});
+
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
@@ -2075,6 +2132,11 @@ AlgaNode {
 	}
 
 	mixFrom { | sender, param = \in, chans, scale, time, sched = 0 |
+		if(sender.isKindOf(Buffer), {
+			"Buffers cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
+			^this.from(sender, param, chans, scale, time, sched);
+		});
+
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("Trying to enstablish a connection between two AlgaNodes on different servers").error;

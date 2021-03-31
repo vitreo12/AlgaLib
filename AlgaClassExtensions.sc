@@ -134,6 +134,11 @@
 
 }
 
+//Add support for >> and >>+
++Buffer {
+
+}
+
 +SystemClock {
 	//If using a SystemClock in AlgaScheduler, just schedule as if quant is time
 	*algaSchedAtQuantOnce { | quant, task |
