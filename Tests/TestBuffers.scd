@@ -27,7 +27,7 @@ a.from(b, \b);
 //Keeps 0.7
 a.replace( {PlayBuf.ar(1, \b.kr(b), BufRateScale.kr(\b.kr(b)) * \s.kr(1), loop:1) } )
 
-//Now 2 is used again
+//Now 2 is used again (explicit args)
 a.replace( {PlayBuf.ar(1, \b.kr(b), BufRateScale.kr(\b.kr(b)) * \s.kr(1), loop:1) }, [\s, 2])
 
 d = AN({DC.kr(1)})

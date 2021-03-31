@@ -189,8 +189,8 @@ AlgaNode {
 		^true;
 	}
 
-	init { | argDef, argArgs, argConnectionTime = 0,
-		argPlayTime = 0, argSched = 0, argOutsMapping, argServer |
+	init { | argDef, argArgs, argConnectionTime = 0, argPlayTime = 0,
+		argSched = 0, argOutsMapping, argServer |
 
         if((argDef.class != Symbol).and(argDef.class != Function), {
             "AlgaNode: first argument must be either a Symbol or a Function".error;
@@ -2392,9 +2392,9 @@ AlgaNode {
 			condition: { this.algaInstantiated },
 			func: {
 				this.replaceInner(def:def, args:args, time:time,
+					outsMapping:outsMapping,
 					keepOutsMappingIn:keepOutsMappingIn,
 					keepOutsMappingOut:keepOutsMappingOut,
-					outsMapping:outsMapping,
 					keepScalesIn:keepScalesIn, keepScalesOut:keepScalesOut
 				)
 			},
