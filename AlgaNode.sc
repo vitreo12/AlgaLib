@@ -2382,14 +2382,14 @@ AlgaNode {
 
 	//replace content of the node, re-making all the connections.
 	//If this was connected to a number / array, should I restore that value too or keep the new one?
-	replace { | obj, args, time, sched = 0, outsMapping, keepOutsMappingIn = true,
+	replace { | def, args, time, sched = 0, outsMapping, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
 		//Check global algaInstantiated
 		scheduler.addAction(
 			condition: { this.algaInstantiated },
 			func: {
-				this.replaceInner(obj:obj, args:args, time:time,
+				this.replaceInner(obj:def, args:args, time:time,
 					keepOutsMappingIn:keepOutsMappingIn,
 					keepOutsMappingOut:keepOutsMappingOut,
 					outsMapping:outsMapping,

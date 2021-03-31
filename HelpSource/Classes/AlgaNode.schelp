@@ -25,7 +25,7 @@ CLASSMETHODS::
 METHOD:: new
 Create a new link::Classes/AlgaNode::.
 ARGUMENT:: def
-Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::
+Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::.
 ARGUMENT:: args
 Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. If the entry is another link::Classes/AlgaNode::, the connection will be applied in regards to emphasis::connectionTime::, or emphasis::time::, if defined.
 ARGUMENT:: connectionTime
@@ -77,8 +77,8 @@ Shortcut for emphasis::playTime::.
 
 METHOD:: replace
 Replace the current content of the link::Classes/AlgaNode::. This method also takes care of restoring all running connections, applying the correct connection times and rate / channels conversions.
-ARGUMENT:: obj
-Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::
+ARGUMENT:: def
+Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::.
 ARGUMENT:: args
 Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. Note that these will be applied in regards to emphasis::connectionTime::.
 ARGUMENT:: time
