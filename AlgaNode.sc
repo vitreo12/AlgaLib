@@ -103,8 +103,8 @@ AlgaNode {
 	var <algaToBeCleared = false;
 	var <algaCleared = false;
 
-	*new { | obj, args, connectionTime = 0, playTime = 0, outsMapping, server, sched = 0 |
-		^super.new.init(obj, args, connectionTime, playTime, outsMapping, server, sched)
+	*new { | def, args, connectionTime = 0, playTime = 0, outsMapping, server, sched = 0 |
+		^super.new.init(def, args, connectionTime, playTime, outsMapping, server, sched)
 	}
 
 	initAllVariables { | argServer |

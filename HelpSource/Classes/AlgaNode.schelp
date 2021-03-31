@@ -24,7 +24,7 @@ CLASSMETHODS::
 
 METHOD:: new
 Create a new link::Classes/AlgaNode::.
-ARGUMENT:: obj
+ARGUMENT:: def
 Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::
 ARGUMENT:: args
 Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. If the entry is another link::Classes/AlgaNode::, the connection will be applied in regards to emphasis::connectionTime::, or emphasis::time::, if defined.
