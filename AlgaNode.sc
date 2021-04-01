@@ -2693,6 +2693,7 @@ AlgaNode {
 
 	stopInner { | time, sched, isClear = false |
 		if(isClear, {
+			//Already in a scheduled action
 			this.freePlaySynth(time, true);
 		}, {
 			scheduler.addAction(
