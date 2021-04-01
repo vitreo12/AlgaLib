@@ -105,27 +105,26 @@ AlgaStartup {
 
 				y = y + 1;
 
-				if(y <= i, { //only y <= i
-					currentPair = [i, y];
-					isAlreadyDone = alreadyDonePairs[currentPair];
+				currentPair = [i, y];
+				isAlreadyDone = alreadyDonePairs[currentPair];
 
-					if(isAlreadyDone != true , {
-						if(y == 1, {
-							arrayOfIndices = "0";
-						}, {
-							arrayOfIndices = "[";
+				if(isAlreadyDone != true , {
+					if(y == 1, {
+						arrayOfIndices = "0";
+					}, {
+						arrayOfIndices = "[";
 
-							y.do({ | num |
-								arrayOfIndices = arrayOfIndices ++ num.asString ++ ",";
-							});
-
-							arrayOfIndices = arrayOfIndices[0..(arrayOfIndices.size - 2)] ++ "]";
+						y.do({ | num |
+							arrayOfIndices = arrayOfIndices ++ num.asString ++ ",";
 						});
 
-						//Limiter to make sure not to blow up speakers.
-						//Note: Using AlgaEnvGate.ar here instead of AlgaDynamicEnvGate.
-						//no need for dynamic fade times for play / stop, and AlgaEnvGate is cheaper!
-						sdef = "
+						arrayOfIndices = arrayOfIndices[0..(arrayOfIndices.size - 2)] ++ "]";
+					});
+
+					//Limiter to make sure not to blow up speakers.
+					//Note: Using AlgaEnvGate.ar here instead of AlgaDynamicEnvGate.
+					//no need for dynamic fade times for play / stop, and AlgaEnvGate is cheaper!
+					sdef = "
 AlgaSynthDef.new_inner(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
 var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
@@ -133,8 +132,7 @@ Limiter.ar(input) * AlgaEnvGate.kr
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
 
-						sdef.interpret;
-					});
+					sdef.interpret;
 				});
 			});
 		});

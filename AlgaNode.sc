@@ -97,6 +97,9 @@ AlgaNode {
 	//Keep track of current chans mapping for params
 	var <paramsChansMapping;
 
+	//Keep track of the "chans" arg for play so it's kept across .replaces
+	var <playChans;
+
 	//General state queries
 	var <isPlaying = false;
 	var <beingStopped = false;
@@ -2378,7 +2381,7 @@ AlgaNode {
 
 		//If node was playing, or .replace has been called while .stop / .clear, play again
 		if(wasPlaying.or(beingStopped), {
-			this.play;
+			this.playInner(replace:true)
 		})
 	}
 
@@ -2589,40 +2592,46 @@ AlgaNode {
 
 	//Number plays those number of channels sequentially
 	//Array selects specific output
-	createPlaySynth { | time, channelsToPlay |
+	createPlaySynth { | time, channelsToPlay, replace = false |
 		if((isPlaying.not).or(beingStopped), {
 			var actualNumChannels, playSynthSymbol;
 
 			if(rate == \control, { "AlgaNode: cannot play a kr node".error; ^nil; });
 
 			if(channelsToPlay != nil, {
-				if(channelsToPlay.isSequenceableCollection, {
-					var channelsToPlaySize = channelsToPlay.size;
-					if(channelsToPlaySize < numChannels, {
-						actualNumChannels = channelsToPlaySize;
-					}, {
-						actualNumChannels = numChannels;
-					});
-				}, {
-					if(channelsToPlay < numChannels, {
-						if(channelsToPlay < 1, { channelsToPlay = 1 });
-						if(channelsToPlay > AlgaStartup.algaMaxIO, { channelsToPlay = AlgaStartup.algaMaxIO });
-						actualNumChannels = channelsToPlay;
-					}, {
-						actualNumChannels = numChannels;
-					});
-				})
+				//store it so it's kept across replaces, unless a new one is specified
+				playChans = channelsToPlay
 			}, {
-				actualNumChannels = numChannels
+				//If nil and replace, use the one stored
+				if(replace, {
+					channelsToPlay = playChans
+				});
 			});
-
-			playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
 
 			time = this.calculateTemporaryLongestWaitTime(time, playTime);
 
 			if(channelsToPlay.isSequenceableCollection, {
-				//Wrap around the indices entries (or delete out of bounds???)
+				//Array input. It can be channel numbers or outsMapping
+
+				//Detect outsMapping and replace them with the actual channels value
+				channelsToPlay.do({ | entry, i |
+					var outMapping = synthDef.outsMapping[entry.asSymbol];
+					case
+					{ outMapping.isNumberOrArray } {
+						channelsToPlay = channelsToPlay.put(i, outMapping);
+					};
+				});
+
+				//Flatten so that outsMapping are not subarrays
+				channelsToPlay = channelsToPlay.flatten;
+
+				//Wrap around the indices entries around the actual
+				//number of outputs of the node... Should it ignore out of bounds?
 				channelsToPlay = channelsToPlay % numChannels;
+
+				actualNumChannels = channelsToPlay.size;
+
+				playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
 
 				playSynth = AlgaSynth(
 					playSynthSymbol,
@@ -2631,6 +2640,15 @@ AlgaNode {
 					waitForInst:false
 				);
 			}, {
+				if(channelsToPlay.isNumber, {
+					//Tell it to play that specific number of channels, e.g. 2 for just stereo
+					actualNumChannels = channelsToPlay
+				}, {
+					actualNumChannels = numChannels
+				});
+
+				playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
+
 				playSynth = AlgaSynth(
 					playSynthSymbol,
 					[\in, synthBus.busArg, \gate, 1, \fadeTime, time],
@@ -2641,6 +2659,8 @@ AlgaNode {
 
 			isPlaying = true;
 			beingStopped = false;
+		}, {
+			"AlgaNode: node is already playing.".warn;
 		})
 	}
 
@@ -2656,30 +2676,35 @@ AlgaNode {
 		})
 	}
 
-	playInner { | time, channelsToPlay |
-		this.createPlaySynth(time, channelsToPlay);
-	}
-
-	play { | time, chans, sched |
+	playInner { | time, channelsToPlay, sched, replace = false |
 		//Check only for synthBus, it makes more sense than also checking for synth.algaIstantiated,
 		//As it allows meanwhile to create the play synth while synth is getting instantiated
 		scheduler.addAction(
 			condition: { synthBus != nil },
-			func: { this.playInner(time, chans) },
+			func: { this.createPlaySynth(time, channelsToPlay, replace) },
 			sched: sched
 		);
+
 	}
 
-	stopInner { | time, isClear = false |
-		this.freePlaySynth(time, isClear);
+	play { | time, chans, sched |
+		this.playInner(time, chans, sched);
+	}
+
+	stopInner { | time, sched, isClear = false |
+		if(isClear, {
+			this.freePlaySynth(time, true);
+		}, {
+			scheduler.addAction(
+				condition: { this.isPlaying },
+				func: { this.freePlaySynth(time, false); },
+				sched: sched
+			);
+		});
 	}
 
 	stop { | time, sched |
-		scheduler.addAction(
-			condition: { this.isPlaying },
-			func: { this.stopInner(time) },
-			sched: sched
-		);
+		this.stopInner(time, sched);
 	}
 
 	//Global init: all interp synths and synth are correct
@@ -2721,7 +2746,7 @@ AlgaNode {
 				});
 			});
 
-			//Normal from/ to and mixFrom / mixTo
+			//Normal from / to and mixFrom / mixTo
 			^true
 		});
 
@@ -2733,35 +2758,6 @@ AlgaNode {
 
 	clock {
 		^(scheduler.clock)
-	}
-
-	debug {
-		"connectionTime:".postln;
-		("\t" ++ connectionTime.asString).postln;
-		"paramsConnectionTime".postln;
-		("\t" ++ paramsConnectionTime.asString).postln;
-		"longestWaitTime:".postln;
-		("\t" ++ longestWaitTime.asString).postln;
-		"controlNames".postln;
-		("\t" ++ controlNames.asString).postln;
-		"inNodes:".postln;
-		("\t" ++ inNodes.asString).postln;
-		"outNodes:".postln;
-		("\t" ++ outNodes.asString).postln;
-		"outsMapping:".postln;
-		("\t" ++ outsMapping.asString).postln;
-		"paramsChansMapping:".postln;
-		("\t" ++ paramsChansMapping.asString).postln;
-		"interpSynths:".postln;
-		("\t" ++ interpSynths.asString).postln;
-		"interpBusses:".postln;
-		("\t" ++ interpBusses.asString).postln;
-		"normSynths:".postln;
-		("\t" ++ normSynths.asString).postln;
-		"normBusses:".postln;
-		("\t" ++ normBusses.asString).postln;
-		"currentDefaultNodes:".postln;
-		("\t" ++ currentDefaultNodes.asString).postln;
 	}
 }
 

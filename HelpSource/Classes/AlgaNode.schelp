@@ -50,7 +50,15 @@ Play the link::Classes/AlgaNode:: to SuperCollider's output.
 ARGUMENT:: time
 Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
 ARGUMENT:: chans
-Specify an link::Classes/Array:: of output channels to play.
+Specify an link::Classes/Array:: of output channels to play, which can contain emphasis::outsMapping:: symbols. It's also possible to just specify a number, in which case it determines how many channels will be played.
+code::
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play //Play both channels
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: 2) //Play both channels, explicitly
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0]) //Play first channel mono
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0, 0]) //Play first channel stereo
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0, 1]) //Play both channels, explicitly
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0, 1, 1, 0]) //Quadraphonic
+::
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
@@ -217,12 +225,56 @@ b.clear(5);
 a.clear(3);
 ::
 
+subsection:: Simple feedback
+
 code::
 (
-b = AlgaNode({ SinOsc.ar(\freq.kr(134) + \fm.ar(0)) }, connectionTime:2);
-a = AlgaNode({ SinOsc.ar(\freq.kr(220) + \fm.ar(0)) }, connectionTime:3, playTime:2);
-
+Alga.boot({
+	a = AlgaNode({ SinOsc.ar(\freq.kr(220) + \fm.ar(0)) }, connectionTime:5, playTime:2);
+	b = AlgaNode({ SinOsc.ar(\freq.kr(134) + \fm.ar(0)) }, connectionTime:3);
+	a.from(b, \fm, scale:[-100, 100]);
+	b.from(a, \fm, scale:[-50, 50]); //Feedback connection!
+	a.play(chans:2); //play stereo
+})
 )
+
+(
+//Randomly change a's fm scale every 3 seconds
+fork {
+	loop {
+		a.from(b, \fm, scale:[rrand(-200, -30), rrand(10, 250)]);
+		3.wait;
+	}
+};
+
+//Randomly change b's fm scale every 2 seconds
+fork {
+	loop {
+		b.from(a, \fm, scale:[rrand(-150, -10), rrand(3, 30)]);
+		2.wait;
+	}
+}
+)
+
+//Change root frequencies
+(
+b <<.freq 25;
+a <<.freq 103;
+)
+
+//Replace b's definition with a sawtooth wave.
+//Make sure to have the same parameter names so they keep the mappings
+b.replace({ Saw.ar(\freq.kr + \fm.ar) })
+
+//Bye bye
+(
+b.clear(2);
+a.clear(2);
+)
+
+//The errors on console are the routines (fork)
+//that are still trying to make connections.
+//Ctrl + . to stop them
 ::
 
 private:: activeInterpSynths
