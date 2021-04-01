@@ -1982,6 +1982,11 @@ AlgaNode {
 		});
 	}
 
+	checkParamExists { | param = \in |
+		if(controlNames[param] == nil, { ^false });
+		^true;
+	}
+
 	//implements receiver <<.param sender
 	makeConnectionInner { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time |
@@ -1993,6 +1998,12 @@ AlgaNode {
 
 		//Can't connect AlgaNode to itself (yet)
 		if(this === sender, { "AlgaNode: can't connect an AlgaNode to itself".error; ^this });
+
+		//Check parameter in controlNames
+		if(this.checkParamExists(param).not, {
+			("AlgaNode: \\" ++ param ++ " is not a valid parameter, it is not defined in the def.").error;
+			^this
+		});
 
 		if(mix, {
 			var currentDefaultNodeAtParam = currentDefaultNodes[param];
@@ -2050,20 +2061,9 @@ AlgaNode {
 		});
 	}
 
-	checkParamExists { | param = \in |
-		if(controlNames[param] == nil, { ^false });
-		^true;
-	}
-
 	//Wrapper for scheduler
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time, sched = 0 |
-
-		//Check parameter in controlNames
-		if(this.checkParamExists(param).not, {
-			("AlgaNode: \\" ++ param ++ " is not a valid parameter, it is not defined in the def.").error;
-			^this
-		});
 
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			scheduler.addAction(
