@@ -11,6 +11,10 @@ There are 4 important features that make link::Classes/AlgaNode::s different fro
 NUMBEREDLIST::
 ## Connecting link::Classes/AlgaNode::s together will trigger a process of interpolation between the current state of the receiver and the future one where the new connection will take place. This feature applies to any operation: from creation, to connection and replacement of nodes.
 
+NOTE::
+Interpolation is a property that belongs to the emphasis::receiver:: of the connection, not the emphasis::sender::. It is in fact possible to specify different interpolation times for each parameter of a receiver. Any emphasis::sender:: that connects to those parameters will respect the relative interpolation times.
+::
+
 ## Whenever a new connection is made, link::Classes/Alga:: takes care of running any necessary conversions of rate and number of channels: link::Classes/Alga:: takes a emphasis::patch anything into anything:: approach.
 
 ## Whenever a new connection is made, link::Classes/Alga:: takes care of ordering the groups of the link::Classes/AlgaNode::s on the server so that they respect the order of connections, preventing the introduction of blockSize delays in the signal chain. This feature is only limited by feedback connections, in which case, there will obviously be a blockSize delay introduced between the last node in the chain and the first one.
@@ -211,6 +215,14 @@ b.clear(5);
 
 //Bye bye
 a.clear(3);
+::
+
+code::
+(
+b = AlgaNode({ SinOsc.ar(\freq.kr(134) + \fm.ar(0)) }, connectionTime:2);
+a = AlgaNode({ SinOsc.ar(\freq.kr(220) + \fm.ar(0)) }, connectionTime:3, playTime:2);
+
+)
 ::
 
 private:: activeInterpSynths
