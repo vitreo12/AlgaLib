@@ -234,7 +234,6 @@
 
 			time = this.beats.floor + quant;
 		});
-		time.asString.warn;
 		this.schedAbs(time, task)
 	}
 

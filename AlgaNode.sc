@@ -735,6 +735,8 @@ AlgaNode {
 	dispatchFunction { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
+		var dispatchCondition = Condition();
+
 		//Note that this forking mechanism is not robust on \udp
 		if(server.options.protocol == \udp, {
 			"AlgaNode: using a server with UDP protocol. The handling of 'server.sync' can be lost if multiple packets are sent together. It's suggested to use Alga with a server booted with the TCP protocol instead.".warn;
@@ -753,15 +755,20 @@ AlgaNode {
 				outsMapping:outsMapping
 			).send(server);
 
-			server.sync;
-
-			this.buildFromSynthDef(
-				initGroups, replace,
-				keepChannelsMapping:keepChannelsMapping,
-				keepScale:keepScale,
-				sched:sched
-			);
+			server.sync(dispatchCondition);
 		};
+
+		scheduler.addAction(
+			condition: { dispatchCondition.test == true },
+			func: {
+				this.buildFromSynthDef(
+					initGroups, replace,
+					keepChannelsMapping:keepChannelsMapping,
+					keepScale:keepScale,
+					sched:sched
+				);
+			}
+		);
 	}
 
 	resetSynth {
