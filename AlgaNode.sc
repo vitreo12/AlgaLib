@@ -92,7 +92,7 @@ AlgaNode {
 	var <currentDefaultNodes;
 
 	//Keep track of current scaling for params
-	var <paramsScalings;
+	var <paramsScaling;
 
 	//Keep track of current chans mapping for params
 	var <paramsChansMapping;
@@ -180,7 +180,7 @@ AlgaNode {
 
 		//Keep track of the scale arguments for senders (for replace calls)
 		//\param -> IdentityDictionary(sender -> scale)
-		paramsScalings = IdentityDictionary(10);
+		paramsScaling = IdentityDictionary(10);
 
 		//This keeps track of current \default nodes for every param.
 		//These are then used to restore default connections on <| or << after the param being a mix one (<<+)
@@ -587,7 +587,7 @@ AlgaNode {
 
 	//Remove \fadeTime \out and \gate and generate controlNames dict entries
 	createControlNamesAndParamsConnectionTime { | synthDescControlNames |
-		//Reset entries first (but not paramsConnectionTime, reusing old params' one? )
+		//Reset entries first
 		controlNames.clear;
 
 		synthDescControlNames.do({ | controlName |
@@ -609,12 +609,6 @@ AlgaNode {
 				//Create controlNames
 				controlNames[paramName] = controlName;
 
-				//Create paramsConnectionTime ... keeping same value among .replace calls.
-				//Only replace if entry is clear
-				if(paramsConnectionTime[paramName] == nil, {
-					paramsConnectionTime[paramName] = connectionTime;
-				});
-
 				//Create IdentityDictionaries for everything needed
 				interpSynths[paramName] = IdentityDictionary();
 				normSynths[paramName] = IdentityDictionary();
@@ -622,6 +616,13 @@ AlgaNode {
 				activeInterpSynths[paramName] = IdentityDictionary();
 
 				//These need to be kept across .replace calls!
+				//Only replace if entry is clear
+				if(paramsConnectionTime[paramName] == nil, {
+					paramsConnectionTime[paramName] = connectionTime;
+				});
+
+				//These need to be kept across .replace calls!
+				//Only replace if entry is clear
 				if(paramsChansMapping[paramName] == nil, {
 					paramsChansMapping[paramName] = IdentityDictionary();
 				});
@@ -884,23 +885,23 @@ AlgaNode {
 	}
 
 	addScaling { | param, sender, scale |
-		if(paramsScalings[param] == nil, {
-			paramsScalings[param] = IdentityDictionary(2);
-			paramsScalings[param][sender] = scale;
+		if(paramsScaling[param] == nil, {
+			paramsScaling[param] = IdentityDictionary(2);
+			paramsScaling[param][sender] = scale;
 		}, {
-			paramsScalings[param][sender] = scale;
+			paramsScaling[param][sender] = scale;
 		});
 	}
 
 	removeScaling { | param, sender |
-		if(paramsScalings[param] != nil, {
-			paramsScalings[param].removeAt(sender);
+		if(paramsScaling[param] != nil, {
+			paramsScaling[param].removeAt(sender);
 		});
 	}
 
 	getParamScaling { | param, sender |
-		if(paramsScalings[param] != nil, {
-			^(paramsScalings[param][sender])
+		if(paramsScaling[param] != nil, {
+			^(paramsScaling[param][sender])
 		});
 		^nil;
 	}
@@ -2553,10 +2554,9 @@ AlgaNode {
 		this.stopInner(time, isClear:true);
 
 		fork {
-			//Wait time before clearing groups and busses...
+			//Wait time before clearing groups, synths and busses...
 			(time + 1.0).wait;
 
-			//this.freeInterpNormSynths(false, true);
 			this.freeAllGroups(true); //I can just remove the groups, as they contain the synths
 			this.freeAllBusses(true);
 
