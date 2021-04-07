@@ -1,5 +1,4 @@
 Alga.boot;
-Alga.boot(algaServerOptions: AlgaServerOptions(blockSize:512, supernova:true));
 
 (
 b = AlgaNode({SinOsc.ar(134 + \fm.ar(0))}, connectionTime:2);
@@ -28,11 +27,9 @@ c.ct = 3;
 d.ct = 4;
 )
 
-d.replace({\in.ar(0).range(-100.12312, 1000.23)})
+d.replace({\in.ar(0).range(-100.12312, 10.23)})
 
 c.ct = 3;
-
-c.connectionTimeOutNodes
 
 a.ct = 5
 
@@ -67,13 +64,11 @@ a >> ~delay
 
 ~delay <<.dt 0.1
 
-~delay <<.dp 0.9
-
-~delay <<.fb 0.3
+~delay <<.dp 0.8
 
 ~dt = AlgaNode({DC.ar(0.1)})
 
-~dt.replace({LFNoise0.ar(SinOsc.kr(LFNoise1.kr(1).range(0.1, 10)).range(0.1, 100)).range(0.001, 1).lag(0.1)})
+~dt.replace({LFNoise0.ar(1).range(0.001, 1).lag(0.1)})
 
 ~delay <<.dt ~dt
 
@@ -86,3 +81,9 @@ a.replace({SinOsc.ar(100 + \fm.ar(0))})
 ~delay.clear(2)
 
 a.clear(2)
+
+c.clear
+
+d.clear
+
+o.clear

@@ -1,6 +1,25 @@
+// AlgaLib: SuperCollider implementation of the Alga live coding language
+// Copyright (C) 2020-2021 Francesco Cameli
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 AlgaNode {
 	//Server where this node lives
 	var <server;
+
+	//The AlgaScheduler @ this server
+	var <scheduler;
 
 	//Index of the corresponding AlgaBlock in the AlgaBlocksDict.
 	//This is being set in AlgaBlock
@@ -12,80 +31,111 @@ AlgaNode {
 	//This controls the fade in and out when .play / .stop
 	var <playTime = 0;
 
-	//The algaScheduler @ this server
-	var <algaScheduler;
-
 	//This is the longestConnectionTime between all the outNodes.
-	//it's used when .replacing a node connected to something, in order for it to be kept alive
+	//It's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
 	//longestConnectionTime will be moved to AlgaBlock and applied per-block!
-	var <connectionTimeOutNodes;
 	var <longestConnectionTime = 0;
 
-	//The max between longestConnectionTime and playTime
-	var <longestWaitTime = 0;
-
-	//This will be added: args passed in at creation to overwrite SynthDef's one,
-	//When using <|, then, these are the ones that will be restored!
-	var <objArgs;
-
-	var <objClass;
-	var <synthDef;
-
-	var <controlNames;
+	//Keeps track of all the connectionTime of all nodes with this node as input
+	var <connectionTimeOutNodes;
 
 	//per-parameter connectionTime
 	var <paramsConnectionTime;
 
+	//The max between longestConnectionTime and playTime
+	var <longestWaitTime = 0;
+
+	//Explicit args provided by the user
+	//This will be added: args passed in at creation to overwrite SynthDef's one,
+	//When using <|, then, these are the ones that will be restored!
+	var <defArgs;
+
+	//Whenever args have just been set, record their state in order for .replace to correctly replace
+	//the right values ... Check TestBuffers.scd for it in action
+	var <explicitArgs;
+
+	//When setting a number and running .replace, these values will be considered, unless
+	//the user EXPLICITLY set defArgs ... Check TestBuffers.scd for it in action
+	var <replaceArgs;
+
+	//Class for def
+	var <defClass;
+
+	//SynthDef, either explicit or internal (Function generated)
+	var <synthDef;
+
+	//Spec of parameters (names, default values, channels, rate)
+	var <controlNames;
+
+	//Number of channels and rate
 	var <numChannels, <rate;
 
-	var <outs;
+	//Output channel mapping
+	var <outsMapping;
 
+	//All Groups / Synths / Busses
 	var <group, <playGroup, <synthGroup, <normGroup, <interpGroup;
 	var <playSynth, <synth, <normSynths, <interpSynths;
 	var <synthBus, <normBusses, <interpBusses;
 
+	//Currently active interpSynths per param.
+	//These are used when changing time on connections, and need to update already running
+	//interpSynths at specific param / sender combination. It's the whole core that allows
+	//to have dynamic fadeTimes
 	var <activeInterpSynths;
 
+	//Connected nodes
 	var <inNodes, <outNodes;
 
-	//keep track of current \default nodes
+	//keep track of current \default nodes (this is used for mix parameters)
 	var <currentDefaultNodes;
 
-	//keep track of current scaling for params
-	var <paramsScalings;
+	//Keep track of current scaling for params
+	var <paramsScaling;
 
+	//Keep track of current chans mapping for params
 	var <paramsChansMapping;
 
-	var <isPlaying = false;
-	var <toBeCleared = false;
-	var <beingStopped = false;
-	var <cleared = false;
+	//Keep track of the "chans" arg for play so it's kept across .replaces
+	var <playChans;
 
-	*new { | obj, args, connectionTime = 0, playTime = 0, outsMapping, server |
-		^super.new.init(obj, args, connectionTime, playTime, outsMapping, server)
+	//General state queries
+	var <isPlaying = false;
+	var <beingStopped = false;
+	var <algaToBeCleared = false;
+	var <algaCleared = false;
+
+	*new { | def, args, connectionTime, playTime, sched, outsMapping, server |
+		^super.new.init(def, args, connectionTime, playTime, sched, outsMapping, server)
 	}
 
-	init { | argObj, argArgs, argConnectionTime = 0, argPlayTime = 0, argOutsMapping, argServer |
+	initAllVariables { | argServer |
 		//Default server if not specified otherwise
 		server = argServer ? Server.default;
 
 		//AlgaScheduler from specific server
-		algaScheduler = Alga.getScheduler(server);
-		if(algaScheduler == nil, {
+		scheduler = Alga.getScheduler(server);
+		if(scheduler == nil, {
 			(
-				"Can't retrieve correct AlgaScheduler for server " ++
+				"AlgaNode: can't retrieve correct AlgaScheduler for server " ++
 				server.name ++
 				". Has Alga.boot been called on it?"
 			).error;
-			^nil;
+			^false;
 		});
 
 		//param -> ControlName
 		controlNames = IdentityDictionary(10);
 
-		//param -> val
-		objArgs = IdentityDictionary(10);
+		//param -> value
+		defArgs = IdentityDictionary(10);
+
+		//param -> value
+		replaceArgs = IdentityDictionary(10);
+
+		//param -> value
+		explicitArgs = IdentityDictionary(10);
 
 		//param -> connectionTime
 		paramsConnectionTime = IdentityDictionary(10);
@@ -108,7 +158,7 @@ AlgaNode {
 
 		//IdentityDictionary of IdentityDictonaries: (needed for mixing)
 		//\param -> IdentityDictionary(sender -> IdentitySet(interpSynth))
-		//there are used when changing time on connections, and need to update already running
+		//these are used when changing time on connections, and need to update already running
 		//interpSynths at specific param / sender combination. It's the whole core that allows
 		//to have dynamic fadeTimes
 		activeInterpSynths = IdentityDictionary(10);
@@ -130,7 +180,7 @@ AlgaNode {
 
 		//Keep track of the scale arguments for senders (for replace calls)
 		//\param -> IdentityDictionary(sender -> scale)
-		paramsScalings = IdentityDictionary(10);
+		paramsScaling = IdentityDictionary(10);
 
 		//This keeps track of current \default nodes for every param.
 		//These are then used to restore default connections on <| or << after the param being a mix one (<<+)
@@ -139,123 +189,129 @@ AlgaNode {
 		//Keeps all the connectionTimes of the connected nodes
 		connectionTimeOutNodes = IdentityDictionary(10);
 
+		^true;
+	}
+
+	init { | argDef, argArgs, argConnectionTime = 0, argPlayTime = 0,
+		argSched = 0, argOutsMapping, argServer |
+
+        if((argDef.class != Symbol).and(argDef.class != Function), {
+            "AlgaNode: first argument must be either a Symbol or a Function".error;
+            ^this;
+        });
+
+		//initialize all IdentityDictionaries. Check if init went through correctly,
+		//otherwise, don't go through with anything
+		if(this.initAllVariables(argServer).not, {
+			^this
+		});
+
 		//starting connectionTime (using the setter so it also sets longestConnectionTime)
-		this.connectionTime_(argConnectionTime, true);
+		this.connectionTime_(argConnectionTime, all:true);
 		this.playTime_(argPlayTime);
 
 		//Dispatch node creation
-		this.dispatchNode(argObj, argArgs, initGroups:true, outsMapping:argOutsMapping);
+		this.dispatchNode(
+			argDef, argArgs,
+			initGroups: true,
+			outsMapping: argOutsMapping,
+			sched: argSched
+		);
 	}
 
-	setParamsConnectionTime { | val, all = false, param |
+	setParamsConnectionTime { | value, param, all = false |
 		//If all, set all paramConnectionTime regardless of their previous value
 		if(all, {
-			paramsConnectionTime.keysValuesChange({ val });
+			paramsConnectionTime.keysValuesChange({ value });
 		}, {
 			//If not all, only set new param value if param != nil
 			if(param != nil, {
 				var paramConnectionTime = paramsConnectionTime[param];
 				if(paramConnectionTime != nil, {
-					paramsConnectionTime[param] = val;
+					paramsConnectionTime[param] = value;
 				}, {
-					("Invalid param to set connection time for: " ++ param).error;
+					("AlgaNode: invalid param to set connection time for: \\" ++ param).error;
 				});
 			}, {
 				//This will just change the
 				//paramConnectionTime for paramConnectionTimes that haven't been explicitly modified
 				paramsConnectionTime.keysValuesChange({ | param, paramConnectionTime |
-					if(paramConnectionTime == connectionTime, { val }, { paramConnectionTime });
+					if(paramConnectionTime == connectionTime, { value }, { paramConnectionTime });
 				});
 			});
 		});
 	}
 
-	//connectionTime / connectTime / ct / interpolationTime / interpTime / it
-	connectionTime_ { | val, all = false, param |
-		if(val < 0, { val = 0 });
+	//connectionTime / ct / interpolationTime / it
+	//If all, set all paramConnectionTime regardless of their previous value
+	connectionTime_ { | value, param, all = false |
+		value = value ? 0;
+		if(value < 0, { value = 0 });
 		//this must happen before setting connectionTime, as it's been used to set
 		//paramConnectionTimes, checking against the previous connectionTime (before updating it)
-		this.setParamsConnectionTime(val, all, param);
+		this.setParamsConnectionTime(value, param, all);
 
 		//Only set global connectionTime if param is nil
 		if(param == nil, {
-			connectionTime = val;
+			connectionTime = value;
 		});
 
-		this.calculateLongestConnectionTime(val);
+		this.calculateLongestConnectionTime(value);
 	}
 
-	//Convenience wrappers
-	setAllConnectionTime { | val |
-		this.connectionTime_(val, true);
+	ct_ { | value |
+		this.connectionTime_(value)
 	}
-
-	allct { | val |
-		this.connectionTime_(val, true);
-	}
-
-	allit { | val |
-		this.connectionTime_(val, true);
-	}
-
-	act { | val |
-		this.connectionTime_(val, true);
-	}
-
-	ait { | val |
-		this.connectionTime_(val, true);
-	}
-
-	setParamConnectionTime { | param, val |
-		this.connectionTime_(val, false, param);
-	}
-
-	paramct { | param, val |
-		this.connectionTime_(val, false, param);
-	}
-
-	pct { | param, val |
-		this.connectionTime_(val, false, param);
-	}
-
-	paramit { | param, val |
-		this.connectionTime_(val, false, param);
-	}
-
-	pit { | param, val |
-		this.connectionTime_(val, false, param);
-	}
-
-	connectTime_ { | val, all = false, param | this.connectionTime_(val, all, param) }
-
-	connectTime { ^connectionTime }
-
-	ct_ { | val, all = false, param | this.connectionTime_(val, all, param) }
 
 	ct { ^connectionTime }
 
-	interpolationTime_ { | val, all = false, param | this.connectionTime_(val, all, param) }
+	interpolationTime_ { | value |
+		this.connectionTime_(value)
+	}
 
 	interpolationTime { ^connectionTime }
 
-	interpTime_ { | val, all = false, param | this.connectionTime_(val, all, param) }
-
-	interpTime { ^connectionTime }
-
-	it_ { | val, all = false, param | this.connectionTime_(val, all, param) }
+	it_ { | value |
+		this.connectionTime_(value)
+	}
 
 	it { ^connectionTime }
 
+	paramConnectionTime_ { | param, value |
+		this.connectionTime_(value, param);
+	}
+
+	paramConnectionTime { | param | ^paramsConnectionTime[param] }
+
+	pct_ { | param, value |
+		this.connectionTime_(value, param);
+	}
+
+	pct { | param | ^paramsConnectionTime[param] }
+
+	paramInterpolationTime_ { | param, value |
+		this.connectionTime_(value, param);
+	}
+
+	paramInterpolationTime { | param | ^paramsConnectionTime[param] }
+
+	pit_ { | param, value |
+		this.connectionTime_(value, param);
+	}
+
+	pit { | param | ^paramsConnectionTime[param] }
+
 	//playTime
-	playTime_ { | val |
-		if(val < 0, { val = 0 });
-		playTime = val;
+	playTime_ { | value |
+		value = value ? 0;
+		if(value < 0, { value = 0 });
+		playTime = value;
 		this.calculateLongestWaitTime;
 	}
 
 	pt { ^playTime }
 
-	pt_ { | val | this.playTime_(val) }
+	pt_ { | value | this.playTime_(value) }
 
 	//maximum between longestConnectionTime and playTime...
 	//is this necessary? Yes it is, cause if running .clear on the receiver,
@@ -301,10 +357,11 @@ AlgaNode {
 		longestConnectionTime = max(connectionTime, argConnectionTime);
 
 		//Doing the check instead of .max cause it's faster, imagine there are a lot of entries.
-		connectionTimeOutNodes.do({ | val |
-			if(val > longestConnectionTime, { longestConnectionTime = val });
+		connectionTimeOutNodes.do({ | value |
+			if(value > longestConnectionTime, { longestConnectionTime = value });
 		});
 
+		//Calculate longestWaitTime
 		this.calculateLongestWaitTime;
 
 		//Only run this on the nodes that are strictly connected to the one
@@ -320,22 +377,18 @@ AlgaNode {
 		});
 	}
 
-	outsMapping {
-		^outs
-	}
-
 	createAllGroups {
 		if(group == nil, {
-			group = Group(this.server);
-			playGroup = Group(group);
-			synthGroup = Group(group);
-			normGroup = Group(group);
-			interpGroup = Group(group);
+			group = AlgaGroup(server);
+			playGroup = AlgaGroup(group);
+			synthGroup = AlgaGroup(group);
+			normGroup = AlgaGroup(group);
+			interpGroup = AlgaGroup(group);
 		});
 	}
 
 	resetGroups {
-		if(toBeCleared, {
+		if(algaToBeCleared, {
 			playGroup = nil;
 			group = nil;
 			synthGroup = nil;
@@ -345,19 +398,22 @@ AlgaNode {
 	}
 
 	//Groups (and state) will be reset only if they are nil AND they are set to be freed.
-	//the toBeCleared variable can be changed in real time, if AlgaNode.replace is called while
+	//the algaToBeCleared variable can be changed in real time, if AlgaNode.replace is called while
 	//clearing is happening!
 	freeAllGroups { | now = false |
-		if((group != nil).and(toBeCleared), {
+		if((group != nil).and(algaToBeCleared), {
 			if(now, {
 				//Free now
 				group.free;
 
 				//this.resetGroups;
 			}, {
+				//Lock longestWaitTime
+				var time = longestWaitTime;
+
 				//Wait longestWaitTime, then free
 				fork {
-					(longestWaitTime + 1.0).wait;
+					(time + 1.0).wait;
 
 					group.free;
 
@@ -368,7 +424,9 @@ AlgaNode {
 	}
 
 	createSynthBus {
-		synthBus = AlgaBus(server, numChannels, rate);
+		if((numChannels != nil).and(rate != nil), {
+			synthBus = AlgaBus(server, numChannels, rate);
+		});
 	}
 
 	createInterpNormBusses {
@@ -377,7 +435,7 @@ AlgaNode {
 			var paramRate = controlName.rate;
 			var paramNumChannels = controlName.numChannels;
 
-			//interpBusses have 1 more channel for the envelope shape
+			//This is crucial: interpBusses have 1 more channel for the interp envelope!
 			interpBusses[paramName][\default] = AlgaBus(server, paramNumChannels + 1, paramRate);
 			normBusses[paramName] = AlgaBus(server, paramNumChannels, paramRate);
 		});
@@ -390,16 +448,23 @@ AlgaNode {
 
 	freeSynthBus { | now = false |
 		if(now, {
-			if(synthBus != nil, { synthBus.free });
+			if(synthBus != nil, {
+				synthBus.free;
+				synthBus = nil; //Necessary for correct .play behaviour!
+			});
 		}, {
-			//if forking, this.synthBus could have changed, that's why this is needed
+			//Lock longestWaitTime
+			var time = longestWaitTime;
+
+			//if forking, this.synthBus could change, that's why this is needed
 			var prevSynthBus = synthBus.copy;
+			synthBus = nil;  //Necessary for correct .play behaviour!
 
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestConnectionTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestWaitTime + 1.0).wait;
+				(time + 1.0).wait;
 
 				if(prevSynthBus != nil, { prevSynthBus.free });
 			}
@@ -421,6 +486,9 @@ AlgaNode {
 				});
 			});
 		}, {
+			//Lock longestWaitTime
+			var time = longestWaitTime;
+
 			//Dictionary need to be deepcopied
 			var prevNormBusses = normBusses.copy;
 			var prevInterpBusses = interpBusses.copy;
@@ -430,7 +498,7 @@ AlgaNode {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestConnectionTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestWaitTime + 1.0).wait;
+				(time + 1.0).wait;
 
 				if(prevNormBusses != nil, {
 					prevNormBusses.do({ | normBus |
@@ -455,7 +523,7 @@ AlgaNode {
 	}
 
 	//This will also be kept across replaces, as it's just updating the dict
-	createObjArgs { | args |
+	createDefArgs { | args |
 		if(args != nil, {
 			if(args.isSequenceableCollection.not, { "AlgaNode: args must be an array".error; ^this });
 			if((args.size) % 2 != 0, { "AlgaNode: args' size must be a power of two".error; ^this });
@@ -464,11 +532,13 @@ AlgaNode {
 				if(param.class == Symbol, {
 					var iPlusOne = i + 1;
 					if(iPlusOne < args.size, {
-						var val = args[i+1];
-						if((val.isNumberOrArray).or(val.isAlgaNode), {
-							objArgs[param] = val;
+						var value = args[i + 1];
+						if(value.isKindOf(Buffer), { value = value.bufnum });
+						if((value.isNumberOrArray).or(value.isAlgaNode), {
+							defArgs[param] = value;
+							explicitArgs[param] = true;
 						}, {
-							("AlgaNode: args at param " ++ param ++ " must be a number, array or AlgaNode").error;
+							("AlgaNode: args at param \\" ++ param ++ " must be a number, array or AlgaNode").error;
 						});
 					});
 				});
@@ -476,44 +546,48 @@ AlgaNode {
 		});
 	}
 
-	//dispatches controlnames / numChannels / rate according to obj class
-	dispatchNode { | obj, args, initGroups = false, replace = false,
-		keepChannelsMapping = false, outsMapping, keepScale = false |
+	//dispatches controlnames / numChannels / rate according to def class
+	dispatchNode { | def, args, initGroups = false, replace = false,
+		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
-		objClass = obj.class;
+		defClass = def.class;
 
-		//If there is a synth playing, set its instantiated status to false:
+		//If there is a synth playing, set its algaInstantiated status to false:
 		//this is mostly needed for .replace to work properly and wait for the new synth
-		//to be instantiated!
-		if(synth != nil, { synth.instantiated = false });
+		//to be algaInstantiated!
+		if(synth != nil, { synth.algaInstantiated = false });
 
 		//Create args dict
-		this.createObjArgs(args);
+		this.createDefArgs(args);
 
 		//Symbol
-		if(objClass == Symbol, {
-			this.dispatchSynthDef(obj, initGroups, replace,
+		if(defClass == Symbol, {
+			if(outsMapping != nil, {
+				"AlgaNode: outsMapping will not be considered when def is a SynthDef.".warn;
+			});
+			this.dispatchSynthDef(def, initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
-				keepScale:keepScale
+				keepScale:keepScale,
+				sched:sched
 			);
 		}, {
 			//Function
-			if(objClass == Function, {
-				this.dispatchFunction(obj, initGroups, replace,
+			if(defClass == Function, {
+				this.dispatchFunction(def, initGroups, replace,
 					keepChannelsMapping:keepChannelsMapping,
 					outsMapping:outsMapping,
-					keepScale:keepScale
+					keepScale:keepScale,
+					sched:sched
 				);
 			}, {
-				("AlgaNode: class '" ++ objClass ++ "' is invalid").error;
-				this.clear;
+				("AlgaNode: class '" ++ defClass ++ "' is invalid").error;
 			});
 		});
 	}
 
 	//Remove \fadeTime \out and \gate and generate controlNames dict entries
 	createControlNamesAndParamsConnectionTime { | synthDescControlNames |
-		//Reset entries first (but not paramsConnectionTime, reusing old params' one? )
+		//Reset entries first
 		controlNames.clear;
 
 		synthDescControlNames.do({ | controlName |
@@ -525,36 +599,50 @@ AlgaNode {
 
 				var paramName = controlName.name;
 
+				var paramNumChannels = controlName.numChannels;
+				if(paramNumChannels > AlgaStartup.algaMaxIO, {
+					("AlgaNode: trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' whose parameter '" ++ paramName ++ "' has more channels(" ++ paramNumChannels ++ ") than 'Alga.maxIO'(" ++ AlgaStartup.algaMaxIO ++ "). Change 'Alga.maxIO' to fit your needs and run 'Alga.boot' again.").error;
+					this.clear;
+					^false
+				});
+
 				//Create controlNames
 				controlNames[paramName] = controlName;
 
-				//Create paramsConnectionTime ... keeping same value among .replace calls.
+				//Create IdentityDictionaries for everything needed
+				interpSynths[paramName] = IdentityDictionary();
+				normSynths[paramName] = IdentityDictionary();
+				interpBusses[paramName] = IdentityDictionary();
+				activeInterpSynths[paramName] = IdentityDictionary();
+
+				//These need to be kept across .replace calls!
 				//Only replace if entry is clear
 				if(paramsConnectionTime[paramName] == nil, {
 					paramsConnectionTime[paramName] = connectionTime;
 				});
 
-				//Create IdentityDictionaries for everything needed
-				paramsChansMapping[paramName] = IdentityDictionary();
-				interpSynths[paramName] = IdentityDictionary();
-				normSynths[paramName] = IdentityDictionary();
-				interpBusses[paramName] = IdentityDictionary();
-				activeInterpSynths[paramName] = IdentityDictionary();
+				//These need to be kept across .replace calls!
+				//Only replace if entry is clear
+				if(paramsChansMapping[paramName] == nil, {
+					paramsChansMapping[paramName] = IdentityDictionary();
+				});
 			});
 		});
+
+		^true;
 	}
 
 	//calculate the outs variable (the outs channel mapping)
-	calculateOuts { | replace = false, keepChannelsMapping = false |
+	calculateOutsMapping { | replace = false, keepChannelsMapping = false |
 		//Accumulate channelsMapping across .replace calls.
 		if(replace.and(keepChannelsMapping), {
-			var newOuts = IdentityDictionary(10);
+			var newOutsMapping = IdentityDictionary(10);
 
 			//copy previous ones
-			outs.keysValuesDo({ | key, value |
+			outsMapping.keysValuesDo({ | key, value |
 				//Delete out of bounds entries? Or keep them for future .replaces?
 				//if(value < numChannels, {
-				newOuts[key] = value;
+				newOutsMapping[key] = value;
 				//});
 			});
 
@@ -562,30 +650,45 @@ AlgaNode {
 			synthDef.outsMapping.keysValuesDo({ | key, value |
 				//Delete out of bounds entries? Or keep them for future .replaces?
 				//if(value < numChannels, {
-				newOuts[key] = value;
+				newOutsMapping[key] = value;
 				//});
 			});
 
-			outs = newOuts;
+			outsMapping = newOutsMapping;
 		}, {
 			//no replace: use synthDef's ones
-			outs = synthDef.outsMapping;
+			outsMapping = synthDef.outsMapping;
 		});
 	}
 
 	//build all synths
 	buildFromSynthDef { | initGroups = false, replace = false,
-		keepChannelsMapping = false, keepScale = false |
+		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
 		//Retrieve controlNames from SynthDesc
 		var synthDescControlNames = synthDef.asSynthDesc.controls;
-		this.createControlNamesAndParamsConnectionTime(synthDescControlNames);
+		if(this.createControlNamesAndParamsConnectionTime(synthDescControlNames).not, { ^this });
 
 		numChannels = synthDef.numChannels;
+		if(numChannels > AlgaStartup.algaMaxIO, {
+			("AlgaNode: trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' which has more outputs(" ++ numChannels ++ ") than 'Alga.maxIO'(" ++ AlgaStartup.algaMaxIO ++ "). Change 'Alga.maxIO' to fit your needs and run 'Alga.boot' again.").error;
+			this.clear;
+			^this
+		});
+
+		//If explicit free, can't use in AlgaNode
+		if(synthDef.explicitFree, {
+			("AlgaNode: trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' which can free its synth. This is not supported for AlgaNodes, but it will be for AlgaPatterns.").error;
+			this.clear;
+			^this;
+		});
+
 		rate = synthDef.rate;
 
-		//Generate outs (for outsMapping connectinons)
-		this.calculateOuts(replace, keepChannelsMapping);
+		sched = sched ? 0;
+
+		//Calculate correct outsMapping
+		this.calculateOutsMapping(replace, keepChannelsMapping);
 
 		//Create groups if needed
 		if(initGroups, { this.createAllGroups });
@@ -594,64 +697,78 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		this.createAllSynths(
-			replace,
-			keepChannelsMapping:keepChannelsMapping,
-			keepScale:keepScale
-		);
+		scheduler.addAction(func: {
+			this.createAllSynths(
+				replace,
+				keepChannelsMapping:keepChannelsMapping,
+				keepScale:keepScale
+			);
+		}, sched: sched);
 	}
 
 	//Dispatch a SynthDef (symbol)
-	dispatchSynthDef { | obj, initGroups = false, replace = false,
-		keepChannelsMapping = false, keepScale = false |
+	dispatchSynthDef { | def, initGroups = false, replace = false,
+		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
-		var synthDesc = SynthDescLib.global.at(obj);
+		var synthDesc = SynthDescLib.global.at(def);
 
 		if(synthDesc == nil, {
-			("Invalid AlgaSynthDef: '" ++ obj.asString ++ "'").error;
-			this.clear;
+			("AlgaNode: Invalid AlgaSynthDef: '" ++ def.asString ++ "'").error;
 			^this;
 		});
 
 		synthDef = synthDesc.def;
 
 		if(synthDef.class != AlgaSynthDef, {
-			("Invalid AlgaSynthDef: '" ++ obj.asString ++"'").error;
-			this.clear;
+			("AlgaNode: Invalid AlgaSynthDef: '" ++ def.asString ++"'").error;
 			^this;
 		});
 
 		this.buildFromSynthDef(
 			initGroups, replace,
 			keepChannelsMapping:keepChannelsMapping,
-			keepScale:keepScale
+			keepScale:keepScale,
+			sched:sched
 		);
 	}
 
 	//Dispatch a Function
-	dispatchFunction { | obj, initGroups = false, replace = false,
-		keepChannelsMapping = false, outsMapping, keepScale = false |
+	dispatchFunction { | def, initGroups = false, replace = false,
+		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
+
+		var dispatchCondition = Condition();
+
+		//Note that this forking mechanism is not robust on \udp
+		if(server.options.protocol == \udp, {
+			"AlgaNode: using a server with UDP protocol. The handling of 'server.sync' can be lost if multiple packets are sent together. It's suggested to use Alga with a server booted with the TCP protocol instead.".warn;
+		});
 
 		//Need to wait for server to receive the sdef
 		fork {
 			synthDef = AlgaSynthDef(
 				("alga_" ++ UniqueID.next).asSymbol,
-				obj,
+				def,
 				outsMapping:outsMapping
 			).send(server);
 
-			server.sync;
-
-			this.buildFromSynthDef(
-				initGroups, replace,
-				keepChannelsMapping:keepChannelsMapping,
-				keepScale:keepScale
-			);
+			server.sync(dispatchCondition);
 		};
+
+		scheduler.addAction(
+			condition: { dispatchCondition.test == true },
+			func: {
+				this.buildFromSynthDef(
+					initGroups, replace,
+					keepChannelsMapping:keepChannelsMapping,
+					keepScale:keepScale,
+					sched:sched
+				);
+			}
+		);
 	}
 
 	resetSynth {
-		if(toBeCleared, {
+		if(algaToBeCleared, {
 			//IdentitySet to nil (should it fork?)
 			synth = nil;
 			synthDef = nil;
@@ -663,7 +780,7 @@ AlgaNode {
 	}
 
 	resetInterpNormSynths {
-		if(toBeCleared, {
+		if(algaToBeCleared, {
 			//Just reset the Dictionaries entries
 			interpSynths.clear;
 			normSynths.clear;
@@ -678,16 +795,18 @@ AlgaNode {
 
 		//synth's \fadeTime is longestWaitTime. It could probably be removed here,
 		//as it will be set eventually in the case of .clear / etc...
-		var synthArgs = [\out, synthBus.index, \fadeTime, longestWaitTime];
+		var synthArgs = [
+			\out, synthBus.index,
+			\fadeTime, longestWaitTime
+		];
 
-		//connect each param with specific normBus
+		//connect each param with the already allocated normBus
 		normBusses.keysValuesDo({ | param, normBus |
-			synthArgs = synthArgs.add(param);
-			synthArgs = synthArgs.add(normBus.busArg);
+			synthArgs = synthArgs.add(param).add(normBus.busArg);
 		});
 
 		//create synth
-		synth = AlgaSynth.new(
+		synth = AlgaSynth(
 			defName,
 			synthArgs,
 			synthGroup
@@ -702,19 +821,37 @@ AlgaNode {
 	}
 
 	//Either retrieve default value from controlName or from args
-	getDefaultOrArg { | controlName, param = \in |
+	getDefaultOrArg { | controlName, param = \in, replace = false |
 		var defaultOrArg = controlName.defaultValue;
+		var defArg;
+		var explicitArg = explicitArgs[param];
 
-		var objArg = objArgs[param];
+		if(defArgs != nil, {
+			if(replace, {
+				//replaceArgs are all the numbers that are set while coding.
+				//On replace I wanna restore the current value I'm using, not the default value...
+				//Unless I explicily set a new args:
+				defArg = replaceArgs[param];
+			});
 
-		//If objArgs has entry, use that one as default instead
-		if(objArg != nil, {
-			if(objArg.isNumberOrArray, {
-				defaultOrArg = objArg;
-			}, {
-				if(objArg.isAlgaNode, {
-					//Schedule connection with the algaNode
-					this.makeConnection(objArg, param);
+			//No values provided in replaceArgs, or new explicit args: have been just set
+			if((defArg == nil).or(explicitArg), {
+				defArg = defArgs[param];
+				explicitArgs[param] = false; //reset state
+				replaceArgs.removeAt(param); //reset replaceArg
+			});
+
+			//If defArgs has entry, use that one as default instead
+			if(defArg != nil, {
+				if(defArg.isNumberOrArray, {
+					//If it's a number, embed it directly! No interpolation, as it's just setting defaults.
+					//Also this works perfectly with replacing Buffer entries
+					defaultOrArg = defArg;
+				}, {
+					if(defArg.isAlgaNode, {
+						//Schedule connection with the algaNode
+						this.makeConnection(defArg, param);
+					});
 				});
 			});
 		});
@@ -724,6 +861,9 @@ AlgaNode {
 
 	//Check correct array size for scale arguments
 	checkScaleParameterSize { | scaleEntry, name, param, paramNumChannels |
+		if(paramNumChannels == nil, {
+			^scaleEntry
+		});
 		if(scaleEntry.isSequenceableCollection, {
 			var scaleEntrySize = scaleEntry.size;
 			if(scaleEntry.size != paramNumChannels, {
@@ -745,27 +885,41 @@ AlgaNode {
 	}
 
 	addScaling { | param, sender, scale |
-		if(paramsScalings[param] == nil, {
-			paramsScalings[param] = IdentityDictionary(2);
-			paramsScalings[param][sender] = scale;
+		if(paramsScaling[param] == nil, {
+			paramsScaling[param] = IdentityDictionary(2);
+			paramsScaling[param][sender] = scale;
 		}, {
-			paramsScalings[param][sender] = scale;
+			paramsScaling[param][sender] = scale;
 		});
 	}
 
 	removeScaling { | param, sender |
-		if(paramsScalings[param] != nil, {
-			paramsScalings[param].removeAt(sender);
+		if(paramsScaling[param] != nil, {
+			paramsScaling[param].removeAt(sender);
 		});
+	}
+
+	getParamScaling { | param, sender |
+		if(paramsScaling[param] != nil, {
+			^(paramsScaling[param][sender])
+		});
+		^nil;
 	}
 
 	//Calculate scale to send to interp synth
 	calculateScaling { | param, sender, paramNumChannels, scale |
 		if(scale.isNil, { ^nil });
 
-		if(scale.isSequenceableCollection.not, {
-			"AlgaNode: the scale parameter must be an array".error;
+		if(scale.isNumberOrArray.not, {
+			"AlgaNode: the scale parameter must be a Number or an Array".error;
 			^nil
+		});
+
+		//just a number: act like a multiplier
+		if(scale.isNumber, {
+			var outArray = [\outMultiplier, scale];
+			this.addScaling(param, sender, scale);
+			^outArray;
 		});
 
 		//just lowMax / hiMax
@@ -829,6 +983,13 @@ AlgaNode {
 		});
 	}
 
+	getParamChansMapping { | param, sender |
+		if(paramsChansMapping[param] != nil, {
+			^(paramsChansMapping[param][sender])
+		});
+		^nil;
+	}
+
 	//Calculate the array to be used as \indices param for interpSynth
 	calculateSenderChansMappingArray { | param, sender, senderChansMapping,
 		senderNumChans, paramNumChans, updateParamsChansMapping = true |
@@ -838,6 +999,9 @@ AlgaNode {
 		//Connect with outMapping symbols. Retrieve it from the sender
 		if(actualSenderChansMapping.class == Symbol, {
 			actualSenderChansMapping = sender.outsMapping[actualSenderChansMapping];
+			if(actualSenderChansMapping == nil, {
+				("AlgaNode: invalid channel name '" ++ senderChansMapping ++ "'. Default will be used.").warn;
+			});
 		});
 
 		//Update entry in Dict with the non-modified one (used in .replace then)
@@ -862,22 +1026,27 @@ AlgaNode {
 			if(actualSenderChansMapping.isNumber, {
 				^(Array.fill(paramNumChans, { actualSenderChansMapping }));
 			}, {
-				"senderChansMapping must be a number or an array. Using default one.".error;
+				"AlgaNode: senderChansMapping must be a number or an array. Using default one.".error;
 				^(Array.series(paramNumChans));
 			});
 		});
 	}
 
 	//The actual empty function
-	removeActiveInterpSynthOnFree { | param, sender, interpSynth |
+	removeActiveInterpSynthOnFree { | param, sender, interpSynth, action |
 		interpSynth.onFree({
 			activeInterpSynths[param][sender].remove(interpSynth);
+
+			//This is used in AlgaPattern
+			if(action != nil, {
+				action.value;
+			});
 		});
 	}
 
 	//Use the .onFree node function to dynamically fill and empty the activeInterpSynths for
 	//each param / sender combination!
-	addActiveInterpSynthOnFree { | param, sender, interpSynth |
+	addActiveInterpSynthOnFree { | param, sender, interpSynth, action |
 		//Each sender has IdentitySet with all the active ones
 		if(activeInterpSynths[param][sender].class == IdentitySet, {
 			activeInterpSynths[param][sender].add(interpSynth)
@@ -887,7 +1056,7 @@ AlgaNode {
 		});
 
 		//The actual function that empties
-		this.removeActiveInterpSynthOnFree(param, sender, interpSynth);
+		this.removeActiveInterpSynthOnFree(param, sender, interpSynth, action);
 	}
 
 	//Set proper fadeTime for all active interpSynths on param / sender combination
@@ -906,7 +1075,7 @@ AlgaNode {
 			var paramNumChannels = controlName.numChannels;
 
 			var paramRate = controlName.rate;
-			var paramDefault = this.getDefaultOrArg(controlName, paramName);
+			var paramDefault = this.getDefaultOrArg(controlName, paramName, replace);
 
 			var noSenders = false;
 
@@ -949,12 +1118,12 @@ AlgaNode {
 						//Use previous entry for the channel mapping, otherwise, nil.
 						//nil will generate Array.series(...) in calculateSenderChansMappingArray
 						if(keepChannelsMapping, {
-							oldParamsChansMapping = paramsChansMapping[paramName][prevSender];
+							oldParamsChansMapping = this.getParamChansMapping(paramName, prevSender);
 						});
 
 						//Use previous entry for inputs scaling
 						if(keepScale, {
-							oldParamScale = paramsScalings[paramName][prevSender];
+							oldParamScale = this.getParamScaling(paramName, prevSender);
 						});
 
 						//overwrite interp symbol considering the senders' num channels!
@@ -1013,7 +1182,8 @@ AlgaNode {
 						normSynth = AlgaSynth(
 							normSymbol,
 							[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-							normGroup
+							normGroup,
+							waitForInst:false
 						);
 
 						if(onlyEntry, {
@@ -1070,14 +1240,15 @@ AlgaNode {
 
 				//Instantiated right away, with no \fadeTime, as it will directly be connected to
 				//synth's parameter. Synth will read its params from all the normBusses
-				var normSynth = AlgaSynth.new(
+				var normSynth = AlgaSynth(
 					normSymbol,
 					[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-					normGroup
+					normGroup,
+					waitForInst:false
 				);
 
 				//use paramDefault: no replace or no senders in sendersSet
-				var interpSynth = AlgaSynth.new(
+				var interpSynth = AlgaSynth(
 					interpSymbol,
 					[\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
 					interpGroup
@@ -1139,10 +1310,11 @@ AlgaNode {
 			//interpBus has always one more channel for the envelope
 			interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
 
-			normSynth = AlgaSynth.new(
+			normSynth = AlgaSynth(
 				normSymbol,
 				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-				normGroup
+				normGroup,
+				waitForInst:false
 			);
 
 			interpBusses[param][sender] = interpBus;
@@ -1158,7 +1330,7 @@ AlgaNode {
 		}, {
 			//the alga node is already mixed. run replaceMix with itself
 			//this is useful in case scale parameter has been changed by user
-			"The AlgaNode was already mixed. Running 'replaceMix' with itself instead".warn;
+			"AlgaNode: sender was already mixed. Running 'replaceMix' with itself instead".warn;
 			this.replaceMixInner(param, sender, sender, senderChansMapping, scale, time:time);
 		});
 	}
@@ -1201,11 +1373,12 @@ AlgaNode {
 		paramConnectionTime = paramsConnectionTime[param];
 
 		if((controlName.isNil).or(paramConnectionTime.isNil), {
-			("Invalid param for interp synth to free: " ++ param).error;
+			("AlgaNode: invalid param for interp synth to free: \\" ++ param).error;
 			^this
 		});
 
 		//If -1, or invalid, set to global connectionTime
+		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 
 		//calc temporary time
@@ -1235,7 +1408,7 @@ AlgaNode {
 
 		//get interp bus ident dict at specific param
 		interpBusAtParam = interpBusses[param];
-		if(interpBusAtParam == nil, { ("Invalid interp bus at param " ++ param).error; ^this });
+		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param \\" ++ param).error; ^this });
 
 		//Try to get sender one.
 		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
@@ -1244,7 +1417,7 @@ AlgaNode {
 			interpBus = interpBusAtParam[\default];
 			if(interpBus == nil, {
 				(
-					"Invalid interp bus at param " ++
+					"AlgaNode: invalid interp bus at param \\" ++
 					param ++ " and node " ++ senderSym.asString
 				).error;
 				^this
@@ -1274,13 +1447,14 @@ AlgaNode {
 					paramNumChannels
 				).asSymbol;
 
-				AlgaSynth.new(
+				AlgaSynth(
 					fadeInSymbol,
 					[
 						\out, interpBus.index,
 						\fadeTime, time,
 					],
-					interpGroup
+					interpGroup,
+					waitForInst:false
 				);
 			});
 
@@ -1299,7 +1473,7 @@ AlgaNode {
 			});
 
 			//Read \in from the sender's synthBus
-			interpSynth = AlgaSynth.new(
+			interpSynth = AlgaSynth(
 				interpSymbol,
 				interpSynthArgs,
 				interpGroup
@@ -1316,7 +1490,7 @@ AlgaNode {
 				if(sender.isNumberOrArray,  {
 					paramVal = sender;
 				}, {
-					"Invalid paramVal for AlgaNode".error;
+					"AlgaNode: invalid paramVal for AlgaNode".error;
 					^nil;
 				});
 			});
@@ -1335,7 +1509,7 @@ AlgaNode {
 				});
 			});
 
-			interpSynth = AlgaSynth.new(
+			interpSynth = AlgaSynth(
 				interpSymbol,
 				interpSynthArgs,
 				interpGroup
@@ -1358,17 +1532,6 @@ AlgaNode {
 		});
 	}
 
-	//Eventually use this func to free all synths that use \gate and \fadeTime
-	freeSynthOnScheduler { | whatSynth, whatFadeTime |
-		if(whatSynth.instantiated, {
-			whatSynth.set(\gate, 0, \fadeTime, whatFadeTime);
-		}, {
-			algaScheduler.addAction({ whatSynth.instantiated }, {
-				whatSynth.set(\gate, 0, \fadeTime, whatFadeTime);
-			});
-		});
-	}
-
 	//Default now and useConnectionTime to true for synths.
 	//Synth always uses longestConnectionTime, in order to make sure that everything connected to it
 	//will have time to run fade ins and outs
@@ -1376,19 +1539,25 @@ AlgaNode {
 		if(now, {
 			if(synth != nil, {
 				//synth's fadeTime is longestWaitTime!
-				synth.set(\gate, 0, \fadeTime, if(useConnectionTime, { longestWaitTime }, { 0 }));
+				synth.set(
+					\gate, 0,
+					\fadeTime, if(useConnectionTime, { longestWaitTime }, { 0 })
+				);
 
 				//this.resetSynth;
 			});
 		}, {
-			//Needs to be deep copied (a new synth could be instantiated meanwhile)
+			//Lock longestWaitTime
+			var time = longestWaitTime;
+
+			//Needs to be deep copied (a new synth could be algaInstantiated meanwhile)
 			var prevSynth = synth.copy;
 
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestWaitTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestWaitTime + 1.0).wait;
+				(time + 1.0).wait;
 
 				if(prevSynth != nil, {
 					prevSynth.set(\gate, 0, \fadeTime, 0);
@@ -1415,6 +1584,9 @@ AlgaNode {
 
 			//this.resetInterpNormSynths;
 		}, {
+			//Lock longestWaitTime
+			var time = longestWaitTime;
+
 			//Dictionaries need to be deep copied
 			var prevInterpSynths = interpSynths.copy;
 			var prevNormSynths = normSynths.copy;
@@ -1423,7 +1595,7 @@ AlgaNode {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestWaitTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
-				(longestWaitTime + 1.0).wait;
+				(time + 1.0).wait;
 
 				prevInterpSynths.do({ | interpSynthsAtParam |
 					interpSynthsAtParam.do({ | interpSynth |
@@ -1458,45 +1630,51 @@ AlgaNode {
 			var currentDefaultNode = currentDefaultNodes[param];
 
 			//Make sure all of these are scheduled correctly to each other!
-			algaScheduler.addAction({ (normSynthAtParam.instantiated).and(interpSynthAtParam.instantiated) }, {
-				var notDefaultNode = false;
+			scheduler.addAction(
+				condition: {
+					(interpSynthAtParam.algaInstantiated)/*.and(normSynthAtParam.algaInstantiated)*/
+				},
+				func: {
+					var notDefaultNode = false;
 
-				//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
-				//This makes sure that \defauls is kept alive at all times
-				if(sender != currentDefaultNode, {
-					notDefaultNode = true;
-				});
+					//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
+					//This makes sure that \defauls is kept alive at all times
+					if(sender != currentDefaultNode, {
+						notDefaultNode = true;
+					});
 
-				//calculate temporary time
-				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
+					//calculate temporary time
+					time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
-				//Only create fadeOut and free normSynth on .replaceMix and .disconnect! (not .replace).
-				//Also, don't create it for the default node, as that needs to be kept alive at all times!
-				if(notDefaultNode.and(replace.not), {
-					var fadeOutSymbol = ("alga_fadeOut_" ++
-						interpBusAtParam.rate ++
-						(interpBusAtParam.numChannels - 1) //it has one more for env. need to remove that from symbol
-					).asSymbol;
+					//Only create fadeOut and free normSynth on .replaceMix and .disconnect! (not .replace).
+					//Also, don't create it for the default node, as that needs to be kept alive at all times!
+					if(notDefaultNode.and(replace.not), {
+						var fadeOutSymbol = ("alga_fadeOut_" ++
+							interpBusAtParam.rate ++
+							(interpBusAtParam.numChannels - 1) //it has one more for env. need to remove that from symbol
+						).asSymbol;
 
-					AlgaSynth.new(
-						fadeOutSymbol,
-						[
-							\out, interpBusAtParam.index,
-							\fadeTime, time,
-						],
-						interpGroup
-					);
+						AlgaSynth(
+							fadeOutSymbol,
+							[
+								\out, interpBusAtParam.index,
+								\fadeTime, time,
+							],
+							interpGroup,
+							waitForInst:false
+						);
 
-					//This has to be surely instantiated before being freed
-					normSynthAtParam.set(\gate, 0, \fadeTime, time);
-				});
+						//This has to be surely algaInstantiated before being freed
+						normSynthAtParam.set(\gate, 0, \fadeTime, time);
+					});
 
-				//This has to be surely instantiated before being freed
-				interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
+					//This has to be surely algaInstantiated before being freed
+					interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
 
-				//Set correct fadeTime for all active interp synths at param / sender combination
-				this.setFadeTimeForAllActiveInterpSynths(param, sender, time);
-			});
+					//Set correct fadeTime for all active interp synths at param / sender combination
+					this.setFadeTimeForAllActiveInterpSynths(param, sender, time);
+				}
+			);
 		});
 
 		//On a .disconnect / .replaceMix, remove the entries
@@ -1515,7 +1693,8 @@ AlgaNode {
 		var paramConnectionTime = paramsConnectionTime[param];
 
 		//If -1, or invalid, set to global connectionTime
-		if((paramConnectionTime < 0).or(paramConnectionTime == nil), { paramConnectionTime = connectionTime });
+		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
+		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 
 		//Free them all (check if there were mix entries).
 		//sender == nil comes from <|
@@ -1575,10 +1754,10 @@ AlgaNode {
 		//First of all, remove the outNodes that the previous sender had with the
 		//param of this node, if there was any. Only apply if mix==false (no <<+ / >>+)
 		if(mix == false, {
-			var previousSenderSet = inNodes[param];
-			if(previousSenderSet != nil, {
-				previousSenderSet.do({ | previousSender |
-					previousSender.outNodes.removeAt(this);
+			var oldSenderSet = inNodes[param];
+			if(oldSenderSet != nil, {
+				oldSenderSet.do({ | oldSender |
+					oldSender.outNodes.removeAt(this);
 				});
 			});
 		});
@@ -1590,6 +1769,9 @@ AlgaNode {
 			}, {
 				inNodes[param].add(sender);
 			})
+		}, {
+			//Number ... Always replace as mixing is not supported for numbers
+			replaceArgs[param] = sender;
 		});
 	}
 
@@ -1619,53 +1801,62 @@ AlgaNode {
 	}
 
 	removeInOutNodeAtParam { | sender, param = \in |
-		//Just remove one param from sender's set at this entry
-		sender.outNodes[this].remove(param);
+		var inNodesAtParam       = inNodes[param];
+		var senderOutNodesAtThis = sender.outNodes[this];
 
-		//If IdentitySet is now empty, remove it entirely
-		if(sender.outNodes[this].size == 0, {
-			sender.outNodes.removeAt(this);
+		if(senderOutNodesAtThis != nil, {
+			//Just remove one param from sender's set at this entry
+			senderOutNodesAtThis.remove(param);
+
+			//If IdentitySet is now empty, remove it entirely
+			if(senderOutNodesAtThis.size == 0, {
+				sender.outNodes.removeAt(this);
+			});
 		});
 
-		//Remove the specific param / sender combination from inNodes
-		inNodes[param].remove(sender);
+		if(inNodesAtParam != nil, {
+			//Remove the specific param / sender combination from inNodes
+			inNodesAtParam.remove(sender);
 
-		//If IdentitySet is now empty, remove it entirely
-		if(inNodes[param].size == 0, {
-			inNodes.removeAt(param);
+			//If IdentitySet is now empty, remove it entirely
+			if(inNodesAtParam.size == 0, {
+				inNodes.removeAt(param);
+			});
 		});
 
 		//Recalculate longestConnectionTime too...
-		//SHOULD THIS BE DONE AFTER THE SYNTHS ARE CREATED???
-		//(Right now, this happens before creating new synths)
+		//This should also take in account eventual multiple sender / param combinations
 		sender.connectionTimeOutNodes[this] = 0;
 		sender.calculateLongestConnectionTime(0);
 	}
 
 	//Remove entries from inNodes / outNodes / connectionTimeOutNodes for all involved nodes
-	removeInOutNodesDict { | previousSender = nil, param = \in |
-		var previousSenders = inNodes[param];
-		if(previousSenders == nil, { ( "No previous connection enstablished at param: " ++ param).error; ^this; });
+	removeInOutNodesDict { | oldSender = nil, param = \in |
+		var oldSenders = inNodes[param];
+		if(oldSenders == nil, { ( "AlgaNode: no previous connection enstablished at param \\" ++ param).error; ^this; });
 
-		previousSenders.do({ | sender |
+		oldSenders.do({ | sender |
 			var sendersParamsSet = sender.outNodes[this];
 			if(sendersParamsSet != nil, {
-				//no previousSender specified: remove them all!
-				if(previousSender == nil, {
+				//no oldSender specified: remove them all!
+				if(oldSender == nil, {
 					this.removeInOutNodeAtParam(sender, param);
 				}, {
-					//If specified previousSender, only remove that one (in mixing scenarios)
-					if(sender == previousSender, {
+					//If specified oldSender, only remove that one (in mixing scenarios)
+					if(sender == oldSender, {
 						this.removeInOutNodeAtParam(sender, param);
 					})
 				})
 			})
 		});
+
+		//Remove replaceArgs
+		replaceArgs.removeAt(param);
 	}
 
 	//Clear the dicts
 	resetInOutNodesDicts {
-		if(toBeCleared, {
+		if(algaToBeCleared, {
 			inNodes.clear;
 			outNodes.clear;
 		});
@@ -1677,7 +1868,7 @@ AlgaNode {
 
 		var controlName = controlNames[param];
 		if(controlName == nil, {
-			("Invalid param to create a new interp synth for: " ++ param).error;
+			("AlgaNode: invalid param to create a new interp synth for: \\" ++ param).error;
 			^this;
 		});
 
@@ -1707,7 +1898,7 @@ AlgaNode {
 
 		var controlName = controlNames[param];
 		if(controlName == nil, {
-			("Invalid param to create a new interp synth for: " ++ param).error;
+			("AlgaNode: invalid param to create a new interp synth for: \\" ++ param).error;
 			^this;
 		});
 
@@ -1735,20 +1926,20 @@ AlgaNode {
 	}
 
 	//Used in <| and replaceMix
-	removeInterpConnectionAtParam { | previousSender = nil, param = \in, time |
+	removeInterpConnectionAtParam { | oldSender = nil, param = \in, time |
 		var controlName = controlNames[param];
 		if(controlName == nil, {
-			("Invalid param to reset: " ++ param).error;
+			("AlgaNode: invalid param to reset: \\" ++ param).error;
 			^this;
 		});
 
 		//Remove inNodes / outNodes / connectionTimeOutNodes
-		this.removeInOutNodesDict(previousSender, param);
+		this.removeInOutNodesDict(oldSender, param);
 
 		//Re-order groups shouldn't be needed when removing connections
 
 		//Free previous interp synth (fades out)
-		this.freeInterpSynthAtParam(previousSender, param, time:time);
+		this.freeInterpSynthAtParam(oldSender, param, time:time);
 
 		//Create new interp synth with default value (or the one supplied with args at start) (fades in)
 		this.createInterpSynthAtParam(nil, param, time:time);
@@ -1760,7 +1951,7 @@ AlgaNode {
 		if(interpBusAtParam.size > 1, {
 			var interpSynthAtParam = interpSynths[param];
 			var normSynthAtParam = normSynths[param];
-			interpBusAtParam.keysValuesDo({ | key, val |
+			interpBusAtParam.keysValuesDo({ | key, value |
 				if(key != \default, {
 					interpBusAtParam.removeAt(key);
 					interpSynthAtParam.removeAt(key);
@@ -1797,42 +1988,55 @@ AlgaNode {
 		});
 	}
 
+	checkParamExists { | param = \in |
+		if(controlNames[param] == nil, { ^false });
+		^true;
+	}
+
 	//implements receiver <<.param sender
 	makeConnectionInner { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time |
 
 		if((sender.isAlgaNode.not).and(sender.isNumberOrArray.not), {
-			"Can't connect to something that's not an AlgaNode, a Number or an Array".error;
+			"AlgaNode: can't connect to something that's not an AlgaNode, a Number or an Array".error;
 			^this
 		});
 
-		//Can't connect AlgaNode to itself
-		if(this === sender, { "Can't connect an AlgaNode to itself".error; ^this });
+		//Can't connect AlgaNode to itself (yet)
+		if(this === sender, { "AlgaNode: can't connect an AlgaNode to itself".error; ^this });
+
+		//Check parameter in controlNames
+		if(this.checkParamExists(param).not, {
+			("AlgaNode: \\" ++ param ++ " is not a valid parameter, it is not defined in the def.").error;
+			^this
+		});
 
 		if(mix, {
 			var currentDefaultNodeAtParam = currentDefaultNodes[param];
 
 			//trying to <<+ instead of << on first connection
 			if((currentDefaultNodeAtParam == nil), {
+				("AlgaNode: first connection. Running 'from' instead.").warn;
 				mix = false;
 			});
 
-			//can't add to a num. just replace it
+			//can't add to a num. just replace it.. It would be impossible to keep track of all
+			//the numbers. Instead, one should use nodes with DC.kr/ar
 			if(currentDefaultNodeAtParam.isNumberOrArray, {
-				("Trying to add to a non-AlgaNode: " ++ currentDefaultNodeAtParam.asString ++ ". Replacing it.").warn;
+				("AlgaNode: trying to mix values to a non-AlgaNode: " ++ currentDefaultNodeAtParam.asString ++ ". Replacing it.").warn;
 				mix = false;
 			});
 
-			//can't <<+ with numbers or arrays. There would be no way to track them, unless DC.kr/ar
-			if((sender == nil).or(sender.isNumberOrArray), {
-				("Mixing only works for explicit AlgaNodes.").error;
+			//can't <<+
+			if((sender == nil), {
+				("AlgaNode: mixing only works for explicit AlgaNodes.").error;
 				^this;
 			});
 
 			//trying to run replaceMix / mixFrom / mixTo when sender is the only entry!
 			if(inNodes[param].size == 1, {
 				if(inNodes[param].findMatch(sender) != nil, {
-					"AlgaNode was the only entry. Running makeConnection instead".warn;
+					"AlgaNode: sender was the only entry. Running 'makeConnection' instead".warn;
 					mix = false;
 				});
 			});
@@ -1865,35 +2069,48 @@ AlgaNode {
 
 	//Wrapper for scheduler
 	makeConnection { | sender, param = \in, replace = false, mix = false,
-		replaceMix = false, senderChansMapping, scale, time |
+		replaceMix = false, senderChansMapping, scale, time, sched = 0 |
 
-		if(this.cleared.not.and(sender.cleared.not).and(sender.toBeCleared.not), {
-			algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
-				this.makeConnectionInner(sender, param, replace, mix,
-					replaceMix, senderChansMapping, scale, time:time
-				);
-			});
-		}, {
-			"AlgaNode: can't makeConnection, sender has been cleared".error;
-		});
+		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
+			scheduler.addAction(
+				condition: {
+					(this.algaInstantiatedAsReceiver(param, sender, mix)).and(sender.algaInstantiatedAsSender)
+				},
+				func: {
+					this.makeConnectionInner(sender, param, replace, mix,
+						replaceMix, senderChansMapping, scale, time:time
+					)
+				},
+				sched: sched
+			);
+		}, { "AlgaNode: can't makeConnection, sender has been cleared".error; }
+		);
 	}
 
-	from { | sender, param = \in, inChans, scale, time |
+	from { | sender, param = \in, chans, scale, time, sched |
+		//If buffer, use .bufnum and .replace
+		if(sender.isKindOf(Buffer), {
+			var senderBufNum = sender.bufnum;
+			var args = [ param, senderBufNum ];
+			"AlgaNode: changing a Buffer. This will trigger 'replace'.".warn;
+			^this.replace(synthDef.name, args, time, sched);
+		});
+
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
-				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param, senderChansMapping:inChans,
-				scale:scale, time:time
+			this.makeConnection(sender, param, senderChansMapping:chans,
+				scale:scale, time:time, sched:sched
 			);
 		}, {
 			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param, senderChansMapping:inChans,
-					scale:scale, time:time
+				this.makeConnection(sender, param, senderChansMapping:chans,
+					scale:scale, time:time, sched:sched
 				);
 			}, {
-				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
+				("AlgaNode: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
 			});
 		});
 	}
@@ -1903,17 +2120,17 @@ AlgaNode {
 		this.from(sender: sender, param: param);
 	}
 
-	to { | receiver, param = \in, outChans, scale, time |
+	to { | receiver, param = \in, chans, scale, time, sched |
 		if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
-				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			receiver.makeConnection(this, param, senderChansMapping:outChans,
-				scale:scale, time:time
+			receiver.makeConnection(this, param, senderChansMapping:chans,
+				scale:scale, time:time, sched:sched
 			);
 		}, {
-			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
+			("AlgaNode: trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
 		});
 	}
 
@@ -1922,22 +2139,27 @@ AlgaNode {
 		this.to(receiver: receiver, param: param);
 	}
 
-	mixFrom { | sender, param = \in, inChans, scale, time |
+	mixFrom { | sender, param = \in, chans, scale, time, sched |
+		if(sender.isKindOf(Buffer), {
+			"AlgaNode: Buffers cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
+			^this.from(sender, param, chans, scale, time, sched);
+		});
+
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
-				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param, mix:true, senderChansMapping:inChans,
-				scale:scale, time:time
+			this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
+				scale:scale, time:time, sched:sched
 			);
 		}, {
 			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param, mix:true, senderChansMapping:inChans,
-					scale:scale, time:time
+				this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
+					scale:scale, time:time, sched:sched
 				);
 			}, {
-				("Trying to enstablish a connection from an invalid AlgaNode: " ++ sender).error;
+				("AlgaNode: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
 			});
 		});
 	}
@@ -1947,17 +2169,17 @@ AlgaNode {
 		this.mixFrom(sender: sender, param: param);
 	}
 
-	mixTo { | receiver, param = \in, outChans, scale, time |
+	mixTo { | receiver, param = \in, chans, scale, time, sched |
 		if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
-				("Trying to enstablish a connection between two AlgaNodes on different servers").error;
+				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			receiver.makeConnection(this, param, mix:true, senderChansMapping:outChans,
-				scale:scale, time:time
+			receiver.makeConnection(this, param, mix:true, senderChansMapping:chans,
+				scale:scale, time:time, sched:sched
 			);
 		}, {
-			("Trying to enstablish a connection to an invalid AlgaNode: " ++ receiver).error;
+			("AlgaNode: trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
 		});
 	}
 
@@ -1967,62 +2189,86 @@ AlgaNode {
 	}
 
 	//disconnect + makeConnection, very easy
-	replaceMixInner { | param = \in, previousSender, newSender, inChans, scale, time |
-		this.disconnectInner(param, previousSender, true, time:time);
+	replaceMixInner { | param = \in, oldSender, newSender, chans, scale, time |
+		this.disconnectInner(param, oldSender, true, time:time);
 		this.makeConnectionInner(newSender, param,
 			replace:false, mix:true, replaceMix:true,
-			senderChansMapping:inChans, scale:scale, time:time
+			senderChansMapping:chans, scale:scale, time:time
 		);
+	}
+
+	//Alias for replaceMix (which must be deprecated, collides name with .replace)
+	mixSwap { | param = \in, oldSender, newSender, chans, scale, time, sched |
+		^this.replaceMix(param, oldSender, newSender, chans, scale, time, sched);
 	}
 
 	//Replace a mix entry at param... Practically just freeing the old one and triggering the new one.
 	//This will be useful in the future if wanting to implement some kind of system to retrieve individual
 	//mix entries (like, \in1, \in2). No need it for now
-	replaceMix { | param = \in, previousSender, newSender, inChans, scale, time |
+	replaceMix { | param = \in, oldSender, newSender, chans, scale, time, sched |
 		if(newSender.isAlgaNode.not, {
-			(newSender.asString) ++ " is not an AlgaNode".error;
+			("AlgaNode: " ++ (newSender.class.asString) ++ " is not an AlgaNode").error;
 			^this;
 		});
 
-		algaScheduler.addAction({ (this.instantiated).and(previousSender.instantiated).and(newSender.instantiated) }, {
-			var validPreviousSender = true;
+		scheduler.addAction(
+			condition: {
+				(this.algaInstantiatedAsReceiver(param, oldSender, true)).and(
+					oldSender.algaInstantiatedAsSender).and(
+					newSender.algaInstantiatedAsSender)
+			},
+			func: {
+				var validOldSender = true;
 
-			//if not contained, it's invalid.
-			if(this.mixParamContainsSender(param, previousSender).not, {
-				(previousSender.asString ++ " was not present in the mix for param " ++ param.asString).error;
-				validPreviousSender = false;
-			});
+				//if not contained, it's invalid.
+				if(this.mixParamContainsSender(param, oldSender).not, {
+					("AlgaNode: " ++ oldSender.asString ++ " was not present in the mix for param \\" ++ param.asString).error;
+					validOldSender = false;
+				});
 
-			if(validPreviousSender, {
-				this.replaceMixInner(param, previousSender, newSender, inChans, scale, time);
-			});
-		});
+				if(validOldSender, {
+					this.replaceMixInner(param, oldSender, newSender, chans, scale, time);
+				});
+			},
+			sched: sched
+		);
 	}
 
-	resetParamInner { | param = \in, previousSender = nil, time |
+	resetParamInner { | param = \in, oldSender = nil, time |
 		//Also remove inNodes / outNodes / connectionTimeOutNodes
-		if(previousSender != nil, {
-			if(previousSender.isAlgaNode, {
-				this.removeInterpConnectionAtParam(previousSender, param, time:time);
+		if(oldSender != nil, {
+			if(oldSender.isAlgaNode, {
+				this.removeInterpConnectionAtParam(oldSender, param, time:time);
 			}, {
-				("Trying to remove a connection to an invalid AlgaNode: " ++ previousSender).error;
+				("AlgaNode: trying to remove a connection to an invalid AlgaNode: " ++ oldSender.asString).error;
 			})
 		}, {
 			this.removeInterpConnectionAtParam(nil, param, time:time);
 		})
 	}
 
-	resetParam { | param = \in, previousSender = nil, time |
-		algaScheduler.addAction({ (this.instantiated).and(previousSender.instantiated) }, {
-			this.resetParamInner(param, previousSender, time:time);
-		});
+	resetParam { | param = \in, oldSender = nil, time, sched |
+		scheduler.addAction(
+			condition: {
+				(this.algaInstantiatedAsReceiver(param, oldSender, false)).and(oldSender.algaInstantiatedAsSender)
+			},
+			func: {
+				this.resetParamInner(param, oldSender, time:time)
+			},
+			sched: sched
+		);
+	}
+
+	//same as resetParam, which must be deprecated (bad naming)
+	reset { | param = \in, time, sched |
+		^this.resetParam(param, nil, time, sched);
 	}
 
 	//resets to the default value in controlNames
 	//OR, if provided, to the value of the original args that were used to create the node
-	//previousSender is used in case of mixing, to only remove that one
-	<| { | param = \in, previousSender = nil |
-		this.resetParam(param, previousSender);
+	//oldSender is used in case of mixing, to only remove that one
+	<| { | param = \in |
+		this.resetParam(param, nil);
 	}
 
 	//On .replace on an already running mix connection
@@ -2036,9 +2282,14 @@ AlgaNode {
 
 	//On .replace on an already running mix connection
 	replaceMixConnection { | param = \in, sender, senderChansMapping, scale, time |
-		algaScheduler.addAction({ (this.instantiated).and(sender.instantiated) }, {
-			this.replaceMixConnectionInner(param, sender, senderChansMapping, scale, time);
-		});
+		scheduler.addAction(
+			condition: {
+				(this.algaInstantiatedAsReceiver(param, sender, true)).and(sender.algaInstantiatedAsSender)
+			},
+			func: {
+				this.replaceMixConnectionInner(param, sender, senderChansMapping, scale, time)
+			}
+		);
 	}
 
 	//replace connections FROM this
@@ -2053,10 +2304,10 @@ AlgaNode {
 				var oldScale = nil;
 
 				//Restore old channels mapping! It can either be a symbol, number or array here
-				if(keepChannelsMapping, { oldParamsChansMapping = receiver.paramsChansMapping[param][this] });
+				if(keepChannelsMapping, { oldParamsChansMapping = receiver.getParamChansMapping(param, this) });
 
 				//Restore old scale mapping!
-				if(keepScale, { oldScale = receiver.paramsScalings[param][this] });
+				if(keepScale, { oldScale = receiver.getParamScaling(param, this) });
 
 				//If it was a mixer connection, use replaceMixConnection
 				if(receiver.mixParamContainsSender(param, this), {
@@ -2077,16 +2328,26 @@ AlgaNode {
 		});
 	}
 
-	replaceInner { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
-		outsMapping, keepInScale = true, keepOutScale = true, time |
+	replaceInner { | def, args, time, outsMapping, keepOutsMappingIn = true,
+		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
 		var wasPlaying = false;
 
 		//re-init groups if clear was used
 		var initGroups = if(group == nil, { true }, { false });
 
+		//Trying to .replace on a cleared AlgaNode
+		if(algaCleared, {
+			"AlgaNode: trying to 'replace' on a cleared AlgaNode. Running 'AlgaNode.new' instead.".warn;
+			algaCleared = false;
+			^this.init(def, args, connectionTime, playTime, outsMapping, server, 0);
+		});
+
 		//In case it has been set to true when clearing, then replacing before clear ends!
-		toBeCleared = false;
+		algaToBeCleared = false;
+
+		//calc temporary time
+		time = this.calculateTemporaryLongestWaitTime(time, time);
 
 		//If it was playing, free previous playSynth
 		if(isPlaying, {
@@ -2094,71 +2355,73 @@ AlgaNode {
 			wasPlaying = true;
 		});
 
-		//calc temporary time
-		time = this.calculateTemporaryLongestWaitTime(time, time);
-
 		//This doesn't work with feedbacks, as synths would be freed slightly before
 		//The new ones finish the rise, generating click. These should be freed
-		//When the new synths/busses are surely instantiated on the server!
-		//The cheap solution that it's in place now is to wait 0.5 longer than longestConnectionTime...
-		//Work out a better solution!
+		//When the new synths/busses are surely algaInstantiated on the server!
+		//The cheap solution that it's in place now is to wait 1.0 longer than longestConnectionTime.
+		//Work out a better solution now that AlgaScheduler is well tested!
 		this.freeAllSynths(false, false);
 		this.freeAllBusses;
 
-		//RESET DICT ENTRIES? SHOULD IT BE DONE SOMEWHERE ELSE? SHOULD IT BE DONE AT ALL?
+		//Reset dict entries
 		this.resetInterpNormDicts;
 
 		//New one
-		//Just pass the entry, not the whole thingy
-		this.dispatchNode(obj, args,
+		//Just pass the entry, not the whole thing
+		this.dispatchNode(def, args,
 			initGroups:initGroups,
 			replace:true,
-			keepChannelsMapping:keepChannelsMappingIn, outsMapping:outsMapping,
-			keepScale:keepInScale
+			keepChannelsMapping:keepOutsMappingIn, outsMapping:outsMapping,
+			keepScale:keepScalesIn
 		);
 
 		//Re-enstablish connections that were already in place
 		this.replaceConnections(
-			keepChannelsMapping:keepChannelsMappingOut,
-			keepScale:keepOutScale,
+			keepChannelsMapping:keepOutsMappingOut,
+			keepScale:keepScalesOut,
 			time:time
 		);
 
 		//If node was playing, or .replace has been called while .stop / .clear, play again
 		if(wasPlaying.or(beingStopped), {
-			this.play;
+			this.playInner(replace:true)
 		})
 	}
 
-	//Keep min max ??
-
 	//replace content of the node, re-making all the connections.
 	//If this was connected to a number / array, should I restore that value too or keep the new one?
-	replace { | obj, args, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
-		outsMapping, keepInScale = true, keepOutScale = true, time |
+	replace { | def, args, time, sched, outsMapping, keepOutsMappingIn = true,
+		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
-		algaScheduler.addAction({ this.instantiated }, {
-			this.replaceInner(obj, args, keepChannelsMappingIn,
-				keepChannelsMappingOut, outsMapping,
-				keepInScale, keepOutScale, time:time
-			);
-		});
+		//Check global algaInstantiated
+		scheduler.addAction(
+			condition: { this.algaInstantiated },
+			func: {
+				this.replaceInner(def:def, args:args, time:time,
+					outsMapping:outsMapping,
+					keepOutsMappingIn:keepOutsMappingIn,
+					keepOutsMappingOut:keepOutsMappingOut,
+					keepScalesIn:keepScalesIn, keepScalesOut:keepScalesOut
+				)
+			},
+			sched: sched
+		);
 
 		//Not cleared
-		cleared = false;
+		algaCleared = false;
 	}
 
 	//Basically, this checks if the current sender that is being disconnected was the \default node.
 	//if it is, it switch the default node with the next available
-	checkForUpdateToDefaultNodeAtParam { | param = \in, previousSender |
+	checkForUpdateToDefaultNodeAtParam { | param = \in, oldSender |
 		//If disconnecting the one that \default is assigned to, it must be switched to another one first!!
-		if(currentDefaultNodes[param] == previousSender, {
+		if(currentDefaultNodes[param] == oldSender, {
 			var newDefaultNode;
 
 			//Find another one (the first one available)
 			newDefaultNode = block ({ | break |
 				inNodes[param].do({ | inNode |
-					if(inNode != previousSender, {
+					if(inNode != oldSender, {
 						break.(inNode); //break returns the argument
 					});
 				});
@@ -2175,22 +2438,22 @@ AlgaNode {
 	}
 
 	//Remove individual mix entries at param (called from replaceMix too)
-	disconnectInner { | param = \in, previousSender, replaceMix = false, time |
-		if(this.mixParamContainsSender(param, previousSender).not, {
-			(previousSender.asString ++ " was not present in the mix for param " ++ param.asString).error;
+	disconnectInner { | param = \in, oldSender, replaceMix = false, time |
+		if(this.mixParamContainsSender(param, oldSender).not, {
+			("AlgaNode: " ++ oldSender.asString ++ " was not present in the mix for param " ++ param.asString).error;
 			^this;
 		});
 
-		//Remove inNodes / outNodes / connectionTimeOutNodes for previousSender
-		this.removeInOutNodesDict(previousSender, param);
+		//Remove inNodes / outNodes / connectionTimeOutNodes for oldSender
+		this.removeInOutNodesDict(oldSender, param);
 
 		//check if \default node needs updating
-		this.checkForUpdateToDefaultNodeAtParam(param, previousSender);
+		this.checkForUpdateToDefaultNodeAtParam(param, oldSender);
 
 		if(replaceMix.not, {
 			var interpSynthsAtParam;
 
-			this.freeInterpSynthAtParam(previousSender, param, true, time:time);
+			this.freeInterpSynthAtParam(oldSender, param, true, time:time);
 
 			//retrieve the updated ones
 			interpSynthsAtParam = interpSynths[param];
@@ -2217,40 +2480,49 @@ AlgaNode {
 			});
 		}, {
 			//Just free if replaceMix == true
-			this.freeInterpSynthAtParam(previousSender, param, true, time:time);
+			this.freeInterpSynthAtParam(oldSender, param, true, time:time);
 		});
 	}
 
 	//Remove individual mix entries at param
-	disconnect { | param = \in, previousSender, time |
-		if(previousSender.isAlgaNode.not, {
-			(previousSender.asString) ++ " is not an AlgaNode".error;
-			^this;
-		});
-
+	disconnect { | param = \in, oldSender = nil, time, sched |
 		//If it wasn't a mix param, but the only entry, run <| instead
 		if(inNodes[param].size == 1, {
-			if(inNodes[param].findMatch(previousSender) != nil, {
-				"AlgaNode was the only entry. Running <| instead".warn;
-				^this.resetParam(param, previousSender, time:time);
+			if(inNodes[param].findMatch(oldSender) != nil, {
+				"AlgaNode: oldSender was the only entry. Running 'reset' instead".warn;
+				^this.resetParam(param, oldSender, time:time);
 			});
 		});
 
-		algaScheduler.addAction({ (this.instantiated).and(previousSender.instantiated) }, {
-			this.disconnectInner(param, previousSender, time:time);
+		if(oldSender == nil, {
+			^this.resetParam(param, oldSender, time:time);
 		});
+
+		//Else, mix param
+		if(oldSender.isAlgaNode.not, {
+			("AlgaNode: " ++ (oldSender.class.asString) ++ " is not an AlgaNode").error;
+			^this;
+		});
+
+		scheduler.addAction(
+			condition: {
+				(this.algaInstantiatedAsReceiver(param, oldSender, true)).and(oldSender.algaInstantiatedAsSender)
+			},
+			func: { this.disconnectInner(param, oldSender, time:time) },
+			sched: sched
+		);
 	}
 
 	//alias for disconnect: remove a mix entry
-	removeMix { | param = \in, previousSender |
-		this.disconnect(param, previousSender);
+	removeMix { | param = \in, oldSender, time, sched |
+		this.disconnect(param, oldSender, time, sched);
 	}
 
 	//Find out if specific param / sender combination is in the mix
 	mixParamContainsSender { | param = \in, sender |
-		^(interpSynths[param][sender] != nil)
-		//Or this?
-		//^(inNodes[param].findMatch(sender) != nil);
+		var interpSynthsAtParam = interpSynths[param];
+		if(interpSynthsAtParam == nil, { ^false });
+		^(interpSynthsAtParam[sender] != nil)
 	}
 
 	//When clear, run disconnections to nodes connected to this
@@ -2276,16 +2548,15 @@ AlgaNode {
 		this.removeConnectionFromReceivers(time);
 
 		//This could be overwritten if .replace is called
-		toBeCleared = true;
+		algaToBeCleared = true;
 
 		//Stop playing (if it was playing at all)
 		this.stopInner(time, isClear:true);
 
 		fork {
-			//Wait time before clearing groups and busses...
-			(longestWaitTime + 1.0).wait;
+			//Wait time before clearing groups, synths and busses...
+			(time + 1.0).wait;
 
-			//this.freeInterpNormSynths(false, true);
 			this.freeAllGroups(true); //I can just remove the groups, as they contain the synths
 			this.freeAllBusses(true);
 
@@ -2295,34 +2566,20 @@ AlgaNode {
 			this.resetGroups;
 			this.resetInOutNodesDicts;
 
-			cleared = true;
+			defClass = nil;
+			defArgs = nil;
+
+			algaCleared = true;
 		}
 	}
 
-	clear { | time, interpTime |
-		algaScheduler.addAction({ this.instantiated }, {
-			this.clearInner(time, interpTime);
-		});
-	}
-
-	//All synths must be instantiated (including interpolators and normalizers)
-	instantiated {
-		if(synth == nil, { ^false });
-
-		interpSynths.do({ | interpSynthsAtParam |
-			interpSynthsAtParam.do({ | interpSynthAtParam |
-				if(interpSynthAtParam.instantiated.not, { ^false });
-			});
-		});
-
-		normSynths.do({ | normSynthsAtParam |
-			normSynthsAtParam.do({ | normSynthAtParam |
-				if(normSynthAtParam.instantiated.not, { ^false });
-			});
-		});
-
-		//Lastly, the actual synth
-		^synth.instantiated;
+	//for clear, check algaInstantiated and not isPlaying
+	clear { | time, sched |
+		scheduler.addAction(
+			condition: { this.algaInstantiated },
+			func: { this.clearInner(time) },
+			sched: sched
+		);
 	}
 
 	//Move this node's group before another node's one
@@ -2337,56 +2594,75 @@ AlgaNode {
 
 	//Number plays those number of channels sequentially
 	//Array selects specific output
-	createPlaySynth { | time, channelsToPlay |
+	createPlaySynth { | time, channelsToPlay, replace = false |
 		if((isPlaying.not).or(beingStopped), {
 			var actualNumChannels, playSynthSymbol;
 
-			if(rate == \control, { "Cannot play a kr AlgaNode".error; ^nil; });
+			if(rate == \control, { "AlgaNode: cannot play a kr node".error; ^nil; });
 
 			if(channelsToPlay != nil, {
-				if(channelsToPlay.isSequenceableCollection, {
-					var channelsToPlaySize = channelsToPlay.size;
-					if(channelsToPlaySize < numChannels, {
-						actualNumChannels = channelsToPlaySize;
-					}, {
-						actualNumChannels = numChannels;
-					});
-				}, {
-					if(channelsToPlay < numChannels, {
-						if(channelsToPlay < 1, { channelsToPlay = 1 });
-						if(channelsToPlay > AlgaStartup.algaMaxIO, { channelsToPlay = AlgaStartup.algaMaxIO });
-						actualNumChannels = channelsToPlay;
-					}, {
-						actualNumChannels = numChannels;
-					});
-				})
+				//store it so it's kept across replaces, unless a new one is specified
+				playChans = channelsToPlay
 			}, {
-				actualNumChannels = numChannels
+				//If nil and replace, use the one stored
+				if(replace, {
+					channelsToPlay = playChans
+				});
 			});
-
-			playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
 
 			time = this.calculateTemporaryLongestWaitTime(time, playTime);
 
 			if(channelsToPlay.isSequenceableCollection, {
-				//Wrap around the indices entries (or delete out of bounds???)
+				//Array input. It can be channel numbers or outsMapping
+
+				//Detect outsMapping and replace them with the actual channels value
+				channelsToPlay.do({ | entry, i |
+					var outMapping = synthDef.outsMapping[entry.asSymbol];
+					case
+					{ outMapping.isNumberOrArray } {
+						channelsToPlay = channelsToPlay.put(i, outMapping);
+					};
+				});
+
+				//Flatten so that outsMapping are not subarrays
+				channelsToPlay = channelsToPlay.flatten;
+
+				//Wrap around the indices entries around the actual
+				//number of outputs of the node... Should it ignore out of bounds?
 				channelsToPlay = channelsToPlay % numChannels;
 
-				playSynth = Synth(
+				actualNumChannels = channelsToPlay.size;
+
+				playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
+
+				playSynth = AlgaSynth(
 					playSynthSymbol,
 					[\in, synthBus.busArg, \indices, channelsToPlay, \gate, 1, \fadeTime, time],
-					playGroup
+					playGroup,
+					waitForInst:false
 				);
 			}, {
-				playSynth = Synth(
+				if(channelsToPlay.isNumber, {
+					//Tell it to play that specific number of channels, e.g. 2 for just stereo
+					actualNumChannels = channelsToPlay
+				}, {
+					actualNumChannels = numChannels
+				});
+
+				playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
+
+				playSynth = AlgaSynth(
 					playSynthSymbol,
 					[\in, synthBus.busArg, \gate, 1, \fadeTime, time],
-					playGroup
+					playGroup,
+					waitForInst:false
 				);
 			});
 
 			isPlaying = true;
 			beingStopped = false;
+		}, {
+			"AlgaNode: node is already playing.".warn;
 		})
 	}
 
@@ -2402,57 +2678,89 @@ AlgaNode {
 		})
 	}
 
-	playInner { | time, channelsToPlay |
-		this.createPlaySynth(time, channelsToPlay);
+	playInner { | time, channelsToPlay, sched, replace = false |
+		//Check only for synthBus, it makes more sense than also checking for synth.algaIstantiated,
+		//As it allows meanwhile to create the play synth while synth is getting instantiated
+		scheduler.addAction(
+			condition: { synthBus != nil },
+			func: { this.createPlaySynth(time, channelsToPlay, replace) },
+			sched: sched
+		);
+
 	}
 
-	//Add option for fade time here!
-	play { | time, channelsToPlay |
-		algaScheduler.addAction({ this.instantiated }, {
-			this.playInner(time, channelsToPlay);
+	play { | time, chans, sched |
+		this.playInner(time, chans, sched);
+	}
+
+	stopInner { | time, sched, isClear = false |
+		if(isClear, {
+			//Already in a scheduled action
+			this.freePlaySynth(time, true);
+		}, {
+			scheduler.addAction(
+				condition: { this.isPlaying },
+				func: { this.freePlaySynth(time, false); },
+				sched: sched
+			);
 		});
 	}
 
-	stopInner { | time, isClear = false |
-		this.freePlaySynth(time, isClear);
+	stop { | time, sched |
+		this.stopInner(time, sched);
 	}
 
-	//Add option for fade time here!
-	stop { | time |
-		algaScheduler.addAction({ this.instantiated }, {
-			this.stopInner(time);
+	//Global init: all interp synths and synth are correct
+	algaInstantiated {
+		interpSynths.do({ | interpSynthsAtParam |
+			interpSynthsAtParam.do( { | interpSynthAtParam |
+				if(interpSynthAtParam.algaInstantiated.not, { ^false })
+			});
 		});
+
+		^(synth.algaInstantiated);
+	}
+
+	//To send signal, only the synth and synthBus are needed to be surely insantiated
+	algaInstantiatedAsSender {
+		if(synth == nil, { ^false });
+		^((synth.algaInstantiated).and(synthBus != nil));
+	}
+
+	//To receive signals, and perform interpolation, the specific interpSynth(s)
+	//is needed to be surely insantiated
+	algaInstantiatedAsReceiver { | param = \in, sender, mix = false |
+		var interpSynthsAtParam = interpSynths[param];
+		var inNodesAtParam = inNodes[param];
+
+		//First connection
+		if((interpSynthsAtParam.size == 1).and(inNodesAtParam.size == 0), {
+			if(interpSynthsAtParam[\default].algaInstantiated, {
+				^true
+			});
+		});
+
+		//Subsequent connections
+		if((interpSynthsAtParam.size > 0).and(inNodesAtParam.size > 0), {
+			//.replaceMix
+			if(mix.and(interpSynthsAtParam[sender] != nil), {
+				if(interpSynthsAtParam[sender].algaInstantiated, {
+					^true
+				});
+			});
+
+			//Normal from / to and mixFrom / mixTo
+			^true
+		});
+
+		//Fallback
+		^false;
 	}
 
 	isAlgaNode { ^true }
 
-	debug {
-		"connectionTime:".postln;
-		("\t" ++ connectionTime.asString).postln;
-		"paramsConnectionTime".postln;
-		("\t" ++ paramsConnectionTime.asString).postln;
-		"longestWaitTime:".postln;
-		("\t" ++ longestWaitTime.asString).postln;
-		"controlNames".postln;
-		("\t" ++ controlNames.asString).postln;
-		"inNodes:".postln;
-		("\t" ++ inNodes.asString).postln;
-		"outNodes:".postln;
-		("\t" ++ outNodes.asString).postln;
-		"outs:".postln;
-		("\t" ++ outs.asString).postln;
-		"paramsChansMapping:".postln;
-		("\t" ++ paramsChansMapping.asString).postln;
-		"interpSynths:".postln;
-		("\t" ++ interpSynths.asString).postln;
-		"interpBusses:".postln;
-		("\t" ++ interpBusses.asString).postln;
-		"normSynths:".postln;
-		("\t" ++ normSynths.asString).postln;
-		"normBusses:".postln;
-		("\t" ++ normBusses.asString).postln;
-		"currentDefaultNodes:".postln;
-		("\t" ++ currentDefaultNodes.asString).postln;
+	clock {
+		^(scheduler.clock)
 	}
 }
 

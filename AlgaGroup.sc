@@ -14,34 +14,34 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-AlgaSynth : Synth {
+AlgaGroup : Group {
 	//Need the setter to "synth.algaInstantiated = false" in *new, to reset state
 	var <>algaInstantiated = false;
 
-	*new { | defName, args, target, addAction=\addToHead, waitForInst = true |
-		var synth, server, addActionID;
+	*new { arg target, addAction = \addToHead, waitForInst = true;
+		var group, server, addActionID;
 		target = target.asTarget;
 		server = target.server;
+		group = this.basicNew(server);
 		addActionID = addActions[addAction];
-		synth = this.basicNew(defName, server);
-		synth.group = if(addActionID < 2) { target } { target.group };
+		group.group = if(addActionID < 2) { target } { target.group };
 
-		synth.algaInstantiated = false;
+		group.algaInstantiated = false;
 
 		//oneshot function that waits for initialization
 		if(waitForInst, {
-			synth.waitForInstantiation(synth.nodeID);
+			group.waitForInstantiation(group.nodeID);
 		}, {
-			synth.algaInstantiated = true;
+			group.algaInstantiated = true
 		});
 
-		//actually send synth to server
-		server.sendMsg(9, //"s_new"
-			defName, synth.nodeID, addActionID, target.nodeID,
-			*(args.asOSCArgArray)
+		//actually send group to server
+		server.sendMsg(
+			this.creationCmd, group.nodeID,
+			addActionID, target.nodeID
 		);
 
-		^synth;
+		^group
 	}
 
 	waitForInstantiation { | nodeID |
@@ -55,7 +55,7 @@ AlgaSynth : Synth {
 		if(server.options.protocol == \udp, {
 			SystemClock.sched(3, {
 				if(algaInstantiated.not, {
-					("Using a server with the UDP protocol, use the TCP one instead. Instantiation packet for AlgaSynth " ++ nodeID ++ " has been lost. Setting algaInstantiated to true").warn;
+					("Using a server with the UDP protocol, use the TCP one instead. Instantiation packet for AlgaGroup " ++ nodeID ++ " has been lost. Setting algaInstantiated to true").warn;
 					algaInstantiated = true;
 					oscfunc.free;
 				})

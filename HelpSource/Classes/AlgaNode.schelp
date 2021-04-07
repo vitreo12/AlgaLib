@@ -1,0 +1,405 @@
+TITLE:: AlgaNode
+summary:: Alga module representing an instance of a sonic process
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaSynthDef
+
+DESCRIPTION::
+An link::Classes/AlgaNode:: is the fundamental element of link::Classes/Alga::. Conceptually, it is very similar to an individual in a modular synthesizer, which, however, can be dynamically created and replaced on the fly. link::Classes/AlgaNode::s can be patched together by addressing specific output to input (and vice-versa) connections.
+
+There are 4 important features that make link::Classes/AlgaNode::s different from other forms of patching already present in emphasis::SuperCollider::.
+
+NUMBEREDLIST::
+## Connecting link::Classes/AlgaNode::s together will trigger a process of interpolation between the current state of the receiver and the future one where the new connection will take place. This feature applies to any operation: from creation, to connection and replacement of nodes.
+
+NOTE::
+Interpolation is a property that belongs to the emphasis::receiver:: of the connection, not the emphasis::sender::. It is in fact possible to specify different interpolation times for each parameter of a receiver. Any emphasis::sender:: that connects to those parameters will respect the relative interpolation times.
+::
+
+## Whenever a new connection is made, link::Classes/Alga:: takes care of running any necessary conversions of rate and number of channels: link::Classes/Alga:: takes a emphasis::patch anything into anything:: approach.
+
+## Whenever a new connection is made, link::Classes/Alga:: takes care of ordering the groups of the link::Classes/AlgaNode::s on the server so that they respect the order of connections, preventing the introduction of blockSize delays in the signal chain. This feature is only limited by feedback connections, in which case, there will obviously be a blockSize delay introduced between the last node in the chain and the first one.
+
+## link::Classes/AlgaNode::s do not only specify connections via their parameters, as it is usual in emphasis::SuperCollider::, but also by emphasis::output names::. In fact, thanks to the link::Classes/AlgaSynthDef:: class it is possible to define specific emphasis::symbol to channel(s):: combinations to address a specific output - or outputs - of a node. An link::Classes/AlgaNode::, then, is not only described by its emphasis::inputs::, but, like in modular synthesizers, also by its emphasis::outputs::.
+::
+
+By going through the examples, hopefully all these notions will be clearer.
+
+CLASSMETHODS::
+
+METHOD:: new
+Create a new link::Classes/AlgaNode::.
+ARGUMENT:: def
+Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::.
+ARGUMENT:: args
+Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. If the entry is another link::Classes/AlgaNode::, the connection will be applied in regards to emphasis::connectionTime::, or emphasis::time::, if defined.
+ARGUMENT:: connectionTime
+Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaNode::.
+ARGUMENT:: playTime
+Specify the fading in / fading out time that it takes for this link::Classes/AlgaNode:: to play through speakers. These values are applied when calling the emphasis::play:: or emphasis::stop:: functions.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+ARGUMENT:: outsMapping
+It works just like link::Classes/AlgaSynthDef::'s emphasis::outsMapping:: argument, but for the case of using an emphasis::UGen function:: as the emphasis::obj:: argument. Specify new mappings by an array that maps symbols to specific output channels. If not specified, the default code::\out1, \out2, etc..:: symbols can be used to address specific channels.
+ARGUMENT:: server
+Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaNode:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
+
+INSTANCEMETHODS::
+
+METHOD:: play
+Play the link::Classes/AlgaNode:: to SuperCollider's output.
+ARGUMENT:: time
+Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
+ARGUMENT:: chans
+Specify an link::Classes/Array:: of output channels to play, which can contain emphasis::outsMapping:: symbols. It's also possible to just specify a number, in which case it determines how many channels will be played.
+code::
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play //Play both channels
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: 2) //Play both channels, explicitly
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0]) //Play first channel mono
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0, 0]) //Play first channel stereo
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0, 1]) //Play both channels, explicitly
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0, 1, 1, 0]) //Quadraphonic
+::
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+
+
+METHOD:: stop
+Stop the output to speakers.
+
+METHOD:: clear
+Clear the link::Classes/AlgaNode::, dropping all connections in place (with appropriate interpolation) as well as the output to speakers.
+
+METHOD:: connectionTime
+Specify a new time that the connections to any of the parameters will use to perform interpolations.
+
+METHOD:: ct
+Shortcut for emphasis::connectionTime::.
+
+method:: paramConnectionTime
+Specify a new time that the connections to the specific emphasis::param:: will use to perform interpolations.
+
+method:: pct
+Shortcut for emphasis::paramConnectionTime::.
+
+METHOD:: playTime
+Specify fade in / fade out times when calling emphasis::play:: and emphasis::stop::.
+
+METHOD:: pt
+Shortcut for emphasis::playTime::.
+
+METHOD:: replace
+Replace the current content of the link::Classes/AlgaNode::. This method also takes care of restoring all running connections, applying the correct connection times and rate / channels conversions.
+ARGUMENT:: def
+Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::.
+ARGUMENT:: args
+Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. Note that these will be applied in regards to emphasis::connectionTime::.
+ARGUMENT:: time
+Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+ARGUMENT:: outsMapping
+It works just like link::Classes/AlgaSynthDef::'s emphasis::outsMapping:: argument, but for the case of using an emphasis::UGen function:: as the emphasis::obj:: argument. Specify new mappings by an array that maps symbols to specific output channels.
+ARGUMENT:: keepOutsMappingIn
+Specify whether the current emphasis::output channels mapping:: of the link::Classes/AlgaNode::s connected to the inputs of this one should be maintained.
+ARGUMENT:: keepOutsMappingOut
+Specify whether the current emphasis::output channels mapping:: of the link::Classes/AlgaNode::s connected to the outputs of this one should be maintained.
+ARGUMENT:: keepScalesIn
+Specify whether the emphasis::scales:: of all the link::Classes/AlgaNode::s connected to the inputs of this one should be maintained.
+ARGUMENT:: keepScalesOut
+Specify whether the emphasis::scales:: of all the link::Classes/AlgaNode::s connected to the outputs of this one should be maintained.
+
+METHOD:: from
+Connect the specific input parameter of this link::Classes/AlgaNode:: to the output of another link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+ARGUMENT:: sender
+An link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+ARGUMENT:: param
+Which parameter to connect to.
+ARGUMENT:: chans
+An optional link::Classes/Symbol:: or link::Classes/Array:: to specify which of the emphasis::output channels mapping:: to take from the output of the emphasis::sender::. If not specified, all channels will be used.
+code::
+(
+a = AlgaNode(
+    { SinOsc.ar([220, 440, 880, 1760])},
+    outsMapping: [\one, [0, 1], \two, [2, 3], \three, 2, \four, 3]
+)
+)
+
+b = AlgaNode({ \in.ar([0, 0]) }).play  //a simple 2 channel bypass
+b.from(a, chans: \one)   //connects \one == [0, 1]
+b.from(a, chans: \two)   //connects \two == [2, 3]
+b.from(a, chans: [0, 3]) //connects [0, 3], a custom channels mapping
+::
+ARGUMENT:: scale
+An optional link::Classes/Number:: or link::Classes/Array::. If it is a number, the value works as a multiplier of the output of the emphasis::sender::. If it is an array, it can be specified in two different ways:
+NUMBEREDLIST::
+## 4 elements, specify a emphasis::linlin:: connection: code::[-1, 1, 0, 10]::.
+## 2 elements, specify a emphasis::linlin:: connection but assume that the input range is -1 to 1: code::[0, 10]::.
+::
+Note that all the values can be specified as arrays, in which case they map for specific channels. For example, code::[-1, [1, 2], 0, [10, 20]]:: will scale the first channel to code::[-1, 1, 0, 10]::, and the second one to code::[-1, 2, 0, 20]::.
+ARGUMENT:: time
+Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+
+
+METHOD:: <<
+Shortcut for emphasis::from::, where, due to syntax restrictions, only emphasis::sender:: and emphasis::param:: can be specified.
+Connect the specific input parameter of this link::Classes/AlgaNode:: to the output of another link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+ARGUMENT:: sender
+An link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+ARGUMENT:: param
+Which parameter to connect to.
+
+METHOD:: to
+Same as emphasis::from::, where the emphasis::receiver:: argument is the link::Classes/AlgaNode:: that the connection is applied to.
+
+METHOD:: >>
+Shortcut for emphasis::to::, where, due to syntax restrictions, only emphasis::receiver:: and emphasis::param:: can be specified.
+
+METHOD:: mixFrom
+Same as emphasis::from::, but all active connections to the parameter are maintained. Essentially, this adds another connection to the specific parameter, adding the values of all the connections together.
+
+METHOD:: <<+
+Shortcut for emphasis::mixFrom::, where, due to syntax restrictions, only emphasis::sender:: and emphasis::param:: can be specified.
+
+METHOD:: mixTo
+Same as emphasis::mixFrom::, where the emphasis::receiver:: argument is the link::Classes/AlgaNode:: that the connection is applied to.
+
+METHOD:: >>+
+Shortcut for emphasis::mixTo::, where, due to syntax restrictions, only emphasis::receiver:: and emphasis::param:: can be specified.
+
+METHOD:: mixSwap
+Replace a connection in the mix of a specific parameter: emphasis::newSender:: replaces emphasis::oldSender::. All the other arguments work the same as the other connection methods.
+
+METHOD:: disconnect
+If emphasis::oldSender:: is specified, disconnect that specific entry in the mix of a specific parameter. Otherwise, reset the entire parameter to its default value.
+
+METHOD:: reset
+Same as emphasis::disconnect:: where no emphasis::oldSender:: is specified: reset the parameter to its default value, disconnecting all mix entries.
+
+METHOD:: <|
+Shortcut for emphasis::reset::.
+
+EXAMPLES::
+code::
+//Boot Alga. The first time it's booted, it will take some time
+//as it needs to generate various AlgaSynthDefs that are essential for
+//the system to work.
+(
+Alga.boot({
+	AlgaSynthDef(\mySineOsc, {
+		SinOsc.ar(\freq.ar(440)).dup
+	}).add;
+});
+)
+
+//Declare a node and play to output
+a = AlgaNode(\mySineOsc, connectionTime:2).play;
+
+//Change \freq parameter. Note how it interpolates to new value over 2 seconds
+a <<.freq 220;
+
+//Declare a square oscillator with variable frequency 1 to 100
+b = AlgaNode({ Pulse.ar(LFNoise1.kr(1).range(1, 100)) });
+
+//Map the b node to a's \freq parameter, scaling the -1 to 1 range to 100 to 1000.
+//The interpolation will take 5 seconds to complete
+a.from(b, \freq, scale: [100, 1000], time:5);
+
+//Declare a new Sine oscillator to use as LFO
+c = AlgaNode(\mySineOsc, [\freq, 2]);
+
+//Also connect c to a's \freq, mixing with what was already there.
+//This will use a's connectionTime, 2
+a.mixFrom(c, \freq, scale:[-100, 100]);
+
+//Clear over 3 seconds. Note how the interpolation will bring us back
+//to just having b modulating a's frequency parameter
+c.clear(3);
+
+//Clear over 5 seconds. No more connections:
+//now we'll interpolate back to a's \freq default value, 440
+b.clear(5);
+
+//Bye bye
+a.clear(3);
+::
+
+subsection:: Simple feedback
+
+code::
+(
+Alga.boot({
+	a = AlgaNode({ SinOsc.ar(\freq.kr(220) + \fm.ar(0)) }, connectionTime:5, playTime:2);
+	b = AlgaNode({ SinOsc.ar(\freq.kr(134) + \fm.ar(0)) }, connectionTime:3);
+	a.from(b, \fm, scale:[-100, 100]);
+	b.from(a, \fm, scale:[-50, 50]); //Feedback connection!
+	a.play(chans:2); //play stereo
+})
+)
+
+(
+//Randomly change a's fm scale every 3 seconds
+fork {
+	loop {
+		a.from(b, \fm, scale:[rrand(-200, -30), rrand(10, 250)]);
+		3.wait;
+	}
+};
+
+//Randomly change b's fm scale every 2 seconds
+fork {
+	loop {
+		b.from(a, \fm, scale:[rrand(-150, -10), rrand(3, 30)]);
+		2.wait;
+	}
+}
+)
+
+//Change root frequencies
+(
+b <<.freq 25;
+a <<.freq 103;
+)
+
+//Replace b's definition with a sawtooth wave.
+//Make sure to have the same parameter names so they keep the mappings
+b.replace({ Saw.ar(\freq.kr + \fm.ar) })
+
+//Bye bye
+(
+b.clear(2);
+a.clear(2);
+)
+
+//The errors on console are the routines (fork)
+//that are still trying to make connections.
+//Ctrl + . to stop them
+::
+
+private:: activeInterpSynths
+private:: addActiveInterpSynthOnFree
+private:: addInNode
+private:: addInOutNodesDict
+private:: addOutNode
+private:: addScaling
+private:: algaCleared
+private:: algaInstantiated
+private:: algaInstantiatedAsReceiver
+private:: algaInstantiatedAsSender
+private:: algaToBeCleared
+private:: beingStopped
+private:: blockIndex
+private:: buildFromSynthDef
+private:: calculateLongestConnectionTime
+private:: calculateLongestWaitTime
+private:: calculateOutsMapping
+private:: calculateScaling
+private:: calculateSenderChansMappingArray
+private:: calculateTemporaryLongestWaitTime
+private:: checkForUpdateToDefaultNodeAtParam
+private:: checkScaleParameterSize
+private:: cleanupMixBussesAndSynths
+private:: clearInner
+private:: clock
+private:: connectionTimeOutNodes
+private:: controlNames
+private:: createAllBusses
+private:: createAllGroups
+private:: createAllSynths
+private:: createControlNamesAndParamsConnectionTime
+private:: createInterpNormBusses
+private:: createInterpNormSynths
+private:: createInterpSynthAtParam
+private:: createMixInterpSynthInterpBusBusNormSynthAtParam
+private:: createObjArgs
+private:: createPlaySynth
+private:: createSynth
+private:: createSynthBus
+private:: currentDefaultNodes
+private:: debug
+private:: disconnectInner
+private:: dispatchFunction
+private:: dispatchNode
+private:: dispatchSynthDef
+private:: freeAllBusses
+private:: freeAllGroups
+private:: freeAllSynths
+private:: freeInterpNormBusses
+private:: freeInterpNormSynths
+private:: freeInterpSynthAtParam
+private:: freeMixNodeAtParam
+private:: freePlaySynth
+private:: freeSynth
+private:: freeSynthBus
+private:: getDefaultOrArg
+private:: getParamChansMapping
+private:: getParamScaling
+private:: group
+private:: inNodes
+private:: initAllVariables
+private:: interpBusses
+private:: interpGroup
+private:: interpSynths
+private:: interpolationTime
+private:: interpolationTime
+private:: isAlgaNode
+private:: isPlaying
+private:: it
+private:: it
+private:: longestConnectionTime
+private:: longestWaitTime
+private:: makeConnection
+private:: makeConnectionInner
+private:: mixParamContainsSender
+private:: moveAfter
+private:: moveBefore
+private:: moveDefaultNodeToMix
+private:: newInterpConnectionAtParam
+private:: newMixConnectionAtParam
+private:: normBusses
+private:: normGroup
+private:: normSynths
+private:: numChannels
+private:: objArgs
+private:: objClass
+private:: outNodes
+private:: outsMapping
+private:: paramInterpolationTime
+private:: paramsChansMapping
+private:: paramsConnectionTime
+private:: paramsScalings
+private:: pit
+private:: playGroup
+private:: playInner
+private:: playSynth
+private:: rate
+private:: removeActiveInterpSynthOnFree
+private:: removeConnectionFromReceivers
+private:: removeInOutNodeAtParam
+private:: removeInOutNodesDict
+private:: removeInterpConnectionAtParam
+private:: removeMix
+private:: removeScaling
+private:: replaceConnections
+private:: replaceInner
+private:: replaceMix
+private:: replaceMixConnection
+private:: replaceMixConnectionInner
+private:: replaceMixInner
+private:: resetGroups
+private:: resetInOutNodesDicts
+private:: resetInterpNormDicts
+private:: resetInterpNormSynths
+private:: resetParam
+private:: resetParamInner
+private:: resetSynth
+private:: scheduler
+private:: server
+private:: setFadeTimeForAllActiveInterpSynths
+private:: setParamsConnectionTime
+private:: stopInner
+private:: synth
+private:: synthBus
+private:: synthDef
+private:: synthGroup
