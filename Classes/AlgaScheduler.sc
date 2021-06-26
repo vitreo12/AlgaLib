@@ -1,3 +1,19 @@
+// AlgaLib: SuperCollider implementation of the Alga live coding language
+// Copyright (C) 2020-2021 Francesco Cameli
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 AlgaThread {
 	classvar <>verbose = false;
 	var <name, <server, <clock, <task;
@@ -421,6 +437,7 @@ AlgaScheduler : AlgaThread {
 
 		condition = condition ? { true };
 
+		sched = sched ? 0;
 		if(sched < 0, { sched = 0 });
 
 		if((condition.isFunction.not).or(func.isFunction.not), {
@@ -461,7 +478,9 @@ AlgaScheduler : AlgaThread {
 }
 
 //Run things concurrently in the scheduler.
-//Each event waits for the previous one to be completed.
+//Each event waits for the previous one to be completed...
+//NOTE that this behaviour is broken when using an AlgaNode with a Function,
+//as the server.sync call screws up the ordering of its buildFromSynthDef call
 AlgaPatch {
 	*new { | func, server |
 		var scheduler;

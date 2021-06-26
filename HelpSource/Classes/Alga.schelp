@@ -1,0 +1,39 @@
+TITLE:: Alga
+summary:: live-coding dialect focused on the interpolation between sonic nodes
+categories:: Alga
+related:: Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaServerOptions
+
+DESCRIPTION::
+emphasis::Alga:: is a new live coding language whose focus is not on pattern manipulation, but on describing dynamic connections between nodes. By linking link::Classes/AlgaNode::s together, it is possible to create a fluid, complex network of sonic interactions. What makes emphasis::Alga:: different from other environments is its interpolation capabilities. In fact, the nature of the connections between link::Classes/AlgaNode::s arises from continuous processes of interpolation between the current states of the system and future ones, over specified windows of time.
+
+Check the link::Classes/AlgaNode:: help file for examples on usage.
+
+CLASSMETHODS::
+
+METHOD:: boot
+Boot emphasis::Alga:: on a specified link::Classes/Server::. If not specified, Server.default will be used.
+ARGUMENT:: onBoot
+Execute a link::Classes/Function:: on boot.
+ARGUMENT:: server
+The link::Classes/Server:: to boot emphasis::Alga:: on.
+ARGUMENT:: algaServerOptions
+An instance of link::Classes/AlgaServerOptions:: to boot the server with. If not specified, a default one will be created.
+ARGUMENT:: clock
+The emphasis::Clock:: for the internal link::Classes/AlgaScheduler::. If not specified, a default link::Classes/TempoClock:: will be created.
+
+METHOD:: maxIO
+Change the maximum number of IO connections between link::Classes/AlgaNode::s. This requires the emphasis::initSynthDefs:: method to re-compile all the necessary link::Classes/AlgaSynthDef::s. The default value is 8.
+ARGUMENT:: value
+The new value. Must be an link::Classes/Integer::.
+
+METHOD:: initSynthDefs
+Force the recompilation of all link::Classes/AlgaSynthDef::s necessary for link::Classes/Alga::'s runtime. This needs to be executed only once anytime the value of emphasis::maxIO:: changes. Before emphasis::boot::, link::Classes/Alga:: already checks that everything is correct.
+
+private:: clearAllSchedulers
+private:: clearScheduler
+private:: clearServer
+private:: getScheduler
+private:: newScheduler
+private:: newServer
+private:: schedulers
+private:: servers

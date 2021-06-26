@@ -8,13 +8,15 @@ Alga.boot({
 });
 )
 
-//This can bug because of the .sync in dispatchFunction, which screws ordering!
+//This was bugging because of the .sync in dispatchFunction, which screws ordering!
+//Now it's fixed by pushing one more action to AlgaScheduler (check implementation)
 100.do { AN({ SinOsc.ar(Rand(220, 2000)) * EnvGen.ar(Env.perc) * 0.1 }, sched:1).play };
 
 //This works as expected
 100.do { AN(\t, sched:1).play };
 
-//This can bug because of the .sync in dispatchFunction, which screws ordering!
+//This was bugging because of the .sync in dispatchFunction, which screws ordering!
+//Now it's fixed by pushing one more action to AlgaScheduler (check implementation)
 (
 a = AN({ \in.ar }).play;
 100.do { |i| b = AN(\t_const); a.mixFrom(b, time:0.3); };

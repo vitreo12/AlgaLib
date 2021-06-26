@@ -1,0 +1,70 @@
+TITLE:: AlgaServerOptions
+summary:: ServerOptions for Alga
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode
+
+DESCRIPTION::
+Convenience wrapper around link::Classes/ServerOptions:: to work nicely when using link::Classes/Alga::.
+
+CLASSMETHODS::
+METHOD:: new
+Create a new instance.
+ARGUMENT:: sampleRate
+Set sampling rate. If not determined, it will use code::Server.default.options.sampleRate::.
+ARGUMENT:: blockSize
+Set block size. If not determined, it will use code::Server.default.options.blockSize::.
+ARGUMENT:: numInputBusChannels
+Set number of inputs. If not determined, it will use code::Server.default.options.numInputBusChannels::.
+ARGUMENT:: numOutputBusChannels
+Set number of outputs. If not determined, it will use code::Server.default.options.numOutputBusChannels::.
+ARGUMENT:: memSize
+Set real time memory allocator size. Default value is 524288, which amounts to 512 megabytes.
+ARGUMENT:: numAudioBusChannels
+Set the maximum number of audio busses on the server, which link::Classes/Alga:: use extensively. Default value is 24576.
+ARGUMENT:: numControlBusChannels
+Set the maximum number of control busses on the server, which link::Classes/Alga:: use extensively. Default value is 24576.
+ARGUMENT:: numBuffers
+Set the maximum number of available link::Classes/Buffer::s. Default value is 24576.
+ARGUMENT:: maxNodes
+Set the maximum number of concurrent nodes on the server. Default value is 32768.
+ARGUMENT:: maxSynthDefs
+Set the maximum number of link::Classes/AlgaSynthDef::s. Default value is 32768.
+ARGUMENT:: numWireBus
+Set the maximum number of internal connections for an link::Classes/AlgaSynthDef::s. Default value is 32768.
+ARGUMENT:: supernova
+Boot a supernova server insead of scsynth. Default is false
+ARGUMENT:: supernovaThreads
+Set number of threads to boot supernova with. Default is code::Server.default.options.threads::.
+ARGUMENT:: supernovaUseSystemClock
+Set supernova to use system clock for more accuracy in syncinc with sclang. Default is true.
+ARGUMENT:: protocol
+Set the OSC protocol to boot the server with. Default is code::\tcp::.
+note::
+The code::\udp:: protocol does not work nicely with link::Classes/Alga:: as it might drop OSC packages which are essential in the language to server communication.
+::
+ARGUMENT:: latency
+Set the latency in scheduling OSC messages. Default is code::Server.default.latency::.
+note::
+link::Classes/Alga:: uses a high number of OSC messages. A higher latency number will help in making sure timing is always respected.
+::
+
+
+INSTANCEMETHODS::
+private:: blockSize
+private:: latency
+private:: maxNodes
+private:: maxSynthDefs
+private:: memSize
+private:: numAudioBusChannels
+private:: numBuffers
+private:: numControlBusChannels
+private:: numInputBusChannels
+private:: numOutputBusChannels
+private:: numWireBufs
+private:: protocol
+private:: sampleRate
+private:: supernova
+private:: vaUseSystemClock
+private:: vaUseSystemClock
+private:: supernovaThreads
+private:: supernovaUseSystemClock
