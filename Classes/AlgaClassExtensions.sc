@@ -1,3 +1,19 @@
+// AlgaLib: SuperCollider implementation of the Alga live coding language
+// Copyright (C) 2020-2021 Francesco Cameli
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 +Object {
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
@@ -27,7 +43,13 @@
 	}
 }
 
-+ SynthDef {
++Nil {
+    //Fundamental for bug-prone trying to index a nil 'nil[0]'
+    //for example when dealing with nested IdentityDictionaries
+    at { | index | ^nil }
+}
+
++SynthDef {
 	//Like .store but without sending to server: algaStore is executed before Alga.boot
 	algaStore { | libname=\global, dir(synthDefDir), completionMsg, mdPlugin |
 		var lib = SynthDescLib.getLib(libname);
@@ -127,17 +149,17 @@
 }
 
 //Add support for >> and >>+
-+Pattern {
-
-}
-
-//Add support for >> and >>+
 +Number {
 
 }
 
 //Add support for >> and >>+
 +SequenceableCollection {
+
+}
+
+//Add support for >> and >>+
++Buffer {
 
 }
 
@@ -236,7 +258,6 @@
 
 			time = this.beats.floor + quant;
 		});
-		time.asString.warn;
 		this.schedAbs(time, task)
 	}
 
@@ -304,93 +325,3 @@
 	isTempoClock { ^true }
 }
 
-/*
-//Debug purposes (used in the s.bind calls in AlgaScheduler)
-+BundleNetAddr {
-	closeBundle { arg time;
-		var bundleList, lastBundles;
-		if(time != false) {
-			if(async.not) {
-				if(AlgaScheduler.verbose, {
-					("Server: latency: " ++ time).warn;
-					("Server: msg bundle: " ++ bundle).warn;
-				});
-				saveAddr.sendClumpedBundles(time, *bundle);
-				^bundle;
-			};
-
-			forkIfNeeded {
-				bundleList = this.splitBundles(time);
-				lastBundles = bundleList.pop;
-				bundleList.do { |bundles|
-					var t = bundles.removeAt(0);
-					saveAddr.sync(nil, bundles, t); // make an independent condition.
-				};
-				saveAddr.sendClumpedBundles(*lastBundles);  // time ... args
-			}
-		};
-		^bundle
-	}
-}
-*/
-
-/*
-//Just as schedBundleArrayOnClock, but it also supports array of array bundles.
-//This is used for AlgaPatterns in order to send all synths together in a single bundle
-+SequenceableCollection {
-	algaSchedBundleArrayOnClock { | clock, bundleArray, server, latency, lag = 0 |
-
-		// "this" is an array of delta times for the clock (usually in beats)
-		// "lag" is a value or an array of tempo independent absolute lag times (in seconds)
-
-		var sendBundle;
-
-		latency = latency ? server.latency;
-
-		sendBundle = { |i|
-			//this could either be an array of array, or just array.
-			//the star makes sure of "unpacking" things to send correctly!
-			var bundle = bundleArray.wrapAt(i);
-			server.algaSendClumpedBundle(latency, *bundle) //this star here fixes it all!
-		};
-
-		if(lag == 0, {
-			this.do({ |delta, i|
-				if(delta != 0, {
-					// schedule only on the clock passed in
-					clock.sched(delta, { sendBundle.value(i) })
-				}, {
-					// send directly
-					sendBundle.value(i)
-				});
-			});
-		}, {
-			lag = lag.asArray;
-
-			this.do({ |delta, i|
-				if(delta != 0, {
-					// schedule on both clocks
-					clock.sched(delta, {
-						SystemClock.sched(lag.wrapAt(i), { sendBundle.value(i) })
-					})
-				}, {
-					// schedule only on the system clock
-					SystemClock.sched(lag.wrapAt(i), { sendBundle.value(i) })
-				});
-			});
-		});
-	}
-}
-
-//This is used for AlgaPatterns in order to send all synths together in a single bundle
-+Server {
-	algaSendClumpedBundle { | time ... msgs |
-		if(AlgaScheduler.verbose, {
-			("Server: latency: " ++ time).warn;
-			("Server: msg bundle: " ++ msgs).warn;
-		});
-
-		addr.sendClumpedBundles(time, *msgs); //Better than sendBundle, as it checks for msg size!
-	}
-}
-*/
