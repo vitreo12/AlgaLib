@@ -1,3 +1,19 @@
+// AlgaLib: SuperCollider implementation of the Alga live coding language
+// Copyright (C) 2020-2021 Francesco Cameli
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 AlgaStartup {
 	classvar <algaMaxIO = 8;
 
@@ -90,36 +106,34 @@ AlgaStartup {
 
 				y = y + 1;
 
-				if(y <= i, { //only y <= i
-					currentPair = [i, y];
-					isAlreadyDone = alreadyDonePairs[currentPair];
+				currentPair = [i, y];
+				isAlreadyDone = alreadyDonePairs[currentPair];
 
-					if(isAlreadyDone != true , {
-						if(y == 1, {
-							arrayOfIndices = "0";
-						}, {
-							arrayOfIndices = "[";
+				if(isAlreadyDone != true , {
+					if(y == 1, {
+						arrayOfIndices = "0";
+					}, {
+						arrayOfIndices = "[";
 
-							y.do({ | num |
-								arrayOfIndices = arrayOfIndices ++ num.asString ++ ",";
-							});
-
-							arrayOfIndices = arrayOfIndices[0..(arrayOfIndices.size - 2)] ++ "]";
+						y.do({ | num |
+							arrayOfIndices = arrayOfIndices ++ num.asString ++ ",";
 						});
 
-						//Limiter to make sure not to blow up speakers.
-						//Note: Using AlgaEnvGate.ar here instead of AlgaDynamicEnvGate.
-						//no need for dynamic fade times for play / stop, and AlgaEnvGate is cheaper!
-						sdef = "
-AlgaSynthDef(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
+						arrayOfIndices = arrayOfIndices[0..(arrayOfIndices.size - 2)] ++ "]";
+					});
+
+					//Limiter to make sure not to blow up speakers.
+					//Note: Using AlgaEnvGate.ar here instead of AlgaDynamicEnvGate.
+					//no need for dynamic fade times for play / stop, and AlgaEnvGate is cheaper!
+					sdef = "
+AlgaSynthDef.new_inner(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
 var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
-Limiter.ar(input) * AlgaEnvGate.ar
-}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+Limiter.ar(input) * AlgaEnvGate.kr
+}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
 
-						sdef.interpret;
-					});
+					sdef.interpret;
 				});
 			});
 		});
@@ -249,7 +263,7 @@ Limiter.ar(input) * AlgaEnvGate.ar
 						});
 
 						result = "
-AlgaSynthDef(" ++ name ++ ", { | scaleCurve = 0 |
+AlgaSynthDef.new_inner(" ++ name ++ ", { | scaleCurve = 0 |
 var in, env, out, outMultiplier, outScale, outs;
 in = " ++ in ++ "
 out = " ++ indices ++ "
@@ -272,7 +286,7 @@ outs;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 
 //Env comes from outside. Can be sampled and hold too.
-AlgaSynthDef(" ++ name_pattern ++ ", { | scaleCurve = 0 |
+AlgaSynthDef.new_inner(" ++ name_pattern ++ ", { | scaleCurve = 0 |
 var in, env, out, outMultiplier, outScale;
 in = " ++ in ++ "
 out = " ++ indices ++ "
@@ -317,7 +331,7 @@ out;
 
 			if(i == 1, {
 
-				result_audio = "AlgaSynthDef(\\alga_norm_audio1, {
+				result_audio = "AlgaSynthDef.new_inner(\\alga_norm_audio1, {
 var args = \\args.ar([0, 0]);
 var val = args[0];
 var env = args[1];
@@ -325,7 +339,7 @@ var out = Sanitize.ar(val / env);
 out;
 }, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
-				result_control = "AlgaSynthDef(\\alga_norm_control1, {
+				result_control = "AlgaSynthDef.new_inner(\\alga_norm_control1, {
 var args = \\args.kr([0, 0]);
 var val = args[0];
 var env = args[1];
@@ -343,7 +357,7 @@ out;
 				//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
 				arrayOfZeros = arrayOfZeros[0..(arrayOfZeros.size - 2)] ++ "]";
 
-				result_audio = "AlgaSynthDef(\\alga_norm_audio" ++ i.asString ++ ", {
+				result_audio = "AlgaSynthDef.new_inner(\\alga_norm_audio" ++ i.asString ++ ", {
 var args = \\args.ar(" ++ arrayOfZeros ++ ");
 var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
@@ -351,7 +365,7 @@ var out = Sanitize.ar(val / env);
 out;
 }, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
-				result_control = "AlgaSynthDef(\\alga_norm_control" ++ i.asString ++ ", {
+				result_control = "AlgaSynthDef.new_inner(\\alga_norm_control" ++ i.asString ++ ", {
 var args = \\args.kr(" ++ arrayOfZeros ++ ");
 var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
@@ -365,6 +379,9 @@ out;
 			result_audio.interpret;
 			result_control.interpret;
 
+			//result_audio.postln;
+			//result_control.postln;
+
 		});
 	}
 
@@ -375,7 +392,7 @@ out;
 
 			i = i + 1;
 
-			fadein_kr = "AlgaSynthDef(\\alga_fadeIn_control" ++ i.asString ++ ", { | curve = \\lin |
+			fadein_kr = "AlgaSynthDef.new_inner(\\alga_fadeIn_control" ++ i.asString ++ ", { | curve = \\lin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = 0;
@@ -384,7 +401,7 @@ val[" ++ i ++ "] = EnvGen.kr(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \
 val;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
-			fadein_ar = "AlgaSynthDef(\\alga_fadeIn_audio" ++ i.asString ++ ", { | curve = \\sin |
+			fadein_ar = "AlgaSynthDef.new_inner(\\alga_fadeIn_audio" ++ i.asString ++ ", { | curve = \\sin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = DC.ar(0);
@@ -393,7 +410,7 @@ val[" ++ i ++ "] = EnvGen.ar(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \
 val;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
-			fadeout_kr = "AlgaSynthDef(\\alga_fadeOut_control" ++ i.asString ++ ", { | curve = \\lin |
+			fadeout_kr = "AlgaSynthDef.new_inner(\\alga_fadeOut_control" ++ i.asString ++ ", { | curve = \\lin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = 0;
@@ -402,7 +419,7 @@ val[" ++ i ++ "] = EnvGen.kr(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \
 val;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
-			fadeout_ar = "AlgaSynthDef(\\alga_fadeOut_audio" ++ i.asString ++ ", { | curve = \\sin |
+			fadeout_ar = "AlgaSynthDef.new_inner(\\alga_fadeOut_audio" ++ i.asString ++ ", { | curve = \\sin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = DC.ar(0);
@@ -420,11 +437,11 @@ val;
 
 	*initAlgaPatternInterp {
 		var result = "
-AlgaSynthDef(\\alga_pattern_interp_env_audio, {
+AlgaSynthDef.new_inner(\\alga_pattern_interp_env_audio, {
 AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 
-AlgaSynthDef(\\alga_pattern_interp_env_control, {
+AlgaSynthDef.new_inner(\\alga_pattern_interp_env_control, {
 AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
