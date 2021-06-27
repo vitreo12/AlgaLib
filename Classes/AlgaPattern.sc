@@ -1,3 +1,19 @@
+// AlgaLib: SuperCollider implementation of the Alga live coding language
+// Copyright (C) 2020-2021 Francesco Cameli
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 AlgaPatternInterpStreams {
 	var <algaPattern;
 	var <server;
@@ -18,6 +34,9 @@ AlgaPatternInterpStreams {
 		server       = algaPattern.server;
 	}
 
+	//Each param has its own interpSynth and bus. These differ from AlgaNode's ones,
+	//as they are not embedded with the interpolation behaviour itself, but they are external.
+	//This allows to separate the per-tick pattern triggering from the interpolation process.
 	createPatternInterpSynthAndBus { | paramName, paramRate, paramNumChannels, entry, uniqueID |
 		var interpGroup = algaPattern.interpGroup;
 		var interpBus, interpSynth;
@@ -79,7 +98,7 @@ AlgaPatternInterpStreams {
 		entry = entry.asStream;
 
 		//Use an unique id as index as it's more reliable than entry:
-		//entry could very well be a number, screwing things up in IdentityDict
+		//entry could very well be a number, screwing things up in IdentityDict.
 		uniqueID = UniqueID.next;
 
 		if(entriesAtParam == nil, {
@@ -173,9 +192,9 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Doesn't have args and outsMapping like AlgaNode
-	*new { | obj, connectionTime = 0, playTime = 0, server, sched = 0 |
+	*new { | def, connectionTime = 0, playTime = 0, server, sched = 0 |
 		^super.new(
-			obj: obj,
+			def: def,
 			connectionTime: connectionTime,
 			playTime: playTime,
 			server: server,
@@ -234,13 +253,15 @@ AlgaPattern : AlgaNode {
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
 		paramDefault, patternParamBus, patternBussesAndSynths |
 
+		//All the current interpStreams for this param. Retrieve the entries,
+		//which store all the senders to this param for the interpStream.
 		var interpStreamsAtParam = interpStreams.entries[paramName];
 
 		//Core of the interpolation behaviour for AlgaPattern !!
 		if(interpStreamsAtParam != nil, {
-			interpStreamsAtParam.keysValuesDo({ | uniqueID, interpStreamAtParam |
+			interpStreamsAtParam.keysValuesDo({ | uniqueID, interpStreamAtParam | //indexed by uniqueIDs
 				var validParam = false;
-				var paramVal = interpStreamAtParam;
+				var paramVal = interpStreamAtParam; //paramVal is the interpStreamAtParam
 				var senderNumChannels, senderRate;
 
 				//Unpack Pattern value
@@ -248,7 +269,7 @@ AlgaPattern : AlgaNode {
 					paramVal = paramVal.next;
 				});
 
-				//Valid values from a pattern are Numbers / Arrays / AlgaNodes
+				//Valid values are Numbers / Arrays / AlgaNodes
 				case
 
 				//Number / Array
@@ -382,11 +403,11 @@ AlgaPattern : AlgaNode {
 	}
 
 	//dispatchNode: first argument is an Event
-	dispatchNode { | obj, args, initGroups = false, replace = false,
+	dispatchNode { | def, args, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
 		//def: entry
-		var defEntry = obj[\def];
+		var defEntry = def[\def];
 
 		if(defEntry == nil, {
 			"AlgaPattern: no 'def' entry in the Event".error;
@@ -394,10 +415,10 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Store the Event
-		eventPairs = obj;
+		eventPairs = def;
 
 		//Store class of the synthEntry
-		objClass = defEntry.class;
+		defClass = defEntry.class;
 
 		//If there is a synth playing, set its algaInstantiated status to false:
 		//this is mostly needed for .replace to work properly and wait for the new synth
@@ -405,21 +426,21 @@ AlgaPattern : AlgaNode {
 		if(synth != nil, { synth.algaInstantiated = false });
 
 		case
-		{ objClass == Symbol } {
+		{ defClass == Symbol } {
 			^this.dispatchSynthDef(defEntry, initGroups, replace,
 				keepChannelsMapping:keepChannelsMapping,
 				keepScale:keepScale,
 				sched:sched
 			);
 		}
-		{ obj.isListPattern } {
+		{ def.isListPattern } {
 			^this.dispatchListPattern;
 		}
-		{ objClass == Function } {
+		{ defClass == Function } {
 			^this.dispatchFunction;
 		};
 
-		("AlgaPattern: class '" ++ objClass ++ "' is invalid as a \def").error;
+		("AlgaPattern: class '" ++ defClass ++ "' is an invalid 'def'").error;
 	}
 
 	//Overloaded function
@@ -447,7 +468,8 @@ AlgaPattern : AlgaNode {
 		//Create groups if needed
 		if(initGroups, { this.createAllGroups });
 
-		//Create synthBus (interpBusses are taken care of in createPatternInterpSynthAndBus)
+		//Create synthBus for output
+		//interpBusses are taken care of in createPatternInterpSynthAndBus.
 		this.createSynthBus;
 
 		//Create the actual pattern, pushing action to scheduler
@@ -475,7 +497,7 @@ AlgaPattern : AlgaNode {
 	//Build the actual pattern
 	createPattern {
 		var foundDurOrDelta = false;
-		var patternPairs = Array.newClear(0);
+		var patternPairs = Array.newClear;
 
 		//Loop over the Event input from the user
 		eventPairs.keysValuesDo({ | paramName, value |
@@ -587,7 +609,7 @@ AlgaPattern : AlgaNode {
 	// 2) replace just the SynthDef with either a new SynthDef or a ListPattern with JUST SynthDefs.
 	//    This would be equivalent to <<.def \newSynthDef
 	//    OR <<.def Pseq([\newSynthDef1, \newSynthDef2])
-	replace { | obj, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
+	replace { | def, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
 		keepInScale = true, keepOutScale = true |
         "AlgaPattern: replace is not supported yet".error;
 	}
