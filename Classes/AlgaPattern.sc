@@ -41,15 +41,19 @@ AlgaPatternInterpStreams {
 		var interpGroup = algaPattern.interpGroup;
 		var interpBus, interpSynth;
 
+		//Holds no paramNumChannels infos
 		var interpSymbol = (
 			"alga_pattern_interp_env_" ++
 			paramRate
 		).asSymbol;
 
+		//Retrieve all active interpSynths at the current param
 		var interpSynthsAtParam = interpSynths[paramName];
 
-		interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+		//alga_pattern_interp_env_... outputs one channel only
+		interpBus = AlgaBus(server, 1, paramRate);
 
+		//This synth triggers an interp envelope, despite the pattern's own synths
 		interpSynth = AlgaSynth(
 			interpSymbol,
 			[\out, interpBus.index, \fadeTime, 0],
@@ -58,8 +62,8 @@ AlgaPatternInterpStreams {
 
 		//Each param / entry combination has its own interpSynth and interpBus!
 		//This behaviour is different from AlgaNode, which dynamically replaces the previous one.
-		//However, pattern synths are created on the fly, so these things need to be re-used until
-		//interpolation has finished
+		//However, pattern synths are created on the fly, so the interpSynths need to be kept alive until
+		//interpolation has finished. In a nutshell, patternSynths and interpSynths are decoupled.
 		if(interpSynthsAtParam == nil, {
 			interpSynths[paramName] = IdentityDictionary().put(uniqueID, interpSynth);
 			interpBusses[paramName] = IdentityDictionary().put(uniqueID, interpBus);
@@ -72,8 +76,6 @@ AlgaPatternInterpStreams {
 		//algaPattern.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
 
 		//interpBus should have a similar mechanism here !!!
-
-		//How to normalize ???
 
 		//Add entries to algaPattern too ... These are needed for algaInstantiatedAsReceiver ...
 		//This does not take in account mixing yet!
@@ -371,6 +373,7 @@ AlgaPattern : AlgaNode {
 
 			//This is the interpBus for this param that all patternParamSynths will write to.
 			//This will then be used for the actual normalization that happens in the normSynth
+			//As with AlgaNode's, it needs one extra channel for the separate env.
 			var patternInterpSumBus = AlgaBus(server, paramNumChannels + 1, paramRate);
 
 			//This is the normBus that the normSynth will write to, and patternSynth will read from
@@ -386,7 +389,8 @@ AlgaPattern : AlgaNode {
 			//Args for normSynth
 			var patternParamNormSynthArgs = [
 				\args, patternInterpSumBus.busArg,
-				\out, patternParamNormBus.index
+				\out, patternParamNormBus.index,
+				\fadeTime, 0
 			];
 
 			//The actual normSynth for this specific param.
@@ -657,7 +661,8 @@ AlgaPattern : AlgaNode {
 		algaReschedulingEventStreamPlayer.reschedule(sched);
 	}
 
-	//Since can't check synth, just check if the group is instantiated
+	//There is no way to check individual synths.
+	//So, let's at least check that the group must be insantiated
 	algaInstantiated {
 		^(group.algaInstantiated);
 	}
