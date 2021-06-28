@@ -83,6 +83,7 @@ AlgaPatternInterpStreams {
 		algaPattern.interpBusses[paramName][\default] = interpBus;
 	}
 
+	//Add a new sender interpolation to the current param
 	add { | entry, controlName |
 		var paramName, paramRate, paramNumChannels;
 		var uniqueID;
@@ -96,19 +97,25 @@ AlgaPatternInterpStreams {
 		paramRate = controlName.rate;
 		paramNumChannels = controlName.numChannels;
 
+		//Retrieve all the current entries for the paramName:
+		//entries are all the active senders for this AlgaPattern
 		entriesAtParam = entries[paramName];
+
+		//Interpret entry asStream
 		entry = entry.asStream;
 
-		//Use an unique id as index as it's more reliable than entry:
-		//entry could very well be a number, screwing things up in IdentityDict.
+		//Use an unique id as index as it's more reliable than using the entry as key:
+		//entry could very well be a number (like 440), screwing things up in IdentityDict.
 		uniqueID = UniqueID.next;
 
+		//Either create a new Dict for the param, or add to existing one
 		if(entriesAtParam == nil, {
 			entries[paramName] = IdentityDictionary().put(uniqueID, entry);
 		}, {
 			entries[paramName].put(uniqueID,entry);
 		});
 
+		//Create the interpSynth and interpBus for the new sender
 		this.createPatternInterpSynthAndBus(
 			paramName, paramRate, paramNumChannels,
 			entry, uniqueID
