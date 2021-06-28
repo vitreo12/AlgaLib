@@ -19,8 +19,4 @@ Alga.boot({
 
 a.from(Pseq([Pseq([100, [100, 300]]), 2000], inf), \freq)
 
-s.scope
-
 Alga.initSynthDefs
-
-s.avgCPU

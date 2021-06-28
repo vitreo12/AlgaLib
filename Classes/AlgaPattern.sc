@@ -369,6 +369,29 @@ AlgaPattern : AlgaNode {
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
 
+			//normBus. This stores the output of all the patternParamSynths with the sum of
+			//all the envelopes
+			var patternParamNormBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+
+			//symbol
+			var patternParamNormSynthSymbol = (
+				"alga_norm_" ++
+				paramRate ++
+				paramNumChannels
+			).asSymbol;
+
+			//args
+			var patternParamNormSynthArgs = [];
+
+			//The actual normSynth for this specific param.
+			//The patternSynth will read from its output.
+			var patternParamNormSynth = AlgaSynth(
+				patternParamNormSynthSymbol,
+				patternParamNormSynthArgs,
+				normGroup,
+				waitForInst: false
+			);
+
 			//New bus to write interpolation result to
 			var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
 
@@ -380,6 +403,10 @@ AlgaPattern : AlgaNode {
 
 			//Read from interpBusAtParam
 			patternSynthArgs = patternSynthArgs.add(paramName).add(patternParamBus.busArg);
+
+			//Register normBus and interpBus to be freed
+			patternBussesAndSynths.add(patternParamNormBus);
+			patternBussesAndSynths.add(patternParamNormSynth);
 
 			//Register paramPatternBus to be freed
 			patternBussesAndSynths.add(patternParamBus);
