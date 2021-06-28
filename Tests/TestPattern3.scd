@@ -17,6 +17,12 @@ Alga.boot({
 });
 )
 
+a.from(440, \freq);
+
 a.from(Pseq([Pseq([100, [100, 300]]), 2000], inf), \freq)
 
 Alga.initSynthDefs
+
+s.scope
+
+AlgaNode

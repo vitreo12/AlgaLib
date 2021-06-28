@@ -285,9 +285,9 @@ outs[" ++ y ++ "] = env;
 outs;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 
-//Env comes from outside. Can be sampled and hold too.
+//Env comes from outside. TODO: sample and hold
 AlgaSynthDef.new_inner(" ++ name_pattern ++ ", { | scaleCurve = 0 |
-var in, env, out, outMultiplier, outScale;
+var in, env, out, outMultiplier, outScale, outs;
 in = " ++ in ++ "
 out = " ++ indices ++ "
 outMultiplier = " ++ multiplier ++ "
@@ -302,7 +302,10 @@ out = " ++ scaling ++ "
 out = out * outMultiplier;
 env = " ++ env_pattern ++ "
 out = out * env;
-out;
+outs = Array.newClear(" ++ (y + 1) ++ ");
+" ++ outs ++ "
+outs[" ++ y ++ "] = env;
+outs;
 }, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
 
@@ -435,6 +438,7 @@ val;
 		});
 	}
 
+	//This shuld also have sample and hold option!
 	*initAlgaPatternInterp {
 		var result = "
 AlgaSynthDef.new_inner(\\alga_pattern_interp_env_audio, {

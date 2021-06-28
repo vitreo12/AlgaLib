@@ -246,12 +246,12 @@ AlgaPattern : AlgaNode {
 	//What about multi-channel expansion? As of now, multichannel works with the
 	//same conversion rules as AlgaNode, but perhaps it's more ideomatic to implement
 	//native channel expansion. It should be easy: just pop new synths and route them
-	//to the same patternParamBus.
+	//to the same patternInterpSumBus.
 	//However, mind of the overhead of \alga_pattern_ ... functions, which are expensive
 	//due to scalings, etc... Perhaps they should be reworked to just "bypass" the input
 	//and route it correctly to the bus that interpolation will be using.
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
-		paramDefault, patternParamBus, patternBussesAndSynths |
+		paramDefault, patternInterpSumBus, patternBussesAndSynths |
 
 		//All the current interpStreams for this param. Retrieve the entries,
 		//which store all the senders to this param for the interpStream.
@@ -326,7 +326,7 @@ AlgaPattern : AlgaNode {
 					var patternParamSynthArgs = [
 						\in, paramVal,
 						\env, patternParamEnvBus.busArg,
-						\out, patternParamBus.index,
+						\out, patternInterpSumBus.index,
 						\fadeTime, 0
 					];
 
@@ -361,27 +361,33 @@ AlgaPattern : AlgaNode {
 		//The actual synth that will be created
 		var patternSynth;
 
-		//Loop over controlNames and create as many Synths as needed,
-		//also considering interpolation issues
+		//Loop over controlNames and create as many Busses and Synths as needed,
+		//also considering interpolation / normalization
 		controlNames.do({ | controlName |
 			var paramName = controlName.name;
 			var paramNumChannels = controlName.numChannels;
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
 
-			//normBus. This stores the output of all the patternParamSynths with the sum of
-			//all the envelopes
-			var patternParamNormBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+			//This is the interpBus for this param that all patternParamSynths will write to.
+			//This will then be used for the actual normalization that happens in the normSynth
+			var patternInterpSumBus = AlgaBus(server, paramNumChannels + 1, paramRate);
 
-			//symbol
+			//This is the normBus that the normSynth will write to, and patternSynth will read from
+			var patternParamNormBus = AlgaBus(server, paramNumChannels, paramRate);
+
+			//Symbol for normSynth
 			var patternParamNormSynthSymbol = (
 				"alga_norm_" ++
 				paramRate ++
 				paramNumChannels
 			).asSymbol;
 
-			//args
-			var patternParamNormSynthArgs = [];
+			//Args for normSynth
+			var patternParamNormSynthArgs = [
+				\args, patternInterpSumBus.busArg,
+				\out, patternParamNormBus.index
+			];
 
 			//The actual normSynth for this specific param.
 			//The patternSynth will read from its output.
@@ -392,24 +398,19 @@ AlgaPattern : AlgaNode {
 				waitForInst: false
 			);
 
-			//New bus to write interpolation result to
-			var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
-
 			//Create all interp synths for current param
 			this.createPatternParamSynths(
 				paramName, paramNumChannels, paramRate,
-				paramDefault, patternParamBus, patternBussesAndSynths
+				paramDefault, patternInterpSumBus, patternBussesAndSynths
 			);
 
-			//Read from interpBusAtParam
-			patternSynthArgs = patternSynthArgs.add(paramName).add(patternParamBus.busArg);
+			//Read from patternParamNormBus
+			patternSynthArgs = patternSynthArgs.add(paramName).add(patternParamNormBus.busArg);
 
-			//Register normBus and interpBus to be freed
+			//Register normBus, normSynth, interSumBus to be freed
 			patternBussesAndSynths.add(patternParamNormBus);
 			patternBussesAndSynths.add(patternParamNormSynth);
-
-			//Register paramPatternBus to be freed
-			patternBussesAndSynths.add(patternParamBus);
+			patternBussesAndSynths.add(patternInterpSumBus);
 		});
 
 		//This synth writes directly to synthBus
@@ -420,7 +421,7 @@ AlgaPattern : AlgaNode {
 			waitForInst: false
 		);
 
-		//Free all interpBusses and interpSynths on patternSynth's release
+		//Free all normBusses, normSynths, interpBusses and interpSynths on patternSynth's release
 		patternSynth.onFree( {
 			patternBussesAndSynths.do({ | entry |
 				//.free works both for AlgaSynths and AlgaBusses
