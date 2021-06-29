@@ -34,10 +34,30 @@ AlgaPatternInterpStreams {
 		server       = algaPattern.server;
 	}
 
+	//Free all active interpSynths. This triggers the onFree action that's executed in
+	//addActiveInterpSynthOnFree
+	freeActiveInterpSynthsAtParam { | paramName, time = 0 |
+		var interpSynthsAtParam = interpSynths[paramName];
+		var interpBussesAtParam = interpBusses[paramName];
+
+		if(interpSynthsAtParam != nil, {
+			interpSynthsAtParam.keysValuesDo({ | uniqueID, interpSynth |
+				//Trigger the release of the interpSynth. When freed, the onFree action
+				//will be triggered. This is executed thanks to addActiveInterpSynthOnFree
+				interpSynth.set(
+					\t_release, 1,
+					\fadeTime, time,
+				);
+			});
+		});
+	}
+
 	//Each param has its own interpSynth and bus. These differ from AlgaNode's ones,
 	//as they are not embedded with the interpolation behaviour itself, but they are external.
 	//This allows to separate the per-tick pattern triggering from the interpolation process.
-	createPatternInterpSynthAndBus { | paramName, paramRate, paramNumChannels, entry, uniqueID |
+	createPatternInterpSynthAndBusAtParam { | paramName, paramRate, paramNumChannels,
+		entry, uniqueID, time = 0 |
+
 		var interpGroup = algaPattern.interpGroup;
 		var interpBus, interpSynth;
 
@@ -47,44 +67,65 @@ AlgaPatternInterpStreams {
 			paramRate
 		).asSymbol;
 
-		//Retrieve all active interpSynths at the current param
+		//Retrieve all active interpSynths at the current param.
 		var interpSynthsAtParam = interpSynths[paramName];
 
 		//alga_pattern_interp_env_... outputs one channel only
 		interpBus = AlgaBus(server, 1, paramRate);
-
-		//This synth triggers an interp envelope, despite the pattern's own synths
-		interpSynth = AlgaSynth(
-			interpSymbol,
-			[\out, interpBus.index, \fadeTime, 0],
-			interpGroup
-		);
 
 		//Each param / entry combination has its own interpSynth and interpBus!
 		//This behaviour is different from AlgaNode, which dynamically replaces the previous one.
 		//However, pattern synths are created on the fly, so the interpSynths need to be kept alive until
 		//interpolation has finished. In a nutshell, patternSynths and interpSynths are decoupled.
 		if(interpSynthsAtParam == nil, {
+			//If it's the first synth, fadeTime is 0. This only happens when first creating the pattern!
+			interpSynth = AlgaSynth(
+				interpSymbol,
+				[\out, interpBus.index, \fadeTime, 0],
+				interpGroup
+			);
 			interpSynths[paramName] = IdentityDictionary().put(uniqueID, interpSynth);
 			interpBusses[paramName] = IdentityDictionary().put(uniqueID, interpBus);
 		}, {
+			//If it's not the first synth, fadeTime is time
+			interpSynth = AlgaSynth(
+				interpSymbol,
+				[\out, interpBus.index, \fadeTime, time],
+				interpGroup
+			);
 			interpSynths[paramName].put(uniqueID, interpSynth);
 			interpBusses[paramName].put(uniqueID, interpBus);
 		});
 
 		//Add interpSynth to the current active ones for specific param / sender combination
-		//algaPattern.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
+		//Note: no mixing yet
+		algaPattern.addActiveInterpSynthOnFree(paramName, \default, interpSynth, {
+			var entriesAtParam      = entries[paramName];
+			var interpSynthsAtParam = interpSynths[paramName];
+			var interpBussesAtParam = interpBusses[paramName];
 
-		//interpBus should have a similar mechanism here !!!
+			//Remove entry from entries
+			if(entriesAtParam != nil, { entriesAtParam.removeAt(uniqueID) });
 
-		//Add entries to algaPattern too ... These are needed for algaInstantiatedAsReceiver ...
-		//This does not take in account mixing yet!
+			//Remove entry from interpSynths
+			if(interpSynthsAtParam != nil, { interpSynthsAtParam.removeAt(uniqueID) });
+
+			//Remove entry from interpBusses and free the bus
+			if(interpBussesAtParam != nil, {
+				var interpBusAtParam = interpBussesAtParam[uniqueID];
+				interpBussesAtParam.removeAt(uniqueID);
+				if(interpBusAtParam != nil, { interpBusAtParam.free });
+			});
+		});
+
+		//Add entries to algaPattern too.These are needed for algaInstantiatedAsReceiver.
+		//Note: no mixing yet
 		algaPattern.interpSynths[paramName][\default] = interpSynth;
 		algaPattern.interpBusses[paramName][\default] = interpBus;
 	}
 
 	//Add a new sender interpolation to the current param
-	add { | entry, controlName |
+	add { | entry, controlName, time = 0 |
 		var paramName, paramRate, paramNumChannels;
 		var uniqueID;
 		var entriesAtParam;
@@ -115,10 +156,17 @@ AlgaPatternInterpStreams {
 			entries[paramName].put(uniqueID,entry);
 		});
 
-		//Create the interpSynth and interpBus for the new sender
-		this.createPatternInterpSynthAndBus(
+		//Trigger the interpolation process on all the other active interpSynths
+		this.freeActiveInterpSynthsAtParam(
+			paramName,
+			time
+		);
+
+		//Create the interpSynth and interpBus for the new sender and
+		//activate the interpolation processon all the other active interpSynths.
+		this.createPatternInterpSynthAndBusAtParam(
 			paramName, paramRate, paramNumChannels,
-			entry, uniqueID
+			entry, uniqueID, time
 		);
 	}
 
@@ -447,7 +495,6 @@ AlgaPattern : AlgaNode {
 
 		//def: entry
 		var defEntry = def[\def];
-
 		if(defEntry == nil, {
 			"AlgaPattern: no 'def' entry in the Event".error;
 			^this;
@@ -621,7 +668,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Add to interpStreams (which also creates interpBus / interpSynth)
-		interpStreams.add(sender, controlNames[param]);
+		interpStreams.add(sender, controlNames[param], time);
 	}
 
 	//<<, <<+ and <|

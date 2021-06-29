@@ -9,18 +9,23 @@ Alga.boot({
 
 	a = AlgaPattern((
 		def: \test,
-		dur: 0.5,
+		dur: 1,
 		freq: Pwhite([400, 200], 1000)
 	)).play;
 
-	s.plotTree
+	//s.plotTree
 });
 )
 
-a.from(440, \freq);
+a.from(440, \freq, time:1);
 
 a.from(Pseq([Pseq([100, [100, 300]]), 2000], inf), \freq)
 
 Alga.initSynthDefs
 
 s.scope
+
+a.activeInterpSynths
+
+a.interpStreams.interpBusses
+a.interpStreams.interpSynths
