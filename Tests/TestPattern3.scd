@@ -19,7 +19,13 @@ Alga.boot({
 
 a.from(440, \freq, time:1);
 
-a.from(Pseq([Pseq([100, [100, 300]]), 2000], inf), \freq)
+a.from(Pseq([220, 440, 880], inf), \freq, time:10)
+
+a.inNodes
+
+b = AN({ SinOsc.ar([100, 200]).range(200, 300) })
+
+a.from(b, \freq, time:20)
 
 Alga.initSynthDefs
 

@@ -709,6 +709,20 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
+	//Add pattern support
+	from { | sender, param = \in, chans, scale, time, sched |
+		//Force pattern dispatch
+		if(sender.isPattern, {
+			^this.makeConnection(sender, param, senderChansMapping:chans,
+				scale:scale, time:time, sched:sched
+			);
+		});
+
+		//All the other cases apply to AlgaNode too.
+		//AlgaPattern.makeConnection is getting called anyways.
+		^super.from(sender, param, chans, scale, time, sched);
+	}
+
 	// <<| \param (goes back to defaults)
 	//previousSender is the mix one, in case that will be implemented in the future
 	resetParam { | param = \in, previousSender = nil, time |
