@@ -78,7 +78,8 @@ AlgaPatternInterpStreams {
 		//However, pattern synths are created on the fly, so the interpSynths need to be kept alive until
 		//interpolation has finished. In a nutshell, patternSynths and interpSynths are decoupled.
 		if(interpSynthsAtParam == nil, {
-			//If it's the first synth, fadeTime is 0. This only happens when first creating the pattern!
+			//If it's the first synth, fadeTime is 0.
+			//This only happens when first creating the AlgaPattern!
 			interpSynth = AlgaSynth(
 				interpSymbol,
 				[\out, interpBus.index, \fadeTime, 0],
@@ -104,8 +105,14 @@ AlgaPatternInterpStreams {
 			var interpSynthsAtParam = interpSynths[paramName];
 			var interpBussesAtParam = interpBusses[paramName];
 
-			//Remove entry from entries
-			if(entriesAtParam != nil, { entriesAtParam.removeAt(uniqueID) });
+			//Remove entry from entries and deal with inNodes / outNodes for both receiver and sender
+			if(entriesAtParam != nil, {
+				var entryAtParam = entriesAtParam[uniqueID];
+				entriesAtParam.removeAt(uniqueID);
+				if(entryAtParam != nil, {
+					this.removeInOutNodesDictAtParam(entryAtParam, paramName);
+				});
+			});
 
 			//Remove entry from interpSynths
 			if(interpSynthsAtParam != nil, { interpSynthsAtParam.removeAt(uniqueID) });
@@ -122,6 +129,38 @@ AlgaPatternInterpStreams {
 		//Note: no mixing yet
 		algaPattern.interpSynths[paramName][\default] = interpSynth;
 		algaPattern.interpBusses[paramName][\default] = interpBus;
+	}
+
+	//Wrapper around AlgaNode's
+	addInOutNodesDictAtParam { | sender, param, mix = false |
+		if(sender.isAlgaNode, {
+			algaPattern.addInOutNodesDict(sender, param, mix:false);
+		}, {
+			//If ListPattern, loop over and only add AlgaNodes
+			if(sender.isListPattern, {
+				sender.list.do({ | listEntry |
+					if(listEntry.isAlgaNode, {
+						algaPattern.addInOutNodesDict(listEntry, param, mix:false);
+					});
+				});
+			});
+		});
+	}
+
+	//Wrapper around AlgaNode's
+	removeInOutNodesDictAtParam { | oldSender, param |
+		if(oldSender.isAlgaNode, {
+			algaPattern.removeInOutNodesDict(oldSender, param);
+		}, {
+			//If ListPattern, loop over and only remove AlgaNodes
+			if(oldSender.isListPattern, {
+				oldSender.list.do({ | listEntry |
+					if(listEntry.isAlganode, {
+						algaPattern.removeInOutNodesDict(listEntry, param)
+					});
+				});
+			});
+		});
 	}
 
 	//Add a new sender interpolation to the current param
@@ -156,6 +195,9 @@ AlgaPatternInterpStreams {
 			entries[paramName].put(uniqueID,entry);
 		});
 
+		//Add proper inNodes / outNodes / connectionTimeOutNodes ...
+		this.addInOutNodesDictAtParam(entry, paramName, false);
+
 		//Trigger the interpolation process on all the other active interpSynths
 		this.freeActiveInterpSynthsAtParam(
 			paramName,
@@ -168,24 +210,6 @@ AlgaPatternInterpStreams {
 			paramName, paramRate, paramNumChannels,
 			entry, uniqueID, time
 		);
-	}
-
-	remove { | param = \in |
-		entries.removeAt(param);
-		interpSynths.removeAt(param);
-		interpBusses.removeAt(param);
-	}
-
-	removeEntryAtParam { | param = \in, entry |
-		entries[param].remove(entry);
-		interpSynths[param].remove(entry);
-		interpBusses[param].remove(entry);
-	}
-
-	removeEntryAtParamOnSynthFree { | synth, param = \in, entry |
-		synth.onFree({
-			this.removeEntryAtParam(param, entry);
-		});
 	}
 }
 
@@ -371,32 +395,34 @@ AlgaPattern : AlgaNode {
 					//behaviour of activeInterpSynths and get busses from there.
 					var patternParamEnvBus = interpStreams.interpBusses[paramName][uniqueID];
 
-					var patternParamSymbol = (
-						"alga_pattern_" ++
-						senderRate ++
-						senderNumChannels ++
-						"_" ++
-						paramRate ++
-						paramNumChannels
-					).asSymbol;
+					if(patternParamEnvBus != nil, {
+						var patternParamSymbol = (
+							"alga_pattern_" ++
+							senderRate ++
+							senderNumChannels ++
+							"_" ++
+							paramRate ++
+							paramNumChannels
+						).asSymbol;
 
-					var patternParamSynthArgs = [
-						\in, paramVal,
-						\env, patternParamEnvBus.busArg,
-						\out, patternInterpSumBus.index,
-						\fadeTime, 0
-					];
+						var patternParamSynthArgs = [
+							\in, paramVal,
+							\env, patternParamEnvBus.busArg,
+							\out, patternInterpSumBus.index,
+							\fadeTime, 0
+						];
 
-					var patternParamSynth = AlgaSynth(
-						patternParamSymbol,
-						patternParamSynthArgs,
-						interpGroup,
-						\addToTail,
-						waitForInst: false
-					);
+						var patternParamSynth = AlgaSynth(
+							patternParamSymbol,
+							patternParamSynthArgs,
+							interpGroup,
+							\addToTail,
+							waitForInst: false
+						);
 
-					//Register patternParamSynth to be freed
-					patternBussesAndSynths.add(patternParamSynth);
+						//Register patternParamSynth to be freed
+						patternBussesAndSynths.add(patternParamSynth);
+					});
 				}, {
 					("AlgaPattern: Invalid class " ++ paramVal.class ++ " input for parameter " ++ paramName.asString).error;
 				});
