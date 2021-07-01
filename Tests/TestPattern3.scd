@@ -9,29 +9,18 @@ Alga.boot({
 
 	a = AlgaPattern((
 		def: \test,
-		dur: 1,
+		dur: 0.5,
 		freq: Pwhite([400, 200], 1000)
 	)).play;
 
-	//s.plotTree
+	b = AN({ SinOsc.ar([100, 200]).range(200, 300) });
+
+	s.plotTree
 });
 )
 
 a.from(440, \freq, time:1);
 
-a.from(Pseq([220, 440, 880], inf), \freq, time:10)
+a.from(Pseq([220, 440, 880], inf), \freq, time:5)
 
-a.inNodes
-
-b = AN({ SinOsc.ar([100, 200]).range(200, 300) })
-
-a.from(b, \freq, time:20)
-
-Alga.initSynthDefs
-
-s.scope
-
-a.activeInterpSynths
-
-a.interpStreams.interpBusses
-a.interpStreams.interpSynths
+a.from(b, \freq, time:5);

@@ -38,12 +38,13 @@ AlgaPatternInterpStreams {
 	//addActiveInterpSynthOnFree
 	freeActiveInterpSynthsAtParam { | paramName, time = 0 |
 		var interpSynthsAtParam = interpSynths[paramName];
-		var interpBussesAtParam = interpBusses[paramName];
 
 		if(interpSynthsAtParam != nil, {
 			interpSynthsAtParam.keysValuesDo({ | uniqueID, interpSynth |
 				//Trigger the release of the interpSynth. When freed, the onFree action
-				//will be triggered. This is executed thanks to addActiveInterpSynthOnFree
+				//will be triggered. This is executed thanks to addActiveInterpSynthOnFree...
+				//Note that only the first call to \t_release will be used as trigger, while
+				//\fadeTime will always be set on any consecutive call (even after the first trigger of \t_release).
 				interpSynth.set(
 					\t_release, 1,
 					\fadeTime, time,
@@ -198,7 +199,8 @@ AlgaPatternInterpStreams {
 		//Add proper inNodes / outNodes / connectionTimeOutNodes ...
 		this.addInOutNodesDictAtParam(entry, paramName, false);
 
-		//Trigger the interpolation process on all the other active interpSynths
+		//Trigger the interpolation process on all the other active interpSynths.
+		//This must always be before createPatternInterpSynthAndBusAtParam
 		this.freeActiveInterpSynthsAtParam(
 			paramName,
 			time
