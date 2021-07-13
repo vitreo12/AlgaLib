@@ -19,18 +19,34 @@ Alga.boot({
 
 	b = AN({ SinOsc.ar([100, 200]) });
 
-	s.plotTree
+	//s.plotTree
 });
 )
+
+a <<.dur 0.5
+
+a.from(1, \dur, sched:1)
+
+a.from(0.25, \dur, sched:1)
+
+a.from(Pseq([1, 2, 0.1], inf), \dur, sched:1)
+
+
+//sometimes with 0.25 (or faster),
+//going from the synth to 440 has some "wrong ones" at the end: investigate!
+a.from(0.25, \dur, sched:1)
 
 a.from(440, \freq, time:1);
 
 a.from(Pseq([220, 440, 880], inf), \freq, time:5)
 
-//scale?
 a.from(b, \freq, time:5, scale:[330, 1000]);
 
+
+
+
 //chansMapping?
+
 
 //replace?
 (

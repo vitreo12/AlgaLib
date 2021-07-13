@@ -255,7 +255,7 @@ AlgaPattern : AlgaNode {
 
 	1) What about inNodes for an AlgaPattern, especially with ListPatterns as \def? (WIP)
 
-	2) How to connect an AlgaNode to an AlgaPattern parameter? What about kr / ar? (WIP)
+	2) How to connect an AlgaNode to an AlgaPattern parameter? What about kr / ar? DONE
 
 	3) Continuous or SAH interpolation (both in Patterns and AlgaNodes) (WIP)
 
@@ -290,6 +290,9 @@ AlgaPattern : AlgaNode {
 
 	//The actual Patterns to be manipulated
 	var <pattern;
+
+	//The \dur entry (special case)
+	var <dur;
 
 	//The Event input
 	var <eventPairs;
@@ -357,6 +360,11 @@ AlgaPattern : AlgaNode {
 				algaPatternServer
 			);
 		});
+	}
+
+	//Set dur asStream for it to work within Pfuncn
+	setDur { | value |
+		dur = value.asStream
 	}
 
 	//Create all pattern synths per-param ...
@@ -665,19 +673,10 @@ AlgaPattern : AlgaNode {
 		eventPairs.keysValuesDo({ | paramName, value |
 			if((paramName == \dur).or(paramName == \delta), {
 				foundDurOrDelta = true;
+				this.setDur(value);
 			});
 
-			if(paramName != \def, {
-				//delta == dur
-				if(paramName == \delta, {
-					paramName = \dur;
-				});
-
-				//Add \dur to array
-				if(paramName == \dur, {
-					patternPairs = patternPairs.add(\dur).add(value);
-				});
-			}, {
+			if(paramName == \def, {
 				//Add \def key as \instrument
 				patternPairs = patternPairs.add(\instrument).add(value);
 			});
@@ -685,7 +684,7 @@ AlgaPattern : AlgaNode {
 
 		//If no dur or delta, default to 1
 		if(foundDurOrDelta.not, {
-			patternPairs = patternPairs.add(\dur).add(1)
+			this.setDur(1);
 		});
 
 		//Add all the default entries from SynthDef that the user hasn't set yet
@@ -710,6 +709,7 @@ AlgaPattern : AlgaNode {
 		//the context of this AlgaPattern
 		patternPairs = patternPairs.addAll([
 			\type, \algaNote,
+			\dur, Pfuncn( { dur.next }, inf), //Pfunc allows to modify the value
 			\algaPattern, this,
 			\algaPatternServer, server,
 			\algaPatternClock, this.clock
@@ -724,6 +724,16 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
+	//interpolate dur (not yet)
+	interpolateDur { | value, sched |
+		if(sched == nil, { sched = 0 });
+		("AlgaPattern: \dur interpolation is not supported yet. Rescheduling \dur at the " ++ sched ++ " quantization.").warn;
+		this.setDur(value);
+		//should this be add to scheduler with sched 0? Shouldn't be necessary,
+		//as both are using the same clock...
+		algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
+	}
+
 	//<<, <<+ and <|
 	makeConnectionInner { | param = \in, sender, scale, time = 0 |
 		var paramConnectionTime = paramsConnectionTime[param];
@@ -731,19 +741,8 @@ AlgaPattern : AlgaNode {
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
 
-		//delta == dur
-		if(param == \delta, {
-			param = \dur
-		});
-
 		if((sender.isAlgaNode.not).and(sender.isPattern.not).and(sender.isNumberOrArray.not), {
-			"AlgaPattern: makeConnection only works with AlgaNodes, Patterns, Numbers and Arrays".error;
-			^this;
-		});
-
-		//Special case, \dur
-		if(param == \dur, {
-			"AlgaPattern: \dur interpolation is not supported yet".error;
+			"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, Patterns, Numbers and Arrays".error;
 			^this;
 		});
 
@@ -758,7 +757,20 @@ AlgaPattern : AlgaNode {
 
 	//<<, <<+ and <|
 	makeConnection { | sender, param = \in, replace = false, mix = false,
-		replaceMix = false, senderChansMapping, scale, time, sched = 0 |
+		replaceMix = false, senderChansMapping, scale, time, sched |
+
+		//delta == dur
+		if(param == \delta, {
+			param = \dur
+		});
+
+		//Special case, \dur
+		if(param == \dur, {
+			this.interpolateDur(sender, sched);
+			^this;
+		});
+
+		//All other cases
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			scheduler.addAction(
 				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
