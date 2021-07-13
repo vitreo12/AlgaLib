@@ -21,6 +21,7 @@ AlgaPatternInterpStreams {
 	var <entries;
 	var <interpSynths;
 	var <interpBusses;
+	var <scaleArrays;
 
 	*new { | algaPattern |
 		^super.new.init(algaPattern)
@@ -30,6 +31,7 @@ AlgaPatternInterpStreams {
 		entries      = IdentityDictionary(10);
 		interpSynths = IdentityDictionary(10);
 		interpBusses = IdentityDictionary(10);
+		scaleArrays  = IdentityDictionary(10);
 		algaPattern  = argAlgaPattern;
 		server       = algaPattern.server;
 	}
@@ -57,10 +59,11 @@ AlgaPatternInterpStreams {
 	//as they are not embedded with the interpolation behaviour itself, but they are external.
 	//This allows to separate the per-tick pattern triggering from the interpolation process.
 	createPatternInterpSynthAndBusAtParam { | paramName, paramRate, paramNumChannels,
-		entry, uniqueID, time = 0 |
+		entry, uniqueID, scale, time = 0 |
 
 		var interpGroup = algaPattern.interpGroup;
 		var interpBus, interpSynth;
+		var scaleArray;
 
 		//Holds no paramNumChannels infos
 		var interpSymbol = (
@@ -105,6 +108,7 @@ AlgaPatternInterpStreams {
 			var entriesAtParam      = entries[paramName];
 			var interpSynthsAtParam = interpSynths[paramName];
 			var interpBussesAtParam = interpBusses[paramName];
+			var scaleArraysAtParam  = scaleArrays[paramName];
 
 			//Remove entry from entries and deal with inNodes / outNodes for both receiver and sender
 			if(entriesAtParam != nil, {
@@ -112,6 +116,15 @@ AlgaPatternInterpStreams {
 				entriesAtParam.removeAt(uniqueID);
 				if(entryAtParam != nil, {
 					this.removeInOutNodesDictAtParam(entryAtParam, paramName);
+				});
+			});
+
+			//Remove scaleArray
+			if(scaleArraysAtParam != nil, {
+				var scaleArrayAtParam = scaleArraysAtParam[uniqueID];
+				scaleArraysAtParam.removeAt(uniqueID);
+				if(scaleArrayAtParam != nil, {
+					algaPattern.removeScaling(paramName, uniqueID);
 				});
 			});
 
@@ -164,8 +177,22 @@ AlgaPatternInterpStreams {
 		});
 	}
 
+	//add a scaleArray
+	addScaleArray { | paramName, paramNumChannels, uniqueID, scale |
+		var scaleArraysAtParam = scaleArrays[paramName];
+
+		//Using uniqueID as sender (so mixing will work in the future)
+		var scaleArray = algaPattern.calculateScaling(paramName, uniqueID, paramNumChannels, scale);
+
+		if(scaleArraysAtParam == nil, {
+			scaleArrays[paramName] = IdentityDictionary().put(uniqueID, scaleArray);
+		}, {
+			scaleArrays[paramName].put(uniqueID, scaleArray);
+		});
+	}
+
 	//Add a new sender interpolation to the current param
-	add { | entry, controlName, time = 0 |
+	add { | entry, controlName, scale, time = 0 |
 		var paramName, paramRate, paramNumChannels;
 		var uniqueID;
 		var entriesAtParam;
@@ -195,6 +222,9 @@ AlgaPatternInterpStreams {
 		}, {
 			entries[paramName].put(uniqueID,entry);
 		});
+
+		//Add the scaleArray
+		this.addScaleArray(paramName, paramNumChannels, uniqueID, scale);
 
 		//Add proper inNodes / outNodes / connectionTimeOutNodes ...
 		this.addInOutNodesDictAtParam(entry, paramName, false);
@@ -334,11 +364,7 @@ AlgaPattern : AlgaNode {
 	//due to scalings, etc... Perhaps they should be reworked to just "bypass" the input
 	//and route it correctly to the bus that interpolation will be using.
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
-		paramDefault, patternInterpSumBus, patternBussesAndSynths |
-
-		//All the current interpStreams for this param. Retrieve the entries,
-		//which store all the senders to this param for the interpStream.
-		var interpStreamsAtParam = interpStreams.entries[paramName];
+		paramDefault, patternInterpSumBus, patternBussesAndSynths, interpStreamsAtParam, scaleArraysAtParam |
 
 		//Core of the interpolation behaviour for AlgaPattern !!
 		if(interpStreamsAtParam != nil, {
@@ -398,6 +424,8 @@ AlgaPattern : AlgaNode {
 					var patternParamEnvBus = interpStreams.interpBusses[paramName][uniqueID];
 
 					if(patternParamEnvBus != nil, {
+						var patternParamSynth;
+
 						var patternParamSymbol = (
 							"alga_pattern_" ++
 							senderRate ++
@@ -414,7 +442,15 @@ AlgaPattern : AlgaNode {
 							\fadeTime, 0
 						];
 
-						var patternParamSynth = AlgaSynth(
+						//get correct scaleArray
+						var scaleArray = scaleArraysAtParam[uniqueID];
+
+						//add scaleArray to args
+						if(scaleArray != nil, {
+							patternParamSynthArgs = patternParamSynthArgs.addAll(scaleArray);
+						});
+
+						patternParamSynth = AlgaSynth(
 							patternParamSymbol,
 							patternParamSynthArgs,
 							interpGroup,
@@ -485,10 +521,18 @@ AlgaPattern : AlgaNode {
 				waitForInst: false
 			);
 
+			//All the current interpStreams for this param. Retrieve the entries,
+			//which store all the senders to this param for the interpStream.
+			var interpStreamsAtParam = interpStreams.entries[paramName];
+
+			//scaleArray
+			var scaleArraysAtParam = interpStreams.scaleArrays[paramName];
+
 			//Create all interp synths for current param
 			this.createPatternParamSynths(
 				paramName, paramNumChannels, paramRate,
-				paramDefault, patternInterpSumBus, patternBussesAndSynths
+				paramDefault, patternInterpSumBus, patternBussesAndSynths,
+				interpStreamsAtParam, scaleArraysAtParam
 			);
 
 			//Read from patternParamNormBus
@@ -651,7 +695,11 @@ AlgaPattern : AlgaNode {
 			});
 
 			//Add to interpStreams (which also creates interpBus / interpSynth)
-			interpStreams.add(paramValue, controlName, this);
+			interpStreams.add(
+				entry: paramValue,
+				controlName: controlName,
+				time: 0
+			);
 		});
 
 		//Add \type, \algaNode, and all things related to
@@ -673,11 +721,13 @@ AlgaPattern : AlgaNode {
 	}
 
 	//<<, <<+ and <|
-	makeConnectionInner { | param = \in, sender, time = 0, scale  |
+	makeConnectionInner { | param = \in, sender, scale, time = 0 |
 		var paramConnectionTime = paramsConnectionTime[param];
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
+
+		time.asString.warn;
 
 		//delta == dur
 		if(param == \delta, {
@@ -696,7 +746,12 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Add to interpStreams (which also creates interpBus / interpSynth)
-		interpStreams.add(sender, controlNames[param], time);
+		interpStreams.add(
+			entry: sender,
+			controlName: controlNames[param],
+			scale: scale,
+			time: time
+		);
 	}
 
 	//<<, <<+ and <|
@@ -705,13 +760,20 @@ AlgaPattern : AlgaNode {
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			scheduler.addAction(
 				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
-				func: { this.makeConnectionInner(param, sender, time, scale) },
+				func: {
+					this.makeConnectionInner(
+						param: param,
+						sender: sender,
+						scale: scale,
+						time: time
+					)
+				},
 				sched: sched
 			)
 		});
 	}
 
-	//Add pattern support
+	//Only from is needed: to already calls into makeConnection
 	from { | sender, param = \in, chans, scale, time, sched |
 		//Force pattern dispatch
 		if(sender.isPattern, {
@@ -737,10 +799,12 @@ AlgaPattern : AlgaNode {
 	// 2) replace just the SynthDef with either a new SynthDef or a ListPattern with JUST SynthDefs.
 	//    This would be equivalent to <<.def \newSynthDef
 	//    OR <<.def Pseq([\newSynthDef1, \newSynthDef2])
+	/*
 	replace { | def, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
 		keepInScale = true, keepOutScale = true |
         "AlgaPattern: replace is not supported yet".error;
 	}
+	*/
 
 	//Don't support <<+ for now
 	mixFrom { | sender, param = \in, inChans, scale, time |

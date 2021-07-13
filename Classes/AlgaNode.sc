@@ -1183,9 +1183,7 @@ AlgaNode {
 
 						//Add scale array to args
 						if(scaleArray != nil, {
-							scaleArray.do({ | entry |
-								interpSynthArgs = interpSynthArgs.add(entry);
-							});
+							interpSynthArgs = interpSynthArgs.addAll(scaleArray);
 						});
 
 						interpSynth = AlgaSynth(
@@ -1484,9 +1482,7 @@ AlgaNode {
 
 			//add scaleArray to args
 			if(scaleArray != nil, {
-				scaleArray.do({ | entry |
-					interpSynthArgs = interpSynthArgs.add(entry);
-				});
+				interpSynthArgs = interpSynthArgs.addAll(scaleArray);
 			});
 
 			//Read \in from the sender's synthBus
@@ -1521,9 +1517,7 @@ AlgaNode {
 
 			//add scaleArray to args
 			if(scaleArray != nil, {
-				scaleArray.do({ | entry |
-					interpSynthArgs = interpSynthArgs.add(entry);
-				});
+				interpSynthArgs = interpSynthArgs.addAll(scaleArray);
 			});
 
 			interpSynth = AlgaSynth(
