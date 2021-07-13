@@ -59,7 +59,7 @@ AlgaPatternInterpStreams {
 	//as they are not embedded with the interpolation behaviour itself, but they are external.
 	//This allows to separate the per-tick pattern triggering from the interpolation process.
 	createPatternInterpSynthAndBusAtParam { | paramName, paramRate, paramNumChannels,
-		entry, uniqueID, scale, time = 0 |
+		entry, uniqueID, time = 0 |
 
 		var interpGroup = algaPattern.interpGroup;
 		var interpBus, interpSynth;
@@ -239,8 +239,12 @@ AlgaPatternInterpStreams {
 		//Create the interpSynth and interpBus for the new sender and
 		//activate the interpolation processon all the other active interpSynths.
 		this.createPatternInterpSynthAndBusAtParam(
-			paramName, paramRate, paramNumChannels,
-			entry, uniqueID, time
+			paramName: paramName,
+			paramRate: paramRate,
+			paramNumChannels: paramNumChannels,
+			entry: entry,
+			uniqueID: uniqueID,
+			time: time
 		);
 	}
 }
@@ -726,8 +730,6 @@ AlgaPattern : AlgaNode {
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
-
-		time.asString.warn;
 
 		//delta == dur
 		if(param == \delta, {
