@@ -21,6 +21,8 @@ AlgaPatternInterpStreams {
 	var <entries;
 	var <interpSynths;
 	var <interpBusses;
+	var <interpBussesToFree;
+
 	var <scaleArrays;
 
 	*new { | algaPattern |
@@ -28,12 +30,13 @@ AlgaPatternInterpStreams {
 	}
 
 	init { | argAlgaPattern |
-		entries      = IdentityDictionary(10);
-		interpSynths = IdentityDictionary(10);
-		interpBusses = IdentityDictionary(10);
-		scaleArrays  = IdentityDictionary(10);
-		algaPattern  = argAlgaPattern;
-		server       = algaPattern.server;
+		entries            = IdentityDictionary(10);
+		interpSynths       = IdentityDictionary(10);
+		interpBusses       = IdentityDictionary(10);
+		interpBussesToFree = IdentitySet();
+		scaleArrays        = IdentityDictionary(10);
+		algaPattern        = argAlgaPattern;
+		server             = algaPattern.server;
 	}
 
 	//Free all active interpSynths. This triggers the onFree action that's executed in
@@ -102,7 +105,14 @@ AlgaPatternInterpStreams {
 			interpBusses[paramName].put(uniqueID, interpBus);
 		});
 
-		//Add interpSynth to the current active ones for specific param / sender combination
+		//Add entries to algaPattern too.These are needed for algaInstantiatedAsReceiver.
+		//Note: no mixing yet
+		algaPattern.interpSynths[paramName][\default] = interpSynth;
+		algaPattern.interpBusses[paramName][\default] = interpBus;
+
+		//Add interpSynth to the current active ones for specific param / sender combination.
+		//Also add a "onFree" routine that deletes unused entries from Dictionaries. This function
+		//is called on freeing the interpSynth.
 		//Note: no mixing yet
 		algaPattern.addActiveInterpSynthOnFree(paramName, \default, interpSynth, {
 			var entriesAtParam      = entries[paramName];
@@ -131,21 +141,25 @@ AlgaPatternInterpStreams {
 			//Remove entry from interpSynths
 			if(interpSynthsAtParam != nil, { interpSynthsAtParam.removeAt(uniqueID) });
 
-			//Remove entry from interpBusses and free the bus
+			//Remove entry from interpBusses and add entry to interpBussesToFree.
+			//IMPORTANT: interpBusAtParam CAN'T be freed here, as dangling synths can still
+			//be executed, and they would be (wrongly) pointing to the interpBus, causing
+			//wrong results at the end of the interpolation process. interpBusAtParam needs
+			//to be freed in the pattern loop.
 			if(interpBussesAtParam != nil, {
 				var interpBusAtParam = interpBussesAtParam[uniqueID];
 				interpBussesAtParam.removeAt(uniqueID);
-				if(interpBusAtParam != nil, { interpBusAtParam.free });
+				//interpBussesToFree are freed in the pattern loop when patternSynth gets freed.
+				//This is essential for the interpolation process to correctly only free busses
+				//when completely unused on both lang and server!
+				//interpBusAtParam can't be freed here as it can still be used if the patternSynth
+				//takes longer to free itself (perhaps a long envelope) than the interpolation synth.
+				interpBussesToFree.add(interpBusAtParam);
 			});
 		});
-
-		//Add entries to algaPattern too.These are needed for algaInstantiatedAsReceiver.
-		//Note: no mixing yet
-		algaPattern.interpSynths[paramName][\default] = interpSynth;
-		algaPattern.interpBusses[paramName][\default] = interpBus;
 	}
 
-	//Wrapper around AlgaNode's
+	//Wrapper around AlgaNode's addInOutNodesDict
 	addInOutNodesDictAtParam { | sender, param, mix = false |
 		if(sender.isAlgaNode, {
 			algaPattern.addInOutNodesDict(sender, param, mix:false);
@@ -161,7 +175,7 @@ AlgaPatternInterpStreams {
 		});
 	}
 
-	//Wrapper around AlgaNode's
+	//Wrapper around AlgaNode's removeInOutNodesDict
 	removeInOutNodesDictAtParam { | oldSender, param |
 		if(oldSender.isAlgaNode, {
 			algaPattern.removeInOutNodesDict(oldSender, param);
@@ -367,6 +381,15 @@ AlgaPattern : AlgaNode {
 		dur = value.asStream
 	}
 
+	//Free all unused busses from interpStreams
+	freeUnusedInterpBusses {
+		var interpBussesToFree = interpStreams.interpBussesToFree;
+		interpBussesToFree.do({ | interpBus |
+			interpBus.free;
+			interpBussesToFree.remove(interpBus);
+		});
+	}
+
 	//Create all pattern synths per-param ...
 	//What about multi-channel expansion? As of now, multichannel works with the
 	//same conversion rules as AlgaNode, but perhaps it's more ideomatic to implement
@@ -567,8 +590,15 @@ AlgaPattern : AlgaNode {
 		//Free all normBusses, normSynths, interpBusses and interpSynths on patternSynth's release
 		patternSynth.onFree( {
 			patternBussesAndSynths.do({ | entry |
-				//.free works both for AlgaSynths and AlgaBusses
+				//free works both for AlgaSynths and AlgaBusses
 				entry.free;
+
+				//IMPORTANT: free the unused interpBusses of the interpStreams.
+				//This needs to happen on patternSynth's free as that's the notice
+				//that no other synths will be using them. Also, this fixes the case where
+				//patternSynth takes longer than \dur. We want to wait for the end of patternSynth
+				//to free all used things!
+				this.freeUnusedInterpBusses;
 			});
 		});
 	}
@@ -727,7 +757,7 @@ AlgaPattern : AlgaNode {
 	//interpolate dur (not yet)
 	interpolateDur { | value, sched |
 		if(sched == nil, { sched = 0 });
-		("AlgaPattern: \dur interpolation is not supported yet. Rescheduling \dur at the " ++ sched ++ " quantization.").warn;
+		("AlgaPattern: 'dur' interpolation is not supported yet. Rescheduling 'dur' at the " ++ sched ++ " quantization.").warn;
 		this.setDur(value);
 		//should this be add to scheduler with sched 0? Shouldn't be necessary,
 		//as both are using the same clock...
