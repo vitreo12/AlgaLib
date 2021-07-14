@@ -45,7 +45,11 @@ a.from(b, \freq, time:5, scale:[[330, 220], [1000, 1200]]);
 
 
 
-//chansMapping?
+//chans?
+a.from(b, \freq, time:1, chans:\out1)
+
+
+//AlgaNodeArg
 
 
 //replace?
