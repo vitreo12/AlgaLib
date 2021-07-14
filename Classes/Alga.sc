@@ -112,7 +112,7 @@ Alga {
 		server.latency = algaServerOptions.latency;
 
 		//Check AlgaSynthDef folder exists...
-		if(File.existsCaseSensitive(AlgaStartup.algaSynthDefIOPath) == false, {
+		if(File.exists(AlgaStartup.algaSynthDefIOPath) == false, {
 			("Could not retrieve the correct AlgaSyntDef/IO folder. Running 'Alga.initSynthDefs' now...").warn;
 			this.initSynthDefs;
 		});
