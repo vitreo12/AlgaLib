@@ -118,9 +118,9 @@ AlgaNode {
 		scheduler = Alga.getScheduler(server);
 		if(scheduler == nil, {
 			(
-				"AlgaNode: can't retrieve correct AlgaScheduler for server " ++
+				"AlgaNode: can't retrieve a valid AlgaScheduler for server '" ++
 				server.name ++
-				". Has Alga.boot been called on it?"
+				"'. Has Alga.boot been called on it?"
 			).error;
 			^false;
 		});
@@ -1012,6 +1012,11 @@ AlgaNode {
 		senderNumChans, paramNumChans, updateParamsChansMapping = true |
 
 		var actualSenderChansMapping = senderChansMapping;
+
+		if(sender.isAlgaNode.not, {
+			("AlgaNode: expected an AlgaNode to calculate chansMapping, but received a '" ++ sender.class ++ "'").warn;
+			^(Array.series(paramNumChans));
+		});
 
 		//Connect with outMapping symbols. Retrieve it from the sender
 		if(actualSenderChansMapping.class == Symbol, {

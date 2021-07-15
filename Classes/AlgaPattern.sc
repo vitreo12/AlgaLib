@@ -23,20 +23,20 @@ AlgaPatternInterpStreams {
 	var <interpBusses;
 	var <interpBussesToFree;
 
-	var <scaleArrays;
+	var <scaleArraysAndChans;
 
 	*new { | algaPattern |
 		^super.new.init(algaPattern)
 	}
 
 	init { | argAlgaPattern |
-		entries            = IdentityDictionary(10);
-		interpSynths       = IdentityDictionary(10);
-		interpBusses       = IdentityDictionary(10);
-		interpBussesToFree = IdentitySet();
-		scaleArrays        = IdentityDictionary(10);
-		algaPattern        = argAlgaPattern;
-		server             = algaPattern.server;
+		entries             = IdentityDictionary(10);
+		interpSynths        = IdentityDictionary(10);
+		interpBusses        = IdentityDictionary(10);
+		interpBussesToFree  = IdentitySet();
+		scaleArraysAndChans = IdentityDictionary(10);
+		algaPattern         = argAlgaPattern;
+		server              = algaPattern.server;
 	}
 
 	//Free all active interpSynths. This triggers the onFree action that's executed in
@@ -115,10 +115,10 @@ AlgaPatternInterpStreams {
 		//is called on freeing the interpSynth.
 		//Note: no mixing yet
 		algaPattern.addActiveInterpSynthOnFree(paramName, \default, interpSynth, {
-			var entriesAtParam      = entries[paramName];
-			var interpSynthsAtParam = interpSynths[paramName];
-			var interpBussesAtParam = interpBusses[paramName];
-			var scaleArraysAtParam  = scaleArrays[paramName];
+			var entriesAtParam              = entries[paramName];
+			var interpSynthsAtParam         = interpSynths[paramName];
+			var interpBussesAtParam         = interpBusses[paramName];
+			var scaleArraysAndChansAtParam  = scaleArraysAndChans[paramName];
 
 			//Remove entry from entries and deal with inNodes / outNodes for both receiver and sender
 			if(entriesAtParam != nil, {
@@ -129,11 +129,11 @@ AlgaPatternInterpStreams {
 				});
 			});
 
-			//Remove scaleArray
-			if(scaleArraysAtParam != nil, {
-				var scaleArrayAtParam = scaleArraysAtParam[uniqueID];
-				scaleArraysAtParam.removeAt(uniqueID);
-				if(scaleArrayAtParam != nil, {
+			//Remove scaleArray and chans
+			if(scaleArraysAndChansAtParam != nil, {
+				var scaleArrayAndChansAtParam = scaleArraysAndChansAtParam[uniqueID];
+				scaleArraysAndChansAtParam.removeAt(uniqueID);
+				if(scaleArrayAndChansAtParam != nil, {
 					algaPattern.removeScaling(paramName, uniqueID);
 				});
 			});
@@ -191,22 +191,22 @@ AlgaPatternInterpStreams {
 		});
 	}
 
-	//add a scaleArray
-	addScaleArray { | paramName, paramNumChannels, uniqueID, scale |
-		var scaleArraysAtParam = scaleArrays[paramName];
+	//add a scaleArray and chans
+	addScaleArrayAndChans { | paramName, paramNumChannels, uniqueID, chans, scale |
+		var scaleArraysAndChansAtParam = scaleArraysAndChans[paramName];
 
 		//Using uniqueID as sender (so mixing will work in the future)
 		var scaleArray = algaPattern.calculateScaling(paramName, uniqueID, paramNumChannels, scale);
 
-		if(scaleArraysAtParam == nil, {
-			scaleArrays[paramName] = IdentityDictionary().put(uniqueID, scaleArray);
+		if(scaleArraysAndChansAtParam == nil, {
+			scaleArraysAndChans[paramName] = IdentityDictionary().put(uniqueID, [scaleArray, chans]);
 		}, {
-			scaleArrays[paramName].put(uniqueID, scaleArray);
+			scaleArraysAndChans[paramName].put(uniqueID, [scaleArray, chans]);
 		});
 	}
 
 	//Add a new sender interpolation to the current param
-	add { | entry, controlName, scale, time = 0 |
+	add { | entry, controlName, chans, scale, time = 0 |
 		var paramName, paramRate, paramNumChannels;
 		var uniqueID;
 		var entriesAtParam;
@@ -237,8 +237,8 @@ AlgaPatternInterpStreams {
 			entries[paramName].put(uniqueID,entry);
 		});
 
-		//Add the scaleArray
-		this.addScaleArray(paramName, paramNumChannels, uniqueID, scale);
+		//Add the scaleArray and chans
+		this.addScaleArrayAndChans(paramName, paramNumChannels, uniqueID, chans, scale);
 
 		//Add proper inNodes / outNodes / connectionTimeOutNodes ...
 		this.addInOutNodesDictAtParam(entry, paramName, false);
@@ -399,19 +399,22 @@ AlgaPattern : AlgaNode {
 	//due to scalings, etc... Perhaps they should be reworked to just "bypass" the input
 	//and route it correctly to the bus that interpolation will be using.
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
-		paramDefault, patternInterpSumBus, patternBussesAndSynths, interpStreamsAtParam, scaleArraysAtParam |
+		paramDefault, patternInterpSumBus, patternBussesAndSynths, interpStreamsAtParam, scaleArraysAndChansAtParam |
 
 		//Core of the interpolation behaviour for AlgaPattern !!
 		if(interpStreamsAtParam != nil, {
 			interpStreamsAtParam.keysValuesDo({ | uniqueID, interpStreamAtParam | //indexed by uniqueIDs
 				var validParam = false;
 				var paramVal = interpStreamAtParam; //paramVal is the interpStreamAtParam
-				var senderNumChannels, senderRate;
+				var sender, senderNumChannels, senderRate;
 
 				//Unpack Pattern value
 				if(paramVal.isStream, {
 					paramVal = paramVal.next;
 				});
+
+				//Fallback sender (modified for AlgaNode, needed for chansMapping)
+				sender = paramVal;
 
 				//Valid values are Numbers / Arrays / AlgaNodes
 				case
@@ -433,6 +436,7 @@ AlgaPattern : AlgaNode {
 
 				//AlgaNode
 				{ paramVal.isAlgaNode } {
+					sender = paramVal; //essential for chansMapping (paramVal gets modified)
 					if(paramVal.algaInstantiated, {
 						//if algaInstantiated, use the rate, numchannels and bus arg from the alga bus
 						senderRate = paramVal.rate;
@@ -477,12 +481,31 @@ AlgaPattern : AlgaNode {
 							\fadeTime, 0
 						];
 
-						//get correct scaleArray
-						var scaleArray = scaleArraysAtParam[uniqueID];
+						//get correct scaleArray and chans
+						var scaleArrayAndChansAtParam = scaleArraysAndChansAtParam[uniqueID];
 
 						//add scaleArray to args
-						if(scaleArray != nil, {
-							patternParamSynthArgs = patternParamSynthArgs.addAll(scaleArray);
+						if(scaleArrayAndChansAtParam != nil, {
+							var scaleArray = scaleArrayAndChansAtParam[0]; //0 == scaleArray
+							var chansMapping = scaleArrayAndChansAtParam[1]; //1 == chans
+
+							if(scaleArray != nil, {
+								patternParamSynthArgs = patternParamSynthArgs.addAll(scaleArray);
+							});
+
+							//only apply chansMapping to AlgaNodes
+							if((chansMapping != nil).and(sender.isAlgaNode), {
+								var indices = this.calculateSenderChansMappingArray(
+									paramName,
+									sender,
+									chansMapping,
+									senderNumChannels,
+									paramNumChannels,
+									false //don't update the AlgaNode's chans dict
+								);
+
+								patternParamSynthArgs = patternParamSynthArgs.add(\indices).add(indices);
+							});
 						});
 
 						patternParamSynth = AlgaSynth(
@@ -560,14 +583,14 @@ AlgaPattern : AlgaNode {
 			//which store all the senders to this param for the interpStream.
 			var interpStreamsAtParam = interpStreams.entries[paramName];
 
-			//scaleArray
-			var scaleArraysAtParam = interpStreams.scaleArrays[paramName];
+			//scaleArray and chans
+			var scaleArraysAndChansAtParam = interpStreams.scaleArraysAndChans[paramName];
 
 			//Create all interp synths for current param
 			this.createPatternParamSynths(
 				paramName, paramNumChannels, paramRate,
 				paramDefault, patternInterpSumBus, patternBussesAndSynths,
-				interpStreamsAtParam, scaleArraysAtParam
+				interpStreamsAtParam, scaleArraysAndChansAtParam
 			);
 
 			//Read from patternParamNormBus
@@ -765,7 +788,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//<<, <<+ and <|
-	makeConnectionInner { | param = \in, sender, scale, time = 0 |
+	makeConnectionInner { | param = \in, sender, senderChansMapping, scale, time = 0 |
 		var paramConnectionTime = paramsConnectionTime[param];
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
@@ -780,6 +803,7 @@ AlgaPattern : AlgaNode {
 		interpStreams.add(
 			entry: sender,
 			controlName: controlNames[param],
+			chans: senderChansMapping,
 			scale: scale,
 			time: time
 		);
@@ -808,6 +832,7 @@ AlgaPattern : AlgaNode {
 					this.makeConnectionInner(
 						param: param,
 						sender: sender,
+						senderChansMapping: senderChansMapping,
 						scale: scale,
 						time: time
 					)
