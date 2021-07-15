@@ -265,23 +265,20 @@ AlgaPatternInterpStreams {
 
 AlgaPattern : AlgaNode {
 	/*
-	Todos:
+	TODOs:
 
-	1) What about inNodes for an AlgaPattern, especially with ListPatterns as \def? (WIP)
+	1) AlgaArg / AlgaPatternArg (scale / chans)
 
-	2) How to connect an AlgaNode to an AlgaPattern parameter? What about kr / ar? DONE
+	2) .replace()
 
-	3) Continuous or SAH interpolation (both in Patterns and AlgaNodes) (WIP)
+	3) Continuous or SAH interpolation (both in Patterns and AlgaNodes)
 
-	4) \dur implementation: doesn't work cause it's not time accurate: there's no way
-	   of syncing multiple patterns, as the interpolation process with Pseg will end up out
-	   of phase. Right now, \dur just sets the requested value AFTER time.
+	4) .clear()
 
-	5) Can an AlgaNode connect to \dur? Only if it's \control rate (using AlgaPkr)
 	*/
 
 	/*
-	Maybes:
+	MAYBEs:
 
 	1) fx: (def: Pseq([\delay, \tanh]), delayTime: Pseq([0.2, 0.4]))
 
