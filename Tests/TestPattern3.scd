@@ -19,6 +19,8 @@ Alga.boot({
 
 	b = AN({ SinOsc.ar([100, 200]) });
 
+	c = AN({ Saw.ar([100, 200]) });
+
 	//s.plotTree
 });
 )
@@ -55,8 +57,25 @@ a.from(b, \freq, time:1, scale:[[330, 220], [1000, 1200]], chans:\out2)
 a.from(b, \freq, time:1, scale:[[330, 220], [1000, 1200]], chans:Pseq([\out1, \out2], inf))
 
 
-//AlgaNodeArg
+//AlgaArg
+(
+a.from(
+	AlgaArg(b, scale:Pseq([[[330, 220], [1000, 1200]], [[110, 120], [500, 600]]], inf), chans:Pseq([\out1, \out2])),
+	\freq,
+	time:2
+)
+)
 
+(
+a.from(
+	Pseq([
+		AlgaArg(b, scale:Pseq([[[330, 220], [1000, 1200]], [[110, 120], [500, 600]]], inf), chans:Pseq([\out1, \out2])),
+		AlgaArg(c, scale:Pseq([[[120, 223], [450, 600]], [[720, 200], [1200, 820]]], inf))
+	], inf),
+	\freq,
+	time:2
+)
+)
 
 //replace?
 (

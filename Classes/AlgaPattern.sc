@@ -264,6 +264,12 @@ AlgaPatternInterpStreams {
 	}
 }
 
+AlgaPatternArg {
+
+}
+
+AlgaArg : AlgaPatternArg {}
+
 AlgaPattern : AlgaNode {
 	/*
 	TODOs:
