@@ -247,7 +247,7 @@ AlgaNode {
 				if(paramConnectionTime != nil, {
 					paramsConnectionTime[param] = value;
 				}, {
-					("AlgaNode: invalid param to set connection time for: \\" ++ param).error;
+					("AlgaNode: invalid param to set connection time for: '" ++ param ++ "'").error;
 				});
 			}, {
 				//This will just change the
@@ -555,7 +555,7 @@ AlgaNode {
 							defArgs[param] = value;
 							explicitArgs[param] = true;
 						}, {
-							("AlgaNode: args at param \\" ++ param ++ " must be a number, array or AlgaNode").error;
+							("AlgaNode: args at param '" ++ param ++ "' must be a number, array or AlgaNode").error;
 						});
 					});
 				});
@@ -1393,7 +1393,7 @@ AlgaNode {
 		paramConnectionTime = paramsConnectionTime[param];
 
 		if((controlName.isNil).or(paramConnectionTime.isNil), {
-			("AlgaNode: invalid param for interp synth to free: \\" ++ param).error;
+			("AlgaNode: invalid param for interp synth to free: '" ++ param ++ "'").error;
 			^this
 		});
 
@@ -1428,7 +1428,7 @@ AlgaNode {
 
 		//get interp bus ident dict at specific param
 		interpBusAtParam = interpBusses[param];
-		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param \\" ++ param).error; ^this });
+		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
 
 		//Try to get sender one.
 		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
@@ -1437,8 +1437,8 @@ AlgaNode {
 			interpBus = interpBusAtParam[\default];
 			if(interpBus == nil, {
 				(
-					"AlgaNode: invalid interp bus at param \\" ++
-					param ++ " and node " ++ senderSym.asString
+					"AlgaNode: invalid interp bus at param '" ++
+					param ++ "' and node " ++ senderSym.asString
 				).error;
 				^this
 			});
@@ -1849,7 +1849,7 @@ AlgaNode {
 	//Remove entries from inNodes / outNodes / connectionTimeOutNodes for all involved nodes
 	removeInOutNodesDict { | oldSender = nil, param = \in |
 		var oldSenders = inNodes[param];
-		if(oldSenders == nil, { ( "AlgaNode: no previous connection enstablished at param \\" ++ param).error; ^this; });
+		if(oldSenders == nil, { ( "AlgaNode: no previous connection enstablished at param '" ++ param ++ "'").error; ^this; });
 
 		oldSenders.do({ | sender |
 			var sendersParamsSet = sender.outNodes[this];
@@ -1884,7 +1884,7 @@ AlgaNode {
 
 		var controlName = controlNames[param];
 		if(controlName == nil, {
-			("AlgaNode: invalid param to create a new interp synth for: \\" ++ param).error;
+			("AlgaNode: invalid param to create a new interp synth for: '" ++ param ++ "'").error;
 			^this;
 		});
 
@@ -1914,7 +1914,7 @@ AlgaNode {
 
 		var controlName = controlNames[param];
 		if(controlName == nil, {
-			("AlgaNode: invalid param to create a new interp synth for: \\" ++ param).error;
+			("AlgaNode: invalid param to create a new interp synth for: '" ++ param ++ "'").error;
 			^this;
 		});
 
@@ -1945,7 +1945,7 @@ AlgaNode {
 	removeInterpConnectionAtParam { | oldSender = nil, param = \in, time |
 		var controlName = controlNames[param];
 		if(controlName == nil, {
-			("AlgaNode: invalid param to reset: \\" ++ param).error;
+			("AlgaNode: invalid param to reset: '" ++ param ++ "'").error;
 			^this;
 		});
 
@@ -2023,7 +2023,7 @@ AlgaNode {
 
 		//Check parameter in controlNames
 		if(this.checkParamExists(param).not, {
-			("AlgaNode: \\" ++ param ++ " is not a valid parameter, it is not defined in the def.").error;
+			("AlgaNode: '" ++ param ++ "' is not a valid parameter, it is not defined in the def.").error;
 			^this
 		});
 
@@ -2238,7 +2238,7 @@ AlgaNode {
 
 				//if not contained, it's invalid.
 				if(this.mixParamContainsSender(param, oldSender).not, {
-					("AlgaNode: " ++ oldSender.asString ++ " was not present in the mix for param \\" ++ param.asString).error;
+					("AlgaNode: " ++ oldSender.asString ++ " was not present in the mix for param '" ++ "'" ++ param.asString).error;
 					validOldSender = false;
 				});
 

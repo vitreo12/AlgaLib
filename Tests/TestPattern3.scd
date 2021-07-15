@@ -27,6 +27,8 @@ a <<.dur 0.5
 
 a.from(1, \dur, sched:1)
 
+a.from(0.5, \dur, sched:1)
+
 a.from(0.25, \dur, sched:1)
 
 a.from(Pseq([1, 2, 0.1], inf), \dur, sched:1)
@@ -34,7 +36,7 @@ a.from(Pseq([1, 2, 0.1], inf), \dur, sched:1)
 
 //sometimes with 0.25 (or faster),
 //going from the synth to 440 has some "wrong ones" at the end: investigate!
-a.from(0.15, \dur, sched:1)
+a.from(0.1, \dur, sched:1)
 
 a.from(440, \freq, time:1);
 
@@ -43,10 +45,8 @@ a.from(Pseq([220, 660, [885, 880]], inf), \freq, time:5)
 a.from(b, \freq, time:5, scale:[[330, 220], [1000, 1200]]);
 
 
-
-
 //chans?
-a.from(b, \freq, time:1, chans:\out1)
+a.from(b, \freq, time:1, scale:[[330, 220], [1000, 1200]], chans:\out2)
 
 
 //AlgaNodeArg

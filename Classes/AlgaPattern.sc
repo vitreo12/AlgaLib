@@ -277,6 +277,8 @@ AlgaPattern : AlgaNode {
 
 	5) mixFrom() / mixTo()
 
+	6) ListPattern as \def (how about numChannels / rate? enforce same one?)
+
 	*/
 
 	/*
@@ -703,7 +705,7 @@ AlgaPattern : AlgaNode {
 
 	//Support Function in the future
 	dispatchFunction {
-		"AlgaPattern: Functions as \def are not supported yet".error;
+		"AlgaPattern: Functions as 'def' are not supported yet".error;
 	}
 
 	//Support multiple SynthDefs in the future,
@@ -713,7 +715,7 @@ AlgaPattern : AlgaNode {
 	//to correctly instantiate the interpStreams... I know it's quite the overhead,
 	//but, for now, it's just the easier solution.
 	dispatchListPattern {
-		"AlgaPattern: ListPatterns as \def are not supported yet".error;
+		"AlgaPattern: ListPatterns as 'def' are not supported yet".error;
 	}
 
 	//Build the actual pattern
@@ -776,14 +778,22 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//interpolate dur (not yet)
+	//Interpolate dur (not yet)
 	interpolateDur { | value, sched |
 		if(sched == nil, { sched = 0 });
 		("AlgaPattern: 'dur' interpolation is not supported yet. Rescheduling 'dur' at the " ++ sched ++ " quantization.").warn;
+
+		//Set new \dur
 		this.setDur(value);
-		//should this be add to scheduler with sched 0? Shouldn't be necessary,
-		//as both are using the same clock...
-		algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
+
+		//Add to scheduler just to make cascadeMode work... In theory, shouldn't be needed
+		//as this uses the same clock of the scheduler
+		scheduler.addAction(
+			condition: { this.algaInstantiated },
+			func: {
+				algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
+			}
+		);
 	}
 
 	//<<, <<+ and <|
