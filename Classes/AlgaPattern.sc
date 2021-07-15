@@ -271,9 +271,11 @@ AlgaPattern : AlgaNode {
 
 	2) .replace()
 
-	3) Continuous or SAH interpolation (both in Patterns and AlgaNodes)
+	3) .clear()
 
-	4) .clear()
+	4) Continuous or SAH interpolation (both in Patterns and AlgaNodes)
+
+	5) mixFrom() / mixTo()
 
 	*/
 
