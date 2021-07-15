@@ -924,7 +924,7 @@ AlgaNode {
 	}
 
 	//Calculate scale to send to interp synth
-	calculateScaling { | param, sender, paramNumChannels, scale |
+	calculateScaling { | param, sender, paramNumChannels, scale, addScaling = true |
 		if(scale.isNil, { ^nil });
 
 		if(scale.isNumberOrArray.not, {
@@ -935,7 +935,7 @@ AlgaNode {
 		//just a number: act like a multiplier
 		if(scale.isNumber, {
 			var outArray = [\outMultiplier, scale];
-			this.addScaling(param, sender, scale);
+			if(addScaling, { this.addScaling(param, sender, scale) });
 			^outArray;
 		});
 
@@ -958,7 +958,7 @@ AlgaNode {
 			scale[0] = newHighMin;
 			scale[1] = newHighMax;
 
-			this.addScaling(param, sender, scale);
+			if(addScaling, { this.addScaling(param, sender, scale) });
 
 			^outArray;
 		}, {
@@ -989,7 +989,7 @@ AlgaNode {
 				scale[2] = newHighMin;
 				scale[3] = newHighMax;
 
-				this.addScaling(param, sender, scale);
+				if(addScaling, { this.addScaling(param, sender, scale) });
 
 				^outArray;
 			}, {

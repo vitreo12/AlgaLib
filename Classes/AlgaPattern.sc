@@ -195,13 +195,14 @@ AlgaPatternInterpStreams {
 	addScaleArrayAndChans { | paramName, paramNumChannels, uniqueID, chans, scale |
 		var scaleArraysAndChansAtParam = scaleArraysAndChans[paramName];
 
-		//Using uniqueID as sender (so mixing will work in the future)
-		var scaleArray = algaPattern.calculateScaling(paramName, uniqueID, paramNumChannels, scale);
+		//Pattern support
+		chans = chans.asStream;
+		scale = scale.asStream;
 
 		if(scaleArraysAndChansAtParam == nil, {
-			scaleArraysAndChans[paramName] = IdentityDictionary().put(uniqueID, [scaleArray, chans]);
+			scaleArraysAndChans[paramName] = IdentityDictionary().put(uniqueID, [scale, chans]);
 		}, {
-			scaleArraysAndChans[paramName].put(uniqueID, [scaleArray, chans]);
+			scaleArraysAndChans[paramName].put(uniqueID, [scale, chans]);
 		});
 	}
 
@@ -487,27 +488,51 @@ AlgaPattern : AlgaNode {
 
 						//add scaleArray to args
 						if(scaleArrayAndChansAtParam != nil, {
-							var scaleArray = scaleArrayAndChansAtParam[0]; //0 == scaleArray
+							var scale = scaleArrayAndChansAtParam[0]; //0 == scaleArray
 							var chansMapping = scaleArrayAndChansAtParam[1]; //1 == chans
 
-							if(scaleArray != nil, {
-								patternParamSynthArgs = patternParamSynthArgs.addAll(scaleArray);
+							if(scale != nil, {
+								//Pattern support
+								if(scale.isStream, {
+									scale = scale.next
+								});
+
+								if(scale != nil, {
+									var scaleArray = this.calculateScaling(
+										paramName,
+										sender,
+										paramNumChannels,
+										scale,
+										false //don't update the AlgaNode's scalings dict
+									);
+
+									patternParamSynthArgs = patternParamSynthArgs.addAll(scaleArray);
+								});
 							});
 
 							//only apply chansMapping to AlgaNodes
 							if((chansMapping != nil).and(sender.isAlgaNode), {
-								var indices = this.calculateSenderChansMappingArray(
-									paramName,
-									sender,
-									chansMapping,
-									senderNumChannels,
-									paramNumChannels,
-									false //don't update the AlgaNode's chans dict
-								);
+								//Pattern support
+								if(chansMapping.isStream, {
+									chansMapping = chansMapping.next
+								});
 
-								patternParamSynthArgs = patternParamSynthArgs.add(\indices).add(indices);
+								if(chansMapping != nil, {
+									var indices = this.calculateSenderChansMappingArray(
+										paramName,
+										sender,
+										chansMapping,
+										senderNumChannels,
+										paramNumChannels,
+										false //don't update the AlgaNode's chans dict
+									);
+
+									patternParamSynthArgs = patternParamSynthArgs.add(\indices).add(indices);
+								});
 							});
 						});
+
+						patternParamSynthArgs.postln;
 
 						patternParamSynth = AlgaSynth(
 							patternParamSymbol,

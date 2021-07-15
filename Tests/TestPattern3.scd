@@ -42,11 +42,17 @@ a.from(440, \freq, time:1);
 
 a.from(Pseq([220, 660, [885, 880]], inf), \freq, time:5)
 
+//scale
 a.from(b, \freq, time:5, scale:[[330, 220], [1000, 1200]]);
 
+//pattern support
+a.from(b, \freq, time:3, scale:Pseq([[[330, 220], [1000, 1200]], [[110, 120], [500, 600]]], inf));
 
-//chans?
+//chans
 a.from(b, \freq, time:1, scale:[[330, 220], [1000, 1200]], chans:\out2)
+
+//pattern support
+a.from(b, \freq, time:1, scale:[[330, 220], [1000, 1200]], chans:Pseq([\out1, \out2], inf))
 
 
 //AlgaNodeArg
