@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//This class holds all data for currently active interpSynths / interpBusses and relative
+//metadata for an individual AlgaPattern. It's used on the pattern loop to retrieve
+//which synths to play, and their current state.
 AlgaPatternInterpStreams {
 	var <algaPattern;
 	var <server;
@@ -264,12 +267,29 @@ AlgaPatternInterpStreams {
 	}
 }
 
+//This class is used to specify individual parameters of a pattern argument.
+//It can be used to dynamically set parameters of a connected Node (like scale and chans).
+//This of course only works with the "from" construct
 AlgaPatternArg {
+	var <sender, <chans, <scale;
 
+	*new { | sender, chans, scale |
+		^super.new.init(sender, chans, scale)
+	}
+
+	init { | argSender, argChans, argScale |
+		sender = argSender.asStream; //Pattern support
+		chans  = argChans.asStream;  //Pattern support
+		scale  = argScale.asStream;  //Pattern support
+	}
+
+	isAlgaPatternArg { ^true }
 }
 
+//Alias for AlgaPatternArg
 AlgaArg : AlgaPatternArg {}
 
+//AlgaPattern
 AlgaPattern : AlgaNode {
 	/*
 	TODOs:
@@ -407,31 +427,38 @@ AlgaPattern : AlgaNode {
 	//due to scalings, etc... Perhaps they should be reworked to just "bypass" the input
 	//and route it correctly to the bus that interpolation will be using.
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
-		paramDefault, patternInterpSumBus, patternBussesAndSynths, interpStreamsAtParam, scaleArraysAndChansAtParam |
+		paramDefault, patternInterpSumBus, patternBussesAndSynths, interpStreamsEntriesAtParam, scaleArraysAndChansAtParam |
 
 		//Core of the interpolation behaviour for AlgaPattern !!
-		if(interpStreamsAtParam != nil, {
-			interpStreamsAtParam.keysValuesDo({ | uniqueID, interpStreamAtParam | //indexed by uniqueIDs
-				var validParam = false;
-				var paramVal = interpStreamAtParam; //paramVal is the interpStreamAtParam
+		if(interpStreamsEntriesAtParam != nil, {
+			interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry | //indexed by uniqueIDs
 				var sender, senderNumChannels, senderRate;
+				var chansMapping, scale;
+				var validParam = false;
 
 				//Unpack Pattern value
-				if(paramVal.isStream, {
-					paramVal = paramVal.next;
+				if(entry.isStream, { entry = entry.next });
+
+				//Check if it's an AlgaPatternArg. Unpack it.
+				if(entry.isAlgaPatternArg, {
+					chansMapping = entry.chans;
+					scale        = entry.scale;
+					entry        = entry.sender;
+					//Unpack Pattern value
+					if(entry.isStream, { entry = entry.next });
 				});
 
 				//Fallback sender (modified for AlgaNode, needed for chansMapping)
-				sender = paramVal;
+				sender = entry;
 
 				//Valid values are Numbers / Arrays / AlgaNodes
 				case
 
 				//Number / Array
-				{ paramVal.isNumberOrArray } {
-					if(paramVal.isSequenceableCollection, {
+				{ entry.isNumberOrArray } {
+					if(entry.isSequenceableCollection, {
 						//an array
-						senderNumChannels = paramVal.size;
+						senderNumChannels = entry.size;
 						senderRate = "control";
 					}, {
 						//a num
@@ -443,18 +470,18 @@ AlgaPattern : AlgaNode {
 				}
 
 				//AlgaNode
-				{ paramVal.isAlgaNode } {
-					sender = paramVal; //essential for chansMapping (paramVal gets modified)
-					if(paramVal.algaInstantiated, {
+				{ entry.isAlgaNode } {
+					sender = entry; //essential for chansMapping (entry gets modified)
+					if(entry.algaInstantiated, {
 						//if algaInstantiated, use the rate, numchannels and bus arg from the alga bus
-						senderRate = paramVal.rate;
-						senderNumChannels = paramVal.numChannels;
-						paramVal = paramVal.synthBus.busArg;
+						senderRate = entry.rate;
+						senderNumChannels = entry.numChannels;
+						entry = entry.synthBus.busArg;
 					}, {
 						//otherwise, use default
 						senderRate = "control";
 						senderNumChannels = paramNumChannels;
-						paramVal = paramDefault;
+						entry = paramDefault;
 						("AlgaPattern: AlgaNode wasn't algaInstantiated yet. Using default value for " ++ paramName).warn;
 					});
 
@@ -483,7 +510,7 @@ AlgaPattern : AlgaNode {
 						).asSymbol;
 
 						var patternParamSynthArgs = [
-							\in, paramVal,
+							\in, entry,
 							\env, patternParamEnvBus.busArg,
 							\out, patternInterpSumBus.index,
 							\fadeTime, 0
@@ -492,53 +519,55 @@ AlgaPattern : AlgaNode {
 						//get correct scaleArray and chans
 						var scaleArrayAndChansAtParam = scaleArraysAndChansAtParam[uniqueID];
 
-						//add scaleArray to args
-						if(scaleArrayAndChansAtParam != nil, {
-							var scale = scaleArrayAndChansAtParam[0]; //0 == scaleArray
-							var chansMapping = scaleArrayAndChansAtParam[1]; //1 == chans
-
-							if(scale != nil, {
-								//Pattern support
-								if(scale.isStream, {
-									scale = scale.next
-								});
-
-								if(scale != nil, {
-									var scaleArray = this.calculateScaling(
-										paramName,
-										sender,
-										paramNumChannels,
-										scale,
-										false //don't update the AlgaNode's scalings dict
-									);
-
-									patternParamSynthArgs = patternParamSynthArgs.addAll(scaleArray);
-								});
-							});
-
-							//only apply chansMapping to AlgaNodes
-							if((chansMapping != nil).and(sender.isAlgaNode), {
-								//Pattern support
-								if(chansMapping.isStream, {
-									chansMapping = chansMapping.next
-								});
-
-								if(chansMapping != nil, {
-									var indices = this.calculateSenderChansMappingArray(
-										paramName,
-										sender,
-										chansMapping,
-										senderNumChannels,
-										paramNumChannels,
-										false //don't update the AlgaNode's chans dict
-									);
-
-									patternParamSynthArgs = patternParamSynthArgs.add(\indices).add(indices);
-								});
+						//If AlgaPatternArg's is nil, use argument's one (if defined)
+						if(scale == nil, {
+							if(scaleArrayAndChansAtParam != nil, {
+								scale = scaleArrayAndChansAtParam[0]; //0 == scaleArray
 							});
 						});
 
-						patternParamSynthArgs.postln;
+						if(scale != nil, {
+							//Pattern support
+							if(scale.isStream, { scale = scale.next });
+
+							if(scale != nil, {
+								var scaleArray = this.calculateScaling(
+									paramName,
+									sender,
+									paramNumChannels,
+									scale,
+									false //don't update the AlgaNode's scalings dict
+								);
+
+								patternParamSynthArgs = patternParamSynthArgs.addAll(scaleArray);
+							});
+						});
+
+						//If AlgaPatternArg's is nil, use argument's one (if defined)
+						if(chansMapping == nil, {
+							if(scaleArrayAndChansAtParam != nil, {
+								chansMapping = scaleArrayAndChansAtParam[1]; //1 == chans
+							});
+						});
+
+						//only apply chansMapping to AlgaNodes
+						if((chansMapping != nil).and(sender.isAlgaNode), {
+							//Pattern support
+							if(chansMapping.isStream, { chansMapping = chansMapping.next });
+
+							if(chansMapping != nil, {
+								var indices = this.calculateSenderChansMappingArray(
+									paramName,
+									sender,
+									chansMapping,
+									senderNumChannels,
+									paramNumChannels,
+									false //don't update the AlgaNode's chans dict
+								);
+
+								patternParamSynthArgs = patternParamSynthArgs.add(\indices).add(indices);
+							});
+						});
 
 						patternParamSynth = AlgaSynth(
 							patternParamSymbol,
@@ -552,7 +581,7 @@ AlgaPattern : AlgaNode {
 						patternBussesAndSynths.add(patternParamSynth);
 					});
 				}, {
-					("AlgaPattern: Invalid class " ++ paramVal.class ++ " input for parameter " ++ paramName.asString).error;
+					("AlgaPattern: Invalid class '" ++ entry.class ++ "' for parameter '" ++ paramName.asString ++ "'").error;
 				});
 			});
 		});
@@ -613,7 +642,7 @@ AlgaPattern : AlgaNode {
 
 			//All the current interpStreams for this param. Retrieve the entries,
 			//which store all the senders to this param for the interpStream.
-			var interpStreamsAtParam = interpStreams.entries[paramName];
+			var interpStreamsEntriesAtParam = interpStreams.entries[paramName];
 
 			//scaleArray and chans
 			var scaleArraysAndChansAtParam = interpStreams.scaleArraysAndChans[paramName];
@@ -622,7 +651,7 @@ AlgaPattern : AlgaNode {
 			this.createPatternParamSynths(
 				paramName, paramNumChannels, paramRate,
 				paramDefault, patternInterpSumBus, patternBussesAndSynths,
-				interpStreamsAtParam, scaleArraysAndChansAtParam
+				interpStreamsEntriesAtParam, scaleArraysAndChansAtParam
 			);
 
 			//Read from patternParamNormBus
@@ -834,8 +863,8 @@ AlgaPattern : AlgaNode {
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
 
-		if((sender.isAlgaNode.not).and(sender.isPattern.not).and(sender.isNumberOrArray.not), {
-			"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, Patterns, Numbers and Arrays".error;
+		if((sender.isAlgaNode.not).and(sender.isPattern.not).and(sender.isAlgaPatternArg.not).and(sender.isNumberOrArray.not), {
+			"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, AlgaPatternArgs, Patterns, Numbers and Arrays".error;
 			^this;
 		});
 
@@ -884,8 +913,8 @@ AlgaPattern : AlgaNode {
 
 	//Only from is needed: to already calls into makeConnection
 	from { | sender, param = \in, chans, scale, time, sched |
-		//Force pattern dispatch
-		if(sender.isPattern, {
+		//Force pattern and AlgaPatternArg dispatch
+		if((sender.isPattern).or(sender.isAlgaPatternArg), {
 			^this.makeConnection(sender, param, senderChansMapping:chans,
 				scale:scale, time:time, sched:sched
 			);

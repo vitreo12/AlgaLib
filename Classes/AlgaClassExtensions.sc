@@ -17,6 +17,7 @@
 +Object {
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
+	isAlgaPatternArg { ^false }
 	isPattern { ^false }
 	isStream { ^false }
 	isListPattern { ^false }

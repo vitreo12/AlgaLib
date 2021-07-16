@@ -2,7 +2,7 @@
 Alga.boot({
 
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.ar([440, 441])) /* * \amp.ar(1) */ * EnvGen.ar(Env.perc(0.01, 1), doneAction:2)
+		SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2)
 	}).add;
 
 	AlgaSynthDef(\test2, {
@@ -60,7 +60,7 @@ a.from(b, \freq, time:1, scale:[[330, 220], [1000, 1200]], chans:Pseq([\out1, \o
 //AlgaArg
 (
 a.from(
-	AlgaArg(b, scale:Pseq([[[330, 220], [1000, 1200]], [[110, 120], [500, 600]]], inf), chans:Pseq([\out1, \out2])),
+	AlgaArg(b, scale:Pseq([[[330, 220], [1000, 1200]], [[110, 120], [500, 600]]], inf), chans:Pseq([\out1, \out2], inf)),
 	\freq,
 	time:2
 )
@@ -69,7 +69,7 @@ a.from(
 (
 a.from(
 	Pseq([
-		AlgaArg(b, scale:Pseq([[[330, 220], [1000, 1200]], [[110, 120], [500, 600]]], inf), chans:Pseq([\out1, \out2])),
+		AlgaArg(b, scale:Pseq([[[330, 220], [1000, 1200]], [[110, 120], [500, 600]]], inf), chans:Pseq([\out1, \out2], inf)),
 		AlgaArg(c, scale:Pseq([[[120, 223], [450, 600]], [[720, 200], [1200, 820]]], inf))
 	], inf),
 	\freq,

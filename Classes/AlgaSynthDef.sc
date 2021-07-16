@@ -62,7 +62,7 @@ AlgaSynthDef : SynthDef {
 				});
 
 				if(error, {
-					("AlgaSynthDef: \\" ++ controlNameName.asString ++ " parameter cannot be explicitly set. It's used internally.").error;
+					("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally.").error;
 					^nil
 				});
 			});
