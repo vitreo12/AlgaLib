@@ -354,9 +354,10 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Doesn't have args and outsMapping like AlgaNode
-	*new { | def, connectionTime = 0, playTime = 0, server, sched = 0 |
+	*new { | def, args, connectionTime = 0, playTime = 0, sched = 0, server |
 		^super.new(
 			def: def,
+			args: args,
 			connectionTime: connectionTime,
 			playTime: playTime,
 			server: server,
@@ -708,6 +709,9 @@ AlgaPattern : AlgaNode {
 		//this is mostly needed for .replace to work properly and wait for the new synth
 		//to be algaInstantiated!
 		if(synth != nil, { synth.algaInstantiated = false });
+
+		//Create args dict
+		this.createDefArgs(args);
 
 		case
 		{ defClass == Symbol } {

@@ -77,7 +77,7 @@ a.from(
 )
 )
 
-//replace?
+//replace
 (
 a.replace((
 	def: \test2,
@@ -85,3 +85,6 @@ a.replace((
 	freq: Pwhite([400, 200], 1000)
 ))
 )
+
+//clear
+a.clear
