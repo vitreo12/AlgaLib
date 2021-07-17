@@ -69,9 +69,6 @@ AlgaPatternInterpStreams {
 		var patternInterpSumBus = algaPattern.currentPatternInterpSumBus;        //Use currentPatternInterpSumBus
 		var patternBussesAndSynths = algaPattern.currentPatternBussesAndSynths; //Use currentPatternBussesAndSynths
 
-		patternInterpSumBus.postln;
-		patternBussesAndSynths.postln;
-
 		if((patternInterpSumBus != nil).and(patternBussesAndSynths != nil), {
 			algaPattern.createPatternParamSynth(
 				entry: entry,
@@ -81,7 +78,7 @@ AlgaPatternInterpStreams {
 				paramRate: paramRate,
 				paramDefault: paramDefault,
 				patternInterpSumBus: patternInterpSumBus,
-				patternBussesAndSynths: patternBussesAndSynths, //Use currentPatternBussesAndSynths
+				patternBussesAndSynths: patternBussesAndSynths,
 				scaleArraysAndChansAtParam: scaleArraysAndChansAtParam
 			)
 		});
@@ -489,8 +486,6 @@ AlgaPattern : AlgaNode {
 		//Unpack Pattern value
 		if(entry.isStream, { entry = entry.next });
 
-		"ye".warn;
-
 		//Check if it's an AlgaPatternArg. Unpack it.
 		if(entry.isAlgaPatternArg, {
 			chansMapping = entry.chans;
@@ -539,8 +534,6 @@ AlgaPattern : AlgaNode {
 
 			validParam = true;
 		};
-
-		entry.asString.warn;
 
 		if(validParam, {
 			//Get the bus where interpolation envelope is written to...
@@ -746,14 +739,10 @@ AlgaPattern : AlgaNode {
 			waitForInst: false
 		);
 
-		//currentPatternBussesAndSynths.asString.warn;
-		//currentPatternInterpSumBus.asString.warn;
-
 		//Free all normBusses, normSynths, interpBusses and interpSynths on patternSynth's release
 		patternSynth.onFree( {
 			patternBussesAndSynths.do({ | entry |
-				//free works both for AlgaSynths and AlgaBusses
-				entry.free;
+				entry.free //free works both for AlgaSynths and AlgaBusses
 			});
 
 			//IMPORTANT: free the unused interpBusses of the interpStreams.
