@@ -2,7 +2,7 @@
 Alga.boot({
 
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2)
+		SinOsc.ar(\freq.ar(440)) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2)
 	}).add;
 
 	AlgaSynthDef(\test2, {
@@ -13,9 +13,9 @@ Alga.boot({
 
 	a = AlgaPattern((
 		def: \test,
-		dur: 0.5,
-		freq: Pwhite([400, 200], 1000)
-	)).play;
+		dur: 1,
+		freq: 440
+	), sched:1).play;
 
 	b = AN({ SinOsc.ar([100, 200]) });
 
@@ -24,6 +24,11 @@ Alga.boot({
 	//s.plotTree
 });
 )
+
+//Test mid pattern
+a.from(300, \freq)
+
+a.from(Pseq([440, 880, 1960], inf), \freq, sched:1)
 
 a <<.dur 0.5
 
@@ -35,9 +40,6 @@ a.from(0.25, \dur, sched:1)
 
 a.from(Pseq([1, 2, 0.1], inf), \dur, sched:1)
 
-
-//sometimes with 0.25 (or faster),
-//going from the synth to 440 has some "wrong ones" at the end: investigate!
 a.from(0.1, \dur, sched:1)
 
 a.from(440, \freq, time:1);
@@ -92,9 +94,6 @@ a.clear
 //ListPattern (check inNodes)
 a.from(Pseq([b, c], inf), \freq, scale:[100, 600], time:1);
 a.inNodes.postln;
-
-//time == 0 stops the running synth immediately, but it shouldn't
-a.from(480, \freq)
 
 //args
 (

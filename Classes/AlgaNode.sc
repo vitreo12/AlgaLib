@@ -1013,10 +1013,8 @@ AlgaNode {
 
 		var actualSenderChansMapping = senderChansMapping;
 
-		if(sender.isAlgaNode.not, {
-			("AlgaNode: expected an AlgaNode to calculate chansMapping, but received a '" ++ sender.class ++ "'").warn;
-			^(Array.series(paramNumChans));
-		});
+		//If sender is not an AlgaNode, use default
+		if(sender.isAlgaNode.not, { ^(Array.series(paramNumChans)) });
 
 		//Connect with outMapping symbols. Retrieve it from the sender
 		if(actualSenderChansMapping.class == Symbol, {
