@@ -1803,7 +1803,7 @@ AlgaNode {
 
 	//add entries to the inNodes / outNodes / connectionTimeOutNodes of the two AlgaNodes
 	addInOutNodesDict { | sender, param = \in, mix = false |
-		//This will replace the entries on new connection (as mix == false)
+		//This will replace the entries on new connection (when mix == false)
 		this.addInNode(sender, param, mix);
 
 		//This will add the entries to the existing IdentitySet, or create a new one

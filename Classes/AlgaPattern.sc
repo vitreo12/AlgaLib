@@ -162,23 +162,29 @@ AlgaPatternInterpStreams {
 		});
 	}
 
-	//Wrapper around AlgaNode's addInOutNodesDict
+	//Wrapper around AlgaNode's addInOutNodesDict.
+	//If entry is a ListPattern, loop around it and add each entry that is an AlgaNode.
 	addInOutNodesDictAtParam { | sender, param, mix = false |
 		if(sender.isAlgaNode, {
 			algaPattern.addInOutNodesDict(sender, param, mix:false);
 		}, {
 			//If ListPattern, loop over and only add AlgaNodes
 			if(sender.isListPattern, {
-				sender.list.do({ | listEntry |
+				sender.list.do({ | listEntry, index |
 					if(listEntry.isAlgaNode, {
-						algaPattern.addInOutNodesDict(listEntry, param, mix:false);
+						if(index == 0, {
+							algaPattern.addInOutNodesDict(listEntry, param, mix:false); //mix == false so it replaces
+						}, {
+							algaPattern.addInOutNodesDict(listEntry, param, mix:true);  //mix == true so it adds
+						});
 					});
 				});
 			});
 		});
 	}
 
-	//Wrapper around AlgaNode's removeInOutNodesDict
+	//Wrapper around AlgaNode's removeInOutNodesDict.
+	//If entry is a ListPattern, loop around it and remove each entry that is an AlgaNode.
 	removeInOutNodesDictAtParam { | oldSender, param |
 		if(oldSender.isAlgaNode, {
 			algaPattern.removeInOutNodesDict(oldSender, param);
@@ -214,6 +220,7 @@ AlgaPatternInterpStreams {
 		var paramName, paramRate, paramNumChannels;
 		var uniqueID;
 		var entriesAtParam;
+		var entryOriginal = entry; //Original entry, not .asStream. Needed for addInOutNodesDictAtParam
 
 		if(controlName == nil, {
 			"AlgaPatternInterpStreams: Invalid controlName".error
@@ -238,14 +245,15 @@ AlgaPatternInterpStreams {
 		if(entriesAtParam == nil, {
 			entries[paramName] = IdentityDictionary().put(uniqueID, entry);
 		}, {
-			entries[paramName].put(uniqueID,entry);
+			entries[paramName].put(uniqueID, entry);
 		});
 
 		//Add the scaleArray and chans
 		this.addScaleArrayAndChans(paramName, paramNumChannels, uniqueID, chans, scale);
 
-		//Add proper inNodes / outNodes / connectionTimeOutNodes ...
-		this.addInOutNodesDictAtParam(entry, paramName, false);
+		//Add proper inNodes / outNodes / connectionTimeOutNodes. Use entryOriginal in order
+		//to retrieve if it is a ListPattern.
+		this.addInOutNodesDictAtParam(entryOriginal, paramName, false);
 
 		//Trigger the interpolation process on all the other active interpSynths.
 		//This must always be before createPatternInterpSynthAndBusAtParam
@@ -969,7 +977,7 @@ AlgaPattern : AlgaNode {
 		^(group.algaInstantiated);
 	}
 
-	//To send signal... algaInstantiatedAsReceiver is same as AlgaNode
+	//To send signal. algaInstantiatedAsReceiver is same as AlgaNode
 	algaInstantiatedAsSender {
 		^((this.algaInstantiated).and(synthBus != nil));
 	}

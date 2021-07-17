@@ -88,3 +88,25 @@ a.replace((
 
 //clear
 a.clear
+
+//ListPattern (check inNodes)
+a.from(Pseq([b, c], inf), \freq, scale:[100, 600], time:1);
+a.inNodes.postln;
+
+//time == 0 stops the running synth immediately, but it shouldn't
+a.from(480, \freq)
+
+//args
+(
+Alga.boot({
+	AlgaSynthDef(\test, {
+		SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2)
+	}).add;
+
+	s.sync;
+
+	b = AN({ SinOsc.kr(1).range(100, 440) });
+
+	a = AP((\def: \test, \dur: 0.5), [\freq, b], connectionTime:3).play
+})
+)
