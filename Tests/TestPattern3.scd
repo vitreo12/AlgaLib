@@ -4,17 +4,17 @@ Alga.initSynthDefs;
 Alga.boot({
 
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.ar(440)) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2)
+		SinOsc.ar(\freq.kr([440, 441])) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2)
 	}).add;
 
 	AlgaSynthDef(\testImpulse, {
-		FreeSelf.kr(Impulse.kr(0));
-		//EnvGen.kr(Env.perc(0.01, 0.5), doneAction:2);
-		Impulse.ar(0) * \amp.ar(1);
+		//FreeSelf.kr(Impulse.kr(0));
+		EnvGen.kr(Env.perc(0.01, 0.5), doneAction:2);
+		(Impulse.ar(0) * \amp.kr(1)).poll
 	}).add;
 
 	AlgaSynthDef(\test2, {
-		Saw.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2) * DC.ar(0.4)
+		Saw.ar(\freq.kr([440, 441])) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2) * DC.ar(0.4)
 	}).add;
 
 	AlgaSynthDef(\testBus, {
@@ -23,25 +23,25 @@ Alga.boot({
 
 	s.sync;
 
-	/*
 	a = AlgaPattern((
 		def: \test,
 		dur: 1,
 		freq: 440
 	)).play;
-	*/
 
+	/*
 	a = AlgaPattern((
 		def: \testImpulse,
 		dur: 1,
 		amp: 1
 	)).play;
+	*/
 
 	b = AN({ SinOsc.ar([100, 200]) });
 
 	c = AN({ Saw.ar([100, 200]) });
 
-	s.plotTree
+	//s.plotTree
 });
 )
 
@@ -69,7 +69,7 @@ a.from(0.1, \dur, sched:1)
 
 a.from(440, \freq, time:1);
 
-a.from(Pseq([220, 660, [885, 880]], inf), \freq, time:5)
+a.from(Pseq([220, 660, [885, 880]], inf), \freq, time:3)
 
 
 

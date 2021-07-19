@@ -180,7 +180,7 @@ AlgaPatternInterpStreams {
 				//when completely unused on both lang and server!
 				//interpBusAtParam can't be freed here as it can still be used if the patternSynth
 				//takes longer to free itself (perhaps a long envelope) than the interpolation synth.
-				interpBussesToFree.add(interpBusAtParam);
+				if(interpBusAtParam != nil, { interpBussesToFree.add(interpBusAtParam) });
 			});
 		});
 	}
@@ -470,7 +470,15 @@ AlgaPattern : AlgaNode {
 	freeUnusedInterpBusses {
 		var interpBussesToFree = interpStreams.interpBussesToFree;
 		interpBussesToFree.do({ | interpBus |
-			interpBus.free;
+			//apparently kr busses can still bug out with fast durs at end of interpolation,
+			//wait a bit more to free the bus. IDK why this happens, honestly...
+			if(interpBus.rate == \control, {
+				fork { 0.5.wait; interpBus.free }
+			}, {
+				//ar, just free it
+				interpBus.free
+			});
+
 			interpBussesToFree.remove(interpBus);
 		});
 	}
@@ -703,7 +711,6 @@ AlgaPattern : AlgaNode {
 				patternParamNormSynthSymbol,
 				patternParamNormSynthArgs,
 				normGroup,
-				\addToTail,
 				waitForInst: false
 			);
 
@@ -744,7 +751,7 @@ AlgaPattern : AlgaNode {
 		//Free all normBusses, normSynths, interpBusses and interpSynths on patternSynth's release
 		patternSynth.onFree( {
 			patternBussesAndSynths.do({ | entry |
-				entry.free //free works both for AlgaSynths and AlgaBusses
+				entry.free; //free works both for AlgaSynths and AlgaBusses
 			});
 
 			//IMPORTANT: free the unused interpBusses of the interpStreams.
