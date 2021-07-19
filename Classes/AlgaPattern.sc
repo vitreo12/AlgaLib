@@ -22,7 +22,6 @@ AlgaPatternInterpStreams {
 	var <server;
 
 	var <entries;
-	var <entriesOriginal;
 	var <interpSynths;
 	var <interpBusses;
 	var <interpBussesToFree;
@@ -35,7 +34,6 @@ AlgaPatternInterpStreams {
 
 	init { | argAlgaPattern |
 		entries             = IdentityDictionary(10);
-		entriesOriginal     = IdentityDictionary(10);
 		interpSynths        = IdentityDictionary(10);
 		interpBusses        = IdentityDictionary(10);
 		interpBussesToFree  = IdentitySet();
@@ -215,6 +213,7 @@ AlgaPatternInterpStreams {
 	}
 
 	//Remove one entry
+	/*
 	removeInOutNodesDictAtParam { | oldSender, param |
 		if(oldSender.isAlgaNode, {
 			algaPattern.removeInOutNodesDict(oldSender, param);
@@ -234,19 +233,12 @@ AlgaPatternInterpStreams {
 			});
 		});
 	}
+	*/
 
 	//Wrapper around AlgaNode's removeInOutNodesDict.
 	//If entry is a ListPattern, loop around it and remove each entry that is an AlgaNode.
 	removeAllInOutNodesDictAtParam { | paramName |
-		var entriesOriginalAtParam  = entriesOriginal[paramName];
-		if(entriesOriginalAtParam != nil, {
-			entriesOriginalAtParam.keysValuesDo({ | uniqueID, entryOriginalAtParam |
-				entriesOriginalAtParam.removeAt(uniqueID);
-				if(entryOriginalAtParam != nil, {
-					this.removeInOutNodesDictAtParam(entryOriginalAtParam, paramName)
-				});
-			});
-		});
+		algaPattern.removeInOutNodesDict(nil, paramName) //nil removes them all
 	}
 
 	//add a scaleArray and chans
@@ -265,16 +257,14 @@ AlgaPatternInterpStreams {
 	}
 
 	//Add entry / entryOriginal to dictionaries
-	addEntry { | entry, entryOriginal, paramName, uniqueID |
+	addEntry { | entry, paramName, uniqueID |
 		var  entriesAtParam = entries[paramName];
 		//Either create a new Dict for the param, or add to existing one
 		if(entriesAtParam == nil, {
 			entries[paramName] = IdentityDictionary().put(uniqueID, entry);
-			entriesOriginal[paramName] = IdentityDictionary().put(uniqueID, entryOriginal);
 			^true; //first entry
 		}, {
 			entries[paramName].put(uniqueID, entry);
-			entriesOriginal[paramName].put(uniqueID, entryOriginal);
 			^false; //not first entry
 		});
 	}
@@ -301,15 +291,14 @@ AlgaPatternInterpStreams {
 		//entry could very well be a number (like 440), screwing things up in IdentityDict.
 		uniqueID = UniqueID.next;
 
-		//Remove all older inNodes / outNodes... if not mix, in theory.
-		//This must come before updating entriesOriginal
-		this.removeAllInOutNodesDictAtParam(paramName);
-
-		//Add entry / entryOriginals to dicts
-		isFirstEntry = this.addEntry(entry, entryOriginal, paramName, uniqueID);
+		//Add entry to dict
+		isFirstEntry = this.addEntry(entry, paramName, uniqueID);
 
 		//Add the scaleArray and chans
 		this.addScaleArrayAndChans(paramName, paramNumChannels, uniqueID, chans, scale);
+
+		//Remove all older inNodes / outNodes... if not mix, in theory.
+		this.removeAllInOutNodesDictAtParam(paramName);
 
 		//Add proper inNodes / outNodes / connectionTimeOutNodes. Use entryOriginal in order
 		//to retrieve if it is a ListPattern.
