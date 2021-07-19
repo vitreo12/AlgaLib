@@ -26,14 +26,11 @@ AlgaSynthDef : SynthDef {
 
 	var <>outsMapping;
 
-	//Use OffsetOut by default!
-	classvar <>sampleAccurate=true;
-
-	*new { | name, func, rates, prependArgs, outsMapping, variants, metadata |
-		^this.new_inner(name, func, rates, prependArgs, outsMapping, variants, metadata)
+	*new { | name, func, rates, prependArgs, outsMapping, variants, metadata, sampleAccurate = true |
+		^this.new_inner(name, func, rates, prependArgs, outsMapping, variants, metadata, sampleAccurate)
 	}
 
-	*new_inner { | name, func, rates, prependArgs, outsMapping, variants, metadata, makeFadeEnv = true |
+	*new_inner { | name, func, rates, prependArgs, outsMapping, variants, metadata, makeFadeEnv = true, sampleAccurate = true |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var outerBuildSynthDef = UGen.buildSynthDef;
 

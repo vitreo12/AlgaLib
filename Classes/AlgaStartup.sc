@@ -14,6 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+/*
+NOTE that all AlgaSynthDefs here declared have sampleAccurate:false so that
+the AlgaSynthDef will use Out instead of OffsetOut. This is FUNDAMENTAL to avoid bugs
+with sample accuracy. All these definitions are needed FROM THE START of an audio block,
+and should not be delayed as OffsetOut would. sampleAccurate:true is still maintained
+as default for AlgaSynthDefs defined by users, in which case OffsetOut can delay the
+specific definition within the audio block. Its controls, though, NEED to start at the
+beginning of the audio block!
+*/
 AlgaStartup {
 	classvar <algaMaxIO = 8;
 
@@ -130,7 +139,7 @@ AlgaSynthDef.new_inner(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
 var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
 Limiter.ar(input) * AlgaEnvGate.kr
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+}, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
 
 					sdef.interpret;
@@ -283,12 +292,13 @@ outs = Array.newClear(" ++ (y + 1) ++ ");
 " ++ outs ++ "
 outs[" ++ y ++ "] = env;
 outs;
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+}, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 
 //Env comes from outside. TODO: sample and hold
 AlgaSynthDef.new_inner(" ++ name_pattern ++ ", { | scaleCurve = 0 |
 var in, env, out, outMultiplier, outScale, outs;
 in = " ++ in ++ "
+in.poll(label:\"interp_in\");
 out = " ++ indices ++ "
 outMultiplier = " ++ multiplier ++ "
 outScale = out.lincurve(
@@ -301,12 +311,14 @@ scaleCurve,
 out = " ++ scaling ++ "
 out = out * outMultiplier;
 env = " ++ env_pattern ++ "
+env.poll(label:\"interp_env\");
 out = out * env;
 outs = Array.newClear(" ++ (y + 1) ++ ");
 " ++ outs ++ "
 outs[" ++ y ++ "] = env;
+outs.poll(label:\"interp_outs\");
 outs;
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+}, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
 
 						result.interpret;
@@ -336,11 +348,11 @@ outs;
 
 				result_audio = "AlgaSynthDef.new_inner(\\alga_norm_audio1, {
 var args = \\args.ar([0, 0]);
-var val = args[0];
-var env = args[1];
-var out = Sanitize.ar(val / env);
+var val = args[0].poll(label:\"norm_val\");
+var env = args[1].poll(label:\"norm_env\");
+var out = Sanitize.ar(val / env);//.poll(label:\"norm\");
 out;
-}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 				result_control = "AlgaSynthDef.new_inner(\\alga_norm_control1, {
 var args = \\args.kr([0, 0]);
@@ -348,7 +360,7 @@ var val = args[0];
 var env = args[1];
 var out = Sanitize.kr(val / env);
 out;
-}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			}, {
 
@@ -366,7 +378,7 @@ var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
 var out = Sanitize.ar(val / env);
 out;
-}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 				result_control = "AlgaSynthDef.new_inner(\\alga_norm_control" ++ i.asString ++ ", {
 var args = \\args.kr(" ++ arrayOfZeros ++ ");
@@ -374,7 +386,7 @@ var val = args[0.." ++ (i - 1).asString ++ "];
 var env = args[" ++ i.asString ++ "];
 var out = Sanitize.kr(val / env);
 out;
-}, makeFadeEnv:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:true, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			});
 
@@ -402,7 +414,7 @@ val[i] = 0;
 });
 val[" ++ i ++ "] = EnvGen.kr(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
 val;
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			fadein_ar = "AlgaSynthDef.new_inner(\\alga_fadeIn_audio" ++ i.asString ++ ", { | curve = \\sin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
@@ -411,7 +423,7 @@ val[i] = DC.ar(0);
 });
 val[" ++ i ++ "] = EnvGen.ar(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
 val;
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			fadeout_kr = "AlgaSynthDef.new_inner(\\alga_fadeOut_control" ++ i.asString ++ ", { | curve = \\lin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
@@ -420,7 +432,7 @@ val[i] = 0;
 });
 val[" ++ i ++ "] = EnvGen.kr(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
 val;
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			fadeout_ar = "AlgaSynthDef.new_inner(\\alga_fadeOut_audio" ++ i.asString ++ ", { | curve = \\sin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
@@ -429,7 +441,7 @@ val[i] = DC.ar(0);
 });
 val[" ++ i ++ "] = EnvGen.ar(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
 val;
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+}, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
 			fadein_kr.interpret;
 			fadein_ar.interpret;
@@ -442,12 +454,12 @@ val;
 	*initAlgaPatternInterp {
 		var result = "
 AlgaSynthDef.new_inner(\\alga_pattern_interp_env_audio, {
-AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0)).poll(label:\"env\");
+}, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 
 AlgaSynthDef.new_inner(\\alga_pattern_interp_env_control, {
 AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
-}, makeFadeEnv:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+}, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
 		result.interpret;
 	}

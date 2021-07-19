@@ -244,6 +244,7 @@ AlgaPatternInterpStreams {
 		var uniqueID;
 		var entriesAtParam;
 		var entryOriginal = entry; //Original entry, not .asStream. Needed for addInOutNodesDictAtParam
+		var isFirstEntry = false;
 
 		if(controlName == nil, {
 			"AlgaPatternInterpStreams: Invalid controlName".error
@@ -267,6 +268,7 @@ AlgaPatternInterpStreams {
 
 		//Either create a new Dict for the param, or add to existing one
 		if(entriesAtParam == nil, {
+			isFirstEntry = true;
 			entries[paramName] = IdentityDictionary().put(uniqueID, entry);
 		}, {
 			entries[paramName].put(uniqueID, entry);
@@ -301,14 +303,16 @@ AlgaPatternInterpStreams {
 		//Only one per-change is needed, as the interpolation process will continue as soon as the pattern
 		//triggers new synth. This just avoids to have silences and gaps when modifying a param mid-pattern.
 		//This must come AFTER createPatternInterpSynthAndBusAtParam.
-		this.createTemporaryPatternParamSynthAtParam(
-			entry: entry,
-			uniqueID: uniqueID,
-			paramName: paramName,
-			paramNumChannels: paramNumChannels,
-			paramRate: paramRate,
-			paramDefault: paramDefault
-		);
+		if(isFirstEntry.not, {
+			this.createTemporaryPatternParamSynthAtParam(
+				entry: entry,
+				uniqueID: uniqueID,
+				paramName: paramName,
+				paramNumChannels: paramNumChannels,
+				paramRate: paramRate,
+				paramDefault: paramDefault
+			);
+		});
 	}
 }
 
@@ -339,18 +343,15 @@ AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
-	1) AlgaArg / AlgaPatternArg (scale / chans)
+	1) .replace()
 
-	2) .replace()
+	2) .clear()
 
-	3) .clear()
+	3) Continuous or SAH interpolation (both in Patterns and AlgaNodes)
 
-	4) Continuous or SAH interpolation (both in Patterns and AlgaNodes)
+	4) mixFrom() / mixTo()
 
-	5) mixFrom() / mixTo()
-
-	6) ListPattern as \def (how about numChannels / rate? enforce same one?)
-
+	5) ListPattern as \def (how about numChannels / rate? enforce same one?)
 	*/
 
 	/*
@@ -408,8 +409,8 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Doesn't have args and outsMapping like AlgaNode
-	*new { | def, args, connectionTime = 0, playTime = 0, sched = 0, server |
+	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
+	*new { | def, args, connectionTime = 0, playTime = 0, sched = 1, server |
 		^super.new(
 			def: def,
 			args: args,
@@ -702,6 +703,7 @@ AlgaPattern : AlgaNode {
 				patternParamNormSynthSymbol,
 				patternParamNormSynthArgs,
 				normGroup,
+				\addToTail,
 				waitForInst: false
 			);
 
@@ -826,11 +828,8 @@ AlgaPattern : AlgaNode {
 		//interpBusses are taken care of in createPatternInterpSynthAndBus.
 		this.createSynthBus;
 
-		//Create the actual pattern, pushing action to scheduler
-		scheduler.addAction(
-			func: { this.createPattern },
-			sched: sched
-		);
+		//Create the actual pattern.
+		this.createPattern(sched);
 	}
 
 	//Support Function in the future
@@ -849,7 +848,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Build the actual pattern
-	createPattern {
+	createPattern { | sched |
 		var foundDurOrDelta = false;
 		var patternPairs = Array.newClear;
 
@@ -867,9 +866,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//If no dur or delta, default to 1
-		if(foundDurOrDelta.not, {
-			this.setDur(1);
-		});
+		if(foundDurOrDelta.not, { this.setDur(1) });
 
 		//Add all the default entries from SynthDef that the user hasn't set yet
 		controlNames.do({ | controlName |
@@ -881,7 +878,9 @@ AlgaPattern : AlgaNode {
 				paramValue = this.getDefaultOrArg(controlName, paramName);
 			});
 
-			//Add to interpStreams (which also creates interpBus / interpSynth)
+			//Add to interpStreams (which also creates interpBus / interpSynth).
+			//These are unscheduled, as it's best to just create them asap.
+			//Only the pattern synths  to be scheduled
 			interpStreams.add(
 				entry: paramValue,
 				controlName: controlName,
@@ -902,9 +901,16 @@ AlgaPattern : AlgaNode {
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);
 
-		//start the pattern right away. quant?
-		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
-			clock: this.clock
+		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
+		//createPattern function is non scheduled as it it better to create it right away.
+		scheduler.addAction(
+			//condition? interpStreams' interpEnv to be instantiated?
+			func: {
+				algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
+					clock: this.clock
+				)
+			},
+			sched: sched
 		);
 	}
 
@@ -921,7 +927,9 @@ AlgaPattern : AlgaNode {
 		scheduler.addAction(
 			condition: { this.algaInstantiated },
 			func: {
-				algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
+				if(algaReschedulingEventStreamPlayer != nil, {
+					algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
+				})
 			}
 		);
 	}
