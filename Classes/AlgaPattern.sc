@@ -22,6 +22,7 @@ AlgaPatternInterpStreams {
 	var <server;
 
 	var <entries;
+	var <entriesOriginal;
 	var <interpSynths;
 	var <interpBusses;
 	var <interpBussesToFree;
@@ -34,6 +35,7 @@ AlgaPatternInterpStreams {
 
 	init { | argAlgaPattern |
 		entries             = IdentityDictionary(10);
+		entriesOriginal     = IdentityDictionary(10);
 		interpSynths        = IdentityDictionary(10);
 		interpBusses        = IdentityDictionary(10);
 		interpBussesToFree  = IdentitySet();
@@ -154,9 +156,6 @@ AlgaPatternInterpStreams {
 			if(entriesAtParam != nil, {
 				var entryAtParam = entriesAtParam[uniqueID];
 				entriesAtParam.removeAt(uniqueID);
-				if(entryAtParam != nil, {
-					this.removeInOutNodesDictAtParam(entryAtParam, paramName);
-				});
 			});
 
 			//Remove scaleArray and chans
@@ -195,14 +194,40 @@ AlgaPatternInterpStreams {
 		if(sender.isAlgaNode, {
 			algaPattern.addInOutNodesDict(sender, param, mix:false);
 		}, {
-			//If ListPattern, loop over and only add AlgaNodes
-			if(sender.isListPattern, {
-				sender.list.do({ | listEntry, index |
-					if(listEntry.isAlgaNode, {
-						if(index == 0, {
-							algaPattern.addInOutNodesDict(listEntry, param, mix:false); //mix == false so it replaces
-						}, {
-							algaPattern.addInOutNodesDict(listEntry, param, mix:true);  //mix == true so it adds
+			if(sender.isAlgaPatternArg, {
+				algaPattern.addInOutNodesDict(sender.sender, param, mix:false)
+			}, {
+				//If ListPattern, loop over and only add AlgaNodes / AlgaPatternArgs
+				if(sender.isListPattern, {
+					sender.list.do({ | listEntry, index |
+						if(listEntry.isAlgaPatternArg, { listEntry = listEntry.sender });
+						if(listEntry.isAlgaNode, {
+							if(algaPattern.inNodes.size == 0, {
+								algaPattern.addInOutNodesDict(listEntry, param, mix:false); //mix == false so it replaces
+							}, {
+								algaPattern.addInOutNodesDict(listEntry, param, mix:true);  //mix == true so it adds
+							});
+						});
+					});
+				});
+			});
+		});
+	}
+
+	//Remove one entry
+	removeInOutNodesDictAtParam { | oldSender, param |
+		if(oldSender.isAlgaNode, {
+			algaPattern.removeInOutNodesDict(oldSender, param);
+		}, {
+			if(oldSender.isAlgaPatternArg, {
+				algaPattern.removeInOutNodesDict(oldSender.sender, param);
+			}, {
+				//If ListPattern, loop over and only remove AlgaNodes / AlgaPatternArgs
+				if(oldSender.isListPattern, {
+					oldSender.list.do({ | listEntry |
+						if(listEntry.isAlgaPatternArg, { listEntry = listEntry.sender });
+						if(listEntry.isAlgaNode, {
+							algaPattern.removeInOutNodesDict(listEntry, param)
 						});
 					});
 				});
@@ -212,16 +237,13 @@ AlgaPatternInterpStreams {
 
 	//Wrapper around AlgaNode's removeInOutNodesDict.
 	//If entry is a ListPattern, loop around it and remove each entry that is an AlgaNode.
-	removeInOutNodesDictAtParam { | oldSender, param |
-		if(oldSender.isAlgaNode, {
-			algaPattern.removeInOutNodesDict(oldSender, param);
-		}, {
-			//If ListPattern, loop over and only remove AlgaNodes
-			if(oldSender.isListPattern, {
-				oldSender.list.do({ | listEntry |
-					if(listEntry.isAlganode, {
-						algaPattern.removeInOutNodesDict(listEntry, param)
-					});
+	removeAllInOutNodesDictAtParam { | paramName |
+		var entriesOriginalAtParam  = entriesOriginal[paramName];
+		if(entriesOriginalAtParam != nil, {
+			entriesOriginalAtParam.keysValuesDo({ | uniqueID, entryOriginalAtParam |
+				entriesOriginalAtParam.removeAt(uniqueID);
+				if(entryOriginalAtParam != nil, {
+					this.removeInOutNodesDictAtParam(entryOriginalAtParam, paramName)
 				});
 			});
 		});
@@ -242,26 +264,35 @@ AlgaPatternInterpStreams {
 		});
 	}
 
+	//Add entry / entryOriginal to dictionaries
+	addEntry { | entry, entryOriginal, paramName, uniqueID |
+		var  entriesAtParam = entries[paramName];
+		//Either create a new Dict for the param, or add to existing one
+		if(entriesAtParam == nil, {
+			entries[paramName] = IdentityDictionary().put(uniqueID, entry);
+			entriesOriginal[paramName] = IdentityDictionary().put(uniqueID, entryOriginal);
+			^true; //first entry
+		}, {
+			entries[paramName].put(uniqueID, entry);
+			entriesOriginal[paramName].put(uniqueID, entryOriginal);
+			^false; //not first entry
+		});
+	}
+
 	//Add a new sender interpolation to the current param
 	add { | entry, controlName, chans, scale, time = 0 |
 		var paramName, paramRate, paramNumChannels, paramDefault;
 		var uniqueID;
-		var entriesAtParam;
-		var entryOriginal = entry; //Original entry, not .asStream. Needed for addInOutNodesDictAtParam
-		var isFirstEntry = false;
 
-		if(controlName == nil, {
-			"AlgaPatternInterpStreams: Invalid controlName".error
-		});
+		var entryOriginal = entry; //Original entry, not .asStream. Needed for addInOutNodesDictAtParam
+		var isFirstEntry;
+
+		if(controlName == nil, { "AlgaPatternInterpStreams: Invalid controlName".error });
 
 		paramName = controlName.name;
 		paramRate = controlName.rate;
 		paramNumChannels = controlName.numChannels;
 		paramDefault = controlName.defaultValue;
-
-		//Retrieve all the current entries for the paramName:
-		//entries are all the active senders for this AlgaPattern
-		entriesAtParam = entries[paramName];
 
 		//Interpret entry asStream
 		entry = entry.asStream;
@@ -270,13 +301,12 @@ AlgaPatternInterpStreams {
 		//entry could very well be a number (like 440), screwing things up in IdentityDict.
 		uniqueID = UniqueID.next;
 
-		//Either create a new Dict for the param, or add to existing one
-		if(entriesAtParam == nil, {
-			isFirstEntry = true;
-			entries[paramName] = IdentityDictionary().put(uniqueID, entry);
-		}, {
-			entries[paramName].put(uniqueID, entry);
-		});
+		//Remove all older inNodes / outNodes... if not mix, in theory.
+		//This must come before updating entriesOriginal
+		this.removeAllInOutNodesDictAtParam(paramName);
+
+		//Add entry / entryOriginals to dicts
+		isFirstEntry = this.addEntry(entry, entryOriginal, paramName, uniqueID);
 
 		//Add the scaleArray and chans
 		this.addScaleArrayAndChans(paramName, paramNumChannels, uniqueID, chans, scale);
