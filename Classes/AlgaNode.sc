@@ -192,6 +192,7 @@ AlgaNode {
 		//AlgaPattern specific
 		if(this.isAlgaPattern, {
 			this.interpStreams = AlgaPatternInterpStreams(this);
+			this.temporaryParamSynths = IdentitySet(10);
 		});
 
 		^true;
@@ -1847,7 +1848,12 @@ AlgaNode {
 	//Remove entries from inNodes / outNodes / connectionTimeOutNodes for all involved nodes
 	removeInOutNodesDict { | oldSender = nil, param = \in |
 		var oldSenders = inNodes[param];
-		if(oldSenders == nil, { ( "AlgaNode: no previous connection enstablished at param '" ++ param ++ "'").error; ^this; });
+
+		if(oldSenders == nil, {
+			//AlgaPattern won't care about printing this
+			if(this.isAlgaPattern.not, { ( "AlgaNode: no previous connection enstablished at param '" ++ param ++ "'").error });
+			^this
+		});
 
 		oldSenders.do({ | sender |
 			var sendersParamsSet = sender.outNodes[this];

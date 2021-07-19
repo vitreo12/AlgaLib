@@ -4,7 +4,7 @@ Alga.initSynthDefs;
 Alga.boot({
 
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.kr([440, 441])) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2)
+		SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 0.1), doneAction:2) * DC.ar(0.5)
 	}).add;
 
 	AlgaSynthDef(\testImpulse, {
@@ -63,15 +63,20 @@ a.from(0.5, \dur, sched:1)
 
 a.from(0.25, \dur, sched:1)
 
-a.from(Pseq([1, 2, 0.1], inf), \dur, sched:1)
+a.from(0.125, \dur, sched:1)
 
 a.from(0.1, \dur, sched:1)
 
-a.from(440, \freq, time:1);
+a.from(Pwhite(0.01, 0.1), \dur, sched:1)
 
-a.from(Pseq([220, 660, [885, 880]], inf), \freq, time:3)
+a.from(440, \freq, time:1)
+
+a.from(Pseq([440, 660, [885, 880]], inf), \freq, time:3)
+
+s.plotTree
 
 
+s.scope
 
 //scale
 a.from(b, \freq, time:5, scale:[[330, 220], [1000, 1200]]);
@@ -106,6 +111,7 @@ a.from(
 )
 )
 
+a.inNodes
 
 //replace
 (
