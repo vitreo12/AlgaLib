@@ -342,8 +342,9 @@ AlgaNode {
 	//2 args: new time and original time.
 	//return time, but also set longestWaitTime accordingly
 	calculateTemporaryLongestWaitTime { | time, otherTime |
-		//if nil time, return otherTime (the original one)
-		if((time == nil).or(time.isNumber.not), { ^otherTime });
+		//if nil time, use otherTime (the original one)
+		if((time == nil).or(time.isNumber.not), { time = otherTime });
+		if(time == nil, { time = 0 });
 
 		//this is to set a temporary longestWaitTime
 		if(time > longestWaitTime, {
@@ -366,8 +367,8 @@ AlgaNode {
 			}
 		});
 
-		//return time
-		^time;
+		//return max between time and longestWaitTime
+		^max(time, longestWaitTime);
 	}
 
 	//calculate longestConnectionTime
