@@ -343,8 +343,7 @@ AlgaNode {
 	//return time, but also set longestWaitTime accordingly
 	calculateTemporaryLongestWaitTime { | time, otherTime |
 		//if nil time, use otherTime (the original one)
-		if((time == nil).or(time.isNumber.not), { time = otherTime });
-		if(time == nil, { time = 0 });
+		if((time == nil).or(time.isNumber.not), { ^otherTime });
 
 		//this is to set a temporary longestWaitTime
 		if(time > longestWaitTime, {
@@ -367,8 +366,8 @@ AlgaNode {
 			}
 		});
 
-		//return max between time and longestWaitTime
-		^max(time, longestWaitTime);
+		//return time
+		^time;
 	}
 
 	//calculate longestConnectionTime
@@ -1582,8 +1581,8 @@ AlgaNode {
 		});
 	}
 
-	//Default now and useConnectionTime to true for synths
-	freeInterpNormSynths { | useConnectionTime = true, now = true |
+	//Default now to true
+	freeInterpNormSynths { | now = true |
 		if(now, {
 			//Free synths now
 			interpSynths.do({ | interpSynthsAtParam |
@@ -1629,7 +1628,7 @@ AlgaNode {
 	}
 
 	freeAllSynths { | useConnectionTime = true, now = true |
-		this.freeInterpNormSynths(useConnectionTime, now);
+		this.freeInterpNormSynths(now);
 		this.freeSynth(useConnectionTime, now);
 	}
 
@@ -2361,7 +2360,14 @@ AlgaNode {
 		if(algaCleared, {
 			"AlgaNode: trying to 'replace' on a cleared AlgaNode. Running 'AlgaNode.new' instead.".warn;
 			algaCleared = false;
-			^this.init(def, args, connectionTime, playTime, outsMapping, server, 0);
+			^this.init(
+				def: def,
+				args: args,
+				connectionTime: connectionTime,
+				playTime: playTime,
+				outsMapping: outsMapping,
+				server: server
+			);
 		});
 
 		//In case it has been set to true when clearing, then replacing before clear ends!
@@ -2564,6 +2570,7 @@ AlgaNode {
 	clearInner { | time |
 		//calc temporary time
 		time = this.calculateTemporaryLongestWaitTime(time, playTime);
+		time = max(time, longestWaitTime); //makes sure to wait longest time to run clears
 
 		//If synth had connections, run <| (or disconnect, if mixer) on the receivers
 		this.removeConnectionFromReceivers(time);
@@ -2578,7 +2585,8 @@ AlgaNode {
 			//Wait time before clearing groups, synths and busses...
 			(time + 1.0).wait;
 
-			this.freeAllGroups(true); //I can just remove the groups, as they contain the synths
+			//Just remove groups, they contain the synths
+			this.freeAllGroups(true);
 			this.freeAllBusses(true);
 
 			//Reset all instance variables
