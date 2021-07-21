@@ -277,7 +277,7 @@ AlgaPatternInterpStreams {
 		var entryOriginal = entry; //Original entry, not .asStream. Needed for addInOutNodesDictAtParam
 		var isFirstEntry;
 
-		if(controlName == nil, { "AlgaPatternInterpStreams: Invalid controlName".error });
+		if(controlName == nil, { ("AlgaPatternInterpStreams: Invalid controlName for param '" ++ paramName ++ "'").error });
 
 		paramName = controlName.name;
 		paramRate = controlName.rate;
@@ -971,6 +971,12 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
+	//Interpolate def (not yet)
+	interpolateDef { | value, sched |
+		if(sched == nil, { sched = 0 });
+
+	}
+
 	//<<, <<+ and <|
 	makeConnectionInner { | param = \in, sender, senderChansMapping, scale, time = 0 |
 		var paramConnectionTime = paramsConnectionTime[param];
@@ -1005,6 +1011,12 @@ AlgaPattern : AlgaNode {
 		//Special case, \dur
 		if(param == \dur, {
 			this.interpolateDur(sender, sched);
+			^this;
+		});
+
+		//Special case, \def
+		if(param == \def, {
+			this.interpolateDef(sender, sched);
 			^this;
 		});
 
@@ -1052,12 +1064,19 @@ AlgaPattern : AlgaNode {
 	// 2) replace just the SynthDef with either a new SynthDef or a ListPattern with JUST SynthDefs.
 	//    This would be equivalent to <<.def \newSynthDef
 	//    OR <<.def Pseq([\newSynthDef1, \newSynthDef2])
-	/*
-	replace { | def, time, keepChannelsMappingIn = true, keepChannelsMappingOut = true,
-	keepInScale = true, keepOutScale = true |
-	"AlgaPattern: replace is not supported yet".error;
+	replaceInner { | def, args, time, outsMapping, keepOutsMappingIn = true,
+		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
+
+		if(def.class == Event, { "AlgaPattern: replacing the Event is not supported yet.".error; ^this });
+
+		if(def.class != Symbol, {
+			("AlgaPattern: invalid Class ' " ++ def.class ++ "'. Use a Symbol pointing to a valid AlgaSynthDef").error;
+			^this
+		});
+
+		//Running replace is equale to <<.def
+		this.interpolateDef;
 	}
-	*/
 
 	//Don't support <<+ for now
 	mixFrom { | sender, param = \in, inChans, scale, time |
