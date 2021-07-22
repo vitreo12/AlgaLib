@@ -191,7 +191,6 @@ AlgaNode {
 
 		//AlgaPattern specific
 		if(this.isAlgaPattern, {
-			this.interpStreams = AlgaPatternInterpStreams(this);
 			this.temporaryParamSynths = IdentitySet(10);
 		});
 
@@ -853,7 +852,7 @@ AlgaNode {
 			});
 
 			//No values provided in replaceArgs, or new explicit args: have been just set
-			if((defArg == nil).or(explicitArg), {
+			if((defArg == nil).or(explicitArg == true), {
 				defArg = defArgs[param];
 				explicitArgs[param] = false; //reset state
 				replaceArgs.removeAt(param); //reset replaceArg
@@ -866,6 +865,9 @@ AlgaNode {
 					//Also this works perfectly with replacing Buffer entries
 					defaultOrArg = defArg;
 				}, {
+					//AlgaPattern needs the value to be returned, not to make a connection!
+					if(this.isAlgaPattern, { ^defArg });
+
 					if(defArg.isAlgaNode, {
 						//Schedule connection with the algaNode
 						this.makeConnection(defArg, param);
@@ -2395,7 +2397,9 @@ AlgaNode {
 
 		//New one
 		//Just pass the entry, not the whole thing
-		this.dispatchNode(def, args,
+		this.dispatchNode(
+			def:def,
+			args:args,
 			initGroups:initGroups,
 			replace:true,
 			keepChannelsMapping:keepOutsMappingIn, outsMapping:outsMapping,
@@ -2424,7 +2428,8 @@ AlgaNode {
 		scheduler.addAction(
 			condition: { this.algaInstantiated },
 			func: {
-				this.replaceInner(def:def, args:args, time:time,
+				this.replaceInner(
+					def:def, args:args, time:time,
 					outsMapping:outsMapping,
 					keepOutsMappingIn:keepOutsMappingIn,
 					keepOutsMappingOut:keepOutsMappingOut,

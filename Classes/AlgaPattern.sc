@@ -21,6 +21,12 @@ AlgaPatternInterpStreams {
 	var <algaPattern;
 	var <server;
 
+	//The \dur entry
+	var <>dur;
+
+	//Store it for .replace
+	var <algaReschedulingEventStreamPlayer;
+
 	var <entries;
 	var <interpSynths;
 	var <interpBusses;
@@ -42,11 +48,32 @@ AlgaPatternInterpStreams {
 		server              = algaPattern.server;
 	}
 
+	//On replace, this will be called. It will free everything after longestWaitTime
+	freeActiveInterpSynthsAtParamOnReplace {
+		var interpSynthsOld = interpSynths.copy;
+		var interpBussesOld = interpBusses.copy;
+		var time = algaPattern.longestWaitTime;
+		fork {
+			(time + 1.0).wait;
+
+			interpSynthsOld.do({ | interpSynthsAtParam |
+				interpSynthsAtParam.do({ | interpSynth |
+					interpSynth.free;
+				});
+			});
+
+			interpBussesOld.do({ | interpBussesAtParam |
+				interpBussesAtParam.do({ | interpBus |
+					interpBus.free
+				});
+			});
+		}
+	}
+
 	//Free all active interpSynths. This triggers the onFree action that's executed in
 	//addActiveInterpSynthOnFree
 	freeActiveInterpSynthsAtParam { | paramName, time = 0 |
 		var interpSynthsAtParam = interpSynths[paramName];
-
 		if(interpSynthsAtParam != nil, {
 			interpSynthsAtParam.keysValuesDo({ | uniqueID, interpSynth |
 				//Trigger the release of the interpSynth. When freed, the onFree action
@@ -82,6 +109,8 @@ AlgaPatternInterpStreams {
 					patternInterpSumBus: patternInterpSumBus,
 					patternBussesAndSynths: nil,
 					scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
+					algaSynthBus: algaPattern.synthBus, //sure about this?
+					algaPatternInterpStreams: this,
 					isTemporary: true
 				)
 			});
@@ -189,51 +218,8 @@ AlgaPatternInterpStreams {
 	//Wrapper around AlgaNode's addInOutNodesDict.
 	//If entry is a ListPattern, loop around it and add each entry that is an AlgaNode.
 	addInOutNodesDictAtParam { | sender, param, mix = false |
-		if(sender.isAlgaNode, {
-			algaPattern.addInOutNodesDict(sender, param, mix:false);
-		}, {
-			if(sender.isAlgaPatternArg, {
-				algaPattern.addInOutNodesDict(sender.sender, param, mix:false)
-			}, {
-				//If ListPattern, loop over and only add AlgaNodes / AlgaPatternArgs
-				if(sender.isListPattern, {
-					sender.list.do({ | listEntry, index |
-						if(listEntry.isAlgaPatternArg, { listEntry = listEntry.sender });
-						if(listEntry.isAlgaNode, {
-							if(algaPattern.inNodes.size == 0, {
-								algaPattern.addInOutNodesDict(listEntry, param, mix:false); //mix == false so it replaces
-							}, {
-								algaPattern.addInOutNodesDict(listEntry, param, mix:true);  //mix == true so it adds
-							});
-						});
-					});
-				});
-			});
-		});
+		algaPattern.addInOutNodesDict(sender, param, mix)
 	}
-
-	//Remove one entry
-	/*
-	removeInOutNodesDictAtParam { | oldSender, param |
-		if(oldSender.isAlgaNode, {
-			algaPattern.removeInOutNodesDict(oldSender, param);
-		}, {
-			if(oldSender.isAlgaPatternArg, {
-				algaPattern.removeInOutNodesDict(oldSender.sender, param);
-			}, {
-				//If ListPattern, loop over and only remove AlgaNodes / AlgaPatternArgs
-				if(oldSender.isListPattern, {
-					oldSender.list.do({ | listEntry |
-						if(listEntry.isAlgaPatternArg, { listEntry = listEntry.sender });
-						if(listEntry.isAlgaNode, {
-							algaPattern.removeInOutNodesDict(listEntry, param)
-						});
-					});
-				});
-			});
-		});
-	}
-	*/
 
 	//Wrapper around AlgaNode's removeInOutNodesDict.
 	//If entry is a ListPattern, loop around it and remove each entry that is an AlgaNode.
@@ -337,6 +323,11 @@ AlgaPatternInterpStreams {
 			);
 		});
 	}
+
+	//Play a pattern as an AlgaReschedulingEventStreamPlayer and return it
+	playAlgaReschedulingEventStreamPlayer { | pattern, clock |
+		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(clock:clock)
+	}
 }
 
 //This class is used to specify individual parameters of a pattern argument.
@@ -402,17 +393,11 @@ AlgaPattern : AlgaNode {
 	//The actual Patterns to be manipulated
 	var <pattern;
 
-	//The \dur entry (special case)
-	var <dur;
-
 	//The Event input
 	var <eventPairs;
 
-	//The AlgaReschedulingEventStreamPlayer
-	var <algaReschedulingEventStreamPlayer;
-
-	//Dict of all interpolation streams
-	var <>interpStreams;
+	//interpStreams. These varies on .replace
+	var <interpStreams;
 
 	//IdentitySet of paramSynths that get temporarily created for mid-pattern interpolation
 	var <>temporaryParamSynths;
@@ -451,10 +436,14 @@ AlgaPattern : AlgaNode {
 			//The AlgaSynthDef
 			var algaSynthDef = ~synthDefName.valueEnvir;
 
-			//AlgaPattern and its server / clock
+			//AlgaPattern, the synthBus and its server / clock
 			var algaPattern = ~algaPattern;
+			var algaSynthBus = ~algaSynthBus;
 			var algaPatternServer = ~algaPatternServer;
 			var algaPatternClock = ~algaPatternClock;
+
+			//The interpStreams the Pattern is using
+			var algaPatternInterpStreams = ~algaPatternInterpStreams;
 
 			//Other things for pattern syncing / clocking / scheduling
 			var offset = ~timingOffset;
@@ -466,7 +455,9 @@ AlgaPattern : AlgaNode {
 			//Create the bundle with all needed Synths for this Event.
 			bundle = algaPatternServer.makeBundle(false, {
 				~algaPattern.createEventSynths(
-					algaSynthDef
+					algaSynthDef,
+					algaSynthBus,
+					algaPatternInterpStreams
 				)
 			});
 
@@ -483,14 +474,18 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Set dur asStream for it to work within Pfuncn
-	setDur { | value |
-		dur = value.asStream
+	setDur { | value, newInterpStreams |
+		if(newInterpStreams == nil, {
+			interpStreams.dur = value.asStream
+		}, {
+			newInterpStreams.dur = value.asStream
+		});
 	}
 
 	//Free all unused busses from interpStreams
-	freeUnusedInterpBusses {
-		var interpBussesToFree = interpStreams.interpBussesToFree.copy;
-		interpStreams.interpBussesToFree.clear;
+	freeUnusedInterpBusses { | algaPatternInterpStreams |
+		var interpBussesToFree = algaPatternInterpStreams.interpBussesToFree.copy;
+		algaPatternInterpStreams.interpBussesToFree.clear;
 
 		//For safety reasons, wait a little bit longer to actually .free the interpBusses.
 		//There are cases with very quick durs where the sync is wrong, but this fixes it,
@@ -504,7 +499,8 @@ AlgaPattern : AlgaNode {
 	//Create one pattern synth with the entry / uniqueID pair at paramName
 	//This is the core of the interpolation behaviour for AlgaPattern !!
 	createPatternParamSynth { | entry, uniqueID, paramName, paramNumChannels, paramRate,
-		paramDefault, patternInterpSumBus, patternBussesAndSynths, scaleArraysAndChansAtParam, isTemporary = false |
+		paramDefault, patternInterpSumBus, patternBussesAndSynths, scaleArraysAndChansAtParam, isTemporary = false,
+		algaSynthBus, algaPatternInterpStreams |
 
 		var sender, senderNumChannels, senderRate;
 		var chansMapping, scale;
@@ -550,7 +546,7 @@ AlgaPattern : AlgaNode {
 				//if algaInstantiated, use the rate, numchannels and bus arg from the alga bus
 				senderRate = entry.rate;
 				senderNumChannels = entry.numChannels;
-				entry = entry.synthBus.busArg;
+				entry = algaSynthBus.busArg;
 			}, {
 				//otherwise, use default
 				senderRate = "control";
@@ -569,7 +565,7 @@ AlgaPattern : AlgaNode {
 			// ... Now, I need to keep track of all the active interpBusses instead, not retrievin
 			//from interpBusses, which gets replaced in language, but should implement the same
 			//behaviour of activeInterpSynths and get busses from there.
-			var patternParamEnvBus = interpStreams.interpBusses[paramName][uniqueID];
+			var patternParamEnvBus = algaPatternInterpStreams.interpBusses[paramName][uniqueID];
 
 			if(patternParamEnvBus != nil, {
 				var patternParamSynth;
@@ -663,7 +659,8 @@ AlgaPattern : AlgaNode {
 
 	//Create all pattern synths per-param
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
-		paramDefault, patternInterpSumBus, patternBussesAndSynths, interpStreamsEntriesAtParam, scaleArraysAndChansAtParam |
+		paramDefault, patternInterpSumBus, patternBussesAndSynths,
+		interpStreamsEntriesAtParam, scaleArraysAndChansAtParam, algaSynthBus, algaPatternInterpStreams |
 
 		if(interpStreamsEntriesAtParam != nil, {
 			interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry | //indexed by uniqueIDs
@@ -676,7 +673,9 @@ AlgaPattern : AlgaNode {
 					paramDefault: paramDefault,
 					patternInterpSumBus: patternInterpSumBus,
 					patternBussesAndSynths: patternBussesAndSynths,
-					scaleArraysAndChansAtParam: scaleArraysAndChansAtParam
+					scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
+					algaSynthBus: algaSynthBus,
+					algaPatternInterpStreams: algaPatternInterpStreams
 				)
 			});
 		});
@@ -689,14 +688,14 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
-	createEventSynths { | algaSynthDef |
+	createEventSynths { | algaSynthDef, algaSynthBus, algaPatternInterpStreams |
 		//These will be populated and freed when the patternSynth is released
 		var patternBussesAndSynths = IdentitySet(controlNames.size * 2);
 
 		//args to patternSynth
 		var patternSynthArgs = [
 			\gate, 1,
-			\out, synthBus.index
+			\out, algaSynthBus.index
 		];
 
 		//The actual synth that will be created
@@ -746,16 +745,17 @@ AlgaPattern : AlgaNode {
 
 			//All the current interpStreams for this param. Retrieve the entries,
 			//which store all the senders to this param for the interpStream.
-			var interpStreamsEntriesAtParam = interpStreams.entries[paramName];
+			var interpStreamsEntriesAtParam = algaPatternInterpStreams.entries[paramName];
 
 			//scaleArray and chans
-			var scaleArraysAndChansAtParam = interpStreams.scaleArraysAndChans[paramName];
+			var scaleArraysAndChansAtParam = algaPatternInterpStreams.scaleArraysAndChans[paramName];
 
 			//Create all interp synths for current param
 			this.createPatternParamSynths(
 				paramName, paramNumChannels, paramRate,
 				paramDefault, patternInterpSumBus, patternBussesAndSynths,
-				interpStreamsEntriesAtParam, scaleArraysAndChansAtParam
+				interpStreamsEntriesAtParam, scaleArraysAndChansAtParam,
+				algaSynthBus, algaPatternInterpStreams
 			);
 
 			//Read from patternParamNormBus
@@ -789,7 +789,7 @@ AlgaPattern : AlgaNode {
 			//that no other synths will be using them. Also, this fixes the case where
 			//patternSynth takes longer than \dur. We want to wait for the end of patternSynth
 			//to free all used things!
-			this.freeUnusedInterpBusses;
+			this.freeUnusedInterpBusses(algaPatternInterpStreams);
 		});
 	}
 
@@ -820,7 +820,10 @@ AlgaPattern : AlgaNode {
 
 		case
 		{ defClass == Symbol } {
-			^this.dispatchSynthDef(defEntry, initGroups, replace,
+			^this.dispatchSynthDef(
+				def: defEntry,
+				initGroups: initGroups,
+				replace: replace,
 				keepChannelsMapping:keepChannelsMapping,
 				keepScale:keepScale,
 				sched:sched
@@ -842,6 +845,8 @@ AlgaPattern : AlgaNode {
 
 		//Retrieve controlNames from SynthDesc
 		var synthDescControlNames = synthDef.asSynthDesc.controls;
+
+		//Create controlNames
 		this.createControlNamesAndParamsConnectionTime(synthDescControlNames);
 
 		numChannels = synthDef.numChannels;
@@ -866,7 +871,7 @@ AlgaPattern : AlgaNode {
 		this.createSynthBus;
 
 		//Create the actual pattern.
-		this.createPattern(sched);
+		this.createPattern(replace, sched);
 	}
 
 	//Support Function in the future
@@ -885,15 +890,20 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Build the actual pattern
-	createPattern { | sched |
+	createPattern { | replace = false, sched |
 		var foundDurOrDelta = false;
 		var patternPairs = Array.newClear;
+
+		//Create new interpStreams. NOTE that the Pfunc in dur uses this, as interpStreams
+		//can be overwritten when using replace. This allows to separate the "global" one
+		//from the one that's being created here.
+		var newInterpStreams = AlgaPatternInterpStreams(this);
 
 		//Loop over the Event input from the user
 		eventPairs.keysValuesDo({ | paramName, value |
 			if((paramName == \dur).or(paramName == \delta), {
 				foundDurOrDelta = true;
-				this.setDur(value);
+				this.setDur(value, newInterpStreams);
 			});
 
 			if(paramName == \def, {
@@ -903,7 +913,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//If no dur or delta, default to 1
-		if(foundDurOrDelta.not, { this.setDur(1) });
+		if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
 
 		//Add all the default entries from SynthDef that the user hasn't set yet
 		controlNames.do({ | controlName |
@@ -912,13 +922,14 @@ AlgaPattern : AlgaNode {
 
 			//if not set explicitly yet
 			if(paramValue == nil, {
-				paramValue = this.getDefaultOrArg(controlName, paramName);
+				//When replace, getDefaultOrArg will return LATEST set parameter
+				paramValue = this.getDefaultOrArg(controlName, paramName, replace);
 			});
 
-			//Add to interpStreams (which also creates interpBus / interpSynth).
+			//Add to interpStream (which also creates interpBus / interpSynth).
 			//These are unscheduled, as it's best to just create them asap.
-			//Only the pattern synths  to be scheduled
-			interpStreams.add(
+			//Only the pattern synths need to be scheduled
+			newInterpStreams.add(
 				entry: paramValue,
 				controlName: controlName,
 				time: 0
@@ -929,10 +940,12 @@ AlgaPattern : AlgaNode {
 		//the context of this AlgaPattern
 		patternPairs = patternPairs.addAll([
 			\type, \algaNote,
-			\dur, Pfuncn( { dur.next }, inf), //Pfunc allows to modify the value
+			\dur, Pfuncn( { newInterpStreams.dur.next }, inf), //Pfunc allows to modify the value
 			\algaPattern, this,
+			\algaSynthBus, this.synthBus, //Lock current one: will work on .replace
 			\algaPatternServer, server,
-			\algaPatternClock, this.clock
+			\algaPatternClock, this.clock,
+			\algaPatternInterpStreams, newInterpStreams //Lock current one: will work on .replace
 		]);
 
 		//Create the Pattern by calling .next from the streams
@@ -941,14 +954,14 @@ AlgaPattern : AlgaNode {
 		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
 		//createPattern function is non scheduled as it it better to create it right away.
 		scheduler.addAction(
-			//condition? interpStreams' interpEnv to be instantiated?
 			func: {
-				algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
-					clock: this.clock
-				)
+				newInterpStreams.playAlgaReschedulingEventStreamPlayer(pattern, this.clock)
 			},
 			sched: sched
 		);
+
+		//Update latest interpStreams
+		interpStreams = newInterpStreams;
 	}
 
 	//Interpolate dur (not yet)
@@ -964,17 +977,12 @@ AlgaPattern : AlgaNode {
 		scheduler.addAction(
 			condition: { this.algaInstantiated },
 			func: {
+				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
 				if(algaReschedulingEventStreamPlayer != nil, {
 					algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
 				})
 			}
 		);
-	}
-
-	//Interpolate def (not yet)
-	interpolateDef { | value, sched |
-		if(sched == nil, { sched = 0 });
-
 	}
 
 	//<<, <<+ and <|
@@ -983,8 +991,7 @@ AlgaPattern : AlgaNode {
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
-
-		if((sender.isAlgaNode.not).and(sender.isPattern.not).and(sender.isAlgaPatternArg.not).and(sender.isNumberOrArray.not), {
+	if((sender.isAlgaNode.not).and(sender.isPattern.not).and(sender.isAlgaPatternArg.not).and(sender.isNumberOrArray.not), {
 			"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, AlgaPatternArgs, Patterns, Numbers and Arrays".error;
 			^this;
 		});
@@ -1010,14 +1017,7 @@ AlgaPattern : AlgaNode {
 
 		//Special case, \dur
 		if(param == \dur, {
-			this.interpolateDur(sender, sched);
-			^this;
-		});
-
-		//Special case, \def
-		if(param == \def, {
-			this.interpolateDef(sender, sched);
-			^this;
+			^this.interpolateDur(sender, sched);
 		});
 
 		//All other cases
@@ -1064,18 +1064,31 @@ AlgaPattern : AlgaNode {
 	// 2) replace just the SynthDef with either a new SynthDef or a ListPattern with JUST SynthDefs.
 	//    This would be equivalent to <<.def \newSynthDef
 	//    OR <<.def Pseq([\newSynthDef1, \newSynthDef2])
-	replaceInner { | def, args, time, outsMapping, keepOutsMappingIn = true,
-		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
-		if(def.class == Event, { "AlgaPattern: replacing the Event is not supported yet.".error; ^this });
+	//Called from replaceInner. freeInterpNormSynths is not used for AlgaPatterns
+	freeAllSynths { | useConnectionTime = true, now = true |
+		this.stopPattern(now);
+		this.freeSynth(useConnectionTime, now);
+	}
 
-		if(def.class != Symbol, {
-			("AlgaPattern: invalid Class ' " ++ def.class ++ "'. Use a Symbol pointing to a valid AlgaSynthDef").error;
-			^this
+	//Used when replacing. Free synths and stop the current running pattern
+	stopPattern { | now = true |
+		//Free all synths (it waits for longestWaitTime)
+		interpStreams.freeActiveInterpSynthsAtParamOnReplace;
+
+		//Stop and clear the algaReschedulingEventStreamPlayer
+		if(now, {
+			interpStreams.algaReschedulingEventStreamPlayer.stop
+		}, {
+			var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
+			var time = longestWaitTime;
+			if(algaReschedulingEventStreamPlayer != nil, {
+				fork {
+					(time + 1.0).wait;
+					algaReschedulingEventStreamPlayer.stop
+				}
+			});
 		});
-
-		//Running replace is equale to <<.def
-		this.interpolateDef;
 	}
 
 	//Don't support <<+ for now
@@ -1090,7 +1103,54 @@ AlgaPattern : AlgaNode {
 
 	//stop and reschedule in the future
 	reschedule { | sched = 0 |
-		algaReschedulingEventStreamPlayer.reschedule(sched);
+		interpStreams.algaReschedulingEventStreamPlayer.reschedule(sched);
+	}
+
+	//Wrapper for addInNode
+	addInNodeAlgaNode { | sender, param = \in, mix = false |
+		//Empty entry OR not doing mixing, create new IdentitySet. Otherwise, add to existing
+		if((inNodes[param] == nil).or(mix.not), {
+			inNodes[param] = IdentitySet[sender];
+		}, {
+			inNodes[param].add(sender);
+		})
+	}
+
+	//Wrapper for addInNode
+	addInNode { | sender, param = \in, mix = false |
+		//First of all, remove the outNodes that the previous sender had with the
+		//param of this node, if there was any. Only apply if mix==false (no <<+ / >>+)
+		if(mix == false, {
+			var oldSenderSet = inNodes[param];
+			if(oldSenderSet != nil, {
+				oldSenderSet.do({ | oldSender |
+					oldSender.outNodes.removeAt(this);
+				});
+			});
+		});
+
+		if(sender.isAlgaNode, {
+			this.addInNodeAlgaNode(sender, param, mix);
+		}, {
+			if(sender.isAlgaPatternArg, {
+				this.addInNodeAlgaNode(sender, param, mix);
+			}, {
+				if(sender.isListPattern, {
+					sender.list.do({ | listEntry |
+						if(listEntry.isAlgaPatternArg, { listEntry = listEntry.sender });
+						if(listEntry.isAlgaNode, {
+							if(inNodes.size == 0, {
+								this.addInNodeAlgaNode(listEntry, param, mix:false);
+							}, {
+								this.addInNodeAlgaNode(listEntry, param, mix:true);
+							});
+						});
+					});
+				});
+			});
+
+			replaceArgs[param] = sender;
+		});
 	}
 
 	//There is no way to check individual synths.
