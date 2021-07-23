@@ -29,7 +29,7 @@ Alga.boot({
 (
 a.replace((
 	def:\test2,
-	dur: 0.5,
+	dur: 0.125,
 	//freq: 123
 ), sched:1)
 )
@@ -37,24 +37,16 @@ a.replace((
 (
 a.replace((
 	def:\test,
-	dur: 0.2,
+	dur: 0.125,
 	//freq: 440
 ), sched:1)
 )
 
-a.from(b, \freq, scale:[120, 440])
+a.replace(\test2);
 
-a.interpStreams
-
-a.currentInterpStream.algaReschedulingEventStreamPlayer
-
-a.replaceArgs
+a.from(b, \freq, scale:[120, 440], time:1)
 
 a.inNodes
-
-b.outNodes
-
-s.scope
 
 //This is AlgaNode's behaviour with replace
 (

@@ -204,8 +204,8 @@ AlgaNode {
 		//Also check for AlgaPattern
 		if(this.isAlgaPattern, {
 			//AlgaPattern init
-			if(argDef.class != Event, {
-				"AlgaPattern: first argument must be an Event describing the pattern".error;
+			if((argDef.class != Event).and(argDef.class != Symbol), {
+				"AlgaPattern: first argument must be an Event describing the pattern or a Symbol pointing to a SynthDef".error;
 				^this;
 			});
 		}, {

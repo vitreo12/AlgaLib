@@ -793,12 +793,17 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//dispatchNode: first argument is an Event
+	//dispatchNode: first argument is an Event or SynthDef
 	dispatchNode { | def, args, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
+		var defEntry;
+
+		//Just a Symbol for a SynthDef: wrap it in an Event
+		if(def.class == Symbol, { def = (\def: def) });
+
 		//def: entry
-		var defEntry = def[\def];
+		defEntry = def[\def];
 		if(defEntry == nil, {
 			"AlgaPattern: no 'def' entry in the Event".error;
 			^this;
@@ -912,8 +917,18 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
-		//If no dur or delta, default to 1
-		if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
+		//If no dur and replace, get it from previous interpStreams
+		if(replace, {
+			if(foundDurOrDelta.not, {
+				if(interpStreams != nil, {
+					this.setDur(interpStreams.dur, newInterpStreams)
+				}, {
+					this.setDur(1, newInterpStreams)
+				});
+			})
+		}, {
+			if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
+		});
 
 		//Add all the default entries from SynthDef that the user hasn't set yet
 		controlNames.do({ | controlName |
