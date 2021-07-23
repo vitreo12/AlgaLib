@@ -104,6 +104,7 @@ AlgaNode {
 	var <isPlaying = false;
 	var <beingStopped = false;
 	var <algaToBeCleared = false;
+	var <algaWasBeingCleared = false;
 	var <algaCleared = false;
 
 	*new { | def, args, connectionTime, playTime, sched, outsMapping, server |
@@ -395,13 +396,11 @@ AlgaNode {
 	}
 
 	createAllGroups {
-		if(group == nil, {
-			group = AlgaGroup(server);
-			playGroup = AlgaGroup(group);
-			synthGroup = AlgaGroup(group);
-			normGroup = AlgaGroup(group);
-			interpGroup = AlgaGroup(group);
-		});
+		group = AlgaGroup(server);
+		playGroup = AlgaGroup(group);
+		synthGroup = AlgaGroup(group);
+		normGroup = AlgaGroup(group);
+		interpGroup = AlgaGroup(group);
 	}
 
 	resetGroups {
@@ -415,26 +414,18 @@ AlgaNode {
 	}
 
 	//Groups (and state) will be reset only if they are nil AND they are set to be freed.
-	//the algaToBeCleared variable can be changed in real time, if AlgaNode.replace is called while
-	//clearing is happening!
-	freeAllGroups { | now = false |
-		if((group != nil).and(algaToBeCleared), {
+	freeAllGroups { | now = false, time |
+		if(group != nil, {
 			if(now, {
-				//Free now
 				group.free;
-
-				//this.resetGroups;
 			}, {
-				//Lock longestWaitTime
-				var time = longestWaitTime;
+				var groupOld = group.copy;
 
-				//Wait longestWaitTime, then free
+				if(time == nil, { time = longestWaitTime });
+
 				fork {
 					(time + 1.0).wait;
-
-					group.free;
-
-					//this.resetGroups;
+					groupOld.free;
 				};
 			});
 		});
@@ -463,32 +454,30 @@ AlgaNode {
 		this.createSynthBus;
 	}
 
-	freeSynthBus { | now = false |
+	freeSynthBus { | now = false, time |
 		if(now, {
 			if(synthBus != nil, {
 				synthBus.free;
 				synthBus = nil; //Necessary for correct .play behaviour!
 			});
 		}, {
-			//Lock longestWaitTime
-			var time = longestWaitTime;
-
 			//if forking, this.synthBus could change, that's why this is needed
 			var prevSynthBus = synthBus.copy;
 			synthBus = nil;  //Necessary for correct .play behaviour!
+
+			if(time == nil, { time = longestWaitTime });
 
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestConnectionTime (which will be the time the replaced
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
 				(time + 1.0).wait;
-
 				if(prevSynthBus != nil, { prevSynthBus.free });
 			}
 		});
 	}
 
-	freeInterpNormBusses { | now = false |
+	freeInterpNormBusses { | now = false, time |
 		if(now, {
 			//Free busses now
 			if(normBusses != nil, {
@@ -503,14 +492,12 @@ AlgaNode {
 				});
 			});
 		}, {
-			//Lock longestWaitTime
-			var time = longestWaitTime;
-
 			//Dictionary need to be deepcopied
 			var prevNormBusses = normBusses.copy;
 			var prevInterpBusses = interpBusses.copy;
 
-			//Free prev busses after longestWaitTime
+			if(time == nil, { time = longestWaitTime });
+
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
 				//going on. Simply wait longer than longestConnectionTime (which will be the time the replaced
@@ -534,9 +521,9 @@ AlgaNode {
 		});
 	}
 
-	freeAllBusses { | now = false |
-		this.freeSynthBus(now);
-		this.freeInterpNormBusses(now);
+	freeAllBusses { | now = false, time |
+		this.freeSynthBus(now, time);
+		this.freeInterpNormBusses(now, time);
 	}
 
 	//This will also be kept across replaces, as it's just updating the dict
@@ -1552,7 +1539,7 @@ AlgaNode {
 	//Default now and useConnectionTime to true for synths.
 	//Synth always uses longestConnectionTime, in order to make sure that everything connected to it
 	//will have time to run fade ins and outs
-	freeSynth { | useConnectionTime = true, now = true |
+	freeSynth { | useConnectionTime = true, now = true, time |
 		if(now, {
 			if(synth != nil, {
 				//synth's fadeTime is longestWaitTime!
@@ -1564,11 +1551,10 @@ AlgaNode {
 				//this.resetSynth;
 			});
 		}, {
-			//Lock longestWaitTime
-			var time = longestWaitTime;
-
 			//Needs to be deep copied (a new synth could be algaInstantiated meanwhile)
 			var prevSynth = synth.copy;
+
+			if(time == nil, { time = longestWaitTime });
 
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
@@ -1584,7 +1570,7 @@ AlgaNode {
 	}
 
 	//Default now to true
-	freeInterpNormSynths { | now = true |
+	freeInterpNormSynths { | now = true, time |
 		if(now, {
 			//Free synths now
 			interpSynths.do({ | interpSynthsAtParam |
@@ -1601,12 +1587,11 @@ AlgaNode {
 
 			//this.resetInterpNormSynths;
 		}, {
-			//Lock longestWaitTime
-			var time = longestWaitTime;
-
 			//Dictionaries need to be deep copied
 			var prevInterpSynths = interpSynths.copy;
 			var prevNormSynths = normSynths.copy;
+
+			if(time == nil, { time = longestWaitTime });
 
 			fork {
 				//Cheap solution when having to replacing a synth that had other interp stuff
@@ -1629,9 +1614,9 @@ AlgaNode {
 		});
 	}
 
-	freeAllSynths { | useConnectionTime = true, now = true |
-		this.freeInterpNormSynths(now);
-		this.freeSynth(useConnectionTime, now);
+	freeAllSynths { | useConnectionTime = true, now = true, time |
+		this.freeInterpNormSynths(now, time);
+		this.freeSynth(useConnectionTime, now, time);
 	}
 
 	//Free the entire mix node at specific param.
@@ -2355,8 +2340,8 @@ AlgaNode {
 
 		var wasPlaying = false;
 
-		//re-init groups if clear was used
-		var initGroups = if(group == nil, { true }, { false });
+		//Re-init groups if clear was used or toBeCleared
+		var initGroups = if((group == nil).or(algaCleared).or(algaToBeCleared), { true }, { false });
 
 		//Trying to .replace on a cleared AlgaNode
 		if(algaCleared, {
@@ -2371,6 +2356,9 @@ AlgaNode {
 				server: server
 			);
 		});
+
+		//In case it was being cleared, set flag. This is used in AlgaPattern
+		if(algaToBeCleared, { algaWasBeingCleared = true });
 
 		//In case it has been set to true when clearing, then replacing before clear ends!
 		algaToBeCleared = false;
@@ -2416,7 +2404,10 @@ AlgaNode {
 		//If node was playing, or .replace has been called while .stop / .clear, play again
 		if(wasPlaying.or(beingStopped), {
 			this.playInner(replace:true)
-		})
+		});
+
+		//Reset flag
+		algaWasBeingCleared = false;
 	}
 
 	//replace content of the node, re-making all the connections.
@@ -2574,8 +2565,8 @@ AlgaNode {
 
 	clearInner { | time |
 		//calc temporary time
-		time = this.calculateTemporaryLongestWaitTime(time, playTime);
-		time = max(time, longestWaitTime); //makes sure to wait longest time to run clears
+		var stopTime = this.calculateTemporaryLongestWaitTime(time, playTime);
+		time = max(stopTime, longestWaitTime); //makes sure to wait longest time to run clears
 
 		//If synth had connections, run <| (or disconnect, if mixer) on the receivers
 		this.removeConnectionFromReceivers(time);
@@ -2584,24 +2575,29 @@ AlgaNode {
 		algaToBeCleared = true;
 
 		//Stop playing (if it was playing at all)
-		this.stopInner(time, isClear:true);
+		this.stopInner(stopTime, isClear:true);
+
+		//Just remove groups, they contain the synths
+		this.freeAllGroups(false, time);
+		this.freeAllBusses(false, time);
 
 		fork {
 			//Wait time before clearing groups, synths and busses...
 			(time + 1.0).wait;
 
-			//Just remove groups, they contain the synths
-			this.freeAllGroups(true);
-			this.freeAllBusses(true);
-
 			//Reset all instance variables
-			this.resetSynth;
-			this.resetInterpNormSynths;
-			this.resetGroups;
-			this.resetInOutNodesDicts;
+			if(algaToBeCleared, {
+				this.resetSynth;
+				this.resetInterpNormSynths;
+				this.resetGroups;
+				this.resetInOutNodesDicts;
 
-			defClass = nil;
-			defArgs = nil;
+				defClass = nil;
+				defArgs = nil;
+				if(this.isAlgaPattern, {
+					this.resetAlgaPattern;
+				});
+			});
 
 			algaCleared = true;
 		}

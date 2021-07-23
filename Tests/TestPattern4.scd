@@ -42,18 +42,20 @@ a.replace((
 ), sched:1)
 )
 
-a.replace(\test2);
-
 a.from(b, \freq, scale:[120, 440], time:1)
 
-a.inNodes
 
-//This is AlgaNode's behaviour with replace
-(
-Alga.boot({
-	a = AN({SinOsc.ar(\f.kr(440))});
-	b = AN({\in.ar}, [\in, a], connectionTime:5).play(chans:2);
-	2.wait;
-	a.replace({Saw.ar(\f.kr(440)) * 0.5}, args:[\f, 100])
-});
-)
+
+//CLEAR
+a.clear
+
+a.replace(\test2);
+
+//Doesn't work?
+a.clear
+
+
+a.replace(\test2);
+
+//Not working?
+a.clear

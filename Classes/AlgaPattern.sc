@@ -48,26 +48,34 @@ AlgaPatternInterpStreams {
 		server              = algaPattern.server;
 	}
 
+	//Called from freeActiveInterpSynthsAtParamOnReplace
+	freeActiveInterpSynthsAndBussesAtParam { | interpSynthsToFree, interpBussesToFree |
+		interpSynthsToFree.do({ | interpSynthsAtParam |
+			interpSynthsAtParam.do({ | interpSynth |
+				interpSynth.free;
+			});
+		});
+
+		interpBussesToFree.do({ | interpBussesAtParam |
+			interpBussesAtParam.do({ | interpBus |
+				interpBus.free
+			});
+		});
+	}
+
 	//On replace, this will be called. It will free everything after longestWaitTime
-	freeActiveInterpSynthsAtParamOnReplace {
-		var interpSynthsOld = interpSynths.copy;
-		var interpBussesOld = interpBusses.copy;
-		var time = algaPattern.longestWaitTime;
-		fork {
-			(time + 1.0).wait;
-
-			interpSynthsOld.do({ | interpSynthsAtParam |
-				interpSynthsAtParam.do({ | interpSynth |
-					interpSynth.free;
-				});
-			});
-
-			interpBussesOld.do({ | interpBussesAtParam |
-				interpBussesAtParam.do({ | interpBus |
-					interpBus.free
-				});
-			});
-		}
+	freeActiveInterpSynthsAtParamOnReplace { | now = false |
+		if(now, {
+			this.freeActiveInterpSynthsAndBussesAtParam(interpSynths, interpBusses);
+		}, {
+			var interpSynthsOld = interpSynths.copy;
+			var interpBussesOld = interpBusses.copy;
+			var time = algaPattern.longestWaitTime;
+			fork {
+				(time + 1.0).wait;
+				this.freeActiveInterpSynthsAndBussesAtParam(interpSynthsOld, interpBussesOld);
+			}
+		});
 	}
 
 	//Free all active interpSynths. This triggers the onFree action that's executed in
@@ -543,6 +551,11 @@ AlgaPattern : AlgaNode {
 		{ entry.isAlgaNode } {
 			sender = entry; //essential for chansMapping (entry gets modified)
 			if(entry.algaInstantiated, {
+				if((entry.algaCleared).or(entry.algaToBeCleared), {
+					("AlgaPattern: can't connect to an AlgaNode that's been cleared").error;
+					^nil
+				});
+
 				//if algaInstantiated, use the rate, numchannels and bus arg from the alga bus
 				senderRate = entry.rate;
 				senderNumChannels = entry.numChannels;
@@ -920,10 +933,10 @@ AlgaPattern : AlgaNode {
 		//If no dur and replace, get it from previous interpStreams
 		if(replace, {
 			if(foundDurOrDelta.not, {
-				if(interpStreams != nil, {
-					this.setDur(interpStreams.dur, newInterpStreams)
-				}, {
+				if((interpStreams == nil).or(algaWasBeingCleared), {
 					this.setDur(1, newInterpStreams)
+				}, {
+					this.setDur(interpStreams.dur, newInterpStreams)
 				});
 			})
 		}, {
@@ -1093,27 +1106,29 @@ AlgaPattern : AlgaNode {
 	//    OR <<.def Pseq([\newSynthDef1, \newSynthDef2])
 
 	//Called from replaceInner. freeInterpNormSynths is not used for AlgaPatterns
-	freeAllSynths { | useConnectionTime = true, now = true |
-		this.stopPattern(now);
-		this.freeSynth(useConnectionTime, now);
+	freeAllSynths { | useConnectionTime = true, now = true, time |
+		this.stopPattern(now, time);
+		this.freeSynth(useConnectionTime, now, time);
 	}
 
 	//Used when replacing. Free synths and stop the current running pattern
-	stopPattern { | now = true |
-		//Free all synths (it waits for longestWaitTime)
-		interpStreams.freeActiveInterpSynthsAtParamOnReplace;
+	stopPattern { | now = true, time |
+		if(interpStreams != nil, {
+			//Free all synths (it waits for longestWaitTime)
+			interpStreams.freeActiveInterpSynthsAtParamOnReplace(now);
 
-		//Stop and clear the algaReschedulingEventStreamPlayer
-		if(now, {
-			interpStreams.algaReschedulingEventStreamPlayer.stop
-		}, {
-			var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
-			var time = longestWaitTime;
-			if(algaReschedulingEventStreamPlayer != nil, {
-				fork {
-					(time + 1.0).wait;
-					algaReschedulingEventStreamPlayer.stop
-				}
+			//Stop and clear the algaReschedulingEventStreamPlayer
+			if(now, {
+				interpStreams.algaReschedulingEventStreamPlayer.stop
+			}, {
+				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
+				if(time == nil, { time = longestWaitTime });
+				if(algaReschedulingEventStreamPlayer != nil, {
+					fork {
+						(time + 1.0).wait;
+						algaReschedulingEventStreamPlayer.stop
+					}
+				});
 			});
 		});
 	}
@@ -1182,6 +1197,19 @@ AlgaPattern : AlgaNode {
 		//AlgaNode only uses this for number parameters, but AlgaPattern uses it for any
 		//kind of parameter, including AlgaNodes and AlgaArgs.
 		replaceArgs[param] = sender;
+	}
+
+	//Called from clearInner
+	resetAlgaPattern {
+		temporaryParamSynths.clear;
+		currentPatternInterpSumBus = nil;
+		interpStreams = nil;
+	}
+
+	//Called from clearInner
+	freeAllGroups { | now = false, time |
+		this.freeAllSynths(false, now, time);
+		super.freeAllGroups(now, time);
 	}
 
 	//There is no way to check individual synths.
