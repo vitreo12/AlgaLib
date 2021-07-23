@@ -109,7 +109,7 @@ AlgaPatternInterpStreams {
 					patternInterpSumBus: patternInterpSumBus,
 					patternBussesAndSynths: nil,
 					scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
-					algaSynthBus: algaPattern.synthBus, //sure about this?
+					algaSynthBus: algaPattern.synthBus,
 					algaPatternInterpStreams: this,
 					isTemporary: true
 				)
@@ -871,7 +871,7 @@ AlgaPattern : AlgaNode {
 		this.createSynthBus;
 
 		//Create the actual pattern.
-		this.createPattern(replace, sched);
+		this.createPattern(replace, keepChannelsMapping, keepScale, sched);
 	}
 
 	//Support Function in the future
@@ -890,7 +890,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Build the actual pattern
-	createPattern { | replace = false, sched |
+	createPattern { | replace = false, keepChannelsMapping = false, keepScale = false, sched |
 		var foundDurOrDelta = false;
 		var patternPairs = Array.newClear;
 
@@ -919,11 +919,18 @@ AlgaPattern : AlgaNode {
 		controlNames.do({ | controlName |
 			var paramName = controlName.name;
 			var paramValue = eventPairs[paramName];
+			var chansMapping, scale;
 
 			//if not set explicitly yet
 			if(paramValue == nil, {
-				//When replace, getDefaultOrArg will return LATEST set parameter
+				//When replace, getDefaultOrArg will return LATEST set parameter, via replaceArgs
 				paramValue = this.getDefaultOrArg(controlName, paramName, replace);
+			});
+
+			//If replace, check if keeping chans / scale mappings
+			if(replace, {
+				if(keepChannelsMapping, { chansMapping = this.getParamChansMapping(paramName, paramValue) });
+				if(keepScale, { scale = this.getParamScaling(paramName, paramValue); });
 			});
 
 			//Add to interpStream (which also creates interpBus / interpSynth).
@@ -932,6 +939,8 @@ AlgaPattern : AlgaNode {
 			newInterpStreams.add(
 				entry: paramValue,
 				controlName: controlName,
+				chans: chansMapping,
+				scale: scale,
 				time: 0
 			);
 		});
@@ -995,6 +1004,9 @@ AlgaPattern : AlgaNode {
 			"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, AlgaPatternArgs, Patterns, Numbers and Arrays".error;
 			^this;
 		});
+
+		//Add scaling to Dicts
+		if(scale != nil, { this.addScaling(param, sender, scale) });
 
 		//Add to interpStreams (which also creates interpBus / interpSynth)
 		interpStreams.add(
@@ -1106,7 +1118,7 @@ AlgaPattern : AlgaNode {
 		interpStreams.algaReschedulingEventStreamPlayer.reschedule(sched);
 	}
 
-	//Wrapper for addInNode
+	//Add entry to inNodes
 	addInNodeAlgaNode { | sender, param = \in, mix = false |
 		//Empty entry OR not doing mixing, create new IdentitySet. Otherwise, add to existing
 		if((inNodes[param] == nil).or(mix.not), {
@@ -1129,11 +1141,12 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
+		//If AlgaArg or ListPattern, loop around entries and add each of them
 		if(sender.isAlgaNode, {
 			this.addInNodeAlgaNode(sender, param, mix);
 		}, {
 			if(sender.isAlgaPatternArg, {
-				this.addInNodeAlgaNode(sender, param, mix);
+				this.addInNodeAlgaNode(sender.sender, param, mix);
 			}, {
 				if(sender.isListPattern, {
 					sender.list.do({ | listEntry |
@@ -1148,9 +1161,12 @@ AlgaPattern : AlgaNode {
 					});
 				});
 			});
-
-			replaceArgs[param] = sender;
 		});
+
+		//Use replaceArgs to set LATEST parameter, for retrieval after .replace ...
+		//AlgaNode only uses this for number parameters, but AlgaPattern uses it for any
+		//kind of parameter, including AlgaNodes and AlgaArgs.
+		replaceArgs[param] = sender;
 	}
 
 	//There is no way to check individual synths.
