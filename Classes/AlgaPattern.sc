@@ -896,7 +896,7 @@ AlgaPattern : AlgaNode {
 
 		//Detect if AlgaSynthDef can be freed automatically. Otherwise, error!
 		if(synthDef.explicitFree.not, {
-			("AlgaPattern: AlgaSynthDef '" ++ synthDef.name.asString ++ "' can't free itself: it doesn't implement any DoneAction.").error;
+			("AlgaPattern: AlgaSynthDef '" ++ synthDef.name.asString ++ "' can't free itself: it doesn't implement any Done action.").error;
 			^this
 		});
 

@@ -44,6 +44,11 @@
 	}
 }
 
+//PlayBuf bug with canFreeSynth
++PlayBuf {
+	canFreeSynth { ^inputs.at(6).isNumber.not or: { inputs.at(6) > 1 } }
+}
+
 +Nil {
     //Fundamental for bug-prone trying to index a nil 'nil[0]'
     //for example when dealing with nested IdentityDictionaries
