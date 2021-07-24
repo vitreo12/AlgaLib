@@ -19,9 +19,24 @@ Alga.boot({
 });
 )
 
+a.pt = 0
 
 a.from(c, \buf, time:2, sched:1)
 
 a.from(b, \buf, time:2, sched:1)
 
-a.from(Pseq([b, c], inf), \buf, time:3, sched:1)
+a.stop
+
+a.from(Pseq([b, c], inf), \buf, time:0, sched:1)
+
+a.from(b, \buf, time:0, sched:1)
+
+a.from(c, \buf, time:0, sched:1)
+
+d = AN({ FreeVerb.ar(\in.ar([0, 0]), 1) }).play
+
+d << a
+
+a.play
+
+d.stop(2)
