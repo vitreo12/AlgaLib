@@ -18,6 +18,7 @@
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
 	isAlgaPatternArg { ^false }
+	isBuffer { ^false }
 	isPattern { ^false }
 	isStream { ^false }
 	isListPattern { ^false }
@@ -166,7 +167,7 @@
 
 //Add support for >> and >>+
 +Buffer {
-
+	isBuffer { ^true }
 }
 
 +SystemClock {

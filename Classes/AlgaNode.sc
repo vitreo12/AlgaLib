@@ -531,18 +531,28 @@ AlgaNode {
 		if(args != nil, {
 			if(args.isSequenceableCollection.not, { "AlgaNode: args must be an array".error; ^this });
 			if((args.size) % 2 != 0, { "AlgaNode: args' size must be a power of two".error; ^this });
-
 			args.do({ | param, i |
 				if(param.class == Symbol, {
 					var iPlusOne = i + 1;
 					if(iPlusOne < args.size, {
 						var value = args[i + 1];
-						if(value.isKindOf(Buffer), { value = value.bufnum });
-						if((value.isNumberOrArray).or(value.isAlgaNode), {
-							defArgs[param] = value;
-							explicitArgs[param] = true;
+						if(value.isBuffer, { value = value.bufnum });
+						if(this.isAlgaPattern, {
+							//AlgaPattern
+							if((value.isNumberOrArray).or(value.isAlgaNode).or(value.isPattern).or(value.isAlgaPatternArg), {
+								defArgs[param] = value;
+								explicitArgs[param] = true;
+							}, {
+								("AlgaPattern: args at param '" ++ param ++ "' must be an AlgaNode, AlgaPattern, Number, Array, Pattern, AlgaPatternArg or Buffer").error
+							});
 						}, {
-							("AlgaNode: args at param '" ++ param ++ "' must be a number, array or AlgaNode").error;
+							//AlgaNode
+							if((value.isNumberOrArray).or(value.isAlgaNode), {
+								defArgs[param] = value;
+								explicitArgs[param] = true;
+							}, {
+								("AlgaNode: args at param '" ++ param ++ "' must be an AlgaNode, AlgaPattern, Number, Array or Buffer").error;
+							});
 						});
 					});
 				});
@@ -2096,7 +2106,7 @@ AlgaNode {
 
 	from { | sender, param = \in, chans, scale, time, sched |
 		//If buffer, use .bufnum and .replace
-		if(sender.isKindOf(Buffer), {
+		if(sender.isBuffer, {
 			var senderBufNum = sender.bufnum;
 			var args = [ param, senderBufNum ];
 			"AlgaNode: changing a Buffer. This will trigger 'replace'.".warn;
@@ -2147,7 +2157,7 @@ AlgaNode {
 	}
 
 	mixFrom { | sender, param = \in, chans, scale, time, sched |
-		if(sender.isKindOf(Buffer), {
+		if(sender.isBuffer, {
 			"AlgaNode: Buffers cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
 			^this.from(sender, param, chans, scale, time, sched);
 		});

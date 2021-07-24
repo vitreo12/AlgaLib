@@ -581,6 +581,14 @@ AlgaPattern : AlgaNode {
 			});
 
 			validParam = true;
+		}
+
+		//Buffer
+		{ entry.isBuffer } {
+			entry = entry.bufnum;
+			senderNumChannels = 1;
+			senderRate = "control";
+			validParam = true;
 		};
 
 		if(validParam, {
@@ -1051,8 +1059,8 @@ AlgaPattern : AlgaNode {
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
-	if((sender.isAlgaNode.not).and(sender.isPattern.not).and(sender.isAlgaPatternArg.not).and(sender.isNumberOrArray.not), {
-			"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, AlgaPatternArgs, Patterns, Numbers and Arrays".error;
+		if((sender.isAlgaNode.not).and(sender.isPattern.not).and(sender.isAlgaPatternArg.not).and(sender.isNumberOrArray.not).and(sender.isBuffer.not), {
+			"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, AlgaPatternArgs, Patterns, Numbers, Arrays and Buffers".error;
 			^this;
 		});
 
@@ -1067,6 +1075,33 @@ AlgaPattern : AlgaNode {
 			scale: scale,
 			sampleAndHold: sampleAndHold,
 			time: time
+		);
+	}
+
+	//ListPattern that contains Buffers
+	patternOrAlgaPatternArgContainsBuffers { | pattern |
+		if(pattern.isAlgaPatternArg, { if(pattern.sender.isBuffer, { ^true }) });
+
+		if(pattern.isListPattern, {
+			pattern.list.do({ | entry |
+				if(entry.isBuffer, { ^true });
+				if(entry.isAlgaPatternArg, { if(entry.sender.isBuffer, { ^true }) });
+			});
+		});
+
+		^false
+	}
+
+	//Buffer == replace
+	makeBufferConnection { | sender, param, time, sched |
+	//	var senderBufNum = sender.bufnum;
+		var args = [ param, sender ];
+		"AlgaPattern: changing a Buffer. This will trigger 'replace'.".warn;
+		^this.replace(
+			def: synthDef.name,
+			args: args,
+			time: time,
+			sched: sched
 		);
 	}
 
@@ -1092,6 +1127,9 @@ AlgaPattern : AlgaNode {
 			"AlgaPattern: sampleAndHold must be a boolean value".error;
 			^this
 		});
+
+		//Special case: ListPattern with Buffers
+		if(this.patternOrAlgaPatternArgContainsBuffers(sender), { ^this.makeBufferConnection(sender, param, time, sched) });
 
 		//All other cases
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
@@ -1121,16 +1159,12 @@ AlgaPattern : AlgaNode {
 			);
 		});
 
-		/*
-		//If buffer, use .bufnum and .replace
-		if(sender.isKindOf(Buffer), {
-			var senderBufNum = sender.bufnum;
-			var args = [ param, senderBufNum ];
-			"AlgaNode: changing a Buffer. This will trigger 'replace'.".warn;
-			^this.replace(synthDef.name, args, time, sched);
+		//Buffer == replace
+		if(sender.isBuffer, {
+			^this.makeBufferConnection(sender, param, time, sched)
 		});
-		*/
 
+		//Standard cases
 		if(sender.isAlgaNode, {
 			if(this.server != sender.server, {
 				("AlgaPattern: trying to enstablish a connection between two AlgaNodes on different servers").error;
