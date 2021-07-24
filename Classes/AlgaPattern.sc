@@ -33,6 +33,7 @@ AlgaPatternInterpStreams {
 	var <interpBussesToFree;
 
 	var <scaleArraysAndChans;
+	var <sampleAndHolds;
 
 	*new { | algaPattern |
 		^super.new.init(algaPattern)
@@ -44,6 +45,7 @@ AlgaPatternInterpStreams {
 		interpBusses        = IdentityDictionary(10);
 		interpBussesToFree  = IdentitySet();
 		scaleArraysAndChans = IdentityDictionary(10);
+		sampleAndHolds      = IdentityDictionary(10);
 		algaPattern         = argAlgaPattern;
 		server              = algaPattern.server;
 	}
@@ -117,6 +119,7 @@ AlgaPatternInterpStreams {
 					patternInterpSumBus: patternInterpSumBus,
 					patternBussesAndSynths: nil,
 					scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
+					sampleAndHold: false,
 					algaSynthBus: algaPattern.synthBus,
 					algaPatternInterpStreams: this,
 					isTemporary: true
@@ -186,6 +189,7 @@ AlgaPatternInterpStreams {
 			var interpSynthsAtParam         = interpSynths[paramName];
 			var interpBussesAtParam         = interpBusses[paramName];
 			var scaleArraysAndChansAtParam  = scaleArraysAndChans[paramName];
+			var sampleAndHoldAtParam        = sampleAndHolds[paramName];
 
 			//Remove entry from entries and deal with inNodes / outNodes for both receiver and sender
 			if(entriesAtParam != nil, {
@@ -201,6 +205,9 @@ AlgaPatternInterpStreams {
 					algaPattern.removeScaling(paramName, uniqueID);
 				});
 			});
+
+			//Remove sampleAndHold
+			if(sampleAndHoldAtParam != nil, { sampleAndHolds.removeAt(paramName) });
 
 			//Remove entry from interpSynths
 			if(interpSynthsAtParam != nil, { interpSynthsAtParam.removeAt(uniqueID) });
@@ -263,15 +270,22 @@ AlgaPatternInterpStreams {
 		});
 	}
 
+	//Add sampleAndHold at param. It's generic for that param!
+	addSampleAndHold { | paramName, sampleAndHold |
+		sampleAndHolds[paramName] = sampleAndHold
+	}
+
 	//Add a new sender interpolation to the current param
-	add { | entry, controlName, chans, scale, time = 0 |
+	add { | entry, controlName, chans, scale, sampleAndHold, time = 0 |
 		var paramName, paramRate, paramNumChannels, paramDefault;
 		var uniqueID;
 
 		var entryOriginal = entry; //Original entry, not .asStream. Needed for addInOutNodesDictAtParam
 		var isFirstEntry;
 
-		if(controlName == nil, { ("AlgaPatternInterpStreams: Invalid controlName for param '" ++ paramName ++ "'").error });
+		if(controlName == nil, {
+			("AlgaPatternInterpStreams: Invalid controlName for param '" ++ paramName ++ "'").error
+		});
 
 		paramName = controlName.name;
 		paramRate = controlName.rate;
@@ -290,6 +304,9 @@ AlgaPatternInterpStreams {
 
 		//Add the scaleArray and chans
 		this.addScaleArrayAndChans(paramName, paramNumChannels, uniqueID, chans, scale);
+
+		//Add sampleAndHold
+		this.addSampleAndHold(paramName, sampleAndHold);
 
 		//Remove all older inNodes / outNodes... if not mix, in theory.
 		this.removeAllInOutNodesDictAtParam(paramName);
@@ -320,7 +337,7 @@ AlgaPatternInterpStreams {
 		//Only one per-change is needed, as the interpolation process will continue as soon as the pattern
 		//triggers new synth. This just avoids to have silences and gaps when modifying a param mid-pattern.
 		//This must come AFTER createPatternInterpSynthAndBusAtParam.
-		if(isFirstEntry.not, {
+		if((isFirstEntry.not).and(sampleAndHold.not), {
 			this.createTemporaryPatternParamSynthAtParam(
 				entry: entry,
 				uniqueID: uniqueID,
@@ -365,15 +382,11 @@ AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
-	1) .replace()
+	1) Buffer
 
-	2) .clear()
+	2) mixFrom() / mixTo()
 
-	3) Continuous or SAH interpolation (both in Patterns and AlgaNodes)
-
-	4) mixFrom() / mixTo()
-
-	5) ListPattern as \def (how about numChannels / rate? enforce same one?)
+	3) ListPattern as \def (how about numChannels / rate? enforce same one?)
 	*/
 
 	/*
@@ -383,18 +396,17 @@ AlgaPattern : AlgaNode {
 
 	// Things to do:
 	// 1) Check the def exists
-	// 2) Check it has an \in parameter
-	// 3) Check it can free itself (like with DetectSilence).
-	//    If not, it will be freed with interpSynths
+	// 2) Check it has an \in parameter, and connect to that
+	// 3) Check it can free itself (e.g. with DetectSilence). If not, it will be freed with interpSynths
 	// 4) Route synth's audio through it
 	// 5) Use the "wet" result as output
-	// 6) Can't be interpolated
+	// 6) Can't be interpolated (but the connection itself can)
 
 	2) out: (node: Pseq([a, b], time: 1, scale: 1)
 
 	// Things to do:
 	// 1) Check if it is an AlgaNode or a ListPattern of AlgaNodes
-	// 2) It would just connect to nodes with \in param, mixing ( mixTo / mixFrom )
+	// 2) It would just connect to nodes with the \in param, mixing ( mixTo / mixFrom )
 	// 3) Can't be interpolated (but the connection itself can)
 	*/
 
@@ -507,8 +519,8 @@ AlgaPattern : AlgaNode {
 	//Create one pattern synth with the entry / uniqueID pair at paramName
 	//This is the core of the interpolation behaviour for AlgaPattern !!
 	createPatternParamSynth { | entry, uniqueID, paramName, paramNumChannels, paramRate,
-		paramDefault, patternInterpSumBus, patternBussesAndSynths, scaleArraysAndChansAtParam, isTemporary = false,
-		algaSynthBus, algaPatternInterpStreams |
+		paramDefault, patternInterpSumBus, patternBussesAndSynths, scaleArraysAndChansAtParam,
+		sampleAndHold, algaSynthBus, algaPatternInterpStreams, isTemporary = false |
 
 		var sender, senderNumChannels, senderRate;
 		var chansMapping, scale;
@@ -648,6 +660,11 @@ AlgaPattern : AlgaNode {
 					});
 				});
 
+				//sampleAndHold
+				if(sampleAndHold == true, {
+					patternParamSynthArgs = patternParamSynthArgs.add(\sampleAndHold).add(1)
+				});
+
 				patternParamSynth = AlgaSynth(
 					patternParamSymbol,
 					patternParamSynthArgs,
@@ -673,7 +690,7 @@ AlgaPattern : AlgaNode {
 	//Create all pattern synths per-param
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
 		paramDefault, patternInterpSumBus, patternBussesAndSynths,
-		interpStreamsEntriesAtParam, scaleArraysAndChansAtParam, algaSynthBus, algaPatternInterpStreams |
+		interpStreamsEntriesAtParam, scaleArraysAndChansAtParam, sampleAndHold, algaSynthBus, algaPatternInterpStreams |
 
 		if(interpStreamsEntriesAtParam != nil, {
 			interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry | //indexed by uniqueIDs
@@ -687,6 +704,7 @@ AlgaPattern : AlgaNode {
 					patternInterpSumBus: patternInterpSumBus,
 					patternBussesAndSynths: patternBussesAndSynths,
 					scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
+					sampleAndHold: sampleAndHold,
 					algaSynthBus: algaSynthBus,
 					algaPatternInterpStreams: algaPatternInterpStreams
 				)
@@ -763,11 +781,15 @@ AlgaPattern : AlgaNode {
 			//scaleArray and chans
 			var scaleArraysAndChansAtParam = algaPatternInterpStreams.scaleArraysAndChans[paramName];
 
+			//sampleAndHold
+			var sampleAndHold = algaPatternInterpStreams.sampleAndHolds[paramName];
+			sampleAndHold = sampleAndHold ? false;
+
 			//Create all interp synths for current param
 			this.createPatternParamSynths(
 				paramName, paramNumChannels, paramRate,
 				paramDefault, patternInterpSumBus, patternBussesAndSynths,
-				interpStreamsEntriesAtParam, scaleArraysAndChansAtParam,
+				interpStreamsEntriesAtParam, scaleArraysAndChansAtParam, sampleAndHold,
 				algaSynthBus, algaPatternInterpStreams
 			);
 
@@ -969,6 +991,7 @@ AlgaPattern : AlgaNode {
 				controlName: controlName,
 				chans: chansMapping,
 				scale: scale,
+				sampleAndHold: false,
 				time: 0
 			);
 		});
@@ -1023,7 +1046,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//<<, <<+ and <|
-	makeConnectionInner { | param = \in, sender, senderChansMapping, scale, time = 0 |
+	makeConnectionInner { | param = \in, sender, senderChansMapping, scale, sampleAndHold, time = 0 |
 		var paramConnectionTime = paramsConnectionTime[param];
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
@@ -1042,13 +1065,14 @@ AlgaPattern : AlgaNode {
 			controlName: controlNames[param],
 			chans: senderChansMapping,
 			scale: scale,
+			sampleAndHold: sampleAndHold,
 			time: time
 		);
 	}
 
 	//<<, <<+ and <|
 	makeConnection { | sender, param = \in, replace = false, mix = false,
-		replaceMix = false, senderChansMapping, scale, time, sched |
+		replaceMix = false, senderChansMapping, scale, sampleAndHold, time, sched |
 
 		//delta == dur
 		if(param == \delta, {
@@ -1058,6 +1082,15 @@ AlgaPattern : AlgaNode {
 		//Special case, \dur
 		if(param == \dur, {
 			^this.interpolateDur(sender, sched);
+		});
+
+		//Default to false
+		sampleAndHold = sampleAndHold ? false;
+
+		//Check if it's boolean
+		if((sampleAndHold != true).and(sampleAndHold != false), {
+			"AlgaPattern: sampleAndHold must be a boolean value".error;
+			^this
 		});
 
 		//All other cases
@@ -1070,6 +1103,7 @@ AlgaPattern : AlgaNode {
 						sender: sender,
 						senderChansMapping: senderChansMapping,
 						scale: scale,
+						sampleAndHold: sampleAndHold,
 						time: time
 					)
 				},
@@ -1079,17 +1113,41 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Only from is needed: to already calls into makeConnection
-	from { | sender, param = \in, chans, scale, time, sched |
+	from { | sender, param = \in, chans, scale, sampleAndHold, time, sched |
 		//Force pattern and AlgaPatternArg dispatch
 		if((sender.isPattern).or(sender.isAlgaPatternArg), {
 			^this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
+				scale:scale, sampleAndHold:sampleAndHold, time:time, sched:sched
 			);
 		});
 
-		//All the other cases apply to AlgaNode too.
-		//AlgaPattern.makeConnection is getting called anyways.
-		^super.from(sender, param, chans, scale, time, sched);
+		/*
+		//If buffer, use .bufnum and .replace
+		if(sender.isKindOf(Buffer), {
+			var senderBufNum = sender.bufnum;
+			var args = [ param, senderBufNum ];
+			"AlgaNode: changing a Buffer. This will trigger 'replace'.".warn;
+			^this.replace(synthDef.name, args, time, sched);
+		});
+		*/
+
+		if(sender.isAlgaNode, {
+			if(this.server != sender.server, {
+				("AlgaPattern: trying to enstablish a connection between two AlgaNodes on different servers").error;
+				^this;
+			});
+			this.makeConnection(sender, param, senderChansMapping:chans,
+				scale:scale, time:time, sampleAndHold:sampleAndHold, sched:sched
+			);
+		}, {
+			if(sender.isNumberOrArray, {
+				this.makeConnection(sender, param, senderChansMapping:chans,
+					scale:scale, time:time, sampleAndHold:sampleAndHold, sched:sched
+				);
+			}, {
+				("AlgaPattern: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
+			});
+		});
 	}
 
 	// <<| \param (goes back to defaults)

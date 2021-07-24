@@ -212,6 +212,8 @@ Limiter.ar(input) * AlgaEnvGate.kr
 					var indices_kr = "in;";
 					var env_pattern_ar = "\\env.ar(0);";
 					var env_pattern_kr = "\\env.kr(0);";
+					var sampleAndHold_ar = "Select.ar(\\sampleAndHold.ir(0), [env, Latch.ar(env, 1)]);";
+					var sampleAndHold_kr = "Select.kr(\\sampleAndHold.ir(0), [env, Latch.kr(env, 1)]);";
 
 					//constant multiplier. this is set when mix's scale argument is a single Number
 					var multiplier = "\\outMultiplier.ir(1);";
@@ -229,7 +231,7 @@ Limiter.ar(input) * AlgaEnvGate.kr
 					[\ar_ar, \kr_kr, \ar_kr, \kr_ar].do({ | rate |
 						var result;
 						var name, in, indices, env, scaling;
-						var name_pattern, env_pattern;
+						var name_pattern, env_pattern, sampleAndHold;
 
 						if(rate == \ar_ar, {
 							name = "\\alga_interp_audio" ++ i ++ "_audio" ++ y;
@@ -239,6 +241,7 @@ Limiter.ar(input) * AlgaEnvGate.kr
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));";
 							env_pattern = env_pattern_ar;
+							sampleAndHold = sampleAndHold_ar;
 						});
 
 						if(rate == \kr_kr, {
@@ -249,6 +252,7 @@ Limiter.ar(input) * AlgaEnvGate.kr
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));";
 							env_pattern = env_pattern_kr;
+							sampleAndHold = sampleAndHold_kr;
 						});
 
 						if(rate == \ar_kr, {
@@ -259,6 +263,7 @@ Limiter.ar(input) * AlgaEnvGate.kr
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));";
 							env_pattern = env_pattern_kr;
+							sampleAndHold = sampleAndHold_kr;
 						});
 
 						if(rate == \kr_ar, {
@@ -269,6 +274,7 @@ Limiter.ar(input) * AlgaEnvGate.kr
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
 							env = "AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));";
 							env_pattern = env_pattern_ar;
+							sampleAndHold = sampleAndHold_ar;
 						});
 
 						result = "
@@ -310,6 +316,7 @@ scaleCurve,
 out = " ++ scaling ++ "
 out = out * outMultiplier;
 env = " ++ env_pattern ++ "
+env = " ++ sampleAndHold ++ "
 out = out * env;
 outs = Array.newClear(" ++ (y + 1) ++ ");
 " ++ outs ++ "

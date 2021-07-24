@@ -15,7 +15,7 @@ Alga.boot({
 		def: \test,
 		dur: 0.25,
 		freq: 440
-	), playTime:1).play;
+	), playTime:2).play;
 
 	b = AN({ SinOsc.kr(1) });
 
