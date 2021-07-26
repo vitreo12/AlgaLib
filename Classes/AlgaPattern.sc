@@ -382,11 +382,13 @@ AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
-	1) mixFrom() / mixTo()
+	1) resetParam()
 
-	2) fx: (See next)
+	2) mixFrom() / mixTo()
 
-	3) out: (See next)
+	3) fx: (See next)
+
+	4) out: (See next)
 
 	- fx: (def: Pseq([\delay, \tanh]), delayTime: Pseq([0.2, 0.4]))
 
@@ -1337,7 +1339,7 @@ AlgaPattern : AlgaNode {
 
 	// <<| \param (goes back to defaults)
 	//previousSender is the mix one, in case that will be implemented in the future
-	resetParam { | param = \in, previousSender = nil, time |
+	resetParam { | param = \in, time, sched |
 		"AlgaPattern: resetParam is not supported yet".error;
 	}
 
