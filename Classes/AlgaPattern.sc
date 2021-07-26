@@ -382,11 +382,9 @@ AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
-	1) Buffer
+	1) ListPattern as \def (what about numChannels / rate? enforce same one? sum them all?)
 
 	2) mixFrom() / mixTo()
-
-	3) ListPattern as \def (how about numChannels / rate? enforce same one?)
 	*/
 
 	/*
@@ -881,7 +879,15 @@ AlgaPattern : AlgaNode {
 			^this.dispatchListPattern;
 		}
 		{ defClass == Function } {
-			^this.dispatchFunction;
+			^this.dispatchFunction(
+				def: defEntry,
+				initGroups: initGroups,
+				replace: replace,
+				keepChannelsMapping:keepChannelsMapping,
+				outsMapping:outsMapping,
+				keepScale:keepScale,
+				sched:sched
+			)
 		};
 
 		("AlgaPattern: class '" ++ defClass ++ "' is an invalid 'def'").error;
@@ -922,18 +928,14 @@ AlgaPattern : AlgaNode {
 		this.createPattern(replace, keepChannelsMapping, keepScale, sched);
 	}
 
-	//Support Function in the future
-	dispatchFunction {
-		"AlgaPattern: Functions as 'def' are not supported yet".error;
-	}
-
 	//Support multiple SynthDefs in the future,
 	//only if expressed with ListPattern subclasses (like Pseq, Prand, etc...):
 	//(def: Pseq([\synthDef1, Pseq([\synthDef2, \synthDef3]))
 	//This will collect ALL controlnames for each of the synthDefs in order
 	//to correctly instantiate the interpStreams... I know it's quite the overhead,
 	//but, for now, it's just the easier solution.
-	dispatchListPattern {
+	dispatchListPattern { | def, initGroups = false, replace = false,
+		keepChannelsMapping = false, keepScale = false, sched = 0 |
 		"AlgaPattern: ListPatterns as 'def' are not supported yet".error;
 	}
 
@@ -1053,6 +1055,11 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
+	//Interpolate def (basically, runs .replace)
+	interpolateDef {
+
+	}
+
 	//<<, <<+ and <|
 	makeConnectionInner { | param = \in, sender, senderChansMapping, scale, sampleAndHold, time = 0 |
 		var paramConnectionTime = paramsConnectionTime[param];
@@ -1094,7 +1101,6 @@ AlgaPattern : AlgaNode {
 
 	//Buffer == replace
 	makeBufferConnection { | sender, param, time, sched |
-	//	var senderBufNum = sender.bufnum;
 		var args = [ param, sender ];
 		"AlgaPattern: changing a Buffer. This will trigger 'replace'.".warn;
 		^this.replace(
