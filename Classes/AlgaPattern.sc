@@ -382,15 +382,13 @@ AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
-	1) ListPattern as \def (what about numChannels / rate? enforce same one? sum them all?)
+	1) mixFrom() / mixTo()
 
-	2) mixFrom() / mixTo()
-	*/
+	2) fx: (See next)
 
-	/*
-	MAYBEs:
+	3) out: (See next)
 
-	1) fx: (def: Pseq([\delay, \tanh]), delayTime: Pseq([0.2, 0.4]))
+	- fx: (def: Pseq([\delay, \tanh]), delayTime: Pseq([0.2, 0.4]))
 
 	// Things to do:
 	// 1) Check the def exists
@@ -400,7 +398,7 @@ AlgaPattern : AlgaNode {
 	// 5) Use the "wet" result as output
 	// 6) Can't be interpolated (but the connection itself can)
 
-	2) out: (node: Pseq([a, b], time: 1, scale: 1)
+	- out: (node: Pseq([a, b], time: 1, scale: 1)
 
 	// Things to do:
 	// 1) Check if it is an AlgaNode or a ListPattern of AlgaNodes
@@ -1243,7 +1241,7 @@ AlgaPattern : AlgaNode {
 			//ListPatterns, mainly
 			synthDefName = (def: synthDef)
 		});
-		"AlgaPattern: changing a Buffer. This will trigger 'replace'.".warn;
+		"AlgaPattern: changing a Buffer parameter. This will trigger 'replace'.".warn;
 		^this.replace(
 			def: synthDefName,
 			args: args,
