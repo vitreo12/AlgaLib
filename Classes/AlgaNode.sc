@@ -646,8 +646,42 @@ AlgaNode {
 		^true;
 	}
 
+	//This is for AlgaPattern + ListPattern
+	unpackListPatternOutsMapping {
+		var outsMappingSum = IdentityDictionary();
+
+		synthDef.list.do({ | synthDefSymbol |
+			var synthDef = SynthDescLib.global.at(synthDefSymbol).def;
+			if(synthDef == nil, { ("AlgaPattern: Invalid AlgaSynthDef: '" ++ synthDefSymbol.asString ++ "'").error; ^nil });
+			synthDef.outsMapping.keysValuesDo({ | key, outMapping |
+				var oldOutsMapping = outsMappingSum[key];
+				if(oldOutsMapping == nil, {
+					outsMappingSum[key] = outMapping
+				}, {
+					if(oldOutsMapping != outMapping, {
+						("AlgaPattern: outsMapping mismatch of SynthDef '" ++ synthDefSymbol ++ "' for key '" ++ key ++ "'. Expected '" ++ oldOutsMapping ++ "' but got '" ++ outMapping ++ "'").error;
+						^nil;
+					})
+				});
+			});
+		});
+
+		^outsMappingSum;
+	}
+
 	//calculate the outs variable (the outs channel mapping)
 	calculateOutsMapping { | replace = false, keepChannelsMapping = false |
+		var outsMappingSynthDef;
+
+		//For AlgaPattern: synthDef can be a ListPattern. In that case, sum all outsMappings
+		if((this.isAlgaPattern).and(synthDef.isListPattern), {
+			outsMappingSynthDef = this.unpackListPatternOutsMapping;
+			if(outsMappingSynthDef == nil, { ^nil });
+		}, {
+			//Normal case (no ListPattern): synthDef is an actual synthDef
+			outsMappingSynthDef = synthDef.outsMapping;
+		});
+
 		//Accumulate channelsMapping across .replace calls.
 		if(replace.and(keepChannelsMapping), {
 			var newOutsMapping = IdentityDictionary(10);
@@ -661,7 +695,7 @@ AlgaNode {
 			});
 
 			//new ones from the synthDef
-			synthDef.outsMapping.keysValuesDo({ | key, value |
+			outsMappingSynthDef.keysValuesDo({ | key, value |
 				//Delete out of bounds entries? Or keep them for future .replaces?
 				//if(value < numChannels, {
 				newOutsMapping[key] = value;
@@ -671,7 +705,7 @@ AlgaNode {
 			outsMapping = newOutsMapping;
 		}, {
 			//no replace: use synthDef's ones
-			outsMapping = synthDef.outsMapping;
+			outsMapping = outsMappingSynthDef;
 		});
 	}
 
@@ -692,7 +726,7 @@ AlgaNode {
 
 		//If explicit free, can't use in AlgaNode
 		if(synthDef.explicitFree, {
-			("AlgaNode: trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' which can free its synth. This is not supported for AlgaNodes, but it will be for AlgaPatterns.").error;
+			("AlgaNode: trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' which can free its synth. This is not supported for AlgaNodes, but it is for AlgaPatterns.").error;
 			this.clear;
 			^this;
 		});

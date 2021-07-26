@@ -873,10 +873,17 @@ AlgaPattern : AlgaNode {
 				keepChannelsMapping:keepChannelsMapping,
 				keepScale:keepScale,
 				sched:sched
-			);
+			)
 		}
-		{ def.isListPattern } {
-			^this.dispatchListPattern;
+		{ defEntry.isListPattern } {
+			^this.dispatchListPattern(
+				def: defEntry,
+				initGroups: initGroups,
+				replace: replace,
+				keepChannelsMapping:keepChannelsMapping,
+				keepScale:keepScale,
+				sched:sched
+			)
 		}
 		{ defClass == Function } {
 			^this.dispatchFunction(
@@ -897,22 +904,26 @@ AlgaPattern : AlgaNode {
 	buildFromSynthDef { | initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
-		//Retrieve controlNames from SynthDesc
-		var synthDescControlNames = synthDef.asSynthDesc.controls;
-
-		//Create controlNames
-		this.createControlNamesAndParamsConnectionTime(synthDescControlNames);
-
-		numChannels = synthDef.numChannels;
-		rate = synthDef.rate;
-
-		sched = sched ? 0;
+		var synthDescControlNames;
 
 		//Detect if AlgaSynthDef can be freed automatically. Otherwise, error!
 		if(synthDef.explicitFree.not, {
 			("AlgaPattern: AlgaSynthDef '" ++ synthDef.name.asString ++ "' can't free itself: it doesn't implement any Done action.").error;
 			^this
 		});
+
+		//Retrieve controlNames from SynthDesc
+		synthDescControlNames = synthDef.asSynthDesc.controls;
+
+		//Create controlNames
+		this.createControlNamesAndParamsConnectionTime(synthDescControlNames);
+
+		//Retrieve channels and rate
+		numChannels = synthDef.numChannels;
+		rate = synthDef.rate;
+
+		//Sched must be a num
+		sched = sched ? 0;
 
 		//Generate outsMapping (for outsMapping connectinons)
 		this.calculateOutsMapping(replace, keepChannelsMapping);
@@ -928,15 +939,133 @@ AlgaPattern : AlgaNode {
 		this.createPattern(replace, keepChannelsMapping, keepScale, sched);
 	}
 
-	//Support multiple SynthDefs in the future,
-	//only if expressed with ListPattern subclasses (like Pseq, Prand, etc...):
-	//(def: Pseq([\synthDef1, Pseq([\synthDef2, \synthDef3]))
-	//This will collect ALL controlnames for each of the synthDefs in order
-	//to correctly instantiate the interpStreams... I know it's quite the overhead,
-	//but, for now, it's just the easier solution.
+	//Build spec from ListPattern
+	buildFromListPattern { | initGroups = false, replace = false,
+		keepChannelsMapping = false, keepScale = false, sched = 0 |
+
+		//Sched must be a num
+		sched = sched ? 0;
+
+		//Generate outsMapping (for outsMapping connectinons)
+		if(this.calculateOutsMapping(replace, keepChannelsMapping) == nil, { ^this });
+
+		//Create groups if needed
+		if(initGroups, { this.createAllGroups });
+
+		//Create synthBus for output
+		//interpBusses are taken care of in createPatternInterpSynthAndBus.
+		this.createSynthBus;
+
+		//Create the actual pattern.
+		this.createPattern(replace, keepChannelsMapping, keepScale, sched);
+	}
+
+	//Check rates, numChannels, Symbols and controlNames
+	checkListPatternValidityAndReturnControlNames { | listPattern |
+		var numChannelsCount, rateCount;
+		var controlNamesDict = IdentityDictionary();
+		var controlNamesSum = Array.newClear;
+
+		listPattern.list.do({ | entry |
+			var synthDescEntry, synthDefEntry;
+			var controlNamesEntry;
+			var controlNamesListPatternDefaultsEntry;
+
+			//Only support Symbols (not Functions, too much of a PITA)
+			if(entry.class != Symbol, {
+				"AlgaPattern: the ListPattern defining 'def' can only contain Symbols pointing to valid AlgaSynthDefs".error;
+				^nil;
+			});
+
+			synthDescEntry = SynthDescLib.global.at(entry);
+			synthDefEntry = synthDescEntry.def;
+
+			if(synthDescEntry == nil, {
+				("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++ "'").error;
+				^nil;
+			});
+
+			if(synthDefEntry.class != AlgaSynthDef, {
+				("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++"'").error;
+				^nil;
+			});
+
+			if(synthDefEntry.explicitFree.not, {
+				("AlgaPattern: AlgaSynthDef '" ++ synthDefEntry.name.asString ++ "' can't free itself: it doesn't implement any Done action.").error;
+				^nil
+			});
+
+			if(numChannelsCount == nil, { numChannelsCount = synthDefEntry.numChannels });
+			if(rateCount == nil, { rateCount = synthDefEntry.rate });
+
+			if(synthDefEntry.numChannels != numChannelsCount, {
+				("AlgaPattern: the '" ++ entry.asString ++ "' def has a different channels count than the other entries. Got " ++ synthDefEntry.numChannels ++ " but expected " ++ numChannelsCount).error;
+				^nil;
+			});
+
+			if(synthDefEntry.rate != rateCount, {
+				("AlgaPattern: the '" ++ entry.asString ++ "' def has a different rate than the other entries. Got '" ++ synthDefEntry.rate ++ "' but expected '" ++ rateCount ++ "'").error;
+				^nil;
+			});
+
+			numChannelsCount = synthDefEntry.numChannels;
+			rateCount = synthDefEntry.rate;
+
+			numChannels = numChannelsCount; //global
+			rate = rateCount; //global
+
+			controlNamesEntry = synthDescEntry.controls;
+
+			controlNamesEntry.do({ | controlName |
+				var name = controlName.name;
+				if((name != \fadeTime).and(
+					name != \out).and(
+					name != \gate).and(
+					name != '?'), {
+					if(controlNamesDict[name] == nil, {
+						controlNamesDict[name] = controlName;
+						controlNamesSum = controlNamesSum.add(controlName);
+					}, {
+						var rate = controlNamesDict[name].rate;
+						var numChannels = controlNamesDict[name].numChannels;
+						var newRate = controlName.rate;
+						var newNumChannels = controlName.numChannels;
+						if(rate != newRate, {
+							("AlgaPattern: rate mismatch of SynthDef '" ++ entry ++ "' for parameter '" ++ name ++ "'. Expected '" ++ rate ++ "' but got '" ++ newRate ++ "'").error;
+							^nil
+						});
+						if(numChannels != newNumChannels, {
+							("AlgaPattern: channels mismatch of SynthDef '" ++ entry ++ "' for parameter '" ++ name ++ "'. Expected " ++ numChannels ++ " but got " ++ newNumChannels).error;
+							^nil
+						});
+					});
+				});
+			});
+		});
+
+		^controlNamesSum;
+	}
+
+	//Multiple Symbols over a ListPattern
 	dispatchListPattern { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
-		"AlgaPattern: ListPatterns as 'def' are not supported yet".error;
+
+		//Check rates, numChannels, Symbols and controlNames
+		var controlNamesSum = this.checkListPatternValidityAndReturnControlNames(def);
+		if(controlNamesSum == nil, { ^this });
+
+		//Create controlNames
+		this.createControlNamesAndParamsConnectionTime(controlNamesSum);
+
+		//synthDef will be the ListPattern
+		synthDef = def;
+
+		this.buildFromListPattern(
+			initGroups, replace,
+			keepChannelsMapping:keepChannelsMapping,
+			keepScale:keepScale,
+			sched:sched
+		);
 	}
 
 	//Build the actual pattern
@@ -1055,9 +1184,13 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Interpolate def (basically, runs .replace)
-	interpolateDef {
-
+	//Interpolate def == replace
+	interpolateDef { | def, time, sched |
+		^this.replace(
+			def: (def: def),
+			time: time,
+			sched: sched
+		);
 	}
 
 	//<<, <<+ and <|
@@ -1102,9 +1235,17 @@ AlgaPattern : AlgaNode {
 	//Buffer == replace
 	makeBufferConnection { | sender, param, time, sched |
 		var args = [ param, sender ];
+		var synthDefName;
+		if(synthDef.class == AlgaSynthDef, {
+			//Normal synthDef
+			synthDefName = synthDef.name
+		}, {
+			//ListPatterns, mainly
+			synthDefName = (def: synthDef)
+		});
 		"AlgaPattern: changing a Buffer. This will trigger 'replace'.".warn;
 		^this.replace(
-			def: synthDef.name,
+			def: synthDefName,
 			args: args,
 			time: time,
 			sched: sched
@@ -1158,6 +1299,11 @@ AlgaPattern : AlgaNode {
 
 	//Only from is needed: to already calls into makeConnection
 	from { | sender, param = \in, chans, scale, sampleAndHold, time, sched |
+		//Special case, \def
+		if(param == \def, {
+			^this.interpolateDef(sender, time, sched);
+		});
+
 		//Force pattern and AlgaPatternArg dispatch
 		if((sender.isPattern).or(sender.isAlgaPatternArg), {
 			^this.makeConnection(sender, param, senderChansMapping:chans,
@@ -1180,6 +1326,7 @@ AlgaPattern : AlgaNode {
 				scale:scale, time:time, sampleAndHold:sampleAndHold, sched:sched
 			);
 		}, {
+			//sender == symbol is used for \def
 			if(sender.isNumberOrArray, {
 				this.makeConnection(sender, param, senderChansMapping:chans,
 					scale:scale, time:time, sampleAndHold:sampleAndHold, sched:sched

@@ -23,6 +23,7 @@
 	isStream { ^false }
 	isListPattern { ^false }
 	isTempoClock { ^false }
+	def { ^nil }
 	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
 
 	//AlgaNode / AlgaPattern support
@@ -54,6 +55,8 @@
     //Fundamental for bug-prone trying to index a nil 'nil[0]'
     //for example when dealing with nested IdentityDictionaries
     at { | index | ^nil }
+
+	keysValuesDo { ^nil }
 }
 
 +SynthDef {
