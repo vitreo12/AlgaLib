@@ -4,7 +4,7 @@ Alga.initSynthDefs;
 Alga.boot({
 
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 0.1), doneAction:2) * DC.ar(0.5)
+		SinOsc.ar(\freq.ar([440, 441]).poll) * EnvGen.ar(Env.perc(0.01, 0.1), doneAction:2) * DC.ar(0.5)
 	}).add;
 
 	AlgaSynthDef(\testImpulse, {
@@ -41,12 +41,11 @@ Alga.boot({
 
 	c = AN({ Saw.ar([100, 200]) });
 
+	d = AN({ DC.ar(440) });
+
 	//s.plotTree
 });
 )
-
-
-
 
 s.scope
 
@@ -71,7 +70,7 @@ a.from(Pwhite(0.01, 0.1), \dur, sched:1)
 
 a.from(440, \freq, time:1)
 
-a.from(Pseq([440, 660, [885, 880]], inf), \freq, time:3)
+a.from(Pseq([440, 660, [1000, 880]], inf), \freq, time:3)
 
 s.plotTree
 

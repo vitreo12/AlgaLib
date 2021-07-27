@@ -300,7 +300,7 @@ outs[" ++ y ++ "] = env;
 outs;
 }, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 
-//Env comes from outside. TODO: sample and hold
+//Used in patterns (env comes from outside)
 AlgaSynthDef.new_inner(" ++ name_pattern ++ ", { | scaleCurve = 0 |
 var in, env, out, outMultiplier, outScale, outs;
 in = " ++ in ++ "
@@ -322,6 +322,23 @@ outs = Array.newClear(" ++ (y + 1) ++ ");
 " ++ outs ++ "
 outs[" ++ y ++ "] = env;
 outs;
+}, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+
+//Used in patterns + fx (no env)
+AlgaSynthDef.new_inner(" ++ name_pattern ++ "_fx, { | scaleCurve = 0 |
+var in, out, outMultiplier, outScale;
+in = " ++ in ++ "
+out = " ++ indices ++ "
+outMultiplier = " ++ multiplier ++ "
+outScale = out.lincurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++ "),
+scaleCurve,
+);
+out = " ++ scaling ++ "
+out = out * outMultiplier;
 }, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
 
