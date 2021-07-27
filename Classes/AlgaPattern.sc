@@ -1081,7 +1081,8 @@ AlgaPattern : AlgaNode {
 
 	//Parse a single \fx event
 	parseFXEvent { | value |
-		var synthDescFx, synthDefFx;
+		var foundInParam = false;
+		var synthDescFx, synthDefFx, controlNamesFx;
 
 		//Find \def
 		var def = value[\def];
@@ -1107,12 +1108,30 @@ AlgaPattern : AlgaNode {
 
 		//Must return same channels and rate as the global one
 		if(synthDefFx.numChannels != numChannels, {
-			("AlgaPattern: Invalid number of channels of AlgaSynthDef '" ++ def ++ "' in 'fx': '. Expected " ++ numChannels ++ " but got " ++ synthDefFx.numChannels).error;
+			("AlgaPattern: Invalid number of channels of AlgaSynthDef '" ++ def ++ "' in 'fx'. Expected " ++ numChannels ++ " but got " ++ synthDefFx.numChannels).error;
 			^nil;
 		});
 
 		if(synthDefFx.rate != rate, {
-			("AlgaPattern: Invalid rate of AlgaSynthDef '" ++ def ++ "' in 'fx': '. Expected '" ++ rate ++ "' but got " ++ synthDefFx.rate ++ "'").error;
+			("AlgaPattern: Invalid rate of AlgaSynthDef '" ++ def ++ "' in 'fx'. Expected '" ++ rate ++ "' but got " ++ synthDefFx.rate ++ "'").error;
+			^nil;
+		});
+
+		//Must contain \in parameter at same rate of rate
+		controlNamesFx = synthDef.controls;
+		if(controlNamesFx == nil, {
+			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "'").error;
+			^nil;
+		});
+
+		controlNamesFx.do({ | controlName |
+			if(controlName.name == \in, {
+				foundInParam = true;
+			})
+		});
+
+		if(foundInParam.not, {
+			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "': It does not provide an 'in' parameter").error;
 			^nil;
 		});
 
@@ -1259,8 +1278,27 @@ AlgaPattern : AlgaNode {
 		interpStreams = newInterpStreams;
 	}
 
+	//Get valid synthDef name
+	getSynthDef {
+		if(synthDef.class == AlgaSynthDef, {
+			//Normal synthDef
+			^synthDef.name
+		}, {
+			//ListPatterns, mainly
+			^synthDef
+		});
+	}
+
 	//Interpolate dur (not yet)
-	interpolateDur { | value, sched |
+	interpolateDur { | value, time, sched |
+		("AlgaPattern: 'dur' interpolation is not supported yet. Running .replace instead.").warn;
+		^this.replace(
+			def: (def: this.getSynthDef),
+			time: time,
+			sched: sched
+		);
+
+		/*
 		if(sched == nil, { sched = 0 });
 		("AlgaPattern: 'dur' interpolation is not supported yet. Rescheduling 'dur' at the " ++ sched ++ " quantization.").warn;
 
@@ -1278,12 +1316,25 @@ AlgaPattern : AlgaNode {
 				})
 			}
 		);
+		*/
 	}
 
 	//Interpolate def == replace
 	interpolateDef { | def, time, sched |
 		^this.replace(
 			def: (def: def),
+			time: time,
+			sched: sched
+		);
+	}
+
+	//Buffer == replace
+	interpolateBuffer { | sender, param, time, sched |
+		var args = [ param, sender ]; //new buffer connection
+		"AlgaPattern: changing a Buffer parameter. This will trigger 'replace'.".warn;
+		^this.replace(
+			def: (def: this.getSynthDef),
+			args: args,
 			time: time,
 			sched: sched
 		);
@@ -1306,26 +1357,6 @@ AlgaPattern : AlgaNode {
 		});
 
 		^false
-	}
-
-	//Buffer == replace
-	makeBufferConnection { | sender, param, time, sched |
-		var args = [ param, sender ]; //new buffer connection
-		var synthDefName;
-		if(synthDef.class == AlgaSynthDef, {
-			//Normal synthDef
-			synthDefName = synthDef.name
-		}, {
-			//ListPatterns, mainly
-			synthDefName = (def: synthDef)
-		});
-		"AlgaPattern: changing a Buffer parameter. This will trigger 'replace'.".warn;
-		^this.replace(
-			def: synthDefName,
-			args: args,
-			time: time,
-			sched: sched
-		);
 	}
 
 	//<<, <<+ and <|
@@ -1367,16 +1398,6 @@ AlgaPattern : AlgaNode {
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, sampleAndHold, time, sched |
 
-		//delta == dur
-		if(param == \delta, {
-			param = \dur
-		});
-
-		//Special case, \dur
-		if(param == \dur, {
-			^this.interpolateDur(sender, sched);
-		});
-
 		//Default to false
 		sampleAndHold = sampleAndHold ? false;
 
@@ -1387,7 +1408,9 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Special case: ListPattern with Buffers
-		if(this.patternOrAlgaPatternArgContainsBuffers(sender), { ^this.makeBufferConnection(sender, param, time, sched) });
+		if(this.patternOrAlgaPatternArgContainsBuffers(sender), {
+			^this.interpolateBuffer(sender, param, time, sched)
+		});
 
 		//All other cases
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
@@ -1410,9 +1433,24 @@ AlgaPattern : AlgaNode {
 
 	//Only from is needed: to already calls into makeConnection
 	from { | sender, param = \in, chans, scale, sampleAndHold, time, sched |
+		//delta == dur
+		if(param == \delta, {
+			param = \dur
+		});
+
+		//Special case, \dur
+		if(param == \dur, {
+			^this.interpolateDur(sender, time, sched);
+		});
+
 		//Special case, \def
 		if(param == \def, {
 			^this.interpolateDef(sender, time, sched);
+		});
+
+		//Buffer == replace
+		if(sender.isBuffer, {
+			^this.interpolateBuffer(sender, param, time, sched)
 		});
 
 		//Force pattern and AlgaPatternArg dispatch
@@ -1420,11 +1458,6 @@ AlgaPattern : AlgaNode {
 			^this.makeConnection(sender, param, senderChansMapping:chans,
 				scale:scale, sampleAndHold:sampleAndHold, time:time, sched:sched
 			);
-		});
-
-		//Buffer == replace
-		if(sender.isBuffer, {
-			^this.makeBufferConnection(sender, param, time, sched)
 		});
 
 		//Standard cases
