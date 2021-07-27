@@ -731,21 +731,39 @@ AlgaPattern : AlgaNode {
 		temporaryParamSynths.clear;
 	}
 
+	//Create all needed Synths and Busses for an FX
+	createFXSynth { | fx, algaSynthBus, patternSynthArgs, patternBussesAndSynths |
+
+		//Use fxBus as \out for patternSynth
+
+		//Get numChannels / rate of patternSynth and run conversions
+
+		//Unpack parameters (same behaviour as createPatternParamSynth's unpacking)
+
+		//Get all parameters for the FX synth and run conversions, addToTail
+
+		//Create fxSynth, addToTail
+
+		//Get fxSynth numChannels / rate and run conversions to write to algaSynthBus, addToTail
+
+		//If not explicitFree, add all Synths and Busses to patternBussesAndSynths
+
+		//Else, free all Synths and Busses at fxSynth.onFree
+	}
+
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
 	createEventSynths { | algaSynthDef, algaSynthBus, algaPatternInterpStreams, fx |
 		//These will be populated and freed when the patternSynth is released
 		var patternBussesAndSynths = IdentitySet(controlNames.size * 2);
 
 		//args to patternSynth
-		var patternSynthArgs = [
-			\gate, 1,
-			\out, algaSynthBus.index
-		];
+		var patternSynthArgs = [ \gate, 1 ];
 
 		//The actual synth that will be created
 		var patternSynth;
 
-		//FIRST THING, free all dangling temporary synths
+		//FIRST THING, free all dangling temporary synths. These are created to perform
+		//mid-pattern interpolation of parameters.
 		this.freeAllTemporaryParamSynths;
 
 		//Loop over controlNames and create as many Busses and Synths as needed,
@@ -816,6 +834,15 @@ AlgaPattern : AlgaNode {
 
 			//Current patternInterpSumBus
 			currentPatternInterpSumBus = patternInterpSumBus;
+		});
+
+		//If fx, deal with it
+		if(fx != nil, {
+			//Create fx synth and all relative busses. Also add correct \out for patternSynthArgs.
+			this.createFXSynth(fx, algaSynthBus, patternSynthArgs, patternBussesAndSynths);
+		}, {
+			//Add out bus of patternSynth, directly to algaSynthBus
+			patternSynthArgs = patternSynthArgs.add(\out).add(algaSynthBus.index);
 		});
 
 		//This synth writes directly to synthBus
@@ -1103,6 +1130,7 @@ AlgaPattern : AlgaNode {
 			^nil;
 		});
 
+		/*
 		//Must return same channels and rate as the global one
 		if(synthDefFx.numChannels != numChannels, {
 			("AlgaPattern: Invalid number of channels of AlgaSynthDef '" ++ def ++ "' in 'fx'. Expected " ++ numChannels ++ " but got " ++ synthDefFx.numChannels).error;
@@ -1115,11 +1143,12 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Must contain \in parameter at same rate of rate
-		controlNamesFx = synthDef.controls;
+		controlNamesFx = synthDescFx.controls;
 		if(controlNamesFx == nil, {
 			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "'").error;
 			^nil;
 		});
+		*/
 
 		controlNamesFx.do({ | controlName |
 			if(controlName.name == \in, {
