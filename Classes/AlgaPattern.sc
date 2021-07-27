@@ -386,13 +386,11 @@ AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
-	1) resetParam()
+	1) fx: (See next)
 
 	2) mixFrom() / mixTo()
 
-	3) fx: (See next)
-
-	4) out: (See next)
+	3) out: (See next)
 
 	- fx: (def: Pseq([\delay, \tanh]), delayTime: Pseq([0.2, 0.4]))
 
@@ -464,6 +462,9 @@ AlgaPattern : AlgaNode {
 			var algaPatternServer = ~algaPatternServer;
 			var algaPatternClock = ~algaPatternClock;
 
+			//fx
+			var fx = ~fx;
+
 			//The interpStreams the Pattern is using
 			var algaPatternInterpStreams = ~algaPatternInterpStreams;
 
@@ -479,7 +480,8 @@ AlgaPattern : AlgaNode {
 				~algaPattern.createEventSynths(
 					algaSynthDef,
 					algaSynthBus,
-					algaPatternInterpStreams
+					algaPatternInterpStreams,
+					fx
 				)
 			});
 
@@ -700,7 +702,8 @@ AlgaPattern : AlgaNode {
 	//Create all pattern synths per-param
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
 		paramDefault, patternInterpSumBus, patternBussesAndSynths,
-		interpStreamsEntriesAtParam, scaleArraysAndChansAtParam, sampleAndHold, algaSynthBus, algaPatternInterpStreams |
+		interpStreamsEntriesAtParam, scaleArraysAndChansAtParam, sampleAndHold,
+		algaSynthBus, algaPatternInterpStreams, fx |
 
 		if(interpStreamsEntriesAtParam != nil, {
 			interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry | //indexed by uniqueIDs
@@ -729,15 +732,12 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
-	createEventSynths { | algaSynthDef, algaSynthBus, algaPatternInterpStreams |
+	createEventSynths { | algaSynthDef, algaSynthBus, algaPatternInterpStreams, fx |
 		//These will be populated and freed when the patternSynth is released
 		var patternBussesAndSynths = IdentitySet(controlNames.size * 2);
 
 		//args to patternSynth
-		var patternSynthArgs = [
-			\gate, 1,
-			\out, algaSynthBus.index
-		];
+		var patternSynthArgs;
 
 		//The actual synth that will be created
 		var patternSynth;
@@ -814,6 +814,12 @@ AlgaPattern : AlgaNode {
 			//Current patternInterpSumBus
 			currentPatternInterpSumBus = patternInterpSumBus;
 		});
+
+		//Args to patternSynth
+		patternSynthArgs = [
+			\gate, 1,
+			\out, algaSynthBus.index
+		];
 
 		//This synth writes directly to synthBus
 		patternSynth = AlgaSynth(
@@ -982,12 +988,13 @@ AlgaPattern : AlgaNode {
 			});
 
 			synthDescEntry = SynthDescLib.global.at(entry);
-			synthDefEntry = synthDescEntry.def;
 
 			if(synthDescEntry == nil, {
 				("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++ "'").error;
 				^nil;
 			});
+
+			synthDefEntry = synthDescEntry.def;
 
 			if(synthDefEntry.class != AlgaSynthDef, {
 				("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++"'").error;
@@ -1072,6 +1079,79 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
+	//Parse a single \fx event
+	parseFXEvent { | value |
+		var synthDescFx, synthDefFx;
+
+		//Find \def
+		var def = value[\def];
+		if(def == nil, {
+			("AlgaPattern: no 'def' entry in 'fx': '" ++ value.asString ++ "'").error;
+			^nil
+		});
+
+		//Check that \def is valid
+		synthDescFx = SynthDescLib.global.at(def);
+
+		if(synthDescFx == nil, {
+			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "'").error;
+			^nil;
+		});
+
+		synthDefFx = synthDescFx.def;
+
+		if(synthDefFx.class != AlgaSynthDef, {
+			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++"'").error;
+			^nil;
+		});
+
+		//Must return same channels and rate as the global one
+		if(synthDefFx.numChannels != numChannels, {
+			("AlgaPattern: Invalid number of channels of AlgaSynthDef '" ++ def ++ "' in 'fx': '. Expected " ++ numChannels ++ " but got " ++ synthDefFx.numChannels).error;
+			^nil;
+		});
+
+		if(synthDefFx.rate != rate, {
+			("AlgaPattern: Invalid rate of AlgaSynthDef '" ++ def ++ "' in 'fx': '. Expected '" ++ rate ++ "' but got " ++ synthDefFx.rate ++ "'").error;
+			^nil;
+		});
+
+		//Pass explicitFree from the Event
+		value[\explicitFree] = synthDefFx.explicitFree;
+
+		//Loop over the event
+		value.keysValuesDo({ | key, entry |
+			//Use .asStream for each entry
+			value[key] = entry.asStream
+		});
+
+		^value;
+	}
+
+	//Parse the \fx key
+	parseFX { | value |
+		case
+		//Single Event
+		{ value.class == Event } {
+			^this.parseFXEvent(value);
+		}
+
+		//ListPattern of Events
+		{ value.isListPattern } {
+			value.list.do({ | listEntry, i |
+				var result;
+				if(listEntry.class != Event, {
+					("AlgaPattern: 'fx' only supports Event entries. Entry '" ++ listEntry.asString ++ "' is invalid").error;
+					^nil
+				});
+				result = this.parseFXEvent(listEntry);
+				if(result == nil, { ^nil });
+				value.list[i] = result;
+			});
+			^value;
+		};
+	}
+
 	//Build the actual pattern
 	createPattern { | replace = false, keepChannelsMapping = false, keepScale = false, sched |
 		var foundDurOrDelta = false;
@@ -1084,14 +1164,23 @@ AlgaPattern : AlgaNode {
 
 		//Loop over the Event input from the user
 		eventPairs.keysValuesDo({ | paramName, value |
+			//Add \def key as \instrument
+			if(paramName == \def, {
+				patternPairs = patternPairs.add(\instrument).add(value);
+			});
+
+			//Found \dur or \delta
 			if((paramName == \dur).or(paramName == \delta), {
 				foundDurOrDelta = true;
 				this.setDur(value, newInterpStreams);
 			});
 
-			if(paramName == \def, {
-				//Add \def key as \instrument
-				patternPairs = patternPairs.add(\instrument).add(value);
+			//Add \fx key (parsing everything correctly)
+			if(paramName == \fx, {
+				var parsedFX = this.parseFX(value);
+				if(parsedFX != nil, {
+					patternPairs = patternPairs.add(\fx).add(parsedFX)
+				});
 			});
 		});
 
@@ -1105,6 +1194,7 @@ AlgaPattern : AlgaNode {
 				});
 			})
 		}, {
+			//Else, default it to 1
 			if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
 		});
 
@@ -1122,8 +1212,10 @@ AlgaPattern : AlgaNode {
 
 			//If replace, check if keeping chans / scale mappings
 			if(replace, {
-				if(keepChannelsMapping, { chansMapping = this.getParamChansMapping(paramName, paramValue) });
-				if(keepScale, { scale = this.getParamScaling(paramName, paramValue); });
+				if(keepChannelsMapping, {
+					chansMapping = this.getParamChansMapping(paramName, paramValue)
+				});
+				if(keepScale, { scale = this.getParamScaling(paramName, paramValue) });
 			});
 
 			//Add to interpStream (which also creates interpBus / interpSynth).
@@ -1197,6 +1289,45 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
+	//Interpolate fx == replace
+	interpolateFX {
+
+	}
+
+	//ListPattern that contains Buffers
+	patternOrAlgaPatternArgContainsBuffers { | pattern |
+		if(pattern.isAlgaPatternArg, { if(pattern.sender.isBuffer, { ^true }) });
+
+		if(pattern.isListPattern, {
+			pattern.list.do({ | entry |
+				if(entry.isBuffer, { ^true });
+				if(entry.isAlgaPatternArg, { if(entry.sender.isBuffer, { ^true }) });
+			});
+		});
+
+		^false
+	}
+
+	//Buffer == replace
+	makeBufferConnection { | sender, param, time, sched |
+		var args = [ param, sender ]; //new buffer connection
+		var synthDefName;
+		if(synthDef.class == AlgaSynthDef, {
+			//Normal synthDef
+			synthDefName = synthDef.name
+		}, {
+			//ListPatterns, mainly
+			synthDefName = (def: synthDef)
+		});
+		"AlgaPattern: changing a Buffer parameter. This will trigger 'replace'.".warn;
+		^this.replace(
+			def: synthDefName,
+			args: args,
+			time: time,
+			sched: sched
+		);
+	}
+
 	//<<, <<+ and <|
 	makeConnectionInner { | param = \in, sender, senderChansMapping, scale, sampleAndHold, time = 0 |
 		var isDefault = false;
@@ -1229,40 +1360,6 @@ AlgaPattern : AlgaNode {
 			scale: scale,
 			sampleAndHold: sampleAndHold,
 			time: time
-		);
-	}
-
-	//ListPattern that contains Buffers
-	patternOrAlgaPatternArgContainsBuffers { | pattern |
-		if(pattern.isAlgaPatternArg, { if(pattern.sender.isBuffer, { ^true }) });
-
-		if(pattern.isListPattern, {
-			pattern.list.do({ | entry |
-				if(entry.isBuffer, { ^true });
-				if(entry.isAlgaPatternArg, { if(entry.sender.isBuffer, { ^true }) });
-			});
-		});
-
-		^false
-	}
-
-	//Buffer == replace
-	makeBufferConnection { | sender, param, time, sched |
-		var args = [ param, sender ];
-		var synthDefName;
-		if(synthDef.class == AlgaSynthDef, {
-			//Normal synthDef
-			synthDefName = synthDef.name
-		}, {
-			//ListPatterns, mainly
-			synthDefName = (def: synthDef)
-		});
-		"AlgaPattern: changing a Buffer parameter. This will trigger 'replace'.".warn;
-		^this.replace(
-			def: synthDefName,
-			args: args,
-			time: time,
-			sched: sched
 		);
 	}
 
