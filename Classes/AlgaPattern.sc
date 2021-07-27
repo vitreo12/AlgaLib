@@ -268,6 +268,7 @@ AlgaPatternInterpStreams {
 			entries[paramName].put(uniqueID, entry);
 			^false; //not first entry
 		});
+		^false;
 	}
 
 	//Add sampleAndHold at param. It's generic for that param!
@@ -291,6 +292,9 @@ AlgaPatternInterpStreams {
 		paramRate = controlName.rate;
 		paramNumChannels = controlName.numChannels;
 		paramDefault = controlName.defaultValue;
+
+		//If entry is nil, use paramDefault (used for .reset)
+		if(entry == nil, { entry = paramDefault; entryOriginal = paramDefault });
 
 		//Interpret entry asStream
 		entry = entry.asStream;
@@ -1195,13 +1199,23 @@ AlgaPattern : AlgaNode {
 
 	//<<, <<+ and <|
 	makeConnectionInner { | param = \in, sender, senderChansMapping, scale, sampleAndHold, time = 0 |
+		var isDefault = false;
 		var paramConnectionTime = paramsConnectionTime[param];
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
-		if((sender.isAlgaNode.not).and(sender.isPattern.not).and(sender.isAlgaPatternArg.not).and(sender.isNumberOrArray.not).and(sender.isBuffer.not), {
-			"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, AlgaPatternArgs, Patterns, Numbers, Arrays and Buffers".error;
-			^this;
+
+		//If sender == nil, still pass through. In this case, use default value for param.
+		//This is used in .reset
+		if(sender == nil, { isDefault = true });
+
+		if(isDefault.not, {
+			if((sender.isAlgaNode.not).and(sender.isPattern.not).and(
+				sender.isAlgaPatternArg.not).and(
+				sender.isNumberOrArray.not).and(sender.isBuffer.not), {
+				"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, AlgaPatternArgs, Patterns, Numbers, Arrays and Buffers".error;
+				^this;
+			});
 		});
 
 		//Add scaling to Dicts
@@ -1338,9 +1352,20 @@ AlgaPattern : AlgaNode {
 	}
 
 	// <<| \param (goes back to defaults)
-	//previousSender is the mix one, in case that will be implemented in the future
-	resetParam { | param = \in, time, sched |
-		"AlgaPattern: resetParam is not supported yet".error;
+	//When sender is nil in makeConnection, the default value will be used
+	resetParam { | param = \in, sampleAndHold, time, sched |
+		this.makeConnection(
+			sender: nil,
+			param: param,
+			sampleAndHold: sampleAndHold,
+			time: time,
+			sched: sched
+		)
+	}
+
+	//Alias for resetParam
+	reset { | param = \in, sampleAndHold, time, sched |
+		this.resetParam(param, sampleAndHold, time, sched)
 	}
 
 	//replace entries.
