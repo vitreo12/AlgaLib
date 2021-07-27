@@ -737,7 +737,10 @@ AlgaPattern : AlgaNode {
 		var patternBussesAndSynths = IdentitySet(controlNames.size * 2);
 
 		//args to patternSynth
-		var patternSynthArgs;
+		var patternSynthArgs = [
+			\gate, 1,
+			\out, algaSynthBus.index
+		];
 
 		//The actual synth that will be created
 		var patternSynth;
@@ -814,12 +817,6 @@ AlgaPattern : AlgaNode {
 			//Current patternInterpSumBus
 			currentPatternInterpSumBus = patternInterpSumBus;
 		});
-
-		//Args to patternSynth
-		patternSynthArgs = [
-			\gate, 1,
-			\out, algaSynthBus.index
-		];
 
 		//This synth writes directly to synthBus
 		patternSynth = AlgaSynth(
@@ -1293,30 +1290,10 @@ AlgaPattern : AlgaNode {
 	interpolateDur { | value, time, sched |
 		("AlgaPattern: 'dur' interpolation is not supported yet. Running .replace instead.").warn;
 		^this.replace(
-			def: (def: this.getSynthDef),
+			def: (def: this.getSynthDef, dur: value),
 			time: time,
 			sched: sched
 		);
-
-		/*
-		if(sched == nil, { sched = 0 });
-		("AlgaPattern: 'dur' interpolation is not supported yet. Rescheduling 'dur' at the " ++ sched ++ " quantization.").warn;
-
-		//Set new \dur
-		this.setDur(value);
-
-		//Add to scheduler just to make cascadeMode work... In theory, shouldn't be needed
-		//as this uses the same clock of the scheduler
-		scheduler.addAction(
-			condition: { this.algaInstantiated },
-			func: {
-				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
-				if(algaReschedulingEventStreamPlayer != nil, {
-					algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
-				})
-			}
-		);
-		*/
 	}
 
 	//Interpolate def == replace
@@ -1330,7 +1307,7 @@ AlgaPattern : AlgaNode {
 
 	//Buffer == replace
 	interpolateBuffer { | sender, param, time, sched |
-		var args = [ param, sender ]; //new buffer connection
+		var args = [ param, sender ]; //New buffer connection... Should it be set in the def? (param: sender)?
 		"AlgaPattern: changing a Buffer parameter. This will trigger 'replace'.".warn;
 		^this.replace(
 			def: (def: this.getSynthDef),

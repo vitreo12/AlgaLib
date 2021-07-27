@@ -13,7 +13,7 @@ Alga.boot({
 
 	a = AlgaPattern((
 		def: \test,
-		dur: 0.2,
+		dur: 0.25,
 		buf: b
 	), playTime:2).play;
 });
@@ -28,6 +28,10 @@ a.from(b, \buf, time:2, sched:1)
 a.stop
 
 a.from(Pseq([b, c], inf), \buf, time:0, sched:1)
+
+a.from(0.5, \dur, time:2, sched:1)
+
+a.from(0.25, \dur, time:2, sched:1)
 
 a.from(b, \buf, time:0, sched:1)
 
