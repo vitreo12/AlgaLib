@@ -646,22 +646,56 @@ AlgaNode {
 		^true;
 	}
 
+	//This if for AlgaPattern + ListPattern
+	unpackListPatternRecursive { | listPattern |
+		var outsMappingListPattern = IdentityDictionary();
+		listPattern.list.do({ | listEntry |
+			if(listEntry.isListPattern, {
+				var outsMappingListPatternRecursive = this.unpackListPatternRecursive(listEntry);
+				outsMappingListPatternRecursive.keysValuesDo({ | key, outMapping | outsMappingListPattern[key] = outMapping });
+			}, {
+				var synthDef = SynthDescLib.global.at(listEntry).def;
+				if(synthDef == nil, { ("AlgaPattern: Invalid AlgaSynthDef: '" ++ listEntry ++ "'").error; ^nil });
+				synthDef.outsMapping.keysValuesDo({ | key, outMapping |
+					var oldOutsMapping = outsMappingListPattern[key];
+					if(oldOutsMapping == nil, {
+						outsMappingListPattern[key] = outMapping
+					}, {
+						if(oldOutsMapping != outMapping, {
+							("AlgaPattern: outsMapping mismatch of SynthDef '" ++ listEntry ++ "' for key '" ++ key ++ "'. Expected '" ++ oldOutsMapping ++ "' but got '" ++ outMapping ++ "'").error;
+							^nil;
+						})
+					});
+				});
+			});
+		});
+		^outsMappingListPattern;
+	}
+
 	//This is for AlgaPattern + ListPattern
 	unpackListPatternOutsMapping {
 		var outsMappingSum = IdentityDictionary();
 
 		synthDef.list.do({ | synthDefSymbol |
-			var synthDef = SynthDescLib.global.at(synthDefSymbol).def;
-			if(synthDef == nil, { ("AlgaPattern: Invalid AlgaSynthDef: '" ++ synthDefSymbol.asString ++ "'").error; ^nil });
-			synthDef.outsMapping.keysValuesDo({ | key, outMapping |
-				var oldOutsMapping = outsMappingSum[key];
-				if(oldOutsMapping == nil, {
-					outsMappingSum[key] = outMapping
-				}, {
-					if(oldOutsMapping != outMapping, {
-						("AlgaPattern: outsMapping mismatch of SynthDef '" ++ synthDefSymbol ++ "' for key '" ++ key ++ "'. Expected '" ++ oldOutsMapping ++ "' but got '" ++ outMapping ++ "'").error;
-						^nil;
-					})
+			var synthDef;
+
+			//Unpack ListPatterns recursively
+			if(synthDefSymbol.isListPattern, {
+				var outsMappingListPattern = this.unpackListPatternRecursive(synthDefSymbol);
+				outsMappingListPattern.keysValuesDo({ | key, outMapping | outsMappingSum[key] = outMapping });
+			}, {
+				synthDef = SynthDescLib.global.at(synthDefSymbol).def;
+				if(synthDef == nil, { ("AlgaPattern: Invalid AlgaSynthDef: '" ++ synthDefSymbol.asString ++ "'").error; ^nil });
+				synthDef.outsMapping.keysValuesDo({ | key, outMapping |
+					var oldOutsMapping = outsMappingSum[key];
+					if(oldOutsMapping == nil, {
+						outsMappingSum[key] = outMapping
+					}, {
+						if(oldOutsMapping != outMapping, {
+							("AlgaPattern: outsMapping mismatch of SynthDef '" ++ synthDefSymbol ++ "' for key '" ++ key ++ "'. Expected '" ++ oldOutsMapping ++ "' but got '" ++ outMapping ++ "'").error;
+							^nil;
+						})
+					});
 				});
 			});
 		});

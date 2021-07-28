@@ -386,7 +386,7 @@ AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
-	1) ListPatterns of ListPatterns of ListPatterns ... for \def AND channels / rate conversion before synthBus?
+	1) channels / rate conversion before synthBus?
 
 	2) mixFrom() / mixTo()
 
@@ -1281,73 +1281,78 @@ AlgaPattern : AlgaNode {
 			var controlNamesEntry;
 			var controlNamesListPatternDefaultsEntry;
 
-			//Only support Symbols (not Functions, too much of a PITA)
-			if(entry.class != Symbol, {
-				"AlgaPattern: the ListPattern defining 'def' can only contain Symbols pointing to valid AlgaSynthDefs".error;
-				^nil;
-			});
+			//If another ListPattern, recursively add stuff
+			if(entry.isListPattern, {
+				controlNamesSum = controlNamesSum.addAll(this.checkListPatternValidityAndReturnControlNames(entry));
+			}, {
+				//Only support Symbols (not Functions, too much of a PITA)
+				if(entry.class != Symbol, {
+					"AlgaPattern: the ListPattern defining 'def' can only contain Symbols pointing to valid AlgaSynthDefs".error;
+					^nil;
+				});
 
-			synthDescEntry = SynthDescLib.global.at(entry);
+				synthDescEntry = SynthDescLib.global.at(entry);
 
-			if(synthDescEntry == nil, {
-				("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++ "'").error;
-				^nil;
-			});
+				if(synthDescEntry == nil, {
+					("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++ "'").error;
+					^nil;
+				});
 
-			synthDefEntry = synthDescEntry.def;
+				synthDefEntry = synthDescEntry.def;
 
-			if(synthDefEntry.class != AlgaSynthDef, {
-				("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++"'").error;
-				^nil;
-			});
+				if(synthDefEntry.class != AlgaSynthDef, {
+					("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++"'").error;
+					^nil;
+				});
 
-			if(synthDefEntry.explicitFree.not, {
-				("AlgaPattern: AlgaSynthDef '" ++ synthDefEntry.name.asString ++ "' can't free itself: it doesn't implement any Done action.").error;
-				^nil
-			});
+				if(synthDefEntry.explicitFree.not, {
+					("AlgaPattern: AlgaSynthDef '" ++ synthDefEntry.name.asString ++ "' can't free itself: it doesn't implement any Done action.").error;
+					^nil
+				});
 
-			if(numChannelsCount == nil, { numChannelsCount = synthDefEntry.numChannels });
-			if(rateCount == nil, { rateCount = synthDefEntry.rate });
+				if(numChannelsCount == nil, { numChannelsCount = synthDefEntry.numChannels });
+				if(rateCount == nil, { rateCount = synthDefEntry.rate });
 
-			if(synthDefEntry.numChannels != numChannelsCount, {
-				("AlgaPattern: the '" ++ entry.asString ++ "' def has a different channels count than the other entries. Got " ++ synthDefEntry.numChannels ++ " but expected " ++ numChannelsCount).error;
-				^nil;
-			});
+				if(synthDefEntry.numChannels != numChannelsCount, {
+					("AlgaPattern: the '" ++ entry.asString ++ "' def has a different channels count than the other entries. Got " ++ synthDefEntry.numChannels ++ " but expected " ++ numChannelsCount).error;
+					^nil;
+				});
 
-			if(synthDefEntry.rate != rateCount, {
-				("AlgaPattern: the '" ++ entry.asString ++ "' def has a different rate than the other entries. Got '" ++ synthDefEntry.rate ++ "' but expected '" ++ rateCount ++ "'").error;
-				^nil;
-			});
+				if(synthDefEntry.rate != rateCount, {
+					("AlgaPattern: the '" ++ entry.asString ++ "' def has a different rate than the other entries. Got '" ++ synthDefEntry.rate ++ "' but expected '" ++ rateCount ++ "'").error;
+					^nil;
+				});
 
-			numChannelsCount = synthDefEntry.numChannels;
-			rateCount = synthDefEntry.rate;
+				numChannelsCount = synthDefEntry.numChannels;
+				rateCount = synthDefEntry.rate;
 
-			numChannels = numChannelsCount; //global
-			rate = rateCount; //global
+				numChannels = numChannelsCount; //global
+				rate = rateCount; //global
 
-			controlNamesEntry = synthDescEntry.controls;
+				controlNamesEntry = synthDescEntry.controls;
 
-			controlNamesEntry.do({ | controlName |
-				var name = controlName.name;
-				if((name != \fadeTime).and(
-					name != \out).and(
-					name != \gate).and(
-					name != '?'), {
-					if(controlNamesDict[name] == nil, {
-						controlNamesDict[name] = controlName;
-						controlNamesSum = controlNamesSum.add(controlName);
-					}, {
-						var rate = controlNamesDict[name].rate;
-						var numChannels = controlNamesDict[name].numChannels;
-						var newRate = controlName.rate;
-						var newNumChannels = controlName.numChannels;
-						if(rate != newRate, {
-							("AlgaPattern: rate mismatch of SynthDef '" ++ entry ++ "' for parameter '" ++ name ++ "'. Expected '" ++ rate ++ "' but got '" ++ newRate ++ "'").error;
-							^nil
-						});
-						if(numChannels != newNumChannels, {
-							("AlgaPattern: channels mismatch of SynthDef '" ++ entry ++ "' for parameter '" ++ name ++ "'. Expected " ++ numChannels ++ " but got " ++ newNumChannels).error;
-							^nil
+				controlNamesEntry.do({ | controlName |
+					var name = controlName.name;
+					if((name != \fadeTime).and(
+						name != \out).and(
+						name != \gate).and(
+						name != '?'), {
+						if(controlNamesDict[name] == nil, {
+							controlNamesDict[name] = controlName;
+							controlNamesSum = controlNamesSum.add(controlName);
+						}, {
+							var rate = controlNamesDict[name].rate;
+							var numChannels = controlNamesDict[name].numChannels;
+							var newRate = controlName.rate;
+							var newNumChannels = controlName.numChannels;
+							if(rate != newRate, {
+								("AlgaPattern: rate mismatch of SynthDef '" ++ entry ++ "' for parameter '" ++ name ++ "'. Expected '" ++ rate ++ "' but got '" ++ newRate ++ "'").error;
+								^nil
+							});
+							if(numChannels != newNumChannels, {
+								("AlgaPattern: channels mismatch of SynthDef '" ++ entry ++ "' for parameter '" ++ name ++ "'. Expected " ++ numChannels ++ " but got " ++ newNumChannels).error;
+								^nil
+							});
 						});
 					});
 				});
