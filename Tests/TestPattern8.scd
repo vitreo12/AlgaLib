@@ -2,18 +2,18 @@
 Alga.boot({
 
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 0.5), doneAction:2)
+		(SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 0.5), doneAction:2)).poll(0.1, label:"sig")
 	}).add;
 
 	AlgaSynthDef(\tanh,{
-		(\in.ar(0) * \dist.kr(2)).tanh * 0.5
-	}).add;
+		(\in.ar([0, 0]).poll(0.1, label:"fx") * \dist.kr(2)).tanh * 0.5
+	}, sampleAccurate:false).add;
 
 	AlgaSynthDef(\comb, {
-		var sig = CombC.ar(\in.ar(0), delaytime:\dt.kr(0.1));
-		DetectSilence.ar(sig, doneAction:2);
+		var sig = CombC.ar(\in.ar([0, 0]).poll(0.1, label:"fx"), delaytime:\dt.kr(0.1));
+		FreeSelf.kr(DetectSilence.ar(sig).product);
 		sig
-	}).add;
+	}, sampleAccurate:false).add;
 
 	s.sync;
 
@@ -35,7 +35,7 @@ Alga.boot({
 
 a.from((def:\tanh, \dist:Prand([1, 2], inf)), \fx, time:2, sched:1)
 
-a.from((def:\comb, \dt:Prand([0.01, 0.2], inf)), \fx, time:2, sched:1)
+a.from((def:\comb, \dt:Prand([0.01,  0.01], inf)), \fx, time:2, sched:1)
 
 (
 a.from(
@@ -52,10 +52,14 @@ a.from(
 	(
 		def: \tanh,
 		\dist: Pseq([
-			AlgaPatternArg(b, scale:[1, 3]),
+			AlgaPatternArg(b, scale:[1, 10]),
 			b
 		], inf)
 	),
 	\fx, time:2, sched:1
 )
 )
+
+a.from(0.1, \dur, time:1, sched:1)
+
+s.scope
