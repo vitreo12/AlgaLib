@@ -420,6 +420,9 @@ AlgaPattern : AlgaNode {
 	//interpStreams. These varies on .replace
 	var <interpStreams;
 
+	//Set \dur interpolation behaviour. Either run .replace or change at sched.
+	var <replaceDur = false;
+
 	//IdentitySet of paramSynths that get temporarily created for mid-pattern interpolation
 	var <>temporaryParamSynths;
 
@@ -508,6 +511,15 @@ AlgaPattern : AlgaNode {
 		}, {
 			newInterpStreams.dur = value.asStream
 		});
+	}
+
+	//Set replaceDur
+	replaceDur_ { | value = false |
+		if((value != false).and(value != true), {
+			"AlgaPattern: replaceDur only supports boolean values. Setting it to false".error
+			^nil
+		});
+		replaceDur = value
 	}
 
 	//Free all unused busses from interpStreams
@@ -1572,14 +1584,37 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
+	//Set dur at sched
+	setDurAtSched { | value, sched |
+		//Set new \dur
+		this.setDur(value);
+
+		//Add to scheduler just to make cascadeMode work
+		scheduler.addAction(
+			condition: { this.algaInstantiated },
+			func: {
+				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
+				if(algaReschedulingEventStreamPlayer != nil, {
+					algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
+				})
+			}
+		);
+	}
+
 	//Interpolate dur (not yet)
 	interpolateDur { | value, time, sched |
-		("AlgaPattern: 'dur' interpolation is not supported yet. Running .replace instead.").warn;
-		^this.replace(
-			def: (def: this.getSynthDef, dur: value),
-			time: time,
-			sched: sched
-		);
+		if(replaceDur, {
+			("AlgaPattern: 'dur' interpolation is not supported yet. Running .replace instead.").warn;
+			^this.replace(
+				def: (def: this.getSynthDef, dur: value),
+				time: time,
+				sched: sched
+			);
+		}, {
+			if(sched == nil, { sched = 0 });
+			("AlgaPattern: 'dur' interpolation is not supported yet. Rescheduling 'dur' at the " ++ sched ++ " quantization.").warn;
+			^this.setDurAtSched(value, sched);
+		});
 	}
 
 	//Interpolate def == replace

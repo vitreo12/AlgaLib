@@ -1,8 +1,5 @@
 (
-//Alga.maxIO=2;
-//Alga.initSynthDefs;
 Alga.boot({
-
 	AlgaSynthDef(\test, {
 		SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 0.5), doneAction:2)
 	}, sampleAccurate:true).add;
