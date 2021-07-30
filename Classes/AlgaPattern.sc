@@ -1794,13 +1794,13 @@ AlgaPattern : AlgaNode {
 				//freeAllSynthsAndBussesOnReplace MUST come after algaReschedulingEventStreamPlayer.stop!
 				interpStreams.freeAllSynthsAndBussesOnReplace;
 			}, {
-				var interpStreamsOld = interpStreams.copy;
-				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
+				var interpStreamsOld = interpStreams;
+				var algaReschedulingEventStreamPlayerOld = interpStreams.algaReschedulingEventStreamPlayer;
 				if(time == nil, { time = longestWaitTime });
-				if(algaReschedulingEventStreamPlayer != nil, {
+				if(algaReschedulingEventStreamPlayerOld != nil, {
 					fork {
 						(time + 1.0).wait;
-						algaReschedulingEventStreamPlayer.stop;
+						algaReschedulingEventStreamPlayerOld.stop;
 						//freeAllSynthsAndBussesOnReplace MUST come after algaReschedulingEventStreamPlayer.stop!
 						interpStreamsOld.freeAllSynthsAndBussesOnReplace;
 					}
