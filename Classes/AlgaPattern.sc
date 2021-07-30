@@ -27,14 +27,14 @@ AlgaPatternInterpStreams {
 	//Store it for .replace
 	var <algaReschedulingEventStreamPlayer;
 
-	//Needed to free algaSynthBus / interpSynths / interpBusses on relase:
+	//Store it for .replace
+	var <>algaSynthBus;
+
+	//Needed to free algaSynthBus / interpSynths / interpBusses on release:
 	//there's no other way to know how long a patternSynth would last.
 	//Even if the pattern stopped there could be a last tick of 10s length, or whatever.
-	//These will also contain the fxSynths, which can definitely last longer.
+	//algaPatternSynths will also contain the fxSynths, which can definitely last longer!!!
 	var <algaPatternSynths;
-
-	//Store it to be freed
-	var <>algaSynthBus;
 
 	var <entries;
 	var <interpSynths;
