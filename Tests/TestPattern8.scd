@@ -8,14 +8,13 @@ Alga.boot({
 	}, sampleAccurate:true).add;
 
 	AlgaSynthDef(\tanh,{
-		\in.ar([0, 0])
-		//(\in.ar([0, 0]) * \dist.ar(2)).tanh * 0.5
+		(\in.ar([0, 0]) * \dist.ar(2)).tanh * 0.5
 	}).add;
 
 	AlgaSynthDef(\comb, {
-		\in.ar([0, 0])
-		//var sig = CombC.ar(\in.ar([0, 0]), delaytime:\dt.kr(0.1));
-		//FreeSelf.kr(DetectSilence.ar(sig).product);
+		var sig = CombC.ar(\in.ar([0, 0]), delaytime:\dt.kr(0.1));
+		FreeSelf.kr(DetectSilence.ar(sig).product);
+		sig;
 	}).add;
 
 	s.sync;
@@ -28,7 +27,7 @@ Alga.boot({
 			(def: \tanh, \dist: Pseq([1, 2, 4, 10], inf)),
 			(def: \comb, \dt: Pseq([0.01, 0.05, 0.1], inf))
 		], inf)
-	), playTime:0).play;
+	), playTime:1).play;
 
 	//s.scope;
 
@@ -36,8 +35,7 @@ Alga.boot({
 });
 )
 
-
-a.from((def:\tanh, \dist:Prand([1, 2], inf)), \fx, time:0, sched:1)
+a.from((def:\tanh, \dist:Prand([1, 2, 5], inf)), \fx, time:0, sched:1)
 a.from((def:\comb, \dt:Prand([0.01,  0.01], inf)), \fx, time:0, sched:1)
 
 (
