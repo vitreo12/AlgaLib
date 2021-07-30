@@ -399,7 +399,7 @@ AlgaPattern : AlgaNode {
 
 	1) channels / rate conversion before synthBus?
 
-	2) mixFrom() / mixTo()
+	2) mixFrom()
 
 	3) out: (See next)
 
@@ -407,7 +407,7 @@ AlgaPattern : AlgaNode {
 
 	// Things to do:
 	// 1) Check if it is an AlgaNode or a ListPattern of AlgaNodes
-	// 2) It would just connect to nodes with the \in param, mixing ( mixTo / mixFrom )
+	// 2) It would just connect to nodes with the \in param, mixing ( mixFrom )
 	// 3) Can't be interpolated (but the connection itself can)
 	*/
 
@@ -1847,11 +1847,6 @@ AlgaPattern : AlgaNode {
 	//Don't support <<+ for now
 	mixFrom { | sender, param = \in, inChans, scale, time |
 		"AlgaPattern: mixFrom is not supported yet".error;
-	}
-
-	//Don't support >>+ for now
-	mixTo { | receiver, param = \in, outChans, scale, time |
-		"AlgaPattern: mixTo is not supported yet".error;
 	}
 
 	//stop and reschedule in the future
