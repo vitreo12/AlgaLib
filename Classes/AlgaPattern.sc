@@ -27,6 +27,15 @@ AlgaPatternInterpStreams {
 	//Store it for .replace
 	var <algaReschedulingEventStreamPlayer;
 
+	//Needed to free algaSynthBus / interpSynths / interpBusses on relase:
+	//there's no other way to know how long a patternSynth would last.
+	//Even if the pattern stopped there could be a last tick of 10s length, or whatever.
+	//These will also contain the fxSynths, which can definitely last longer.
+	var <algaPatternSynths;
+
+	//Store it to be freed
+	var <>algaSynthBus;
+
 	var <entries;
 	var <interpSynths;
 	var <interpBusses;
@@ -44,40 +53,44 @@ AlgaPatternInterpStreams {
 		interpSynths        = IdentityDictionary(10);
 		interpBusses        = IdentityDictionary(10);
 		interpBussesToFree  = IdentitySet();
+		algaPatternSynths   = IdentitySet(10);
 		scaleArraysAndChans = IdentityDictionary(10);
 		sampleAndHolds      = IdentityDictionary(10);
 		algaPattern         = argAlgaPattern;
 		server              = algaPattern.server;
 	}
 
-	//Called from freeActiveInterpSynthsAtParamOnReplace
-	freeActiveInterpSynthsAndBussesAtParam { | interpSynthsToFree, interpBussesToFree |
-		interpSynthsToFree.do({ | interpSynthsAtParam |
-			interpSynthsAtParam.do({ | interpSynth |
-				interpSynth.free;
+	//Called from freeAllSynthsOnReplace
+	freeAllInterpSynthsAndBusses {
+		if(interpSynths != nil, {
+			interpSynths.do({ | interpSynthsAtParam |
+				interpSynthsAtParam.do({ | interpSynth |
+					if(interpSynth != nil, { interpSynth.free })
+				});
 			});
 		});
 
-		interpBussesToFree.do({ | interpBussesAtParam |
-			interpBussesAtParam.do({ | interpBus |
-				interpBus.free
+		if(interpBusses != nil, {
+			interpBusses.do({ | interpBussesAtParam |
+				interpBussesAtParam.do({ | interpBus |
+					if(interpBus != nil, { interpBus.free })
+				});
 			});
 		});
 	}
 
-	//On replace, this will be called. It will free everything after longestWaitTime
-	freeActiveInterpSynthsAtParamOnReplace { | now = false |
-		if(now, {
-			this.freeActiveInterpSynthsAndBussesAtParam(interpSynths, interpBusses);
-		}, {
-			var interpSynthsOld = interpSynths.copy;
-			var interpBussesOld = interpBusses.copy;
-			var time = algaPattern.longestWaitTime;
-			fork {
-				(time + 1.0).wait;
-				this.freeActiveInterpSynthsAndBussesAtParam(interpSynthsOld, interpBussesOld);
-			}
-		});
+	//Free the algaSynthBus only if all patternSynths are done. This requires .stop to have been
+	//first called on the algaReschedulingEventStreamPlayer, otherwise this mechanism will fail!
+	freeAllSynthsAndBussesOnReplace {
+		AlgaSpinRoutine.waitFor(
+			condition: { algaPatternSynths.size == 0 }, //wait for all algaPatternSynths to be done
+			func: {
+				this.freeAllInterpSynthsAndBusses; //Free all interpSynths / Busses for the stream
+				if(algaSynthBus != nil, { algaSynthBus.free }); //Finally, free the algaSynthBus too
+			},
+			interval: 0.5, //Check every 0.5, not to overload scheduling
+			maxTime: nil //maxTime == nil means no maxTime, it will keep going
+		)
 	}
 
 	//Free all active interpSynths. This triggers the onFree action that's executed in
@@ -87,9 +100,10 @@ AlgaPatternInterpStreams {
 		if(interpSynthsAtParam != nil, {
 			interpSynthsAtParam.keysValuesDo({ | uniqueID, interpSynth |
 				//Trigger the release of the interpSynth. When freed, the onFree action
-				//will be triggered. This is executed thanks to addActiveInterpSynthOnFree...
+				//will be triggered. This is executed thanks to addActiveInterpSynthOnFree.
 				//Note that only the first call to \t_release will be used as trigger, while
-				//\fadeTime will always be set on any consecutive call (even after the first trigger of \t_release).
+				//\fadeTime will always be set on any consecutive call,
+				//even after the first trigger of \t_release.
 				interpSynth.set(
 					\t_release, 1,
 					\fadeTime, time,
@@ -101,10 +115,8 @@ AlgaPatternInterpStreams {
 	//This creates a temporary patternSynth for mid-pattern interpolation.
 	//It will be freed at the start of the NEXT paramSynth.
 	createTemporaryPatternParamSynthAtParam { | entry, uniqueID, paramName, paramNumChannels, paramRate, paramDefault |
-
 		var scaleArraysAndChansAtParam = scaleArraysAndChans[paramName];
 		var patternInterpSumBus = algaPattern.currentPatternInterpSumBus;  //Use currentPatternInterpSumBus
-
 		if(patternInterpSumBus != nil, {
 			//FUNDAMENTAL: check that the bus is still actually valid and hasn't been freed yet.
 			//In case it's been freed, it means the synths have already been freed
@@ -569,10 +581,10 @@ AlgaPattern : AlgaNode {
 							entry = entry.synthBus.busArg;
 							validParam = true;
 						}, {
-							("AlgaPattern: can't connect to an AlgaNode that's been cleared").error;
+							("AlgaPattern: can't connect to an AlgaNode with an invalid synthBus").error;
 						});
 					}, {
-						("AlgaPattern: can't connect to an AlgaNode that's been cleared").error;
+						("AlgaPattern: can't connect to an AlgaNode with an invalid synthBus").error;
 					});
 				});
 			}, {
@@ -590,6 +602,14 @@ AlgaPattern : AlgaNode {
 			entry = entry.bufnum;
 			senderNumChannels = 1;
 			senderRate = "control";
+			validParam = true;
+		}
+
+		//Nil, use default
+		{ entry.isNil } {
+			senderRate = "control";
+			senderNumChannels = paramNumChannels;
+			entry = paramDefault;
 			validParam = true;
 		};
 
@@ -685,7 +705,7 @@ AlgaPattern : AlgaNode {
 					});
 				});
 
-				//sampleAndHold
+				//sampleAndHold (use == true) as sampleAndHold could be nil too
 				if(sampleAndHold == true, {
 					patternParamSynthArgs = patternParamSynthArgs.add(\sampleAndHold).add(1)
 				});
@@ -713,6 +733,7 @@ AlgaPattern : AlgaNode {
 					).asSymbol;
 				});
 
+				//Actual synth for the param
 				patternParamSynth = AlgaSynth(
 					patternParamSymbol,
 					patternParamSynthArgs,
@@ -766,7 +787,8 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create all needed Synths and Busses for an FX
-	createFXSynth { | fx, algaSynthBus, patternSynthArgs, patternBussesAndSynths |
+	createFXSynthAndPatternSynth { | fx, algaSynthDef, algaSynthBus, algaPatternInterpStreams,
+		patternSynthArgs, patternBussesAndSynths |
 		var patternBussesAndSynthsFx = IdentitySet();
 		var def = fx[\def];
 		var explicitFree = fx[\explicitFree];
@@ -830,7 +852,7 @@ AlgaPattern : AlgaNode {
 			"_fx"
 		).asSymbol;
 
-		//The def
+		//The user's def
 		fxSynthSymbol = def;
 
 		//fxSynth -> algaSynthBus
@@ -850,12 +872,12 @@ AlgaPattern : AlgaNode {
 			var paramNumChannels = controlName.numChannels;
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
-
 			var entry = fx[paramName];
 
-			if((entry != nil).and(paramName != \instrument).and(
+			//Ignore static params
+			if((paramName != '?').and(paramName != \instrument).and(
 				paramName != \def).and(paramName != \out).and(
-				paramName != \gate), {
+				paramName != \gate).and(paramName != \in), {
 
 				//Temporary bus that the patternParamSynth for the fx will write to
 				var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
@@ -874,7 +896,7 @@ AlgaPattern : AlgaNode {
 					paramNumChannels: paramNumChannels,
 					paramRate: paramRate,
 					paramDefault: paramDefault,
-					patternInterpSumBus: patternParamBus,
+					patternInterpSumBus: patternParamBus, //pass the new Bus
 					patternBussesAndSynths: patternBussesAndSynthsFx,
 					isFX: true
 				)
@@ -921,11 +943,19 @@ AlgaPattern : AlgaNode {
 			patternBussesAndSynths.add(fxSynth);
 		});
 
-		//Free all relative synths / busses on fxSynth free
+		//FUNDAMENTAL: add fxSynth to the algaPatternSynths,
+		//so that algaSynthBus is kept alive for the WHOLE duration of the fx too.
+		algaPatternInterpStreams.algaPatternSynths.add(fxSynth);
+
+		//Free all relative synths / busses on fxSynth free.
+		//fxSynth is either freed by itself (if explicitFree),
+		//or when patternSynth is freed.
 		fxSynth.onFree({
-			patternBussesAndSynthsFx.do({ | synthOrBus |
-				synthOrBus.free
-			});
+			//Free synths and busses
+			patternBussesAndSynthsFx.do({ | synthOrBus | synthOrBus.free });
+
+			//Remove fxSynth from algaPatternSynths
+			algaPatternInterpStreams.algaPatternSynths.remove(fxSynth);
 		});
 
 		//Use patternBus as \out for patternSynth
@@ -1028,14 +1058,22 @@ AlgaPattern : AlgaNode {
 
 		//If fx, deal with it
 		if((fx != nil).and(fx.class == Event), {
-			//Create fx synth and all relative busses. Also add correct \out for patternSynthArgs.
-			patternSynthArgs = this.createFXSynth(fx, algaSynthBus, patternSynthArgs, patternBussesAndSynths);
+			//This returns the patternSynthArgs with correct bus to write to (the fx one)
+			patternSynthArgs = this.createFXSynthAndPatternSynth(
+				fx: fx,
+				algaSynthDef: algaSynthDef,
+				algaSynthBus: algaSynthBus,
+				algaPatternInterpStreams: algaPatternInterpStreams,
+				patternSynthArgs: patternSynthArgs,
+				patternBussesAndSynths: patternBussesAndSynths
+			);
 		}, {
-			//Add out bus of patternSynth, directly to algaSynthBus
+			//NO FX
+			//Add \out bus of patternSynth: directly to algaSynthBus
 			patternSynthArgs = patternSynthArgs.add(\out).add(algaSynthBus.index);
 		});
 
-		//This synth writes directly to synthBus
+		//The actual patternSynth according to the user's def
 		patternSynth = AlgaSynth(
 			algaSynthDef,
 			patternSynthArgs,
@@ -1043,11 +1081,13 @@ AlgaPattern : AlgaNode {
 			waitForInst: false
 		);
 
+		//Add pattern synth to algaPatternSynths, and free it when patternSynth gets freed
+		algaPatternInterpStreams.algaPatternSynths.add(patternSynth);
+
 		//Free all normBusses, normSynths, interpBusses and interpSynths on patternSynth's release
 		patternSynth.onFree( {
-			patternBussesAndSynths.do({ | synthOrBus |
-				synthOrBus.free; //free works both for AlgaSynths and AlgaBusses
-			});
+			//Free all Synths and Busses
+			patternBussesAndSynths.do({ | synthOrBus | synthOrBus.free });
 
 			//IMPORTANT: free the unused interpBusses of the interpStreams.
 			//This needs to happen on patternSynth's free as that's the notice
@@ -1055,6 +1095,9 @@ AlgaPattern : AlgaNode {
 			//patternSynth takes longer than \dur. We want to wait for the end of patternSynth
 			//to free all used things!
 			this.freeUnusedInterpBusses(algaPatternInterpStreams);
+
+			//Remove the entry from algaPatternSynths
+			algaPatternInterpStreams.algaPatternSynths.remove(patternSynth);
 		});
 	}
 
@@ -1397,7 +1440,7 @@ AlgaPattern : AlgaNode {
 		var patternPairs = Array.newClear;
 
 		//Create new interpStreams. NOTE that the Pfunc in dur uses this, as interpStreams
-		//can be overwritten when using replace. This allows to separate the "global" one
+		//will be overwritten when using replace. This allows to separate the "global" one
 		//from the one that's being created here.
 		var newInterpStreams = AlgaPatternInterpStreams(this);
 
@@ -1484,6 +1527,11 @@ AlgaPattern : AlgaNode {
 				time: 0
 			);
 		});
+
+		//Set the correct synthBus in newInterpStreams!!!
+		//This is fundamental for the freeing mechanism in stopPattern to work correctly
+		//with the freeAllSynthsAndBussesOnReplace function call
+		newInterpStreams.algaSynthBus = this.synthBus;
 
 		//Add \type, \algaNode, and all things related to
 		//the context of this AlgaPattern
@@ -1722,35 +1770,39 @@ AlgaPattern : AlgaNode {
 		this.resetParam(param, sampleAndHold, time, sched)
 	}
 
-	//replace entries.
-	// options:
+	//replace:
 	// 1) replace the entire AlgaPattern with a new one (like AlgaNode.replace)
 	// 2) replace just the SynthDef with either a new SynthDef or a ListPattern with JUST SynthDefs.
 	//    This would be equivalent to <<.def \newSynthDef
 	//    OR <<.def Pseq([\newSynthDef1, \newSynthDef2])
 
+	//IMPORTANT: this function must be empty. It's called from replaceInner, but synthBus is actually
+	//still being used by the pattern. It should only be freed when the pattern is freed, as it's done
+	//in the stopPattern function. LEAVE THIS FUNCTION EMPTY, OR FAST PATTERNS WILL BUG OUT!!!
+	freeAllBusses { | now = false, time | }
+
 	//Called from replaceInner. freeInterpNormSynths is not used for AlgaPatterns
 	freeAllSynths { | useConnectionTime = true, now = true, time |
 		this.stopPattern(now, time);
-		this.freeSynth(useConnectionTime, now, time);
 	}
 
 	//Used when replacing. Free synths and stop the current running pattern
 	stopPattern { | now = true, time |
 		if(interpStreams != nil, {
-			//Free all synths (it waits for longestWaitTime)
-			interpStreams.freeActiveInterpSynthsAtParamOnReplace(now);
-
-			//Stop and clear the algaReschedulingEventStreamPlayer
 			if(now, {
-				interpStreams.algaReschedulingEventStreamPlayer.stop
+				interpStreams.algaReschedulingEventStreamPlayer.stop;
+				//freeAllSynthsAndBussesOnReplace MUST come after algaReschedulingEventStreamPlayer.stop!
+				interpStreams.freeAllSynthsAndBussesOnReplace;
 			}, {
+				var interpStreamsOld = interpStreams.copy;
 				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
 				if(time == nil, { time = longestWaitTime });
 				if(algaReschedulingEventStreamPlayer != nil, {
 					fork {
 						(time + 1.0).wait;
-						algaReschedulingEventStreamPlayer.stop
+						algaReschedulingEventStreamPlayer.stop;
+						//freeAllSynthsAndBussesOnReplace MUST come after algaReschedulingEventStreamPlayer.stop!
+						interpStreamsOld.freeAllSynthsAndBussesOnReplace;
 					}
 				});
 			});
@@ -1839,6 +1891,7 @@ AlgaPattern : AlgaNode {
 	//There is no way to check individual synths.
 	//So, let's at least check that the group must be insantiated
 	algaInstantiated {
+		if(algaCleared, { ^false });
 		^(group.algaInstantiated);
 	}
 
