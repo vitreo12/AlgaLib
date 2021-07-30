@@ -478,6 +478,9 @@ AlgaNode {
 	}
 
 	freeInterpNormBusses { | now = false, time |
+		//These are handled by AlgaPattern
+		if(this.isAlgaPattern, { ^nil });
+
 		if(now, {
 			//Free busses now
 			if(normBusses != nil, {
@@ -1649,6 +1652,9 @@ AlgaNode {
 
 	//Default now to true
 	freeInterpNormSynths { | now = true, time |
+		//These are handled by AlgaPattern
+		if(this.isAlgaPattern, { ^nil });
+
 		if(now, {
 			//Free synths now
 			interpSynths.do({ | interpSynthsAtParam |
@@ -2820,6 +2826,8 @@ AlgaNode {
 
 	//Global init: all interp synths and synth are correct
 	algaInstantiated {
+		if(algaCleared, { ^false });
+
 		interpSynths.do({ | interpSynthsAtParam |
 			interpSynthsAtParam.do( { | interpSynthAtParam |
 				if(interpSynthAtParam.algaInstantiated.not, { ^false })
@@ -2840,6 +2848,9 @@ AlgaNode {
 	algaInstantiatedAsReceiver { | param = \in, sender, mix = false |
 		var interpSynthsAtParam = interpSynths[param];
 		var inNodesAtParam = inNodes[param];
+
+		//Has been cleared
+		if(algaCleared, { ^false });
 
 		//First connection
 		if((interpSynthsAtParam.size == 1).and(inNodesAtParam.size == 0), {
@@ -2867,9 +2878,7 @@ AlgaNode {
 
 	isAlgaNode { ^true }
 
-	clock {
-		^(scheduler.clock)
-	}
+	clock { ^(scheduler.clock) }
 }
 
 //Alias
