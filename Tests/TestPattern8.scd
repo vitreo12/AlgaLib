@@ -1,20 +1,21 @@
 (
-Alga.maxIO=2;
-Alga.initSynthDefs;
+//Alga.maxIO=2;
+//Alga.initSynthDefs;
 Alga.boot({
 
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.ar(440)) * EnvGen.ar(Env.perc(0.01, 0.5), doneAction:2)
+		SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 0.5), doneAction:2)
 	}, sampleAccurate:true).add;
 
 	AlgaSynthDef(\tanh,{
-		((\in.ar(0).poll(0.1, label:"in_fx") * \dist.ar(2)).tanh * 0.5).poll(0.1, label:"out_fx")
+		\in.ar([0, 0])
+		//(\in.ar([0, 0]) * \dist.ar(2)).tanh * 0.5
 	}).add;
 
 	AlgaSynthDef(\comb, {
-		var sig = CombC.ar(\in.ar(0).poll(0.1, label:"in_fx"), delaytime:\dt.kr(0.1));
-		FreeSelf.kr(DetectSilence.ar(sig)/*.product*/);
-		sig.poll(0.1, label:"out_fx")
+		\in.ar([0, 0])
+		//var sig = CombC.ar(\in.ar([0, 0]), delaytime:\dt.kr(0.1));
+		//FreeSelf.kr(DetectSilence.ar(sig).product);
 	}).add;
 
 	s.sync;
@@ -22,26 +23,22 @@ Alga.boot({
 	a = AlgaPattern((
 		def: \test,
 		dur: 0.1,
-		//freq: Pwhite([100, 220], [440, 880]),
+		freq: Pwhite([100, 220], [440, 880]),
 		fx: Pseq([
-			(def: \tanh /*\dist: Pseq([1, 2, 4, 10], inf)*/),
-			(def: \comb /*\dt: Pseq([0.01, 0.05, 0.1], inf)*/)
+			(def: \tanh, \dist: Pseq([1, 2, 4, 10], inf)),
+			(def: \comb, \dt: Pseq([0.01, 0.05, 0.1], inf))
 		], inf)
 	), playTime:0).play;
 
-	s.scope;
+	//s.scope;
 
-	//b = AN({ SinOsc.kr(5) });
+	b = AN({ SinOsc.kr(5) });
 });
 )
 
+
 a.from((def:\tanh, \dist:Prand([1, 2], inf)), \fx, time:0, sched:1)
 a.from((def:\comb, \dt:Prand([0.01,  0.01], inf)), \fx, time:0, sched:1)
-
-
-a.interpStreams.algaReschedulingEventStreamPlayer.player
-
-
 
 (
 a.from(
@@ -65,5 +62,3 @@ a.from(
 	\fx, time:2, sched:1
 )
 )
-
-s.scope
