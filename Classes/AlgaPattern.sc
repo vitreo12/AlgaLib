@@ -397,11 +397,9 @@ AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
-	1) channels / rate conversion before synthBus?
+	1) out: (See next)
 
 	2) mixFrom()
-
-	3) out: (See next)
 
 	- out: (node: Pseq([a, b], time: 1, scale: 1)
 
