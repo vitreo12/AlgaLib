@@ -420,6 +420,15 @@ AlgaPattern : AlgaNode {
 	//interpStreams. These varies on .replace
 	var <interpStreams;
 
+	//numChannels when using a ListPattern
+	var <numChannelsList;
+
+	//rate when using a ListPattern
+	var <rateList;
+
+	//controlNames when using a ListPattern
+	var <controlNamesList;
+
 	//Set \dur interpolation behaviour. Either run .replace or change at sched.
 	var <replaceDur = false;
 
@@ -647,6 +656,7 @@ AlgaPattern : AlgaNode {
 				var patternParamSymbol;
 				var patternParamSynthArgs;
 				var scaleArrayAndChansAtParam;
+				var indices;
 
 				if(isFX.not, {
 					//Args for patternParamSynth
@@ -698,24 +708,18 @@ AlgaPattern : AlgaNode {
 					});
 				});
 
-				//only apply chansMapping to AlgaNodes
-				if((chansMapping != nil).and(sender.isAlgaNode), {
-					//Pattern support
-					if(chansMapping.isStream, { chansMapping = chansMapping.next });
+				//Always calculate chansMapping for the modulo around paramNumChannels!
+				if(chansMapping.isStream, { chansMapping = chansMapping.next }); //Pattern support
+				indices = this.calculateSenderChansMappingArray(
+					paramName,
+					sender,
+					chansMapping,
+					senderNumChannels,
+					paramNumChannels,
+					false //don't update the AlgaNode's chans dict
+				);
 
-					if(chansMapping != nil, {
-						var indices = this.calculateSenderChansMappingArray(
-							paramName,
-							sender,
-							chansMapping,
-							senderNumChannels,
-							paramNumChannels,
-							false //don't update the AlgaNode's chans dict
-						);
-
-						patternParamSynthArgs = patternParamSynthArgs.add(\indices).add(indices);
-					});
-				});
+				patternParamSynthArgs = patternParamSynthArgs.add(\indices).add(indices);
 
 				//sampleAndHold (use == true) as sampleAndHold could be nil too
 				if(sampleAndHold == true, {
@@ -799,8 +803,9 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create all needed Synths and Busses for an FX
-	createFXSynthAndPatternSynth { | fx, algaSynthDef, algaSynthBus, algaPatternInterpStreams,
-		patternSynthArgs, patternBussesAndSynths |
+	createFXSynthAndPatternSynth { | fx, numChannelsToUse, rateToUse,
+		algaSynthDef, algaSynthBus, algaPatternInterpStreams, patternSynthArgs, patternBussesAndSynths |
+
 		var patternBussesAndSynthsFx = IdentitySet();
 		var def = fx[\def];
 		var explicitFree = fx[\explicitFree];
@@ -814,69 +819,23 @@ AlgaPattern : AlgaNode {
 		var fxNumChannels = fx[\numChannels];
 		var fxRate = fx[\rate];
 
-		//Create the Bus patternSynth will write to, using the final numChannels / rate combination
-		var patternBus = AlgaBus(server, numChannels, rate);
-
-		//Create the conversion Bus from patternInterpSynth and fxSynth
-		var patternInterpInBus = AlgaBus(server, fxInNumChannels, fxInRate);
-
-		//Create the Bus fxSynth will write to
-		var fxBus = AlgaBus(server, fxNumChannels, fxRate);
-
-		//Args to patternInterpInSynth
-		var patternInterpInSynthArgs = [
-			\in, patternBus.busArg,
-			\out, patternInterpInBus.index
-		];
-
 		//Args to fxSynth
-		var fxSynthArgs = [
-			\in, patternInterpInBus.busArg,
-			\out, fxBus.index
-		];
-
-		//Args to fxInterpSynth
-		var fxInterpSynthArgs = [
-			\in, fxBus.busArg,
-			\out, algaSynthBus.index
-		];
-
-		//Synth that converts \in from patternSynth
-		var patternInterpInSynthSymbol;
-		var patternInterpInSynth;
+		var fxSynthArgs = Array.newClear;
 
 		//Actual fxSynth
 		var fxSynthSymbol;
 		var fxSynth;
 
-		//Synth that converts \out from fxSynth
-		var fxInterpSynthSymbol;
-		var fxInterpSynth;
+		//If channels mismatch, these will be used to create final conversion
+		//from fxSynth to algaSynthBus.
+		var fxInterpSynthSymbol, fxInterpSynthArgs, fxInterpSynth;
 
-		//patternSynth -> \in
-		patternInterpInSynthSymbol = (
-			"alga_pattern_" ++
-			rate ++
-			numChannels ++
-			"_" ++
-			fxInRate ++
-			fxInNumChannels ++
-			"_fx"
-		).asSymbol;
+		//Create the Bus patternSynth will write to.
+		//It uses numChannelsToUse and rateToUse, which are set accordingly to the \def specs
+		var patternBus = AlgaBus(server, numChannelsToUse, rateToUse);
 
-		//The user's def
-		fxSynthSymbol = def;
-
-		//fxSynth -> algaSynthBus
-		fxInterpSynthSymbol = (
-			"alga_pattern_" ++
-			fxRate ++
-			fxNumChannels ++
-			"_" ++
-			rate ++
-			numChannels ++
-			"_fx"
-		).asSymbol;
+		//Add patternBus to patternBussesAndSynthsFx
+		patternBussesAndSynthsFx.add(patternBus);
 
 		//Unpack parameters (same behaviour as createPatternParamSynth's unpacking)
 		controlNamesAtFX.do({ | controlName |
@@ -915,14 +874,82 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
-		//Create patternInterpInSynth
-		patternInterpInSynth = AlgaSynth(
-			patternInterpInSynthSymbol,
-			patternInterpInSynthArgs,
-			synthGroup,
-			\addToTail,
-			false
-		);
+		//If numChannels or rate mismatch between patternSynth -> fxSynth
+		if((numChannelsToUse != fxInNumChannels).or(rateToUse != fxInRate), {
+			//patternSynth -> \in
+			var patternInterpInSynthSymbol = (
+				"alga_pattern_" ++
+				rateToUse ++
+				numChannelsToUse ++
+				"_" ++
+				fxInRate ++
+				fxInNumChannels ++
+				"_fx"
+			).asSymbol;
+
+			//new Bus
+			var patternInterpInBus = AlgaBus(server, fxInNumChannels, fxInRate);
+
+			//Args to patternInterpInSynth
+			var patternInterpInSynthArgs = [
+				\in, patternBus.busArg,
+				\out, patternInterpInBus.index
+			];
+
+			//Create patternInterpInSynth
+			var patternInterpInSynth = AlgaSynth(
+				patternInterpInSynthSymbol,
+				patternInterpInSynthArgs,
+				synthGroup,
+				\addToTail,
+				false
+			);
+
+			//Add Bus and Synth to patternBussesAndSynthsFx
+			patternBussesAndSynthsFx.add(patternInterpInBus);
+			patternBussesAndSynthsFx.add(patternInterpInSynth);
+
+			//Add correct \in for fxSynth
+			fxSynthArgs = fxSynthArgs.add(\in).add(patternInterpInBus.busArg)
+		}, {
+			//Same channels / rate: read from patternBus
+			fxSynthArgs = fxSynthArgs.add(\in).add(patternBus.busArg)
+		});
+
+		//If numChannels or rate mismatch between fxSynth -> algaSynthBus
+		if((fxNumChannels != numChannels).or(fxRate != rate), {
+			//Create the Bus fxSynth will write to
+			var fxBus = AlgaBus(server, fxNumChannels, fxRate);
+
+			//fxSynth -> algaSynthBus (that's why it uses rate / numChannels)
+			fxInterpSynthSymbol = (
+				"alga_pattern_" ++
+				fxRate ++
+				fxNumChannels ++
+				"_" ++
+				rate ++
+				numChannels ++
+				"_fx"
+			).asSymbol;
+
+			//Set correct args
+			fxInterpSynthArgs = [
+				\in, fxBus.busArg,
+				\out, algaSynthBus.index
+			];
+
+			//Add Bus to patternBussesAndSynthsFx
+			patternBussesAndSynthsFx.add(fxBus);
+
+			//Add correct \out for fxSynthArgs to fxBus
+			fxSynthArgs = fxSynthArgs.add(\out).add(fxBus.index)
+		}, {
+			//Same channels / rate: write to algaSynthBus
+			fxSynthArgs = fxSynthArgs.add(\out).add(algaSynthBus.index)
+		});
+
+		//The user's def
+		fxSynthSymbol = def;
 
 		//Create fxSynth, addToTail
 		fxSynth = AlgaSynth(
@@ -933,31 +960,27 @@ AlgaPattern : AlgaNode {
 			false
 		);
 
-		//Create fxInterpSynth
-		fxInterpSynth = AlgaSynth(
-			fxInterpSynthSymbol,
-			fxInterpSynthArgs,
-			synthGroup,
-			\addToTail,
-			false
-		);
+		//If not explicitFree, add fxSynth to the free mechanism.
+		//If explicitFree, it will handle it by itself
+		if(explicitFree.not, { patternBussesAndSynths.add(fxSynth) });
 
-		//Add all to patternBussesAndSynthsFx (except fxSynth)
-		patternBussesAndSynthsFx.add(patternBus);
-		patternBussesAndSynthsFx.add(patternInterpInBus);
-		patternBussesAndSynthsFx.add(fxBus);
-		patternBussesAndSynthsFx.add(patternInterpInSynth);
-		patternBussesAndSynthsFx.add(fxInterpSynth);
-
-		//If not explicitFree, add fxSynth to the free mechanism, otherwise
-		//it will be handled by itself
-		if(explicitFree.not, {
-			patternBussesAndSynths.add(fxSynth);
-		});
-
-		//FUNDAMENTAL: add fxSynth to the algaPatternSynths,
-		//so that algaSynthBus is kept alive for the WHOLE duration of the fx too.
+		//FUNDAMENTAL: add fxSynth to the algaPatternSynths so that
+		//algaSynthBus is kept alive for the WHOLE duration of the fx too.
 		algaPatternInterpStreams.algaPatternSynths.add(fxSynth);
+
+		//If there was conversion, create the fxInterpSynth (needs to come after fxSynth !!!)
+		if(fxInterpSynthSymbol != nil, {
+			fxInterpSynth = AlgaSynth(
+				fxInterpSynthSymbol,
+				fxInterpSynthArgs,
+				synthGroup,
+				\addToTail,
+				false
+			);
+
+			//Add to patternBussesAndSynthsFx
+			patternBussesAndSynthsFx.add(fxInterpSynth);
+		});
 
 		//Free all relative synths / busses on fxSynth free.
 		//fxSynth is either freed by itself (if explicitFree),
@@ -979,6 +1002,14 @@ AlgaPattern : AlgaNode {
 
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
 	createEventSynths { | algaSynthDef, algaSynthBus, algaPatternInterpStreams, fx |
+		//Used to check whether using a ListPattern of \defs
+		var numChannelsToUse  = numChannels;
+		var rateToUse = rate;
+		var controlNamesToUse = controlNames;
+
+		//Flag to check for mismatches (and needed conversions) for numChannels / rates
+		var numChannelsOrRateMismatch = false;
+
 		//These will be populated and freed when the patternSynth is released
 		var patternBussesAndSynths = IdentitySet(controlNames.size * 2);
 
@@ -992,9 +1023,15 @@ AlgaPattern : AlgaNode {
 		//mid-pattern interpolation of parameters.
 		this.freeAllTemporaryParamSynths;
 
+		//Check if it's a ListPattern and retrieve correct controlNames
+		if(controlNamesList != nil, {
+			controlNamesToUse = controlNamesList[algaSynthDef];
+			if(controlNamesToUse == nil, { controlNamesToUse = controlNames });
+		});
+
 		//Loop over controlNames and create as many Busses and Synths as needed,
 		//also considering interpolation / normalization
-		controlNames.do({ | controlName |
+		controlNamesToUse.do({ | controlName |
 			var paramName = controlName.name;
 			var paramNumChannels = controlName.numChannels;
 			var paramRate = controlName.rate;
@@ -1068,11 +1105,32 @@ AlgaPattern : AlgaNode {
 			currentPatternInterpSumBus = patternInterpSumBus;
 		});
 
-		//If fx, deal with it
+		//If ListPattern, retrieve correct numChannels
+		if(numChannelsList != nil, {
+			numChannelsToUse = numChannelsList[algaSynthDef];
+			if(numChannelsToUse == nil, { numChannelsToUse = numChannels });
+		});
+
+		//If ListPattern, retrieve correct rate
+		if(rateList != nil, {
+			rateToUse = rateList[algaSynthDef];
+			if(rateToUse == nil, { rateToUse = rate });
+		});
+
+		//If there is a mismatch between numChannels / numChannelsToUse OR rate / rateToUse,
+		//use numChannelsToUse and rateToUse to determine patternSynth's output.
+		//Then, convert it to be used with algaSynthBus.
+		if((numChannels != numChannelsToUse).or(rate != rateToUse), {
+			numChannelsOrRateMismatch = true
+		});
+
+		//If fx
 		if((fx != nil).and(fx.class == Event), {
 			//This returns the patternSynthArgs with correct bus to write to (the fx one)
 			patternSynthArgs = this.createFXSynthAndPatternSynth(
 				fx: fx,
+				numChannelsToUse: numChannelsToUse,
+				rateToUse: rateToUse,
 				algaSynthDef: algaSynthDef,
 				algaSynthBus: algaSynthBus,
 				algaPatternInterpStreams: algaPatternInterpStreams,
@@ -1080,9 +1138,36 @@ AlgaPattern : AlgaNode {
 				patternBussesAndSynths: patternBussesAndSynths
 			);
 		}, {
-			//NO FX
-			//Add \out bus of patternSynth: directly to algaSynthBus
-			patternSynthArgs = patternSynthArgs.add(\out).add(algaSynthBus.index);
+			//Channels mismatch: pop a converter
+			if(numChannelsOrRateMismatch, {
+				var converterBus = AlgaBus(server, numChannelsToUse, rateToUse);
+				var patternSynthConverterSymbol = (
+					"alga_pattern_" ++
+					rateToUse ++
+					numChannelsToUse ++
+					"_" ++
+					rate ++
+					numChannels ++
+					"_fx"
+				).asSymbol;
+				var patternSynthConverter = AlgaSynth(
+					patternSynthConverterSymbol,
+					[ \in, converterBus.busArg, \out, algaSynthBus.index ],
+					synthGroup,
+					\addToTail,
+					false
+				);
+
+				//Add the converter Bus / Synth to patternBussesAndSynths
+				patternBussesAndSynths.add(converterBus);
+				patternBussesAndSynths.add(patternSynthConverter);
+
+				//patternSynth will write to converterBus
+				patternSynthArgs = patternSynthArgs.add(\out).add(converterBus.index);
+			}, {
+				//Standard case: write directly to algaSynthBus
+				patternSynthArgs = patternSynthArgs.add(\out).add(algaSynthBus.index);
+			});
 		});
 
 		//The actual patternSynth according to the user's def
@@ -1142,6 +1227,11 @@ AlgaPattern : AlgaNode {
 
 		//Create args dict
 		this.createDefArgs(args);
+
+		//Reset all ListPattern vars (in case of dispatchListPattern, they will be created anew)
+		numChannelsList = nil;
+		rateList = nil;
+		controlNamesList = nil;
 
 		case
 		{ defClass == Symbol } {
@@ -1245,7 +1335,7 @@ AlgaPattern : AlgaNode {
 		var controlNamesDict = IdentityDictionary();
 		var controlNamesSum = Array.newClear;
 
-		listPattern.list.do({ | entry |
+		listPattern.list.do({ | entry, i |
 			var synthDescEntry, synthDefEntry;
 			var controlNamesEntry;
 			var controlNamesListPatternDefaultsEntry;
@@ -1279,50 +1369,53 @@ AlgaPattern : AlgaNode {
 					^nil
 				});
 
-				if(numChannelsCount == nil, { numChannelsCount = synthDefEntry.numChannels });
-				if(rateCount == nil, { rateCount = synthDefEntry.rate });
-
-				if(synthDefEntry.numChannels != numChannelsCount, {
-					("AlgaPattern: the '" ++ entry.asString ++ "' def has a different channels count than the other entries. Got " ++ synthDefEntry.numChannels ++ " but expected " ++ numChannelsCount).error;
-					^nil;
+				if(numChannelsCount == nil, {
+					numChannelsCount = synthDefEntry.numChannels;
+					numChannels = numChannelsCount
 				});
 
-				if(synthDefEntry.rate != rateCount, {
-					("AlgaPattern: the '" ++ entry.asString ++ "' def has a different rate than the other entries. Got '" ++ synthDefEntry.rate ++ "' but expected '" ++ rateCount ++ "'").error;
-					^nil;
+				if(rateCount == nil, {
+					rateCount = synthDefEntry.rate;
+					rate = rateCount
 				});
 
+				//Use the highest count of numChannels as "main" one, using that one entry's rate
+				if(synthDefEntry.numChannels > numChannelsCount, {
+					numChannels = synthDefEntry.numChannels;
+					rate = synthDefEntry.rate
+				});
+
+				//Store for next iteration
 				numChannelsCount = synthDefEntry.numChannels;
 				rateCount = synthDefEntry.rate;
 
-				numChannels = numChannelsCount; //global
-				rate = rateCount; //global
+				//Add numChannels and rate to numChannelsList and rateList
+				numChannelsList[entry.asSymbol] = numChannelsCount;
+				rateList[entry.asSymbol] = rateCount;
 
+				//Retrieve controlNames
 				controlNamesEntry = synthDescEntry.controls;
 
+				//Create entry for controlNamesList
+				controlNamesList[entry.asSymbol] = IdentityDictionary();
+
+				//Check for duplicates and add correct controlName to controlNamesList[entry.asSymbol]
 				controlNamesEntry.do({ | controlName |
 					var name = controlName.name;
 					if((name != \fadeTime).and(
 						name != \out).and(
 						name != \gate).and(
 						name != '?'), {
+
+						//Just check for duplicate names: we only need one entry per param name
+						//for controlNamesSum.
 						if(controlNamesDict[name] == nil, {
 							controlNamesDict[name] = controlName;
 							controlNamesSum = controlNamesSum.add(controlName);
-						}, {
-							var rate = controlNamesDict[name].rate;
-							var numChannels = controlNamesDict[name].numChannels;
-							var newRate = controlName.rate;
-							var newNumChannels = controlName.numChannels;
-							if(rate != newRate, {
-								("AlgaPattern: rate mismatch of SynthDef '" ++ entry ++ "' for parameter '" ++ name ++ "'. Expected '" ++ rate ++ "' but got '" ++ newRate ++ "'").error;
-								^nil
-							});
-							if(numChannels != newNumChannels, {
-								("AlgaPattern: channels mismatch of SynthDef '" ++ entry ++ "' for parameter '" ++ name ++ "'. Expected " ++ numChannels ++ " but got " ++ newNumChannels).error;
-								^nil
-							});
 						});
+
+						//Add to IdentityDict for specific def / name combination
+						controlNamesList[entry.asSymbol][name] = controlName;
 					});
 				});
 			});
@@ -1334,12 +1427,18 @@ AlgaPattern : AlgaNode {
 	//Multiple Symbols over a ListPattern
 	dispatchListPattern { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
+		var controlNamesSum;
+
+		//Create numChannelsList, rateList and controlNamesList (they're nil otherwise)
+		numChannelsList  = IdentityDictionary();
+		rateList         = IdentityDictionary();
+		controlNamesList = IdentityDictionary();
 
 		//Check rates, numChannels, Symbols and controlNames
-		var controlNamesSum = this.checkListPatternValidityAndReturnControlNames(def);
+		controlNamesSum = this.checkListPatternValidityAndReturnControlNames(def);
 		if(controlNamesSum == nil, { ^this });
 
-		//Create controlNames
+		//Create controlNames from controlNamesSum
 		this.createControlNamesAndParamsConnectionTime(controlNamesSum);
 
 		//synthDef will be the ListPattern
@@ -1415,11 +1514,8 @@ AlgaPattern : AlgaNode {
 		//Pass explicitFree to Event
 		value[\explicitFree] = synthDefFx.explicitFree;
 
-		//Loop over the event
-		value.keysValuesDo({ | key, entry |
-			//Use .asStream for each entry
-			value[key] = entry.asStream
-		});
+		//Loop over the event and use .asStream for each entry
+		value.keysValuesDo({ | key, entry | value[key] = entry.asStream });
 
 		^value;
 	}

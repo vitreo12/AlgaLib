@@ -1084,8 +1084,10 @@ AlgaNode {
 
 		var actualSenderChansMapping = senderChansMapping;
 
-		//If sender is not an AlgaNode, use default
-		if(sender.isAlgaNode.not, { ^(Array.series(paramNumChans)) });
+		//If senderChansMapping is nil or sender is not an AlgaNode, use default, modulo around senderNumChans
+		if((actualSenderChansMapping == nil).or(sender.isAlgaNode.not), {
+			^(Array.series(paramNumChans) % senderNumChans)
+		});
 
 		//Connect with outMapping symbols. Retrieve it from the sender
 		if(actualSenderChansMapping.class == Symbol, {
@@ -1100,8 +1102,8 @@ AlgaNode {
 			paramsChansMapping[param][sender] = actualSenderChansMapping;
 		});
 
-		//Standard case (perhaps, overkill. This is default of the \indices param anyway)
-		if(actualSenderChansMapping == nil, { ^(Array.series(paramNumChans)) });
+		//Standard case, modulo around senderNumChans
+		if(actualSenderChansMapping == nil, { ^(Array.series(paramNumChans) % senderNumChans) });
 
 		if(actualSenderChansMapping.isSequenceableCollection, {
 			//Also allow [\out1, \out2] here.
@@ -1115,10 +1117,10 @@ AlgaNode {
 			^((actualSenderChansMapping.flat % senderNumChans).reshape(paramNumChans));
 		}, {
 			if(actualSenderChansMapping.isNumber, {
-				^(Array.fill(paramNumChans, { actualSenderChansMapping }));
+				^(Array.fill(paramNumChans, { actualSenderChansMapping }) % senderNumChans);
 			}, {
 				"AlgaNode: senderChansMapping must be a number or an array. Using default one.".error;
-				^(Array.series(paramNumChans));
+				^(Array.series(paramNumChans) % senderNumChans);
 			});
 		});
 	}

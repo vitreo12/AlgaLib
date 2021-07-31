@@ -9,7 +9,7 @@ Alga.boot({
 	}).add;
 
 	AlgaSynthDef(\comb, {
-		var sig = CombC.ar(\in.ar([0, 0]), delaytime:\dt.kr(0.1));
+		var sig = CombC.ar(\in.ar([0, 0, 0]), delaytime:\dt.kr(0.1));
 		FreeSelf.kr(DetectSilence.ar(sig).product);
 		sig;
 	}).add;
@@ -31,6 +31,8 @@ Alga.boot({
 	b = AN({ SinOsc.kr(5) });
 });
 )
+
+s.plotTree
 
 a.from((def:\tanh, \dist:Prand([1, 2, 5], inf)), \fx, time:0, sched:1)
 a.from((def:\comb, \dt:Prand([0.01,  0.01], inf)), \fx, time:0, sched:1)
