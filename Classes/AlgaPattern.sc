@@ -401,12 +401,8 @@ AlgaPattern : AlgaNode {
 
 	2) mixFrom()
 
-	- out: (node: Pseq([a, b], time: 1, scale: 1)
-
-	// Things to do:
-	// 1) Check if it is an AlgaNode or a ListPattern of AlgaNodes
-	// 2) It would just connect to nodes with the \in param, mixing ( mixFrom )
-	// 3) Can't be interpolated (but the connection itself can)
+	- out: (node: Pseq([a, b], inf), param: \freq, scale: Pseq([[20, 400], [30, 500]], inf), chans:Pseq([1, 2], inf))
+	- out: Pseq([a, b], inf)
 	*/
 
 	//The actual Patterns to be manipulated
@@ -523,7 +519,7 @@ AlgaPattern : AlgaNode {
 	//Set replaceDur
 	replaceDur_ { | value = false |
 		if((value != false).and(value != true), {
-			"AlgaPattern: replaceDur only supports boolean values. Setting it to false".error
+			"AlgaPattern: 'replaceDur' only supports boolean values. Setting it to false".error
 			^nil
 		});
 		replaceDur = value
