@@ -17,11 +17,12 @@ Alga.boot({
 				scale: Pseq([1, 2], inf),
 				chans: Pseq([1, 2], inf)
 			),
-			Pseq([b, c], inf)
+			Pseq([b, c], inf),
+			\none
 		], inf)
-	), playTime:1).play;
+	), playTime:1);
 
-	b = AN({ (\in.ar * 3).tanh * 0.5 });
-	c = AN({ FreeVerb.ar(\in.ar, 0.8) });
+	b = AN({ (\in.ar * 3).tanh * 0.5 }).play;
+	c = AN({ FreeVerb.ar(\in.ar, 0.8) }).play;
 });
 )

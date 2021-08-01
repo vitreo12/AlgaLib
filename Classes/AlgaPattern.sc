@@ -399,10 +399,19 @@ AlgaPattern : AlgaNode {
 
 	1) out: (See next)
 
-	2) mixFrom()
+	2) AlgaTemp (See next)
+
+	3) mixFrom()
 
 	- out: (node: Pseq([a, b], inf), param: \freq, scale: Pseq([[20, 400], [30, 500]], inf), chans:Pseq([1, 2], inf))
 	- out: Pseq([a, b], inf)
+
+	- AlgaTemp creates a temporary Synth for the specific param (just like fx does for post-audio):
+
+	AlgaPattern((
+	def: \sine,
+	freq: AlgaTemp(\noise1, [\freq, 100], scale:[100, 1000])
+	))
 	*/
 
 	//The actual Patterns to be manipulated
@@ -440,9 +449,7 @@ AlgaPattern : AlgaNode {
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
-		StartUp.add({
-			this.addAlgaNoteEventType;
-		});
+		StartUp.add({ this.addAlgaNoteEventType });
 	}
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
@@ -564,7 +571,7 @@ AlgaPattern : AlgaNode {
 		//Fallback sender (modified for AlgaNode, needed for chansMapping)
 		sender = entry;
 
-		//Valid values are Numbers / Arrays / AlgaNodes
+		//Valid values are Numbers / Arrays / AlgaNodes / Buffers / Nils
 		case
 
 		//Number / Array
