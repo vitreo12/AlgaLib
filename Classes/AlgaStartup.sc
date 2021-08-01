@@ -278,17 +278,17 @@ Limiter.ar(input) * AlgaEnvGate.kr
 						});
 
 						result = "
-AlgaSynthDef.new_inner(" ++ name ++ ", { | scaleCurve = 0 |
+AlgaSynthDef.new_inner(" ++ name ++ ", {
 var in, env, out, outMultiplier, outScale, outs;
 in = " ++ in ++ "
 out = " ++ indices ++ "
 outMultiplier = " ++ multiplier ++ "
-outScale = out.lincurve(
+outScale = out.algaLinCurve(
 \\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
 \\lowMax.ir(" ++ arrayOfOnes ++ "),
 \\highMin.ir(" ++ arrayOfMinusOnes ++ "),
 \\highMax.ir(" ++ arrayOfOnes ++ "),
-scaleCurve,
+\\scaleCurve.ir(0)
 );
 out = " ++ scaling ++ "
 env = " ++ env ++ "
@@ -301,17 +301,17 @@ outs;
 }, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 
 //Used in patterns (env comes from outside)
-AlgaSynthDef.new_inner(" ++ name_pattern ++ ", { | scaleCurve = 0 |
+AlgaSynthDef.new_inner(" ++ name_pattern ++ ", {
 var in, env, out, outMultiplier, outScale, outs;
 in = " ++ in ++ "
 out = " ++ indices ++ "
 outMultiplier = " ++ multiplier ++ "
-outScale = out.lincurve(
+outScale = out.algaLinCurve(
 \\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
 \\lowMax.ir(" ++ arrayOfOnes ++ "),
 \\highMin.ir(" ++ arrayOfMinusOnes ++ "),
 \\highMax.ir(" ++ arrayOfOnes ++ "),
-scaleCurve,
+\\scaleCurve.ir(0)
 );
 out = " ++ scaling ++ "
 out = out * outMultiplier;
@@ -325,17 +325,17 @@ outs;
 }, makeFadeEnv:false, sampleAccurate:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 
 //Used in patterns + fx (no env)
-AlgaSynthDef.new_inner(" ++ name_pattern ++ "_fx, { | scaleCurve = 0 |
+AlgaSynthDef.new_inner(" ++ name_pattern ++ "_fx, {
 var in, out, outMultiplier, outScale;
 in = " ++ in ++ "
 out = " ++ indices ++ "
 outMultiplier = " ++ multiplier ++ "
-outScale = out.lincurve(
+outScale = out.algaLinCurve(
 \\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
 \\lowMax.ir(" ++ arrayOfOnes ++ "),
 \\highMin.ir(" ++ arrayOfMinusOnes ++ "),
 \\highMax.ir(" ++ arrayOfOnes ++ "),
-scaleCurve,
+\\scaleCurve.ir(0)
 );
 out = " ++ scaling ++ "
 out = out * outMultiplier;

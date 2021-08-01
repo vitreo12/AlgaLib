@@ -1010,7 +1010,7 @@ AlgaNode {
 			^outArray;
 		});
 
-		//just lowMax / hiMax
+		//highMin / highMax
 		if(scale.size == 2, {
 			var outArray = Array.newClear(6);
 			var highMin = scale[0];
@@ -1022,8 +1022,8 @@ AlgaNode {
 				^nil
 			});
 
-			outArray[0] = \highMin; outArray[1] = newHighMin;
-			outArray[2] = \highMax; outArray[3] = newHighMax;
+			outArray[0] = \highMin;    outArray[1] = newHighMin;
+			outArray[2] = \highMax;    outArray[3] = newHighMax;
 			outArray[4] = \useScaling; outArray[5] = 1;
 
 			scale[0] = newHighMin;
@@ -1032,43 +1032,106 @@ AlgaNode {
 			if(addScaling, { this.addScaling(param, sender, scale) });
 
 			^outArray;
-		}, {
-			//all four of the scales
-			if(scale.size == 4, {
-				var outArray = Array.newClear(10);
-				var lowMin = scale[0];
-				var lowMax = scale[1];
-				var highMin = scale[2];
-				var highMax = scale[3];
-				var newLowMin = this.checkScaleParameterSize(lowMin, "lowMin", param, paramNumChannels);
-				var newLowMax = this.checkScaleParameterSize(lowMax, "lowMax", param, paramNumChannels);
-				var newHighMin = this.checkScaleParameterSize(highMin, "highMin", param, paramNumChannels);
-				var newHighMax = this.checkScaleParameterSize(highMax, "highMax", param, paramNumChannels);
+		});
 
-				if((newLowMin.isNil).or(newHighMin.isNil).or(newLowMax.isNil).or(newHighMax.isNil), {
-					^nil
-				});
+		//highMin / highMax / scaleCurve
+		if(scale.size == 3, {
+			var outArray = Array.newClear(8);
+			var highMin = scale[0];
+			var highMax = scale[1];
+			var scaleCurve = scale[2];
+			var newHighMin = this.checkScaleParameterSize(highMin, "highMin", param, paramNumChannels);
+			var newHighMax = this.checkScaleParameterSize(highMax, "highMax", param, paramNumChannels);
+			var newScaleCurve = scaleCurve.clip(-50, 50); //clip scaleScurve -50 / 50
 
-				outArray[0] = \lowMin; outArray[1] = newLowMin;
-				outArray[2] = \lowMax; outArray[3] = newLowMax;
-				outArray[4] = \highMin; outArray[5] = newHighMin;
-				outArray[6] = \highMax; outArray[7] = newHighMax;
-				outArray[8] = \useScaling; outArray[9] = 1;
+			if((newHighMin.isNil).or(newHighMax.isNil).or(newScaleCurve.isNil), { ^nil });
 
-				scale[0] = newLowMin;
-				scale[1] = newLowMax;
-				scale[2] = newHighMin;
-				scale[3] = newHighMax;
+			outArray[0] = \highMin;    outArray[1] = newHighMin;
+			outArray[2] = \highMax;    outArray[3] = newHighMax;
+			outArray[4] = \scaleCurve; outArray[5] = newScaleCurve;
+			outArray[6] = \useScaling; outArray[7] = 1;
 
-				if(addScaling, { this.addScaling(param, sender, scale) });
+			scale[0] = newHighMin;
+			scale[1] = newHighMax;
+			scale[2] = newScaleCurve;
 
-				^outArray;
-			}, {
-				("AlgaNode: the scale parameter must be an array of either 2 " ++
-					" (hiMin / hiMax) or 4 (lowMin, lowMax, hiMin, hiMax) entries.").error;
+			if(addScaling, { this.addScaling(param, sender, scale) });
+
+			^outArray;
+		});
+
+		//lowMin / lowMax / highMin / highMax
+		if(scale.size == 4, {
+			var outArray = Array.newClear(10);
+			var lowMin = scale[0];
+			var lowMax = scale[1];
+			var highMin = scale[2];
+			var highMax = scale[3];
+			var newLowMin = this.checkScaleParameterSize(lowMin, "lowMin", param, paramNumChannels);
+			var newLowMax = this.checkScaleParameterSize(lowMax, "lowMax", param, paramNumChannels);
+			var newHighMin = this.checkScaleParameterSize(highMin, "highMin", param, paramNumChannels);
+			var newHighMax = this.checkScaleParameterSize(highMax, "highMax", param, paramNumChannels);
+
+			if((newLowMin.isNil).or(newHighMin.isNil).or(newLowMax.isNil).or(newHighMax.isNil), {
 				^nil
 			});
+
+			outArray[0] = \lowMin;     outArray[1] = newLowMin;
+			outArray[2] = \lowMax;     outArray[3] = newLowMax;
+			outArray[4] = \highMin;    outArray[5] = newHighMin;
+			outArray[6] = \highMax;    outArray[7] = newHighMax;
+			outArray[8] = \useScaling; outArray[9] = 1;
+
+			scale[0] = newLowMin;
+			scale[1] = newLowMax;
+			scale[2] = newHighMin;
+			scale[3] = newHighMax;
+
+			if(addScaling, { this.addScaling(param, sender, scale) });
+
+			^outArray;
 		});
+
+		//lowMin / lowMax / highMin / highMax / scaleCurve
+		if(scale.size == 5, {
+			var outArray = Array.newClear(12);
+			var lowMin = scale[0];
+			var lowMax = scale[1];
+			var highMin = scale[2];
+			var highMax = scale[3];
+			var scaleCurve = scale[4];
+			var newLowMin = this.checkScaleParameterSize(lowMin, "lowMin", param, paramNumChannels);
+			var newLowMax = this.checkScaleParameterSize(lowMax, "lowMax", param, paramNumChannels);
+			var newHighMin = this.checkScaleParameterSize(highMin, "highMin", param, paramNumChannels);
+			var newHighMax = this.checkScaleParameterSize(highMax, "highMax", param, paramNumChannels);
+			var newScaleCurve = scaleCurve.clip(-50, 50); //clip scaleScurve -50 / 50
+
+			if((newLowMin.isNil).or(newHighMin.isNil).or(newLowMax.isNil).or(newHighMax.isNil).or(newScaleCurve.isNil), {
+				^nil
+			});
+
+			outArray[0] = \lowMin;      outArray[1] = newLowMin;
+			outArray[2] = \lowMax;      outArray[3] = newLowMax;
+			outArray[4] = \highMin;     outArray[5] = newHighMin;
+			outArray[6] = \highMax;     outArray[7] = newHighMax;
+			outArray[8] = \scaleCurve;  outArray[9] = newScaleCurve;
+			outArray[10] = \useScaling; outArray[11] = 1;
+
+			scale[0] = newLowMin;
+			scale[1] = newLowMax;
+			scale[2] = newHighMin;
+			scale[3] = newHighMax;
+			scale[4] = newScaleCurve;
+
+			if(addScaling, { this.addScaling(param, sender, scale) });
+
+			^outArray;
+		});
+
+		("AlgaNode: the 'scale' argument must be a Number (for multiplication) or an Array of either 2" ++
+			" (highMin, highMax), 3 (highMin, highMax, curve), 4 (lowMin, lowMax, highMin, highMax)" ++
+			" or 5 (lowMin, lowMax, highMin, highMax, curve) elements.").error;
+		^nil
 	}
 
 	getParamChansMapping { | param, sender |

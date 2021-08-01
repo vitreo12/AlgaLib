@@ -46,6 +46,32 @@
 	}
 }
 
+//Fix lincurve with .ir arg
++UGen {
+	algaLinCurve { arg inMin = 0, inMax = 1, outMin = 0, outMax = 1, curve = -4, clip = \minmax;
+		var grow, a, b, scaled, curvedResult;
+		if (curve.isNumber and: { abs(curve) < 0.125 }) {
+			^this.linlin(inMin, inMax, outMin, outMax, clip)
+		};
+		grow = exp(curve);
+		a = outMax - outMin / (1.0 - grow);
+		b = outMin + a;
+		scaled = (this.prune(inMin, inMax, clip) - inMin) / (inMax - inMin);
+
+		curvedResult = b - (a * pow(grow, scaled));
+
+		^Select.perform(this.methodSelectorForRate, abs(curve) >= 0.125, [
+			this.linlin(inMin, inMax, outMin, outMax, clip),
+			curvedResult
+		])
+	}
+}
+
+//For Array lincurve
++SequenceableCollection {
+	algaLinCurve { arg ... args; ^this.multiChannelPerform('algaLinCurve', *args) }
+}
+
 //PlayBuf bug with canFreeSynth
 +PlayBuf {
 	canFreeSynth { ^inputs.at(6).isNumber.not or: { inputs.at(6) > 1 } }
@@ -56,7 +82,11 @@
     //for example when dealing with nested IdentityDictionaries
     at { | index | ^nil }
 
-	keysValuesDo { ^nil }
+	//As before (.do is already implemented)
+	keysValuesDo { | key, value | ^nil }
+
+	//Needed for scaleCurve (reduce code boilerplate)
+	clip { | min, max | ^nil }
 }
 
 +SynthDef {
