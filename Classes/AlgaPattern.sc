@@ -372,7 +372,6 @@ AlgaPatternInterpStreams {
 
 //This class is used to specify individual parameters of a pattern argument.
 //It can be used to dynamically set parameters of a connected Node (like scale and chans).
-//This of course only works with the "from" construct
 AlgaPatternArg {
 	var <sender, <chans, <scale;
 
