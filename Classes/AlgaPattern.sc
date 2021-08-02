@@ -375,8 +375,8 @@ AlgaPatternInterpStreams {
 AlgaPatternArg {
 	var <sender, <chans, <scale;
 
-	*new { | sender, chans, scale |
-		^super.new.init(sender, chans, scale)
+	*new { | node, chans, scale |
+		^super.new.init(node, chans, scale)
 	}
 
 	init { | argSender, argChans, argScale |
@@ -390,6 +390,50 @@ AlgaPatternArg {
 
 //Alias for AlgaPatternArg
 AlgaArg : AlgaPatternArg {}
+
+//This class is used to create a temporary AlgaNode for a parameter in an AlgaPattern
+AlgaTemp {
+	var <def, <chans, <scale;
+	var <controlNames;
+	var <numChannels, <rate;
+	var <valid = false;
+
+	*new { | def, chans, scale |
+		^super.new.init(def, chans, scale)
+	}
+
+	init { | argDef, argChans, argScale |
+		def    = argDef;
+		chans  = argChans.asStream;  //Pattern support
+		scale  = argScale.asStream;  //Pattern support
+	}
+
+	checkValidSynthDef { | def |
+		var synthDesc = SynthDescLib.global.at(def);
+		var synthDef;
+
+		if(synthDesc == nil, {
+			("AlgaTemp: Invalid AlgaSynthDef: '" ++ def.asString ++ "'").error;
+			^nil;
+		});
+
+		synthDef = synthDesc.def;
+
+		if(synthDef.class != AlgaSynthDef, {
+			("AlgaTemp: Invalid AlgaSynthDef: '" ++ def.asString ++"'").error;
+			^nil;
+		});
+
+		numChannels = synthDef.numChannels;
+		rate = synthDef.rate;
+		controlNames = synthDesc.controls;
+
+		//Set validity
+		if((numChannels != nil).and(rate != nil).and(controlNames != nil), { valid = true });
+	}
+
+	isAlgaTemp { ^true }
+}
 
 //AlgaPattern
 AlgaPattern : AlgaNode {
@@ -422,13 +466,13 @@ AlgaPattern : AlgaNode {
 	//interpStreams. These varies on .replace
 	var <interpStreams;
 
-	//numChannels when using a ListPattern
+	//numChannels when using a ListPattern as \def
 	var <numChannelsList;
 
-	//rate when using a ListPattern
+	//rate when using a ListPattern as \def
 	var <rateList;
 
-	//controlNames when using a ListPattern
+	//controlNames when using a ListPattern as \def
 	var <controlNamesList;
 
 	//Set \dur interpolation behaviour. Either run .replace or change at sched.
@@ -545,6 +589,88 @@ AlgaPattern : AlgaNode {
 		}
 	}
 
+	//Create a temporary synth according to the specs of the AlgaTemp
+	createAlgaTempSynth { | algaTemp, patternBussesAndSynths |
+		var tempBus, tempSynth;
+		var tempSynthArgs = Array.newClear;
+		var tempNumChannels = algaTemp.numChannels;
+		var tempRate = algaTemp.rate;
+		var def, params, controlNames;
+
+		//Check AlgaTemp validity
+		if(algaTemp.valid.not, {
+			"AlgaPattern: Invalid AlgaTemp, using default parameter".error;
+			^nil
+		});
+
+		//Unpack relevant params
+		params = algaTemp.def;
+		def = params[\def];
+		controlNames = algaTemp.controlNames;
+
+		//Loop around the controlNames to set relevant parameters
+		controlNames.do({ | controlName |
+			var paramName = controlName.name;
+			var paramNumChannels = controlName.numChannels;
+			var paramRate = controlName.rate;
+			var paramDefault = controlName.defaultValue;
+			var entry = params[paramName];
+
+			//If entry is nil, the tempSynth will already use the default value
+			if(entry != nil, {
+				//Ignore static params
+				if((paramName != '?').and(paramName != \instrument).and(
+					paramName != \def).and(paramName != \out).and(
+					paramName != \gate).and(paramName != \fadeTime), {
+
+					//Temporary bus that the patternParamSynth for the fx will write to
+					var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
+
+					//Add bus to tempSynth at correct paramName
+					tempSynthArgs = tempSynthArgs.add(paramName).add(patternParamBus.busArg);
+
+					//Register bus to be freed
+					patternBussesAndSynths.add(patternParamBus);
+
+					//Create a patternParamSynth for the temp param
+					this.createPatternParamSynth(
+						entry: entry,
+						uniqueID: nil,
+						paramName: paramName,
+						paramNumChannels: paramNumChannels,
+						paramRate: paramRate,
+						paramDefault: paramDefault,
+						patternInterpSumBus: patternParamBus,
+						patternBussesAndSynths: patternBussesAndSynths,
+						isFX: true //use isFX (it's the same behaviour)
+					)
+				});
+			});
+		});
+
+		//The AlgaBus the tempSynth will write to
+		tempBus = AlgaBus(server, tempNumChannels, tempRate);
+
+		//Write output to tempBus
+		tempSynthArgs = tempSynthArgs.add(\out).add(tempBus.index);
+
+		//The actual AlgaSynth
+		tempSynth = AlgaSynth(
+			def,
+			tempSynthArgs,
+			interpGroup,
+			\addToTail,
+			false
+		);
+
+		//Add Bus and Synth to patternBussesAndSynths
+		patternBussesAndSynths.add(tempBus);
+		patternBussesAndSynths.add(tempSynth);
+
+		//Return the AlgaBus that the tempSynth writes to
+		^tempBus.busArg;
+	}
+
 	//Create one pattern synth with the entry / uniqueID pair at paramName
 	//This is the core of the interpolation behaviour for AlgaPattern !!
 	createPatternParamSynth { | entry, uniqueID, paramName, paramNumChannels, paramRate,
@@ -565,6 +691,32 @@ AlgaPattern : AlgaNode {
 			entry        = entry.sender;
 			//Unpack Pattern value
 			if(entry.isStream, { entry = entry.next });
+		});
+
+		//Check if it's an AlgaTemp. Create it
+		if(entry.isAlgaTemp, {
+			var algaTemp = entry;
+
+			//If valid, this returns the AlgaBus that the tempSynth will write to
+			entry = this.createAlgaTempSynth(
+				algaTemp: algaTemp,
+				patternBussesAndSynths: patternBussesAndSynths
+			);
+
+			if(entry.isNil.not, {
+				//Valid AlgaTemp. entry is an AlgaBus now
+				chansMapping      = algaTemp.chans;
+				scale             = algaTemp.scale;
+				senderRate        = algaTemp.rate;
+				senderNumChannels = algaTemp.numChannels;
+				validParam        = true;
+			}, {
+				//entry == nil
+				senderRate = "control";
+				senderNumChannels = paramNumChannels;
+				entry = paramDefault;
+				validParam = true;
+			});
 		});
 
 		//Fallback sender (modified for AlgaNode, needed for chansMapping)
@@ -845,32 +997,36 @@ AlgaPattern : AlgaNode {
 			var paramDefault = controlName.defaultValue;
 			var entry = fx[paramName];
 
-			//Ignore static params
-			if((paramName != '?').and(paramName != \instrument).and(
-				paramName != \def).and(paramName != \out).and(
-				paramName != \gate).and(paramName != \in), {
+			//If entry is nil, the tempSynth will already use the default value
+			if(entry != nil, {
+				//Ignore static params
+				if((paramName != '?').and(paramName != \instrument).and(
+					paramName != \def).and(paramName != \out).and(
+					paramName != \gate).and(paramName != \in).and(
+					paramName != \fadeTime), {
 
-				//Temporary bus that the patternParamSynth for the fx will write to
-				var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
+					//Temporary bus that the patternParamSynth for the fx will write to
+					var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
 
-				//Add bus to fxSynth at correct paramName
-				fxSynthArgs = fxSynthArgs.add(paramName).add(patternParamBus.busArg);
+					//Add bus to fxSynth at correct paramName
+					fxSynthArgs = fxSynthArgs.add(paramName).add(patternParamBus.busArg);
 
-				//Register bus to be freed
-				patternBussesAndSynthsFx.add(patternParamBus);
+					//Register bus to be freed
+					patternBussesAndSynthsFx.add(patternParamBus);
 
-				//Create a patternParamSynth for the fx param
-				this.createPatternParamSynth(
-					entry: entry,
-					uniqueID: nil,
-					paramName: paramName,
-					paramNumChannels: paramNumChannels,
-					paramRate: paramRate,
-					paramDefault: paramDefault,
-					patternInterpSumBus: patternParamBus, //pass the new Bus
-					patternBussesAndSynths: patternBussesAndSynthsFx,
-					isFX: true
-				)
+					//Create a patternParamSynth for the fx param
+					this.createPatternParamSynth(
+						entry: entry,
+						uniqueID: nil,
+						paramName: paramName,
+						paramNumChannels: paramNumChannels,
+						paramRate: paramRate,
+						paramDefault: paramDefault,
+						patternInterpSumBus: patternParamBus, //pass the new Bus
+						patternBussesAndSynths: patternBussesAndSynthsFx,
+						isFX: true
+					)
+				});
 			});
 		});
 
@@ -1514,8 +1670,13 @@ AlgaPattern : AlgaNode {
 		//Pass explicitFree to Event
 		value[\explicitFree] = synthDefFx.explicitFree;
 
-		//Loop over the event and use .asStream for each entry
-		value.keysValuesDo({ | key, entry | value[key] = entry.asStream });
+		//Loop over the event and parse listPatterns / algaTemps. Also use .asStream for the final entry.
+		value.keysValuesDo({ | key, entry |
+			var parsedEntry = entry;
+			if(parsedEntry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry) });
+			if(parsedEntry.isAlgaTemp, { parsedEntry = this.parseAlgaTempParam(parsedEntry) });
+			value[key] = parsedEntry.asStream
+		});
 
 		^value;
 	}
@@ -1538,6 +1699,61 @@ AlgaPattern : AlgaNode {
 			});
 			^value;
 		};
+	}
+
+	//Parse an AlgaTemp
+	parseAlgaTempParam { | algaTemp |
+		var def = algaTemp.def;
+		var defDef;
+
+		if(def == nil, {
+			"AlgaPattern: AlgaTemp has a nil 'def' argument".error;
+			^nil;
+		});
+
+		if(def.class == Symbol, {
+			defDef = def
+		}, {
+			if(def.class != Event, {
+				"AlgaPattern: AlgaTemp's 'def' argument must either be a Symbol or an Event".error;
+				^nil
+			});
+			defDef = def[\def];
+			if(defDef == nil, {
+				"AlgaPattern: AlgaTemp's 'def' Event does not provide a 'def' entry".error;
+				^nil
+			})
+		});
+
+		//Check if the synthDef is valid
+		algaTemp.checkValidSynthDef(defDef);
+
+		//Loop around the event entries and use .asStream
+		if(def.class == Event, {
+			def.keysValuesDo({ | key, entry |
+				if(key != \def, {
+					var parsedEntry = entry;
+					if(entry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry) });
+					if(entry.isAlgaTemp, { parsedEntry = this.parseAlgaTempParam(parsedEntry) });
+					def[key] = parsedEntry.asStream;
+				});
+			});
+		});
+
+		^algaTemp;
+	}
+
+	//Parse a ListPattern
+	parseListPatternParam { | listPattern |
+		listPattern.list.do({ | listEntry, i |
+			if(listEntry.isListPattern, {
+				listPattern.list[i] = this.parseListPatternParam(listEntry)
+			});
+			if(listEntry.isAlgaTemp, {
+				listPattern.list[i] = this.parseAlgaTempParam(listEntry)
+			});
+		});
+		^listPattern;
 	}
 
 	//Build the actual pattern
@@ -1606,8 +1822,18 @@ AlgaPattern : AlgaNode {
 		//Add all the default entries from SynthDef that the user hasn't set yet
 		controlNames.do({ | controlName |
 			var paramName = controlName.name;
-			var paramValue = eventPairs[paramName];
+			var paramValue = eventPairs[paramName]; //Retrieve it directly from eventPairs
 			var chansMapping, scale;
+
+			//Parse a ListPattern
+			if(paramValue.isListPattern, {
+				paramValue = this.parseListPatternParam(paramValue);
+			});
+
+			//Parse an AlgaTemp
+			if(paramValue.isAlgaTemp, {
+				paramValue = this.parseAlgaTempParam(paramValue);
+			});
 
 			//if not set explicitly yet
 			if(paramValue == nil, {
@@ -1617,9 +1843,7 @@ AlgaPattern : AlgaNode {
 
 			//If replace, check if keeping chans / scale mappings
 			if(replace, {
-				if(keepChannelsMapping, {
-					chansMapping = this.getParamChansMapping(paramName, paramValue)
-				});
+				if(keepChannelsMapping, { chansMapping = this.getParamChansMapping(paramName, paramValue) });
 				if(keepScale, { scale = this.getParamScaling(paramName, paramValue) });
 			});
 
@@ -1769,17 +1993,29 @@ AlgaPattern : AlgaNode {
 		//This is used in .reset
 		if(sender == nil, { isDefault = true });
 
+		//Check valid class
 		if(isDefault.not, {
 			if((sender.isAlgaNode.not).and(sender.isPattern.not).and(
 				sender.isAlgaPatternArg.not).and(
+				sender.isAlgaTemp.not).and(
 				sender.isNumberOrArray.not).and(sender.isBuffer.not), {
-				"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, AlgaPatternArgs, Patterns, Numbers, Arrays and Buffers".error;
+				"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, AlgaPatternArgs, AlgaTemps, Patterns, Numbers, Arrays and Buffers".error;
 				^this;
 			});
 		});
 
 		//Add scaling to Dicts
 		if(scale != nil, { this.addScaling(param, sender, scale) });
+
+		//Parse ListPattern
+		if(sender.isListPattern, {
+			sender = this.parseListPatternParam(sender)
+		});
+
+		//Parse AlgaTemp
+		if(sender.isAlgaTemp, {
+			sender = this.parseAlgaTempParam(sender)
+		});
 
 		//Add to interpStreams (which also creates interpBus / interpSynth)
 		interpStreams.add(
@@ -1856,8 +2092,8 @@ AlgaPattern : AlgaNode {
 			^this.interpolateBuffer(sender, param, time, sched)
 		});
 
-		//Force pattern and AlgaPatternArg dispatch
-		if((sender.isPattern).or(sender.isAlgaPatternArg), {
+		//Force Pattern / AlgaPatternArg / AlgaTemp dispatch
+		if((sender.isPattern).or(sender.isAlgaPatternArg).or(sender.isAlgaTemp), {
 			^this.makeConnection(sender, param, senderChansMapping:chans,
 				scale:scale, sampleAndHold:sampleAndHold, time:time, sched:sched
 			);

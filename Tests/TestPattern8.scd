@@ -5,13 +5,17 @@ Alga.boot({
 	}, sampleAccurate:true).add;
 
 	AlgaSynthDef(\tanh,{
-		(\in.ar([0, 0]) * \dist.ar(2)).tanh * 0.5
+		(\in.ar([0, 0]) * \dist.ar([2, 2])).tanh * 0.5
 	}).add;
 
 	AlgaSynthDef(\comb, {
 		var sig = CombC.ar(\in.ar([0, 0, 0]), delaytime:\dt.kr(0.1));
 		FreeSelf.kr(DetectSilence.ar(sig).product);
 		sig;
+	}).add;
+
+	AlgaSynthDef(\noise1, {
+		LFNoise1.ar(\freq.kr([1, 2]))
 	}).add;
 
 	s.sync;
@@ -55,6 +59,20 @@ a.from(
 			AlgaPatternArg(b, scale:[1, 10]),
 			b
 		], inf)
+	),
+	\fx, time:2, sched:1
+)
+)
+
+//Modulation with AlgaTemp
+(
+a.from(
+	(
+		def: \tanh,
+		\dist: AlgaTemp((
+			def: \noise1,
+			freq: Pwhite([10, 20], [100, 200])
+		), scale: [1, 7])
 	),
 	\fx, time:2, sched:1
 )

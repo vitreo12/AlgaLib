@@ -5,11 +5,15 @@ Alga.boot({
 	}, sampleAccurate:true).add;
 
 	AlgaSynthDef(\noise0, {
-		LFNoise0.ar(\freq.kr([1, 2]))
+		LFNoise0.ar(\freq.kr([1, 2, 3]))
 	}).add;
 
 	AlgaSynthDef(\noise1, {
-		LFNoise1.ar(\freq.kr([1, 2]))
+		LFNoise1.ar(\freq.kr([1, 2, 3, 4]))
+	}).add;
+
+	AlgaSynthDef(\consts, {
+		DC.ar([1,2,3])
 	}).add;
 
 	s.sync;
@@ -26,23 +30,23 @@ Alga.boot({
 				def: \noise1,
 				freq: Pwhite([1, 1], [100, 100])
 			), scale: [100, 400]),
-			Pwhite(300, 500)
-		]);
-	), playTime:1);
+			Pwhite(300, 500, 1)
+		], inf);
+	), playTime:1).play;
 });
+)
 
-//Recursive ?
+//AlgaTemp can contain other AlgaTemps
 (
 a.from(
 	AlgaTemp((
-		def: \noise1
+		def: \noise1,
 		freq: AlgaTemp((
 			def: \noise0,
 			freq: Pwhite([10, 100])
-		), scale: [5, 50]),
-		scale: [250, 500]
-	)),
+		), scale: [5, 50])
+	), scale: Pseq([[250, 500], [330, 1331]], inf)),
 	\freq,
-	time: 3
+	time: 5
 )
 )
