@@ -1790,9 +1790,9 @@ AlgaPattern : AlgaNode {
 			});
 
 			//Add \lag and \offset / \timingOffset
-			if(paramName == \lag, { patternPairs.add(\lag).add(value) });
+			if(paramName == \lag, { patternPairs = patternPairs.add(\lag).add(value) });
 			if((paramName == \offset).or(paramName == \timingOffset), {
-				patternPairs.add(\timingOffset).add(value)
+				patternPairs = patternPairs.add(\timingOffset).add(value)
 			});
 		});
 
