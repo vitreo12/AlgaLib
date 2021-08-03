@@ -442,19 +442,10 @@ AlgaPattern : AlgaNode {
 
 	1) out: (See next)
 
-	2) AlgaTemp (See next)
-
-	3) mixFrom()
+	2) mixFrom()
 
 	- out: (node: Pseq([a, b], inf), param: \freq, scale: Pseq([[20, 400], [30, 500]], inf), chans:Pseq([1, 2], inf))
 	- out: Pseq([a, b], inf)
-
-	- AlgaTemp creates a temporary Synth for the specific param (just like fx does for post-audio):
-
-	AlgaPattern((
-	def: \sine,
-	freq: AlgaTemp(\noise1, [\freq, 100], scale:[100, 1000])
-	))
 	*/
 
 	//The actual Patterns to be manipulated
@@ -2273,3 +2264,20 @@ AlgaMonoPattern : AlgaPattern {}
 
 //Alias
 AMP : AlgaMonoPattern {}
+
+//Extension to support out: from AlgaPattern
++AlgaNode {
+	receivePatternOut { | algaPattern, algaSynthBus, param = \in,
+		patternBussesAndSynths, replace = false |
+
+		//Trigger a fadeIn for the algaPattern
+
+		//Create a synth and read from algaSynthBus (not algaPattern.synthBus)
+
+		//If replace, trigger fadeOut and fadeIn again
+
+		//Add synth to activeInterpSynthsAtParam
+
+		//Add synth to patternBussesAndSynths
+	}
+}

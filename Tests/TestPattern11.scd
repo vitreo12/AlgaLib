@@ -15,12 +15,13 @@ Alga.boot({
 				node: Pseq([b, c], inf),
 				param: \in,
 				scale: Pseq([1, 2], inf),
-				chans: Pseq([1, 2], inf)
+				chans: Pseq([1, 2], inf),
+				time: 1 //Gets applied to b, then to c too. It's per-algaNode
 			),
 			Pseq([b, c], inf),
 			\none
 		], inf)
-	), playTime:1);
+	));
 
 	b = AN({ (\in.ar * 3).tanh * 0.5 }).play;
 	c = AN({ FreeVerb.ar(\in.ar, 0.8) }).play;
