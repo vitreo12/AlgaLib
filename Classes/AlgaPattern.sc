@@ -442,9 +442,17 @@ AlgaPattern : AlgaNode {
 
 	1) out: (See next)
 
-	2) mixFrom()
+	2) detune / scale / ... / -> freq (https://doc.sccode.org/Classes/Event.html)
 
-	- out: (node: Pseq([a, b], inf), param: \freq, scale: Pseq([[20, 400], [30, 500]], inf), chans:Pseq([1, 2], inf))
+	3) mixFrom()
+
+	- out: (
+	node: Pseq([a, b], inf),
+	param: \freq,
+	scale: Pseq([[20, 400], [30, 500]], inf),
+	chans:Pseq([1, 2], inf)
+	)
+
 	- out: Pseq([a, b], inf)
 	*/
 
@@ -1780,6 +1788,12 @@ AlgaPattern : AlgaNode {
 					foundFX = true;
 				});
 			});
+
+			//Add \lag and \offset / \timingOffset
+			if(paramName == \lag, { patternPairs.add(\lag).add(value) });
+			if((paramName == \offset).or(paramName == \timingOffset), {
+				patternPairs.add(\timingOffset).add(value)
+			});
 		});
 
 		//Store current FX for replaces
@@ -2268,9 +2282,13 @@ AMP : AlgaMonoPattern {}
 //Extension to support out: from AlgaPattern
 +AlgaNode {
 	receivePatternOut { | algaPattern, algaSynthBus, param = \in,
-		patternBussesAndSynths, replace = false |
+		patternBussesAndSynths, time, replace = false |
+
+		//Use time or paramConnectionTime
 
 		//Trigger a fadeIn for the algaPattern
+
+		//Run necessary conversions
 
 		//Create a synth and read from algaSynthBus (not algaPattern.synthBus)
 
