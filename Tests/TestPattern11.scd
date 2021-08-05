@@ -6,24 +6,35 @@ Alga.boot({
 
 	s.sync;
 
+	b = AN({ [(\in.ar * 3).tanh * 0.5, Silent.ar] });
+	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 5] });
+
+	d = AN({ Saw.ar(LFNoise0.kr(3).range(50, 300)) * 0.5 });
+
+	b << d;
+	c << d;
+
 	a = AlgaPattern((
 		def: \test,
 		dur: 1,
 		freq: Pwhite([100, 220], [440, 880]),
 		out: Pseq([
-			(
-				node: Pseq([b, c], inf),
+			AlgaOut(
+				node: b,
 				param: \in,
 				scale: Pseq([1, 2], inf),
 				chans: Pseq([1, 2], inf),
-				time: 1 //Gets applied to b, then to c too. It's per-algaNode
+				time: 1
 			),
-			Pseq([b, c], inf),
+			AlgaOut(
+				node: c,
+				param: \in,
+				scale: Pseq([1, 2], inf),
+				chans: Pseq([1, 2], inf),
+				time: 1
+			),
 			\none
 		], inf)
 	));
-
-	b = AN({ (\in.ar * 3).tanh * 0.5 }).play;
-	c = AN({ FreeVerb.ar(\in.ar, 0.8) }).play;
 });
 )

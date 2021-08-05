@@ -388,6 +388,25 @@ AlgaPatternArg {
 	isAlgaPatternArg { ^true }
 }
 
+//This class is used for the \out parameter
+AlgaOut {
+	var <node, <param, <chans, <scale, <time;
+
+	*new { | node, param, chans, scale, time |
+		^super.new.init(node, param, chans, scale, time)
+	}
+
+	init { | argNode, argParam, argChans, argScale, argTime |
+		node   = argNode.asStream;  //Pattern support
+		param  = argParam.asStream; //Pattern support
+		chans  = argChans.asStream; //Pattern support
+		scale  = argScale.asStream; //Pattern support
+		time   = argTime.asStream;  //Pattern support
+	}
+
+	isAlgaOut { ^true }
+}
+
 //Alias for AlgaPatternArg
 AlgaArg : AlgaPatternArg {}
 
@@ -450,7 +469,8 @@ AlgaPattern : AlgaNode {
 	node: Pseq([a, b], inf),
 	param: \freq,
 	scale: Pseq([[20, 400], [30, 500]], inf),
-	chans:Pseq([1, 2], inf)
+	chans: Pseq([1, 2], inf).
+	time: 1
 	)
 
 	- out: Pseq([a, b], inf)
@@ -488,6 +508,9 @@ AlgaPattern : AlgaNode {
 	//Current fx
 	var <currentFX;
 
+	//Current \out
+	var <currentOut;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -521,11 +544,14 @@ AlgaPattern : AlgaNode {
 			var algaPatternServer = ~algaPatternServer;
 			var algaPatternClock = ~algaPatternClock;
 
+			//The interpStreams the Pattern is using
+			var algaPatternInterpStreams = ~algaPatternInterpStreams;
+
 			//fx
 			var fx = ~fx;
 
-			//The interpStreams the Pattern is using
-			var algaPatternInterpStreams = ~algaPatternInterpStreams;
+			//out
+			var algaOut = ~algaOut;
 
 			//Other things for pattern syncing / clocking / scheduling
 			var offset = ~timingOffset;
@@ -537,10 +563,11 @@ AlgaPattern : AlgaNode {
 			//Create the bundle with all needed Synths for this Event.
 			bundle = algaPatternServer.makeBundle(false, {
 				~algaPattern.createEventSynths(
-					algaSynthDef,
-					algaSynthBus,
-					algaPatternInterpStreams,
-					fx
+					algaSynthDef: algaSynthDef,
+					algaSynthBus: algaSynthBus,
+					algaPatternInterpStreams: algaPatternInterpStreams,
+					fx: fx,
+					algaOut: algaOut
 				)
 			});
 
@@ -1155,8 +1182,40 @@ AlgaPattern : AlgaNode {
 		^patternSynthArgs;
 	}
 
+	//Create a temporary synth for \out connection
+	createOutConnection { | algaOut, algaSynthBus, patternBussesAndSynths |
+		case
+		{ algaOut.isAlgaNode } {
+			algaOut.receivePatternOutTempSynth(
+				algaPattern: this,
+				algaSynthBus: algaSynthBus,
+				patternBussesAndSynths: patternBussesAndSynths
+			)
+		}
+		{ algaOut.isAlgaOut } {
+			var node  = algaOut.node;
+			var param = algaOut.param;
+			var scale = algaOut.scale;
+			var chans = algaOut.chans;
+			var time  = algaOut.time;
+
+			if(node.isAlgaNode, {
+				node.receivePatternOutTempSynth(
+					algaPattern: this,
+					algaSynthBus: algaSynthBus,
+					param: param,
+					patternBussesAndSynths: patternBussesAndSynths,
+					chans: chans,
+					scale: scale,
+					time: time
+				)
+			});
+		};
+	}
+
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
-	createEventSynths { | algaSynthDef, algaSynthBus, algaPatternInterpStreams, fx |
+	createEventSynths { | algaSynthDef, algaSynthBus,
+		algaPatternInterpStreams, fx, algaOut |
 		//Used to check whether using a ListPattern of \defs
 		var numChannelsToUse  = numChannels;
 		var rateToUse = rate;
@@ -1323,6 +1382,15 @@ AlgaPattern : AlgaNode {
 				//Standard case: write directly to algaSynthBus
 				patternSynthArgs = patternSynthArgs.add(\out).add(algaSynthBus.index);
 			});
+		});
+
+		//If out
+		if(algaOut != nil, {
+			this.createOutConnection(
+				algaOut: algaOut,
+				algaSynthBus: algaSynthBus,
+				patternBussesAndSynths: patternBussesAndSynths
+			)
 		});
 
 		//The actual patternSynth according to the user's def
@@ -1613,10 +1681,6 @@ AlgaPattern : AlgaNode {
 		var synthDescFx, synthDefFx, controlNamesFx;
 		var def;
 
-		//If any other class but Event, return. This value will be ignored in createEventSynths.
-		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
-		if(value.class != Event, { ^value });
-
 		//Find \def
 		def = value[\def];
 		if(def == nil, {
@@ -1691,12 +1755,79 @@ AlgaPattern : AlgaNode {
 		//ListPattern of Events
 		{ value.isListPattern } {
 			value.list.do({ | listEntry, i |
-				var result;
-				result = this.parseFXEvent(listEntry);
+				var result = this.parseFX(listEntry); //recursive, so it picks up other ListPatterns if needed
 				if(result == nil, { ^nil });
 				value.list[i] = result;
 			});
 			^value;
+		}
+
+		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
+		{ value.class == Symbol } {
+			^value
+		};
+	}
+
+	//Parse a single \out event
+	parseOutAlgaOut { | value |
+		var node = value.node;
+		var param = value.param;
+
+		if(param == nil, param = \in);
+		if(param.class != Symbol, {
+			"AlgaPattern: the 'param' argument in AlgaOut parameter can only be a Symbol. Using 'in'".error;
+			param = \in
+		});
+
+		case
+		{ node.isAlgaNode } {
+			if(node.isAlgaPattern, {
+				"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
+				^nil
+			});
+
+			node.receivePatternOut(
+				algaPattern: this,
+				param: param
+			)
+		}
+		{ node.isListPattern } {
+			node.list.do({ | listEntry, i |
+				node.list[i] = this.parseOut(listEntry)
+			});
+		};
+
+		^value.asStream;
+	}
+
+	//Parse the \out key
+	parseOut { | value |
+		case
+		{ value.isAlgaNode } {
+			if(value.isAlgaPattern, {
+				"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
+				^nil
+			});
+			value.receivePatternOut(
+				algaPattern: this,
+				param: \in
+			);
+			^value
+		}
+		{ value.isAlgaOut } {
+			^this.parseOutAlgaOut(value);
+		}
+		{ value.isListPattern } {
+			value.list.do({ | listEntry, i |
+				var result = this.parseOut(listEntry); //recursive, so it picks up other ListPatterns if needed
+				if(result == nil, { ^nil });
+				value.list[i] = result;
+			});
+			^value.asStream; //return the stream
+		}
+		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
+		{ value.class == Symbol } {
+			^value
 		};
 	}
 
@@ -1760,6 +1891,8 @@ AlgaPattern : AlgaNode {
 		var foundDurOrDelta = false;
 		var foundFX = false;
 		var parsedFX;
+		var parsedOut;
+		var foundOut = false;
 		var patternPairs = Array.newClear;
 
 		//Create new interpStreams. NOTE that the Pfunc in dur uses this, as interpStreams
@@ -1789,6 +1922,16 @@ AlgaPattern : AlgaNode {
 				});
 			});
 
+			//Add \out key
+			if(paramName == \out, {
+				parsedOut = this.parseOut(value);
+				parsedOut.asString.warn;
+				if(parsedOut != nil, {
+					patternPairs = patternPairs.add(\algaOut).add(parsedOut); //can't use \out
+					foundOut = true;
+				});
+			});
+
 			//Add \lag and \offset / \timingOffset
 			if(paramName == \lag, { patternPairs = patternPairs.add(\lag).add(value) });
 			if((paramName == \offset).or(paramName == \timingOffset), {
@@ -1797,11 +1940,10 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Store current FX for replaces
-		if(foundFX, {
-			currentFX = parsedFX;
-		}, {
-			parsedFX = nil;
-		});
+		if(foundFX, { currentFX = parsedFX }, { parsedFX = nil; currentFX = nil });
+
+		//Store current out for replaces
+		if(foundOut, { currentOut = parsedOut }, { parsedOut = nil; currentOut = nil });
 
 		//If no dur and replace, get it from previous interpStreams
 		if(replace, {
@@ -1817,6 +1959,13 @@ AlgaPattern : AlgaNode {
 			if(foundFX.not, {
 				if(currentFX != nil, {
 					patternPairs = patternPairs.add(\fx).add(currentFX);
+				});
+			});
+
+			//No \out from user, use currentOut if available
+			if(foundOut.not, {
+				if(currentOut != nil, {
+					patternPairs = patternPairs.add(\algaOut).add(currentOut);
 				});
 			});
 		}, {
@@ -2198,7 +2347,27 @@ AlgaPattern : AlgaNode {
 			inNodes[param] = IdentitySet[sender];
 		}, {
 			inNodes[param].add(sender);
-		})
+		});
+
+		//Update blocks too
+		AlgaBlocksDict.createNewBlockIfNeeded(this, sender)
+	}
+
+	//Add entries to inNodes
+	addInNodeListPattern { | sender, param = \in |
+		sender.list.do({ | listEntry |
+			if(listEntry.isAlgaPatternArg, { listEntry = listEntry.sender });
+			if(listEntry.isAlgaNode, {
+				if(inNodes.size == 0, {
+					this.addInNodeAlgaNode(listEntry, param, mix:false);
+				}, {
+					this.addInNodeAlgaNode(listEntry, param, mix:true);
+				});
+			});
+			if(listEntry.isListPattern, {
+				this.addInNodeListPattern(listEntry)
+			});
+		});
 	}
 
 	//Wrapper for addInNode
@@ -2222,16 +2391,7 @@ AlgaPattern : AlgaNode {
 				this.addInNodeAlgaNode(sender.sender, param, mix);
 			}, {
 				if(sender.isListPattern, {
-					sender.list.do({ | listEntry |
-						if(listEntry.isAlgaPatternArg, { listEntry = listEntry.sender });
-						if(listEntry.isAlgaNode, {
-							if(inNodes.size == 0, {
-								this.addInNodeAlgaNode(listEntry, param, mix:false);
-							}, {
-								this.addInNodeAlgaNode(listEntry, param, mix:true);
-							});
-						});
-					});
+					this.addInNodeListPattern(sender, param);
 				});
 			});
 		});
@@ -2273,16 +2433,31 @@ AlgaPattern : AlgaNode {
 //Alias
 AP : AlgaPattern {}
 
+/*
 //Implements Pmono behaviour
 AlgaMonoPattern : AlgaPattern {}
 
 //Alias
 AMP : AlgaMonoPattern {}
+*/
 
 //Extension to support out: from AlgaPattern
 +AlgaNode {
-	receivePatternOut { | algaPattern, algaSynthBus, param = \in,
-		patternBussesAndSynths, time, replace = false |
+	//Triggered as soon as connection is made
+	receivePatternOut { | algaPattern, param = \in |
+		//Update inNodes
+		this.addInOutNodesDict(algaPattern, param, true);
+
+		//Update blocks
+		AlgaBlocksDict.createNewBlockIfNeeded(this, algaPattern)
+	}
+
+	//Triggered every patternSynth
+	receivePatternOutTempSynth { | algaPattern, algaSynthBus, param = \in,
+		patternBussesAndSynths, chans, scale, time |
+
+		chans.asString.error;
+		scale.asString.error;
 
 		//Use time or paramConnectionTime
 
@@ -2290,7 +2465,9 @@ AMP : AlgaMonoPattern {}
 
 		//Run necessary conversions
 
-		//Create a synth and read from algaSynthBus (not algaPattern.synthBus)
+		//Calculate scale / chans
+
+		//Create a temporary synth that reads from algaSynthBus (not algaPattern.synthBus)
 
 		//If replace, trigger fadeOut and fadeIn again
 

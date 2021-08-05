@@ -2809,10 +2809,13 @@ AlgaNode {
 				//Wrap around the indices entries around the actual
 				//number of outputs of the node... Should it ignore out of bounds?
 				channelsToPlay = channelsToPlay % numChannels;
-
 				actualNumChannels = channelsToPlay.size;
 
-				playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
+				playSynthSymbol = (
+					"alga_play_" ++
+					numChannels ++ "_" ++
+					actualNumChannels
+				).asSymbol;
 
 				playSynth = AlgaSynth(
 					playSynthSymbol,

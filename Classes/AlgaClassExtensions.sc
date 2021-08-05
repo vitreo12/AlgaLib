@@ -18,6 +18,7 @@
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
 	isAlgaPatternArg { ^false }
+	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
 	isBuffer { ^false }
 	isPattern { ^false }
