@@ -242,14 +242,6 @@ AlgaBlocksDict {
 	}
 
 	*createNewBlockIfNeeded { | receiver, sender |
-		var newBlockIndex;
-		var newBlock;
-
-		var receiverBlockIndex;
-		var senderBlockIndex;
-		var receiverBlock;
-		var senderBlock;
-
 		//This happens when patching a simple number or array in to set a param
 		if((receiver.isAlgaNode.not).or(sender.isAlgaNode.not), { ^nil });
 
@@ -258,6 +250,28 @@ AlgaBlocksDict {
 			("AlgaBlocksDict: Trying to create a block between two AlgaNodes on different servers").error;
 			^receiver;
 		});
+
+		//Check if groups are instantiated, otherwise push action to scheduler
+		if((receiver.group != nil).and(sender.group != nil), {
+			this.createNewBlockIfNeeded_inner(receiver, sender)
+		}, {
+			receiver.scheduler.addAction(
+				condition: { (receiver.group != nil).and(sender.group != nil) },
+				func: {
+					this.createNewBlockIfNeeded_inner(receiver, sender)
+				}
+			)
+		});
+	}
+
+	*createNewBlockIfNeeded_inner { | receiver, sender |
+		var newBlockIndex;
+		var newBlock;
+
+		var receiverBlockIndex;
+		var senderBlockIndex;
+		var receiverBlock;
+		var senderBlock;
 
 		//Unpack things
 		receiverBlockIndex = receiver.blockIndex;
