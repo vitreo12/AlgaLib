@@ -401,7 +401,12 @@ AlgaOut {
 		param  = argParam.asStream; //Pattern support
 		chans  = argChans.asStream; //Pattern support
 		scale  = argScale.asStream; //Pattern support
-		time   = argTime.asStream;  //Pattern support
+		if(argTime == nil, { argTime = 0 });
+		if(argTime.isNumber.not, {
+			"AlgaOut: 'time' must be a number. Using 0".error;
+			argTime = 0
+		});
+		time   = argTime; //NO pattern support
 	}
 
 	isAlgaOut { ^true }
@@ -1189,6 +1194,8 @@ AlgaPattern : AlgaNode {
 			algaOut.receivePatternOutTempSynth(
 				algaPattern: this,
 				algaSynthBus: algaSynthBus,
+				algaNumChannels: numChannels,
+				algaRate: rate,
 				patternBussesAndSynths: patternBussesAndSynths
 			)
 		}
@@ -1203,6 +1210,8 @@ AlgaPattern : AlgaNode {
 				node.receivePatternOutTempSynth(
 					algaPattern: this,
 					algaSynthBus: algaSynthBus,
+					algaNumChannels: numChannels,
+					algaRate: rate,
 					param: param,
 					patternBussesAndSynths: patternBussesAndSynths,
 					chans: chans,
@@ -1232,6 +1241,10 @@ AlgaPattern : AlgaNode {
 
 		//The actual synth that will be created
 		var patternSynth;
+
+		//
+		var validFX = false;
+		var validOut = false;
 
 		//FIRST THING, free all dangling temporary synths. These are created to perform
 		//mid-pattern interpolation of parameters.
@@ -1338,8 +1351,14 @@ AlgaPattern : AlgaNode {
 			numChannelsOrRateMismatch = true
 		});
 
+		//Check validFX
+		if((fx != nil).and(fx.class == Event), { validFX = true });
+
+		//Check validOut
+		if(algaOut != nil, { validOut = true });
+
 		//If fx
-		if((fx != nil).and(fx.class == Event), {
+		if(validFX, {
 			//This returns the patternSynthArgs with correct bus to write to (the fx one)
 			patternSynthArgs = this.createFXSynthAndPatternSynth(
 				fx: fx,
@@ -1382,15 +1401,6 @@ AlgaPattern : AlgaNode {
 				//Standard case: write directly to algaSynthBus
 				patternSynthArgs = patternSynthArgs.add(\out).add(algaSynthBus.index);
 			});
-		});
-
-		//If out
-		if(algaOut != nil, {
-			this.createOutConnection(
-				algaOut: algaOut,
-				algaSynthBus: algaSynthBus,
-				patternBussesAndSynths: patternBussesAndSynths
-			)
 		});
 
 		//The actual patternSynth according to the user's def
@@ -2433,13 +2443,11 @@ AlgaPattern : AlgaNode {
 //Alias
 AP : AlgaPattern {}
 
-/*
 //Implements Pmono behaviour
 AlgaMonoPattern : AlgaPattern {}
 
 //Alias
 AMP : AlgaMonoPattern {}
-*/
 
 //Extension to support out: from AlgaPattern
 +AlgaNode {
@@ -2453,26 +2461,96 @@ AMP : AlgaMonoPattern {}
 	}
 
 	//Triggered every patternSynth
-	receivePatternOutTempSynth { | algaPattern, algaSynthBus, param = \in,
-		patternBussesAndSynths, chans, scale, time |
+	receivePatternOutTempSynth { | algaPattern, algaSynthBus, algaNumChannels, algaRate,
+		param = \in, patternBussesAndSynths, chans, scale, time |
 
-		chans.asString.error;
-		scale.asString.error;
+		/*
+		var fadeInSynthSymbol;
+		var fadeInSynth;
+		*/
 
+		var controlNamesAtParam, paramNumChannels, paramRate;
+		var interpBusAtParam, interpBus;
+		var tempSynthSymbol;
+		var tempSynthArgs, tempSynth;
+
+		/*
+		var paramConnectionTime = paramsConnectionTime[param];
 		//Use time or paramConnectionTime
-
-		//Trigger a fadeIn for the algaPattern
+		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
+		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
+		time = max(time, paramConnectionTime);
+		//Trigger a fadeIn for the algaPattern according to time.
+		//If one is already happening, ignore the new time
+		*/
 
 		//Run necessary conversions
+		controlNamesAtParam = controlNames[param];
+		if(controlNamesAtParam == nil, {
+			("AlgaNode: invalid parameter '" ++ param ++ "'").error;
+			^nil
+		});
+
+		paramNumChannels = controlNamesAtParam.numChannels;
+		paramRate = controlNamesAtParam.rate;
 
 		//Calculate scale / chans
+		chans = chans.next; //Pattern support
+		scale = scale.next; //Pattern support
 
-		//Create a temporary synth that reads from algaSynthBus (not algaPattern.synthBus)
+		//Get interpbus at param / sender combination
+		interpBusAtParam = interpBusses[param];
+		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
+
+		//Try to get sender one.
+		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
+		interpBus = interpBusAtParam[algaPattern];
+		if(interpBus == nil, {
+			interpBus = interpBusAtParam[\default];
+			if(interpBus == nil, {
+				(
+					"AlgaNode: invalid interp bus at param '" ++
+					param ++ "' and node " ++ algaPattern.asString
+				).error;
+				^nil
+			});
+			//interpBusAtParam[algaPattern] = interpBus;
+		});
+
+		//Symbol: use the non fx version as envelope is needed for an interpSynth for AlgaNode
+		tempSynthSymbol = (
+			"alga_pattern_" ++
+			algaRate ++
+			algaNumChannels ++
+			"_" ++
+			paramRate ++
+			paramNumChannels
+		).asSymbol;
+
+		//Read from algaSynthBus (not algaPattern.synthBus, which can change on .replace)
+		tempSynthArgs = [
+			\in, algaSynthBus.busArg,
+			\out, interpBus.index,
+			\fadeTime, 0,
+			\env, 1 //1 for envelope
+		];
+
+		//Create the tempSynth
+		tempSynth = AlgaSynth(
+			tempSynthSymbol,
+			tempSynthArgs,
+			interpGroup,
+			waitForInst:false
+		);
+
+		//Finally, add the reader
 
 		//If replace, trigger fadeOut and fadeIn again
 
-		//Add synth to activeInterpSynthsAtParam
+		//Add Synth to activeInterpSynthsAtParam
+		this.addActiveInterpSynthOnFree(param, algaPattern, tempSynth);
 
-		//Add synth to patternBussesAndSynths
+		//Add Synth to patternBussesAndSynths
+		patternBussesAndSynths.add(tempSynth);
 	}
 }
