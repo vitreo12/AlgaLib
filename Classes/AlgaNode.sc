@@ -836,6 +836,8 @@ AlgaNode {
 				outsMapping:outsMapping
 			).send(server);
 
+			if(synthDef.class == AlgaSynthDefSpec, { synthDef = synthDef.synthDef });
+
 			server.sync(dispatchCondition);
 		};
 

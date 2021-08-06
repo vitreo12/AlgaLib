@@ -27,25 +27,24 @@ Alga.boot({
 				node: b,
 				param: \in,
 				scale: Pseq([1, 2], inf),
-				chans: Pseq([1, 2], inf)
+				chans: Pseq([1, 2], inf),
+				time: 1 //How to use it? Should I drop this?
 			),
 			AlgaOut(
 				node: c,
 				param: \in,
 				scale: Pseq([1, 2], inf),
-				chans: Pseq([1, 2], inf)
+				chans: Pseq([1, 2], inf),
+				time: 1 //How to use it? Should I drop this?
 			),
-			//b,
-			//\none
+			\none
 		], inf)
 	));
 });
 )
 
-//With a new connection, what happens?
+//With a new connection, what should happen? How to handle a fadeIn / fadeOut?
 a.from(AlgaOut(b, \in), \out, time:2, sched:1)
 
-//When replacing, what happens?
-a.replace(\test2, sched:1)
-
-s.scope
+//When replacing, what should happen? How to handle a fadeIn / fadeOut?
+a.replace(\test2, time:2, sched:1)

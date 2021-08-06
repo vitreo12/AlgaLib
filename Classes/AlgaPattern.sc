@@ -1188,12 +1188,12 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create a temporary synth for \out connection
-	createOutConnection { | algaOut, algaSynthBus, patternBussesAndSynths |
+	createOutConnection { | algaOut, outTempBus, patternBussesAndSynths |
 		case
 		{ algaOut.isAlgaNode } {
 			algaOut.receivePatternOutTempSynth(
 				algaPattern: this,
-				algaSynthBus: algaSynthBus,
+				outTempBus: outTempBus,
 				algaNumChannels: numChannels,
 				algaRate: rate,
 				patternBussesAndSynths: patternBussesAndSynths
@@ -1209,7 +1209,7 @@ AlgaPattern : AlgaNode {
 			if(node.isAlgaNode, {
 				node.receivePatternOutTempSynth(
 					algaPattern: this,
-					algaSynthBus: algaSynthBus,
+					outTempBus: outTempBus,
 					algaNumChannels: numChannels,
 					algaRate: rate,
 					param: param,
@@ -1355,7 +1355,7 @@ AlgaPattern : AlgaNode {
 		if((fx != nil).and(fx.class == Event), { validFX = true });
 
 		//Check validOut
-		if(algaOut != nil, { validOut = true });
+		if((algaOut != nil).and((algaOut.isAlgaOut).or(algaOut.isAlgaNode)), { validOut = true });
 
 		//If fx
 		if(validFX, {
@@ -1401,6 +1401,24 @@ AlgaPattern : AlgaNode {
 				//Standard case: write directly to algaSynthBus
 				patternSynthArgs = patternSynthArgs.add(\out).add(algaSynthBus.index);
 			});
+		});
+
+		//Valid out
+		if(validOut, {
+			//New temp bus
+			var outTempBus = AlgaBus(server, numChannels, rate);
+
+			//Add temp bus to patternBussesAndSynths
+			patternBussesAndSynths.add(outTempBus);
+
+			//Add patternTempOut writing to patternSynthArgs
+			patternSynthArgs = patternSynthArgs.add(\patternTempOut).add(outTempBus.index);
+
+			//Create connection synth with the target
+			this.createOutConnection(algaOut, outTempBus, patternBussesAndSynths);
+
+			//Update the synthDef symbol to use the patternTempOut version
+			algaSynthDef = (algaSynthDef.asString ++ "_patternTempOut").asSymbol;
 		});
 
 		//The actual patternSynth according to the user's def
@@ -1935,7 +1953,6 @@ AlgaPattern : AlgaNode {
 			//Add \out key
 			if(paramName == \out, {
 				parsedOut = this.parseOut(value);
-				parsedOut.asString.warn;
 				if(parsedOut != nil, {
 					patternPairs = patternPairs.add(\algaOut).add(parsedOut); //can't use \out
 					foundOut = true;
@@ -2461,7 +2478,7 @@ AMP : AlgaMonoPattern {}
 	}
 
 	//Triggered every patternSynth
-	receivePatternOutTempSynth { | algaPattern, algaSynthBus, algaNumChannels, algaRate,
+	receivePatternOutTempSynth { | algaPattern, outTempBus, algaNumChannels, algaRate,
 		param = \in, patternBussesAndSynths, chans, scale, time |
 
 		/*
@@ -2484,12 +2501,9 @@ AMP : AlgaMonoPattern {}
 		//If one is already happening, ignore the new time
 		*/
 
-		//Run necessary conversions
+		//Get controlNames
 		controlNamesAtParam = controlNames[param];
-		if(controlNamesAtParam == nil, {
-			("AlgaNode: invalid parameter '" ++ param ++ "'").error;
-			^nil
-		});
+		if(controlNamesAtParam == nil, { ^nil });
 
 		paramNumChannels = controlNamesAtParam.numChannels;
 		paramRate = controlNamesAtParam.rate;
@@ -2527,9 +2541,9 @@ AMP : AlgaMonoPattern {}
 			paramNumChannels
 		).asSymbol;
 
-		//Read from algaSynthBus (not algaPattern.synthBus, which can change on .replace)
+		//Read from outTempBus
 		tempSynthArgs = [
-			\in, algaSynthBus.busArg,
+			\in, outTempBus.busArg,
 			\out, interpBus.index,
 			\fadeTime, 0,
 			\env, 1 //1 for envelope

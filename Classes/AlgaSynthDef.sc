@@ -14,6 +14,74 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//Stores both synthDef and synthDef with \out control (for AlgaPattern).
+//and dispatches the methods to both of them.
+AlgaSynthDefSpec {
+	var <synthDef, <synthDefPatternOut;
+
+	*new { | synthDef, synthDefPatternOut |
+		^super.new.init(synthDef, synthDefPatternOut)
+	}
+
+	init { | argSynthDef, argSynthDefPatternOut |
+		synthDef = argSynthDef;
+		synthDefPatternOut = argSynthDefPatternOut;
+	}
+
+	add { | libname, completionMsg, keepDef = true |
+		synthDef.add(libname, completionMsg, keepDef);
+		synthDefPatternOut.add(libname, completionMsg, keepDef);
+	}
+
+	send { | server, completionMsg |
+		synthDef.send(server, completionMsg);
+		synthDefPatternOut.send(server, completionMsg);
+	}
+
+	load { | server, completionMsg, dir |
+		dir = dir ? AlgaSynthDef.synthDefDir;
+		synthDef.load(server, completionMsg, dir);
+		synthDefPatternOut.load(server, completionMsg, dir);
+	}
+
+	store { | libname=\global, dir, completionMsg, mdPlugin |
+		dir = dir ? AlgaSynthDef.synthDefDir;
+		synthDef.store(libname, dir, completionMsg, mdPlugin);
+		synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin);
+	}
+
+	asSynthDesc { | libname=\global, keepDef = true |
+		^synthDef.asSynthDesc(libname, keepDef)
+	}
+
+	name {
+		^synthDef.name
+	}
+
+	numChannels {
+		^synthDef.numChannels
+	}
+
+	rate {
+		^synthDef.rate
+	}
+
+	explicitFree {
+		^synthDef.explicitFree
+	}
+
+	outsMapping {
+		^synthDef.outsMapping
+	}
+
+	//This doesn't work actually
+	/*
+	doesNotUnderstand { | selector ...args |
+		^synthDef.perform(selector, args)
+	}
+	*/
+}
+
 //Hybrid between a normal SynthDef and a ProxySynthDef (makeFadeEnv).
 //makeFadeEnv, however, does not multiply the output, but it is only used for Alga's internal
 //freeing mechanism. Furthermore, outsMapping is provided.
@@ -41,7 +109,43 @@ AlgaSynthDef : SynthDef {
 	}
 
 	*new_inner { | name, func, rates, prependArgs, outsMapping,
-		sampleAccurate = false, variants, metadata, makeFadeEnv = true |
+		sampleAccurate = false, variants, metadata, makeFadeEnv = true, makeOutDef = true |
+		var def = this.new_inner_inner(
+			name: name,
+			func: func,
+			rates: rates,
+			prependArgs: prependArgs,
+			outsMapping: outsMapping,
+			sampleAccurate: sampleAccurate,
+			variants: variants,
+			metadata: metadata,
+			makeFadeEnv: makeFadeEnv,
+			makeOutDef: false
+		);
+
+		if(makeOutDef, {
+			var defOut;
+			name = (name.asString ++ "_patternTempOut").asSymbol;
+			defOut = this.new_inner_inner(
+				name: name,
+				func: func,
+				rates: rates,
+				prependArgs: prependArgs,
+				outsMapping: outsMapping,
+				sampleAccurate: sampleAccurate,
+				variants: variants,
+				metadata: metadata,
+				makeFadeEnv: makeFadeEnv,
+				makeOutDef: true
+			);
+			^AlgaSynthDefSpec(def, defOut);
+		});
+
+		^def;
+	}
+
+	*new_inner_inner { | name, func, rates, prependArgs, outsMapping,
+		sampleAccurate = false, variants, metadata, makeFadeEnv = true, makeOutDef = false |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var outerBuildSynthDef = UGen.buildSynthDef;
 
@@ -65,7 +169,7 @@ AlgaSynthDef : SynthDef {
 				var controlNameName = controlName.name;
 
 				//Don't \gate arg when makeFadeEnv is true, otherwise it's fine (it's used in AlgaStartup)
-				if((makeFadeEnv.and(controlNameName == \gate)).or(controlNameName == \out), {
+				if((makeFadeEnv.and(controlNameName == \gate)).or(controlNameName == \out).or(controlNameName == \patternTempOut), {
 					error = true
 				});
 
@@ -126,7 +230,11 @@ AlgaSynthDef : SynthDef {
 				output
 			}, {
 				outCtl = Control.names(\out).ir(0);
-				(if(rate === \audio and: { sampleAccurate }) { OffsetOut } { Out }).multiNewList([rate, outCtl] ++ output)
+				(if(rate === \audio and: { sampleAccurate }) { OffsetOut } { Out }).multiNewList([rate, outCtl] ++ output);
+				if(makeOutDef, {
+					var outTempCtl = Control.names(\patternTempOut).ir(0);
+					(if(rate === \audio and: { sampleAccurate }) { OffsetOut } { Out }).multiNewList([rate, outTempCtl] ++ output)
+				});
 			})
 		});
 
