@@ -11,10 +11,9 @@ Alga.boot({
 	s.sync;
 
 	b = AN({ [(\in.ar * 3).tanh * 0.5, Silent.ar] }).play;
-	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 5] }).play;
+	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 10] }).play;
 
-	d = AN({ Saw.ar(LFNoise0.kr(3).range(50, 300)) * 0.5 });
-
+	//d = AN({ Saw.ar(LFNoise0.kr(3).range(50, 300)) * 0.5 });
 	//b << d;
 	//c << d;
 
@@ -27,15 +26,13 @@ Alga.boot({
 				node: b,
 				param: \in,
 				scale: Pseq([1, 2], inf),
-				chans: Pseq([1, 2], inf),
-				time: 1 //How to use it? Should I drop this?
+				chans: Pseq([1, 2], inf)
 			),
 			AlgaOut(
 				node: c,
 				param: \in,
 				scale: Pseq([1, 2], inf),
-				chans: Pseq([1, 2], inf),
-				time: 1 //How to use it? Should I drop this?
+				chans: Pseq([1, 2], inf)
 			),
 			\none
 		], inf)

@@ -390,23 +390,17 @@ AlgaPatternArg {
 
 //This class is used for the \out parameter
 AlgaOut {
-	var <node, <param, <chans, <scale, <time;
+	var <node, <param, <chans, <scale;
 
-	*new { | node, param, chans, scale, time |
-		^super.new.init(node, param, chans, scale, time)
+	*new { | node, param, chans, scale |
+		^super.new.init(node, param, chans, scale)
 	}
 
-	init { | argNode, argParam, argChans, argScale, argTime |
+	init { | argNode, argParam, argChans, argScale |
 		node   = argNode.asStream;  //Pattern support
 		param  = argParam.asStream; //Pattern support
 		chans  = argChans.asStream; //Pattern support
 		scale  = argScale.asStream; //Pattern support
-		if(argTime == nil, { argTime = 0 });
-		if(argTime.isNumber.not, {
-			"AlgaOut: 'time' must be a number. Using 0".error;
-			argTime = 0
-		});
-		time   = argTime; //NO pattern support
 	}
 
 	isAlgaOut { ^true }
@@ -466,7 +460,9 @@ AlgaPattern : AlgaNode {
 
 	1) out: (See next)
 
-	2) detune / scale / ... / -> freq (https://doc.sccode.org/Classes/Event.html)
+	2) Allow Functions in AlgaTemp and ListPatterns for 'def'
+
+	3) detune / scale / ... / -> freq (https://doc.sccode.org/Classes/Event.html)
 
 	3) mixFrom()
 
@@ -1204,7 +1200,6 @@ AlgaPattern : AlgaNode {
 			var param = algaOut.param;
 			var scale = algaOut.scale;
 			var chans = algaOut.chans;
-			var time  = algaOut.time;
 
 			if(node.isAlgaNode, {
 				node.receivePatternOutTempSynth(
@@ -1215,8 +1210,7 @@ AlgaPattern : AlgaNode {
 					param: param,
 					patternBussesAndSynths: patternBussesAndSynths,
 					chans: chans,
-					scale: scale,
-					time: time
+					scale: scale
 				)
 			});
 		};
@@ -2105,7 +2099,7 @@ AlgaPattern : AlgaNode {
 	//Interpolate dur (not yet)
 	interpolateDur { | value, time, sched |
 		if(replaceDur, {
-			("AlgaPattern: 'dur' interpolation is not supported yet. Running .replace instead.").warn;
+			("AlgaPattern: 'dur' interpolation is not supported yet. Running 'replace' instead.").warn;
 			^this.replace(
 				def: (def: this.getSynthDef, dur: value),
 				time: time,
@@ -2120,6 +2114,7 @@ AlgaPattern : AlgaNode {
 
 	//Interpolate def == replace
 	interpolateDef { | def, time, sched |
+		"AlgaPattern: changing the 'def' key. This will trigger 'replace'.".warn;
 		^this.replace(
 			def: (def: def),
 			time: time,
@@ -2129,11 +2124,11 @@ AlgaPattern : AlgaNode {
 
 	//Buffer == replace
 	interpolateBuffer { | sender, param, time, sched |
-		var args = [ param, sender ]; //New buffer connection... Should it be set in the def? (param: sender)?
-		"AlgaPattern: changing a Buffer parameter. This will trigger 'replace'.".warn;
+		//var args = [ param, sender ]; //New buffer connection... Should it be set in the def? (param: sender)?
+		("AlgaPattern: changing a Buffer parameter: '" + param.asString ++ ". This will trigger 'replace'.").warn;
 		^this.replace(
-			def: (def: this.getSynthDef),
-			args: args,
+			def: (def: this.getSynthDef, param: sender),
+			//args: args,
 			time: time,
 			sched: sched
 		);
@@ -2141,6 +2136,7 @@ AlgaPattern : AlgaNode {
 
 	//Interpolate fx == replace
 	interpolateFX { | value, time, sched |
+		"AlgaPattern: changing the 'fx' key. This will trigger 'replace'.".warn;
 		^this.replace(
 			def: (def: this.getSynthDef, fx: value),
 			time: time,
@@ -2151,14 +2147,12 @@ AlgaPattern : AlgaNode {
 	//ListPattern that contains Buffers
 	patternOrAlgaPatternArgContainsBuffers { | pattern |
 		if(pattern.isAlgaPatternArg, { if(pattern.sender.isBuffer, { ^true }) });
-
 		if(pattern.isListPattern, {
 			pattern.list.do({ | entry |
 				if(entry.isBuffer, { ^true });
 				if(entry.isAlgaPatternArg, { if(entry.sender.isBuffer, { ^true }) });
 			});
 		});
-
 		^false
 	}
 
