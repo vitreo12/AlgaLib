@@ -462,9 +462,13 @@ AlgaPattern : AlgaNode {
 
 	2) Allow Functions in AlgaTemp and ListPatterns for 'def'
 
-	3) detune / scale / ... / -> freq (https://doc.sccode.org/Classes/Event.html)
+	3) replace(reset: true) to reset all params to default
 
-	3) mixFrom()
+	4) dur:nil AND next() to independently trigger the next event
+
+	5) detune / scale / ... / -> freq (https://doc.sccode.org/Classes/Event.html)
+
+	6) mixFrom()
 
 	- out: (
 	node: Pseq([a, b], inf),
@@ -479,6 +483,9 @@ AlgaPattern : AlgaNode {
 
 	//The actual Patterns to be manipulated
 	var <pattern;
+
+	//The pattern as stream
+	var <patternAsStream;
 
 	//The Event input
 	var <eventPairs;
@@ -1911,6 +1918,7 @@ AlgaPattern : AlgaNode {
 	//Build the actual pattern
 	createPattern { | replace = false, keepChannelsMapping = false, keepScale = false, sched |
 		var foundDurOrDelta = false;
+		var manualDur = false;
 		var foundFX = false;
 		var parsedFX;
 		var parsedOut;
@@ -1931,8 +1939,13 @@ AlgaPattern : AlgaNode {
 
 			//Found \dur or \delta
 			if((paramName == \dur).or(paramName == \delta), {
-				foundDurOrDelta = true;
-				this.setDur(value, newInterpStreams);
+				if(value.class == Symbol, {
+					//Using a symbol (like, \manual) as \dur key
+					manualDur = true
+				}, {
+					foundDurOrDelta = true;
+					this.setDur(value, newInterpStreams);
+				});
 			});
 
 			//Add \fx key (parsing everything correctly)
@@ -2044,7 +2057,6 @@ AlgaPattern : AlgaNode {
 		//the context of this AlgaPattern
 		patternPairs = patternPairs.addAll([
 			\type, \algaNote,
-			\dur, Pfuncn( { newInterpStreams.dur.next }, inf), //Pfunc allows to modify the value
 			\algaPattern, this,
 			\algaSynthBus, this.synthBus, //Lock current one: will work on .replace
 			\algaPatternServer, server,
@@ -2052,20 +2064,42 @@ AlgaPattern : AlgaNode {
 			\algaPatternInterpStreams, newInterpStreams //Lock current one: will work on .replace
 		]);
 
+		//Manual or automatic dur management
+		if(manualDur.not, {
+			//Pfunc allows to modify the value
+			patternPairs = patternPairs.add(\dur).add(Pfuncn( { newInterpStreams.dur.next }, inf));
+		});
+
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);
+		patternAsStream = pattern.asStream; //Needed for \manual \dur
 
 		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
 		//createPattern function is non scheduled as it it better to create it right away.
-		scheduler.addAction(
-			func: {
-				newInterpStreams.playAlgaReschedulingEventStreamPlayer(pattern, this.clock)
-			},
-			sched: sched
-		);
+		if(manualDur.not, {
+			scheduler.addAction(
+				func: {
+					newInterpStreams.playAlgaReschedulingEventStreamPlayer(pattern, this.clock)
+				},
+				sched: sched
+			);
+		});
 
 		//Update latest interpStreams
 		interpStreams = newInterpStreams;
+	}
+
+	//Manually advance the pattern. 'next' as name won't work as it's reserved, apparently
+	advance { | sched |
+		sched = sched ? 0;
+		if(patternAsStream != nil, {
+			scheduler.addAction(
+				func: {
+					patternAsStream.next(()).play; //Empty event as protoEvent!
+				},
+				sched: sched
+			);
+		});
 	}
 
 	//Get valid synthDef name
