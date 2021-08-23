@@ -460,15 +460,11 @@ AlgaPattern : AlgaNode {
 
 	1) out: (See next)
 
-	2) Allow Functions in AlgaTemp and ListPatterns for 'def'
+	2) allow Functions in AlgaTemp and ListPatterns for 'def'
 
-	3) replace(reset: true) to reset all params to default
+	3) detune / scale / ... / -> freq (https://doc.sccode.org/Classes/Event.html)
 
-	4) dur:nil AND next() to independently trigger the next event
-
-	5) detune / scale / ... / -> freq (https://doc.sccode.org/Classes/Event.html)
-
-	6) mixFrom()
+	4) mixFrom()
 
 	- out: (
 	node: Pseq([a, b], inf),
@@ -1451,7 +1447,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//dispatchNode: first argument is an Event or SynthDef
-	dispatchNode { | def, args, initGroups = false, replace = false,
+	dispatchNode { | def, args, initGroups = false, replace = false, reset = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
 		var defEntry;
@@ -1476,6 +1472,9 @@ AlgaPattern : AlgaNode {
 		//this is mostly needed for .replace to work properly and wait for the new synth
 		//to be algaInstantiated!
 		if(synth != nil, { synth.algaInstantiated = false });
+
+		//Parse reset
+		this.parseResetOnReplace(reset);
 
 		//Create args dict
 		this.createDefArgs(args);
@@ -2102,6 +2101,9 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
+	//Alias of advance
+	step { | sched | this.advance(sched) }
+
 	//Get valid synthDef name
 	getSynthDef {
 		if(synthDef.class == AlgaSynthDef, {
@@ -2501,6 +2503,8 @@ AMP : AlgaMonoPattern {}
 		//Update inNodes
 		this.addInOutNodesDict(algaPattern, param, true);
 
+		//Create the fadeIn / fadeOut if needed
+
 		//Update blocks
 		AlgaBlocksDict.createNewBlockIfNeeded(this, algaPattern)
 	}
@@ -2519,20 +2523,11 @@ AMP : AlgaMonoPattern {}
 		var tempSynthSymbol;
 		var tempSynthArgs, tempSynth;
 
-		/*
-		var paramConnectionTime = paramsConnectionTime[param];
-		//Use time or paramConnectionTime
-		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
-		time = max(time, paramConnectionTime);
-		//Trigger a fadeIn for the algaPattern according to time.
-		//If one is already happening, ignore the new time
-		*/
-
 		//Get controlNames
 		controlNamesAtParam = controlNames[param];
 		if(controlNamesAtParam == nil, { ^nil });
 
+		//Get channels / rate of param
 		paramNumChannels = controlNamesAtParam.numChannels;
 		paramRate = controlNamesAtParam.rate;
 
@@ -2584,10 +2579,6 @@ AMP : AlgaMonoPattern {}
 			interpGroup,
 			waitForInst:false
 		);
-
-		//Finally, add the reader
-
-		//If replace, trigger fadeOut and fadeIn again
 
 		//Add Synth to activeInterpSynthsAtParam
 		this.addActiveInterpSynthOnFree(param, algaPattern, tempSynth);

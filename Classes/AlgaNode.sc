@@ -529,6 +529,30 @@ AlgaNode {
 		this.freeInterpNormBusses(now, time);
 	}
 
+	//Parse reset. Basically, deal with removal from defArgs / replaceArgs / inNodes / explicitArgs
+	parseResetOnReplace { | reset |
+		case
+		{ reset.isArray } {
+			reset.do({ | entry |
+				if(entry.class == Symbol, {
+					defArgs.removeAt(entry);
+					replaceArgs.removeAt(entry);
+					inNodes.removeAt(entry);
+					explicitArgs[entry] = false;
+				});
+			});
+		}
+		{ reset == true } {
+			controlNames.do({ | controlName |
+				var paramName = controlName.name;
+				replaceArgs.removeAt(paramName);
+				inNodes.removeAt(paramName);
+				defArgs.removeAt(paramName);
+				explicitArgs[paramName] = false;
+			});
+		};
+	}
+
 	//This will also be kept across replaces, as it's just updating the dict
 	createDefArgs { | args |
 		if(args != nil, {
@@ -564,7 +588,7 @@ AlgaNode {
 	}
 
 	//dispatches controlnames / numChannels / rate according to def class
-	dispatchNode { | def, args, initGroups = false, replace = false,
+	dispatchNode { | def, args, initGroups = false, replace = false, reset = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
 		defClass = def.class;
@@ -573,6 +597,9 @@ AlgaNode {
 		//this is mostly needed for .replace to work properly and wait for the new synth
 		//to be algaInstantiated!
 		if(synth != nil, { synth.algaInstantiated = false });
+
+		//Parse reset
+		this.parseResetOnReplace(reset);
 
 		//Create args dict
 		this.createDefArgs(args);
@@ -2452,8 +2479,6 @@ AlgaNode {
 
 	//replace connections FROM this
 	replaceConnections { | keepChannelsMapping = true, keepScale = true, time |
-		//inNodes are already handled in dispatchNode(replace:true)
-
 		//outNodes. Remake connections that were in place with receivers.
 		//This will effectively trigger interpolation process.
 		outNodes.keysValuesDo({ | receiver, paramsSet |
@@ -2467,7 +2492,7 @@ AlgaNode {
 				//Restore old scale mapping!
 				if(keepScale, { oldScale = receiver.getParamScaling(param, this) });
 
-				//If it was a mixer connection, use replaceMixConnection
+				//If it was a mix connection, use replaceMixConnection
 				if(receiver.mixParamContainsSender(param, this), {
 					//use the scheduler version! don't know if receiver and this are both instantiated
 					receiver.replaceMixConnection(param, this,
@@ -2486,13 +2511,16 @@ AlgaNode {
 		});
 	}
 
-	replaceInner { | def, args, time, outsMapping, keepOutsMappingIn = true,
+	replaceInner { | def, args, time, outsMapping, reset, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
 		var wasPlaying = false;
 
 		//Re-init groups if clear was used or toBeCleared
 		var initGroups = if((group == nil).or(algaCleared).or(algaToBeCleared), { true }, { false });
+
+		//Check reset
+		reset = reset ? false;
 
 		//Trying to .replace on a cleared AlgaNode
 		if(algaCleared, {
@@ -2541,6 +2569,7 @@ AlgaNode {
 			args:args,
 			initGroups:initGroups,
 			replace:true,
+			reset:reset,
 			keepChannelsMapping:keepOutsMappingIn, outsMapping:outsMapping,
 			keepScale:keepScalesIn
 		);
@@ -2563,7 +2592,7 @@ AlgaNode {
 
 	//replace content of the node, re-making all the connections.
 	//If this was connected to a number / array, should I restore that value too or keep the new one?
-	replace { | def, args, time, sched, outsMapping, keepOutsMappingIn = true,
+	replace { | def, args, time, sched, outsMapping, reset = false, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
 		//Check global algaInstantiated
@@ -2573,6 +2602,7 @@ AlgaNode {
 				this.replaceInner(
 					def:def, args:args, time:time,
 					outsMapping:outsMapping,
+					reset:reset,
 					keepOutsMappingIn:keepOutsMappingIn,
 					keepOutsMappingOut:keepOutsMappingOut,
 					keepScalesIn:keepScalesIn, keepScalesOut:keepScalesOut
