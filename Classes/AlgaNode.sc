@@ -1623,7 +1623,9 @@ AlgaNode {
 		//new interp synth, with input connected to sender and output to the interpBus
 		//THIS USES connectionTime!!
 		if(sender.isAlgaNode, {
-			//If mix and replaceMix, spawn a fadeIn synth, which balances out the interpSynth's envelope for normSynth
+			//If mix and replaceMix, spawn a fadeIn synth.
+			//fadeIn balances out the interpSynth's envelope before normSynth.
+			//A fadeIn synth contains all zeroes, except for the envelope (at last position).
 			if(mix.and(newMixConnectionOrReplaceMix), {
 				var fadeInSymbol = ("alga_fadeIn_" ++
 					paramRate ++
@@ -1641,6 +1643,7 @@ AlgaNode {
 				);
 			});
 
+			//The actual interpSynth args
 			interpSynthArgs = [
 				\in, sender.synthBus.busArg,
 				\out, interpBus.index,

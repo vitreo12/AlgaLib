@@ -1190,13 +1190,16 @@ AlgaPattern : AlgaNode {
 	createOutConnection { | algaOut, outTempBus, patternBussesAndSynths |
 		case
 		{ algaOut.isAlgaNode } {
-			algaOut.receivePatternOutTempSynth(
-				algaPattern: this,
-				outTempBus: outTempBus,
-				algaNumChannels: numChannels,
-				algaRate: rate,
-				patternBussesAndSynths: patternBussesAndSynths
-			)
+			//Only if instantiated (or it will click)
+			if(algaOut.algaInstantiatedAsReceiver, {
+				algaOut.receivePatternOutTempSynth(
+					algaPattern: this,
+					outTempBus: outTempBus,
+					algaNumChannels: numChannels,
+					algaRate: rate,
+					patternBussesAndSynths: patternBussesAndSynths
+				)
+			});
 		}
 		{ algaOut.isAlgaOut } {
 			var node  = algaOut.node;
@@ -1205,16 +1208,19 @@ AlgaPattern : AlgaNode {
 			var chans = algaOut.chans;
 
 			if(node.isAlgaNode, {
-				node.receivePatternOutTempSynth(
-					algaPattern: this,
-					outTempBus: outTempBus,
-					algaNumChannels: numChannels,
-					algaRate: rate,
-					param: param,
-					patternBussesAndSynths: patternBussesAndSynths,
-					chans: chans,
-					scale: scale
-				)
+				//Only if instantiated (or it will click)
+				if(node.algaInstantiatedAsReceiver, {
+					node.receivePatternOutTempSynth(
+						algaPattern: this,
+						outTempBus: outTempBus,
+						algaNumChannels: numChannels,
+						algaRate: rate,
+						param: param,
+						patternBussesAndSynths: patternBussesAndSynths,
+						chans: chans,
+						scale: scale
+					)
+				});
 			});
 		};
 	}
@@ -1803,7 +1809,7 @@ AlgaPattern : AlgaNode {
 
 		if(param == nil, param = \in);
 		if(param.class != Symbol, {
-			"AlgaPattern: the 'param' argument in AlgaOut parameter can only be a Symbol. Using 'in'".error;
+			"AlgaPattern: the 'param' argument in AlgaOut can only be a Symbol. Using 'in'".error;
 			param = \in
 		});
 
@@ -1814,9 +1820,14 @@ AlgaPattern : AlgaNode {
 				^nil
 			});
 
-			node.receivePatternOut(
-				algaPattern: this,
-				param: param
+			scheduler.addAction(
+				condition: { node.algaInstantiatedAsReceiver }, //controlNames must be defined
+				func: {
+					node.receivePatternOut(
+						algaPattern: this,
+						param: param
+					)
+				}
 			)
 		}
 		{ node.isListPattern } {
@@ -1836,9 +1847,14 @@ AlgaPattern : AlgaNode {
 				"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
 				^nil
 			});
-			value.receivePatternOut(
-				algaPattern: this,
-				param: \in
+			scheduler.addAction(
+				condition: { value.algaInstantiatedAsReceiver },
+				func: {
+					value.receivePatternOut(
+						algaPattern: this,
+						param: \in
+					);
+				}
 			);
 			^value
 		}
@@ -2498,12 +2514,61 @@ AMP : AlgaMonoPattern {}
 
 //Extension to support out: from AlgaPattern
 +AlgaNode {
-	//Triggered as soon as connection is made
-	receivePatternOut { | algaPattern, param = \in |
-		//Update inNodes
-		this.addInOutNodesDict(algaPattern, param, true);
+	//Triggered when the connection is made
+	receivePatternOut { | algaPattern, param = \in, time = 0 |
+		var controlNamesAtParam, paramNumChannels, paramRate;
+		var fadeInBus, fadeInSymbol, fadeInSynth;
+		var interpBusAtParam, interpBus;
 
-		//Create the fadeIn / fadeOut if needed
+		//Get controlNames
+		controlNamesAtParam = controlNames[param];
+		if(controlNamesAtParam == nil, { ^this });
+
+		//Get channels / rate of param
+		paramNumChannels = controlNamesAtParam.numChannels;
+		paramRate = controlNamesAtParam.rate;
+
+		/*
+		//Get interpbus at param / sender combination
+		interpBusAtParam = interpBusses[param];
+		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
+
+		//Try to get sender one.
+		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
+		interpBus = interpBusAtParam[algaPattern];
+		if(interpBus == nil, {
+			interpBus = interpBusAtParam[\default];
+			if(interpBus == nil, {
+				(
+					"AlgaNode: invalid interp bus at param '" ++
+					param ++ "' and node " ++ algaPattern.asString
+				).error;
+				^this
+			});
+			//interpBusAtParam[algaPattern] = interpBus;
+		});
+
+		//If first connection, create the fadeIn synth
+		fadeInSymbol = fadeInSymbol = ("alga_fadeIn_" ++
+			paramRate ++
+			paramNumChannels
+		).asSymbol;
+
+		fadeInSynth = AlgaSynth(
+			fadeInSymbol,
+			[
+				\out, interpBus.index,
+				\fadeTime, time,
+			],
+			interpGroup,
+			waitForInst:false
+		);
+		*/
+
+		//If new connection, remove previous fadeIn, create fadeOut and a new fadeIn
+
+		//Update inNodes (mix == true)
+		this.addInOutNodesDict(algaPattern, param, true);
 
 		//Update blocks
 		AlgaBlocksDict.createNewBlockIfNeeded(this, algaPattern)
@@ -2511,12 +2576,7 @@ AMP : AlgaMonoPattern {}
 
 	//Triggered every patternSynth
 	receivePatternOutTempSynth { | algaPattern, outTempBus, algaNumChannels, algaRate,
-		param = \in, patternBussesAndSynths, chans, scale, time |
-
-		/*
-		var fadeInSynthSymbol;
-		var fadeInSynth;
-		*/
+		param = \in, patternBussesAndSynths, chans, scale |
 
 		var controlNamesAtParam, paramNumChannels, paramRate;
 		var interpBusAtParam, interpBus;
@@ -2525,7 +2585,7 @@ AMP : AlgaMonoPattern {}
 
 		//Get controlNames
 		controlNamesAtParam = controlNames[param];
-		if(controlNamesAtParam == nil, { ^nil });
+		if(controlNamesAtParam == nil, { ^this });
 
 		//Get channels / rate of param
 		paramNumChannels = controlNamesAtParam.numChannels;
@@ -2549,12 +2609,12 @@ AMP : AlgaMonoPattern {}
 					"AlgaNode: invalid interp bus at param '" ++
 					param ++ "' and node " ++ algaPattern.asString
 				).error;
-				^nil
+				^this
 			});
 			//interpBusAtParam[algaPattern] = interpBus;
 		});
 
-		//Symbol: use the non fx version as envelope is needed for an interpSynth for AlgaNode
+		//Symbol: use the fx version
 		tempSynthSymbol = (
 			"alga_pattern_" ++
 			algaRate ++
@@ -2569,7 +2629,7 @@ AMP : AlgaMonoPattern {}
 			\in, outTempBus.busArg,
 			\out, interpBus.index,
 			\fadeTime, 0,
-			\env, 1 //1 for envelope
+			\env, 1
 		];
 
 		//Create the tempSynth

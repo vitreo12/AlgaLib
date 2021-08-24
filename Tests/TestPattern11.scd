@@ -37,6 +37,8 @@ Alga.boot({
 			\none
 		], inf)
 	));
+
+	s.plotTree;
 });
 )
 
