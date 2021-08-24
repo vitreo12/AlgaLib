@@ -2516,56 +2516,36 @@ AMP : AlgaMonoPattern {}
 +AlgaNode {
 	//Triggered when the connection is made
 	receivePatternOut { | algaPattern, param = \in, time = 0 |
-		var controlNamesAtParam, paramNumChannels, paramRate;
-		var fadeInBus, fadeInSymbol, fadeInSynth;
+		var controlNamesAtParam, paramRate;
+		var envBus, envSymbol, envSynth;
 		var interpBusAtParam, interpBus;
 
 		//Get controlNames
 		controlNamesAtParam = controlNames[param];
 		if(controlNamesAtParam == nil, { ^this });
 
-		//Get channels / rate of param
-		paramNumChannels = controlNamesAtParam.numChannels;
+		//Get rate of param
 		paramRate = controlNamesAtParam.rate;
 
-		/*
-		//Get interpbus at param / sender combination
-		interpBusAtParam = interpBusses[param];
-		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
+		//Create a new env
+		envBus = AlgaBus(server, 1, paramRate);
 
-		//Try to get sender one.
-		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
-		interpBus = interpBusAtParam[algaPattern];
-		if(interpBus == nil, {
-			interpBus = interpBusAtParam[\default];
-			if(interpBus == nil, {
-				(
-					"AlgaNode: invalid interp bus at param '" ++
-					param ++ "' and node " ++ algaPattern.asString
-				).error;
-				^this
-			});
-			//interpBusAtParam[algaPattern] = interpBus;
-		});
-
-		//If first connection, create the fadeIn synth
-		fadeInSymbol = fadeInSymbol = ("alga_fadeIn_" ++
-			paramRate ++
-			paramNumChannels
+		envSymbol = (
+			"alga_pattern_interp_env_" ++
+			paramRate
 		).asSymbol;
 
-		fadeInSynth = AlgaSynth(
-			fadeInSymbol,
-			[
-				\out, interpBus.index,
-				\fadeTime, time,
-			],
+		envSynth = AlgaSynth(
+			envSymbol,
+			[ \out, envBus.index, \fadeTime, time ],
 			interpGroup,
 			waitForInst:false
 		);
-		*/
 
-		//If new connection, remove previous fadeIn, create fadeOut and a new fadeIn
+		//If new connection:
+		// 1) trigger \t_release on the previous ones with correct \fadeTime
+		// 2) create a new env
+
 
 		//Update inNodes (mix == true)
 		this.addInOutNodesDict(algaPattern, param, true);
@@ -2614,7 +2594,7 @@ AMP : AlgaMonoPattern {}
 			//interpBusAtParam[algaPattern] = interpBus;
 		});
 
-		//Symbol: use the fx version
+		//Symbol. Don't use the fx version as \env is needed
 		tempSynthSymbol = (
 			"alga_pattern_" ++
 			algaRate ++
@@ -2637,6 +2617,7 @@ AMP : AlgaMonoPattern {}
 			tempSynthSymbol,
 			tempSynthArgs,
 			interpGroup,
+			\addToTail,
 			waitForInst:false
 		);
 

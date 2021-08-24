@@ -473,7 +473,6 @@ val;
 		});
 	}
 
-	//This shuld also have sample and hold option!
 	*initAlgaPatternInterp {
 		var result = "
 AlgaSynthDef.new_inner(\\alga_pattern_interp_env_audio, {
