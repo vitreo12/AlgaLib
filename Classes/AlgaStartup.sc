@@ -439,8 +439,9 @@ val;
 
 			fadein_ar = "AlgaSynthDef.new_inner(\\alga_fadeIn_audio" ++ i.asString ++ ", { | curve = \\sin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
+var zero = DC.ar(0);
 " ++ i ++ ".do({ | i |
-val[i] = DC.ar(0);
+val[i] = zero;
 });
 val[" ++ i ++ "] = EnvGen.ar(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
 val;
@@ -457,8 +458,9 @@ val;
 
 			fadeout_ar = "AlgaSynthDef.new_inner(\\alga_fadeOut_audio" ++ i.asString ++ ", { | curve = \\sin |
 var val = Array.newClear(" ++ (i + 1) ++ ");
+var zero = DC.ar(0);
 " ++ i ++ ".do({ | i |
-val[i] = DC.ar(0);
+val[i] = zero;
 });
 val[" ++ i ++ "] = EnvGen.ar(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
 val;
