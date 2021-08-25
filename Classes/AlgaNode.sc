@@ -88,7 +88,7 @@ AlgaNode {
 	//Connected nodes
 	var <inNodes, <outNodes;
 
-	//keep track of current \default nodes (this is used for mix parameters)
+	//Keep track of current \default nodes (this is used for mix parameters)
 	var <currentDefaultNodes;
 
 	//Keep track of current scaling for params
@@ -99,6 +99,10 @@ AlgaNode {
 
 	//Keep track of the "chans" arg for play so it's kept across .replaces
 	var <playChans;
+
+	//Needed to receive out: from an AlgaPattern. They store the envelope.
+	var <outEnvSynths;
+	var <outEnvBusses;
 
 	//General state queries
 	var <isPlaying = false;

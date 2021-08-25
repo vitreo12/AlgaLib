@@ -39,6 +39,7 @@ Alga.boot({
 	));
 
 	s.plotTree;
+	s.scope;
 });
 )
 
@@ -47,3 +48,6 @@ a.from(AlgaOut(b, \in), \out, time:2, sched:1)
 
 //When replacing, what should happen? How to handle a fadeIn / fadeOut?
 a.replace(\test2, time:3, sched:1)
+
+//When replacing and resetting?
+a.replace(\test, time:3, sched:1, reset:true)

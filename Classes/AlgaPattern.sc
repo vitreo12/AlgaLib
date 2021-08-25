@@ -2519,6 +2519,16 @@ AMP : AlgaMonoPattern {}
 		var controlNamesAtParam, paramRate;
 		var envBus, envSymbol, envSynth;
 		var interpBusAtParam, interpBus;
+		var isFirstConnection = false;
+
+		//Check if outEnvBusses needs to be init (first time)
+		if(outEnvBusses == nil, { outEnvBusses = IdentityDictionary() });
+
+		//Check if outEnvSynths needs to be init (first time)
+		if(outEnvSynths == nil, { outEnvSynths = IdentityDictionary() });
+
+		//Check if it's first connection (no other busses at param)
+		isFirstConnection = outEnvBusses[param] == nil;
 
 		//Get controlNames
 		controlNamesAtParam = controlNames[param];
@@ -2527,25 +2537,33 @@ AMP : AlgaMonoPattern {}
 		//Get rate of param
 		paramRate = controlNamesAtParam.rate;
 
-		//Create a new env
-		envBus = AlgaBus(server, 1, paramRate);
+		//First connection
+		if(isFirstConnection, {
+			//envBus... When is this freed?
+			envBus = AlgaBus(server, 1, paramRate);
+			outEnvBusses[param] = envBus;
 
-		envSymbol = (
-			"alga_pattern_interp_env_" ++
-			paramRate
-		).asSymbol;
+			//envSymbol
+			envSymbol = (
+				"alga_pattern_interp_env_" ++
+				paramRate
+			).asSymbol;
 
-		envSynth = AlgaSynth(
-			envSymbol,
-			[ \out, envBus.index, \fadeTime, time ],
-			interpGroup,
-			waitForInst:false
-		);
+			//envSynth... When is this freed?
+			envSynth = AlgaSynth(
+				envSymbol,
+				[ \out, envBus.index, \fadeTime, time ],
+				interpGroup,
+				waitForInst:false
+			);
+			outEnvSynths[param] = envSynth;
+		}, {
+			//New connection (there already was one in place)
 
-		//If new connection:
-		// 1) trigger \t_release on the previous ones with correct \fadeTime
-		// 2) create a new env
+			// 1) trigger \t_release on the previous envs with correct \fadeTime:time
 
+			// 2) create a new env
+		});
 
 		//Update inNodes (mix == true)
 		this.addInOutNodesDict(algaPattern, param, true);
@@ -2554,14 +2572,32 @@ AMP : AlgaMonoPattern {}
 		AlgaBlocksDict.createNewBlockIfNeeded(this, algaPattern)
 	}
 
+	//This must be triggered when replacing the sender AlgaPattern:
+	//Trigger the release of all active out: synths at specific param
+	removeAllPatternOuts { | algaPattern, param = \in, time |
+		var outEnvSynth = outEnvSynths[param];
+		var outEnvBus   = outEnvBusses[param];
+		if(outEnvSynth != nil, {
+			outEnvSynth.set(\fadeTime, time)
+		});
+		if(outEnvBus != nil, {
+			outEnvSynth.onFree({ outEnvBus.free }); //free bus when synth is done
+		});
+	}
+
 	//Triggered every patternSynth
 	receivePatternOutTempSynth { | algaPattern, outTempBus, algaNumChannels, algaRate,
 		param = \in, patternBussesAndSynths, chans, scale |
 
+		var envBus;
 		var controlNamesAtParam, paramNumChannels, paramRate;
 		var interpBusAtParam, interpBus;
 		var tempSynthSymbol;
 		var tempSynthArgs, tempSynth;
+
+		//Retrieve envBus from outEnvBusses
+		envBus = outEnvBusses[param];
+		if(envBus == nil, { ("AlgaNode: invalid envBus at param '" ++ param ++ "'").error; ^this });
 
 		//Get controlNames
 		controlNamesAtParam = controlNames[param];
@@ -2604,12 +2640,12 @@ AMP : AlgaMonoPattern {}
 			paramNumChannels
 		).asSymbol;
 
-		//Read from outTempBus
+		//Read from outTempBus and envBus, write to interpBus
 		tempSynthArgs = [
 			\in, outTempBus.busArg,
 			\out, interpBus.index,
 			\fadeTime, 0,
-			\env, 1
+			\env, envBus.busArg
 		];
 
 		//Create the tempSynth
