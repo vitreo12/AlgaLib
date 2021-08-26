@@ -2517,18 +2517,33 @@ AMP : AlgaMonoPattern {}
 	//Triggered when the connection is made
 	receivePatternOut { | algaPattern, param = \in, time = 0 |
 		var controlNamesAtParam, paramRate;
+		var outEnvBussesAtParam, outEnvSynthsAtParam;
 		var envBus, envSymbol, envSynth;
 		var interpBusAtParam, interpBus;
 		var isFirstConnection = false;
 
-		//Check if outEnvBusses needs to be init (first time)
+		//Check if outEnvBusses needs to be init
 		if(outEnvBusses == nil, { outEnvBusses = IdentityDictionary() });
 
-		//Check if outEnvSynths needs to be init (first time)
+		//Check if outEnvSynths needs to be init
 		if(outEnvSynths == nil, { outEnvSynths = IdentityDictionary() });
 
-		//Check if it's first connection (no other busses at param)
-		isFirstConnection = outEnvBusses[param] == nil;
+		//Check entries at param
+		outEnvBussesAtParam = outEnvBusses[param];
+		outEnvSynthsAtParam = outEnvSynths[param];
+
+		//Create dict at param
+		if(outEnvBussesAtParam == nil, {
+			outEnvBusses[param] = IdentityDictionary();
+			outEnvBussesAtParam = outEnvBusses[param]; //update pointer
+			isFirstConnection = true;
+		});
+
+		//Create dict at param
+		if(outEnvSynthsAtParam == nil, {
+			outEnvSynths[param] = IdentityDictionary();
+			outEnvSynthsAtParam = outEnvSynths[param]; //update pointer
+		});
 
 		//Get controlNames
 		controlNamesAtParam = controlNames[param];
@@ -2541,7 +2556,7 @@ AMP : AlgaMonoPattern {}
 		if(isFirstConnection, {
 			//envBus... When is this freed?
 			envBus = AlgaBus(server, 1, paramRate);
-			outEnvBusses[param] = envBus;
+			outEnvBussesAtParam[algaPattern] = envBus; //add entry for algaPattern
 
 			//envSymbol
 			envSymbol = (
@@ -2556,7 +2571,7 @@ AMP : AlgaMonoPattern {}
 				interpGroup,
 				waitForInst:false
 			);
-			outEnvSynths[param] = envSynth;
+			outEnvSynthsAtParam[algaPattern] = envSynth; //add entry for algaPattern
 		}, {
 			//New connection (there already was one in place)
 
@@ -2575,13 +2590,17 @@ AMP : AlgaMonoPattern {}
 	//This must be triggered when replacing the sender AlgaPattern:
 	//Trigger the release of all active out: synths at specific param
 	removeAllPatternOuts { | algaPattern, param = \in, time |
-		var outEnvSynth = outEnvSynths[param];
-		var outEnvBus   = outEnvBusses[param];
-		if(outEnvSynth != nil, {
-			outEnvSynth.set(\fadeTime, time)
-		});
-		if(outEnvBus != nil, {
-			outEnvSynth.onFree({ outEnvBus.free }); //free bus when synth is done
+		var outEnvSynth = outEnvSynths[param][algaPattern];
+		var outEnvBus   = outEnvBusses[param][algaPattern];
+
+		if(outEnvSynth != nil, { outEnvSynth.set(\fadeTime, time) });
+
+		outEnvSynth.onFree({
+			if(outEnvBus != nil, {
+				outEnvBus.free; //free bus when synth is done
+				outEnvBusses[param].removeAt(algaPattern);
+			});
+			outEnvSynths[param].removeAt(algaPattern);
 		});
 	}
 
@@ -2596,7 +2615,7 @@ AMP : AlgaMonoPattern {}
 		var tempSynthArgs, tempSynth;
 
 		//Retrieve envBus from outEnvBusses
-		envBus = outEnvBusses[param];
+		envBus = outEnvBusses[param][algaPattern];
 		if(envBus == nil, { ("AlgaNode: invalid envBus at param '" ++ param ++ "'").error; ^this });
 
 		//Get controlNames
