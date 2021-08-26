@@ -1187,13 +1187,14 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create a temporary synth for \out connection
-	createOutConnection { | algaOut, outTempBus, patternBussesAndSynths |
+	createOutConnection { | algaOut, algaSynthBus, outTempBus, patternBussesAndSynths |
 		case
 		{ algaOut.isAlgaNode } {
 			//Only if instantiated (or it will click)
 			if(algaOut.algaInstantiatedAsReceiver, {
 				algaOut.receivePatternOutTempSynth(
 					algaPattern: this,
+					algaSynthBus: algaSynthBus,
 					outTempBus: outTempBus,
 					algaNumChannels: numChannels,
 					algaRate: rate,
@@ -1212,6 +1213,7 @@ AlgaPattern : AlgaNode {
 				if(node.algaInstantiatedAsReceiver, {
 					node.receivePatternOutTempSynth(
 						algaPattern: this,
+						algaSynthBus: algaSynthBus,
 						outTempBus: outTempBus,
 						algaNumChannels: numChannels,
 						algaRate: rate,
@@ -1418,7 +1420,7 @@ AlgaPattern : AlgaNode {
 			patternSynthArgs = patternSynthArgs.add(\patternTempOut).add(outTempBus.index);
 
 			//Create connection synth with the target
-			this.createOutConnection(algaOut, outTempBus, patternBussesAndSynths);
+			this.createOutConnection(algaOut, algaSynthBus, outTempBus, patternBussesAndSynths);
 
 			//Update the synthDef symbol to use the patternTempOut version
 			algaSynthDef = (algaSynthDef.asString ++ "_patternTempOut").asSymbol;
@@ -2148,7 +2150,7 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Interpolate dur (not yet)
+	//Interpolate dur, either replace OR substitute at sched
 	interpolateDur { | value, time, sched |
 		if(replaceDur, {
 			("AlgaPattern: 'dur' interpolation is not supported yet. Running 'replace' instead.").warn;
@@ -2194,6 +2196,11 @@ AlgaPattern : AlgaNode {
 			time: time,
 			sched: sched
 		);
+	}
+
+	//Interpolate out
+	interpolateOut { | value, time, sched |
+
 	}
 
 	//ListPattern that contains Buffers
@@ -2314,7 +2321,12 @@ AlgaPattern : AlgaNode {
 			^this.interpolateFX(sender, time, sched);
 		});
 
-		//Buffer == replace
+		//Special case, \out
+		if(param == \out, {
+			^this.interpolateOut(sender, time, sched);
+		});
+
+		//Entry is a Buffer == replace
 		if(sender.isBuffer, {
 			^this.interpolateBuffer(sender, param, time, sched)
 		});
@@ -2521,6 +2533,7 @@ AMP : AlgaMonoPattern {}
 		var envBus, envSymbol, envSynth;
 		var interpBusAtParam, interpBus;
 		var isFirstConnection = false;
+		var algaSynthBus = algaPattern.synthBus;
 
 		//Check if outEnvBusses needs to be init
 		if(outEnvBusses == nil, { outEnvBusses = IdentityDictionary() });
@@ -2536,7 +2549,6 @@ AMP : AlgaMonoPattern {}
 		if(outEnvBussesAtParam == nil, {
 			outEnvBusses[param] = IdentityDictionary();
 			outEnvBussesAtParam = outEnvBusses[param]; //update pointer
-			isFirstConnection = true;
 		});
 
 		//Create dict at param
@@ -2552,11 +2564,14 @@ AMP : AlgaMonoPattern {}
 		//Get rate of param
 		paramRate = controlNamesAtParam.rate;
 
+		//Check if first connection from algaPattern
+		isFirstConnection = outEnvBussesAtParam[algaSynthBus] == nil;
+
 		//First connection
 		if(isFirstConnection, {
 			//envBus... When is this freed?
 			envBus = AlgaBus(server, 1, paramRate);
-			outEnvBussesAtParam[algaPattern] = envBus; //add entry for algaPattern
+			outEnvBussesAtParam[algaSynthBus] = envBus; //add entry for algaPattern
 
 			//envSymbol
 			envSymbol = (
@@ -2571,11 +2586,20 @@ AMP : AlgaMonoPattern {}
 				interpGroup,
 				waitForInst:false
 			);
-			outEnvSynthsAtParam[algaPattern] = envSynth; //add entry for algaPattern
+			outEnvSynthsAtParam[algaSynthBus] = envSynth; //add entry for algaPattern
 		}, {
 			//New connection (there already was one in place)
 
-			// 1) trigger \t_release on the previous envs with correct \fadeTime:time
+			// 1) trigger \t_release on ALL previous envSynths with correct \fadeTime:time
+			outEnvSynthsAtParam.keysValuesDo({ | prevAlgaSynthBus, prevOutEnvSynth |
+				var prevOutEnvBus = outEnvBussesAtParam[prevAlgaSynthBus];
+				prevOutEnvSynth.set(\t_release, 1, \fadeTime, time);
+				outEnvSynthsAtParam.removeAt(prevAlgaSynthBus);
+				if(prevOutEnvBus != nil, {
+					prevOutEnvSynth.onFree({ prevOutEnvBus.free });
+					outEnvBussesAtParam.removeAt(prevAlgaSynthBus);
+				});
+			});
 
 			// 2) create a new env
 		});
@@ -2604,8 +2628,8 @@ AMP : AlgaMonoPattern {}
 		});
 	}
 
-	//Triggered every patternSynth
-	receivePatternOutTempSynth { | algaPattern, outTempBus, algaNumChannels, algaRate,
+	//Triggered every patternSynth. algaSynthBus is only used as a "indexer"
+	receivePatternOutTempSynth { | algaPattern, algaSynthBus, outTempBus, algaNumChannels, algaRate,
 		param = \in, patternBussesAndSynths, chans, scale |
 
 		var envBus;
@@ -2614,8 +2638,10 @@ AMP : AlgaMonoPattern {}
 		var tempSynthSymbol;
 		var tempSynthArgs, tempSynth;
 
+		algaSynthBus.index.asString.warn;
+
 		//Retrieve envBus from outEnvBusses
-		envBus = outEnvBusses[param][algaPattern];
+		envBus = outEnvBusses[param][algaSynthBus];
 		if(envBus == nil, { ("AlgaNode: invalid envBus at param '" ++ param ++ "'").error; ^this });
 
 		//Get controlNames

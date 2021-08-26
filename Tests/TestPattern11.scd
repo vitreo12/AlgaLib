@@ -53,3 +53,6 @@ a.replace(\test2, time:3, sched:1)
 
 //When replacing and resetting?
 a.replace(\test, time:3, sched:1, reset:true)
+
+//When replacing one of the receivers?
+b.replace({ (\in.ar * 3).clip * 0.5 });
