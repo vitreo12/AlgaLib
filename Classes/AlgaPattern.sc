@@ -1416,14 +1416,14 @@ AlgaPattern : AlgaNode {
 			//Add temp bus to patternBussesAndSynths
 			patternBussesAndSynths.add(outTempBus);
 
-			//Add patternTempOut writing to patternSynthArgs
-			patternSynthArgs = patternSynthArgs.add(\patternTempOut).add(outTempBus.index);
-
 			//Create connection synth with the target
 			this.createOutConnection(algaOut, algaSynthBus, outTempBus, patternBussesAndSynths);
 
 			//Update the synthDef symbol to use the patternTempOut version
 			algaSynthDef = (algaSynthDef.asString ++ "_patternTempOut").asSymbol;
+
+			//Add patternTempOut writing to patternSynthArgs
+			patternSynthArgs = patternSynthArgs.add(\patternTempOut).add(outTempBus.index);
 		});
 
 		//The actual patternSynth according to the user's def
@@ -1865,8 +1865,8 @@ AlgaPattern : AlgaNode {
 					}
 				);
 				alreadyParsed[value] = true;
-				^value
 			});
+			^value
 		}
 		{ value.isAlgaOut } {
 			^this.parseOutAlgaOut(value, alreadyParsed);
@@ -2568,12 +2568,31 @@ AMP : AlgaMonoPattern {}
 +AlgaNode {
 	//Triggered when the connection is made
 	receivePatternOut { | algaPattern, param = \in, time = 0 |
-		var controlNamesAtParam, paramRate;
+		var controlNamesAtParam, paramRate, paramNumChannels;
 		var outEnvBussesAtParam, outEnvSynthsAtParam;
 		var envBus, envSymbol, envSynth;
 		var interpBusAtParam, interpBus;
 		var isFirstConnection = false;
 		var algaSynthBus = algaPattern.synthBus;
+
+		//Get interpBus at param / sender combination
+		interpBusAtParam = interpBusses[param];
+		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
+
+		//Try to get sender one.
+		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
+		interpBus = interpBusAtParam[algaPattern];
+		if(interpBus == nil, {
+			interpBus = interpBusAtParam[\default];
+			if(interpBus == nil, {
+				(
+					"AlgaNode: invalid interp bus at param '" ++
+					param ++ "' and node " ++ algaPattern.asString
+				).error;
+				^this
+			});
+			//interpBusAtParam[algaPattern] = interpBus;
+		});
 
 		//Check if outEnvBusses needs to be init
 		if(outEnvBusses == nil, { outEnvBusses = IdentityDictionary() });
@@ -2601,7 +2620,8 @@ AMP : AlgaMonoPattern {}
 		controlNamesAtParam = controlNames[param];
 		if(controlNamesAtParam == nil, { ^this });
 
-		//Get rate of param
+		//Get numChannels / rate of param
+		paramNumChannels = controlNamesAtParam.numChannels;
 		paramRate = controlNamesAtParam.rate;
 
 		//Check if first connection from algaPattern
@@ -2615,20 +2635,21 @@ AMP : AlgaMonoPattern {}
 
 			//envSymbol
 			envSymbol = (
-				"alga_pattern_interp_env_" ++
-				paramRate
+				"alga_patternOut_" ++
+				paramRate ++
+				paramNumChannels
 			).asSymbol;
 
-			//envSynth... When is this freed?
+			//envSynth:
+			//This outputs both to interp bus in the form of [0, 0, 0, ..., env]
+			//and both to envBus. envBus is then used as multiplier for the tempSynths later on.
 			envSynth = AlgaSynth(
 				envSymbol,
-				[ \out, envBus.index, \fadeTime, time ],
+				[ \out, interpBus.index, \env_out, envBus.index, \fadeTime, time ],
 				interpGroup,
 				waitForInst:false
 			);
-			outEnvSynthsAtParam[algaSynthBus] = envSynth; //add entry for algaPattern
-
-			//Do I also need fadeIn??
+			outEnvSynthsAtParam[algaSynthBus] = envSynth; //add entry for algaSynthBus
 		}, {
 			//New connection (there already was one in place)
 
@@ -2682,8 +2703,6 @@ AMP : AlgaMonoPattern {}
 		var tempSynthSymbol;
 		var tempSynthArgs, tempSynth;
 
-		algaSynthBus.index.asString.warn;
-
 		//Retrieve envBus from outEnvBusses
 		envBus = outEnvBusses[param][algaSynthBus];
 		if(envBus == nil, { ("AlgaNode: invalid envBus at param '" ++ param ++ "'").error; ^this });
@@ -2699,6 +2718,21 @@ AMP : AlgaMonoPattern {}
 		//Calculate scale / chans
 		chans = chans.next; //Pattern support
 		scale = scale.next; //Pattern support
+		scale = this.calculateScaling(
+			param,
+			nil,
+			paramNumChannels,
+			scale,
+			false //don't update the AlgaNode's scalings dict
+		);
+		chans = this.calculateSenderChansMappingArray(
+			param,
+			nil,
+			chans,
+			algaNumChannels,
+			paramNumChannels,
+			false //don't update the AlgaNode's chans dict
+		);
 
 		//Get interpbus at param / sender combination
 		interpBusAtParam = interpBusses[param];
@@ -2726,7 +2760,8 @@ AMP : AlgaMonoPattern {}
 			algaNumChannels ++
 			"_" ++
 			paramRate ++
-			paramNumChannels
+			paramNumChannels ++
+			"_out"
 		).asSymbol;
 
 		//Read from outTempBus and envBus, write to interpBus
@@ -2736,6 +2771,9 @@ AMP : AlgaMonoPattern {}
 			\fadeTime, 0,
 			\env, envBus.busArg
 		];
+
+		//Add scaling and chans (scale is an array already containing the symbol)
+		tempSynthArgs = tempSynthArgs.addAll(scale).add(\indices).add(chans);
 
 		//Create the tempSynth
 		tempSynth = AlgaSynth(
@@ -2747,7 +2785,7 @@ AMP : AlgaMonoPattern {}
 		);
 
 		//Add Synth to activeInterpSynthsAtParam
-		this.addActiveInterpSynthOnFree(param, algaPattern, tempSynth);
+		//this.addActiveInterpSynthOnFree(param, algaPattern, tempSynth);
 
 		//Add Synth to patternBussesAndSynths
 		patternBussesAndSynths.add(tempSynth);

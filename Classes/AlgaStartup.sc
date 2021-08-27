@@ -340,6 +340,25 @@ outScale = out.algaLinCurve(
 out = " ++ scaling ++ "
 out = out * outMultiplier;
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
+
+//Used in patterns + out (env comes from outside, but it's not forwarded)
+AlgaSynthDef.new_inner(" ++ name_pattern ++ "_out, {
+var in, env, out, outMultiplier, outScale;
+in = " ++ in ++ "
+out = " ++ indices ++ "
+outMultiplier = " ++ multiplier ++ "
+outScale = out.algaLinCurve(
+\\lowMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\lowMax.ir(" ++ arrayOfOnes ++ "),
+\\highMin.ir(" ++ arrayOfMinusOnes ++ "),
+\\highMax.ir(" ++ arrayOfOnes ++ "),
+\\scaleCurve.ir(0)
+);
+out = " ++ scaling ++ "
+out = out * outMultiplier;
+env = " ++ env_pattern ++ "
+out = out * env;
+}, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);
 ";
 
 						result.interpret;
@@ -425,6 +444,7 @@ out;
 		algaMaxIO.do({ | i |
 			var fadein_kr, fadein_ar;
 			var fadeout_kr, fadeout_ar;
+			var fade_patternOut_kr, fade_patternOut_ar;
 
 			i = i + 1;
 
@@ -466,10 +486,35 @@ val[" ++ i ++ "] = EnvGen.ar(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \
 val;
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
 
+			fade_patternOut_kr = "AlgaSynthDef.new_inner_inner(\\alga_patternOut_audio" ++ i.asString ++ ", {
+var env = AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));
+var val = Array.newClear(" ++ (i + 1) ++ ");
+Out.kr(\\env_out.ir(0), env);
+" ++ i ++ ".do({ | i |
+val[i] = 0;
+});
+val[" ++ i ++ "] = env;
+val;
+}, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false, ignoreOutWarning:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+
+			fade_patternOut_ar = "AlgaSynthDef.new_inner_inner(\\alga_patternOut_audio" ++ i.asString ++ ", {
+var env = AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
+var val = Array.newClear(" ++ (i + 1) ++ ");
+var zero = DC.ar(0);
+Out.ar(\\env_out.ir(0), env);
+" ++ i ++ ".do({ | i |
+val[i] = zero;
+});
+val[" ++ i ++ "] = env;
+val;
+}, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false, ignoreOutWarning:true).algaStore(dir:AlgaStartup.algaSynthDefIOPath);";
+
 			fadein_kr.interpret;
 			fadein_ar.interpret;
 			fadeout_kr.interpret;
 			fadeout_ar.interpret;
+			fade_patternOut_kr.interpret;
+			fade_patternOut_ar.interpret;
 		});
 	}
 

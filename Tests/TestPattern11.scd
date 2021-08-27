@@ -1,17 +1,28 @@
 (
 Alga.boot({
 	AlgaSynthDef(\test, {
-		SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 0.5), doneAction:2)
+		SinOsc.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2)
 	}, sampleAccurate:true).add;
 
 	AlgaSynthDef(\test2, {
-		Saw.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 0.5), doneAction:2) * 0.5
+		Saw.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2) * 0.5
 	}, sampleAccurate:true).add;
+
+	SynthDef(\debug, {
+		\in.ar(0).poll
+	}).add;
+
+	AlgaSynthDef(\playOut, {
+		[\in.ar(0), DC.ar(1)]
+	}).add;
 
 	s.sync;
 
-	b = AN({ [(\in.ar * 3).tanh * 0.5, Silent.ar] });
-	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 10] });
+	b = AN({ [(\in.ar * 3).tanh * 0.5, Silent.ar] }).play;
+	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 10] }).play;
+
+	//b = AN({ [\in.ar, Silent.ar] }).play;
+	//c = AN({ [Silent.ar, \in.ar] }).play;
 
 	//d = AN({ Saw.ar(LFNoise0.kr(3).range(50, 300)) * 0.5 });
 	//b << d;
@@ -19,28 +30,25 @@ Alga.boot({
 
 	a = AlgaPattern((
 		def: \test,
-		dur: 0.5,
+		dur: 0.25,
 		freq: Pwhite([100, 220], [440, 880]),
 		out: Pseq([
 			AlgaOut(
 				node: b,
-				param: \in,
-				scale: Pseq([1, 2], inf),
-				chans: Pseq([1, 2], inf)
+				param: \in
 			),
+			b,
+			\none,
 			AlgaOut(
 				node: c,
-				param: \in,
-				scale: Pseq([1, 2], inf),
-				chans: Pseq([1, 2], inf)
+				param: \in
 			),
-			\none,
-			b
+			c
 		], inf)
 	));
 
-	//s.plotTree;
-	//s.scope;
+	s.plotTree;
+	s.scope;
 });
 )
 

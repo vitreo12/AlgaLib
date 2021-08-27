@@ -145,7 +145,7 @@ AlgaSynthDef : SynthDef {
 	}
 
 	*new_inner_inner { | name, func, rates, prependArgs, outsMapping,
-		sampleAccurate = false, variants, metadata, makeFadeEnv = true, makeOutDef = false |
+		sampleAccurate = false, variants, metadata, makeFadeEnv = true, makeOutDef = false, ignoreOutWarning = false |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var outerBuildSynthDef = UGen.buildSynthDef;
 
@@ -180,10 +180,12 @@ AlgaSynthDef : SynthDef {
 			});
 
 			//Check if user has explicit Outs, this is not permitted
-			buildSynthDef.children.do({ | ugen |
-				if(ugen.isKindOf(AbstractOut), {
-					"AlgaSynthDef: Out / OffsetOut cannot be explicitly set. They are declared internally.".error;
-					^nil;
+			if(ignoreOutWarning.not, {
+				buildSynthDef.children.do({ | ugen |
+					if(ugen.isKindOf(AbstractOut), {
+						"AlgaSynthDef: Out / OffsetOut cannot be explicitly set. They are declared internally.".error;
+						^nil;
+					});
 				});
 			});
 
