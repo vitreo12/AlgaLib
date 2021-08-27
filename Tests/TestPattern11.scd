@@ -10,8 +10,8 @@ Alga.boot({
 
 	s.sync;
 
-	b = AN({ [(\in.ar * 3).tanh * 0.5, Silent.ar] }).play;
-	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 10] }).play;
+	b = AN({ [(\in.ar * 3).tanh * 0.5, Silent.ar] });
+	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 10] });
 
 	//d = AN({ Saw.ar(LFNoise0.kr(3).range(50, 300)) * 0.5 });
 	//b << d;
@@ -34,7 +34,8 @@ Alga.boot({
 				scale: Pseq([1, 2], inf),
 				chans: Pseq([1, 2], inf)
 			),
-			\none
+			\none,
+			b
 		], inf)
 	));
 

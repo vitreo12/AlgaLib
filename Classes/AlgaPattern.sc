@@ -1805,7 +1805,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Parse a single \out event
-	parseOutAlgaOut { | value |
+	parseOutAlgaOut { | value, alreadyParsed |
 		var node = value.node;
 		var param = value.param;
 
@@ -1817,24 +1817,27 @@ AlgaPattern : AlgaNode {
 
 		case
 		{ node.isAlgaNode } {
-			if(node.isAlgaPattern, {
-				"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
-				^nil
-			});
+			if(alreadyParsed[node] == nil, {
+				if(node.isAlgaPattern, {
+					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
+					^nil
+				});
 
-			scheduler.addAction(
-				condition: { node.algaInstantiatedAsReceiver }, //controlNames must be defined
-				func: {
-					node.receivePatternOut(
-						algaPattern: this,
-						param: param
-					)
-				}
-			)
+				scheduler.addAction(
+					condition: { node.algaInstantiatedAsReceiver }, //controlNames must be defined
+					func: {
+						node.receivePatternOut(
+							algaPattern: this,
+							param: param
+						)
+					}
+				);
+				alreadyParsed[node] = true;
+			});
 		}
 		{ node.isListPattern } {
 			node.list.do({ | listEntry, i |
-				node.list[i] = this.parseOut(listEntry)
+				node.list[i] = this.parseOut(listEntry, alreadyParsed)
 			});
 		};
 
@@ -1842,30 +1845,35 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Parse the \out key
-	parseOut { | value |
+	parseOut { | value, alreadyParsed |
+		alreadyParsed = alreadyParsed ? IdentityDictionary();
+
 		case
 		{ value.isAlgaNode } {
-			if(value.isAlgaPattern, {
-				"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
-				^nil
+			if(alreadyParsed[value] == nil, {
+				if(value.isAlgaPattern, {
+					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
+					^nil
+				});
+				scheduler.addAction(
+					condition: { value.algaInstantiatedAsReceiver },
+					func: {
+						value.receivePatternOut(
+							algaPattern: this,
+							param: \in
+						);
+					}
+				);
+				alreadyParsed[value] = true;
+				^value
 			});
-			scheduler.addAction(
-				condition: { value.algaInstantiatedAsReceiver },
-				func: {
-					value.receivePatternOut(
-						algaPattern: this,
-						param: \in
-					);
-				}
-			);
-			^value
 		}
 		{ value.isAlgaOut } {
-			^this.parseOutAlgaOut(value);
+			^this.parseOutAlgaOut(value, alreadyParsed);
 		}
 		{ value.isListPattern } {
 			value.list.do({ | listEntry, i |
-				var result = this.parseOut(listEntry); //recursive, so it picks up other ListPatterns if needed
+				var result = this.parseOut(listEntry, alreadyParsed); //recursive, so it picks up other ListPatterns if needed
 				if(result == nil, { ^nil });
 				value.list[i] = result;
 			});
@@ -2101,7 +2109,7 @@ AlgaPattern : AlgaNode {
 
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);
-		patternAsStream = pattern.asStream; //Needed for \manual \dur
+		patternAsStream = pattern.asStream; //Needed for things like dur: \none
 
 		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
 		//createPattern function is non scheduled as it it better to create it right away.
@@ -2619,6 +2627,8 @@ AMP : AlgaMonoPattern {}
 				waitForInst:false
 			);
 			outEnvSynthsAtParam[algaSynthBus] = envSynth; //add entry for algaPattern
+
+			//Do I also need fadeIn??
 		}, {
 			//New connection (there already was one in place)
 
