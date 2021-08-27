@@ -43,8 +43,6 @@ Alga.boot({
 });
 )
 
-a.currentOut
-
 //With a new connection, what should happen? How to handle a fadeIn / fadeOut?
 a.from(AlgaOut(b, \in), \out, time:2, sched:1)
 

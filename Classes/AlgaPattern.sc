@@ -1947,84 +1947,8 @@ AlgaPattern : AlgaNode {
 		//from the one that's being created here.
 		var newInterpStreams = AlgaPatternInterpStreams(this);
 
-		//Loop over the Event input from the user
-		eventPairs.keysValuesDo({ | paramName, value |
-			//Add \def key as \instrument
-			if(paramName == \def, {
-				patternPairs = patternPairs.add(\instrument).add(value);
-			});
-
-			//Found \dur or \delta
-			if((paramName == \dur).or(paramName == \delta), {
-				if(value.class == Symbol, {
-					//Using a symbol (like, \manual) as \dur key
-					manualDur = true
-				}, {
-					foundDurOrDelta = true;
-					this.setDur(value, newInterpStreams);
-				});
-			});
-
-			//Add \fx key (parsing everything correctly)
-			if(paramName == \fx, {
-				parsedFX = this.parseFX(value);
-				if(parsedFX != nil, {
-					patternPairs = patternPairs.add(\fx).add(parsedFX);
-					foundFX = true;
-				});
-			});
-
-			//Add \out key
-			if(paramName == \out, {
-				parsedOut = this.parseOut(value);
-				if(parsedOut != nil, {
-					patternPairs = patternPairs.add(\algaOut).add(parsedOut); //can't use \out
-					foundOut = true;
-				});
-			});
-
-			//Add \lag and \offset / \timingOffset
-			if(paramName == \lag, { patternPairs = patternPairs.add(\lag).add(value) });
-			if((paramName == \offset).or(paramName == \timingOffset), {
-				patternPairs = patternPairs.add(\timingOffset).add(value)
-			});
-		});
-
-		//Store current FX for replaces
-		if(foundFX, { currentFX = parsedFX }, { parsedFX = nil; currentFX = nil });
-
-		//Store current out for replaces
-		if(foundOut, { currentOut = parsedOut }, { parsedOut = nil; currentOut = nil });
-
-		//If no dur and replace, get it from previous interpStreams
-		if(replace, {
-			if(foundDurOrDelta.not, {
-				if((interpStreams == nil).or(algaWasBeingCleared), {
-					this.setDur(1, newInterpStreams)
-				}, {
-					this.setDur(interpStreams.dur, newInterpStreams)
-				});
-			});
-
-			//No \fx from user, use currentFX if available
-			if(foundFX.not, {
-				if(currentFX != nil, {
-					patternPairs = patternPairs.add(\fx).add(currentFX);
-				});
-			});
-
-			//No \out from user, use currentOut if available
-			if(foundOut.not, {
-				if(currentOut != nil, {
-					patternPairs = patternPairs.add(\algaOut).add(currentOut);
-				});
-			});
-		}, {
-			//Else, default it to 1
-			if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
-		});
-
-		//Add all the default entries from SynthDef that the user hasn't set yet
+		//Loop over controlNames and retrieve which parameters the user has set explicitly.
+		//All other parameters will be dealt with later.
 		controlNames.do({ | controlName |
 			var paramName = controlName.name;
 			var paramValue = eventPairs[paramName]; //Retrieve it directly from eventPairs
@@ -2063,6 +1987,92 @@ AlgaPattern : AlgaNode {
 				sampleAndHold: false,
 				time: 0
 			);
+
+			//Remove param entry from eventPairs
+			eventPairs[paramName] = nil;
+		});
+
+		//Loop over all other input from the user, setting all entries that are not part of controlNames
+		eventPairs.keysValuesDo({ | paramName, value |
+			var isAlgaParam = false;
+
+			//Add \def key as \instrument
+			if(paramName == \def, {
+				patternPairs = patternPairs.add(\instrument).add(value);
+				isAlgaParam = true;
+			});
+
+			//Found \dur or \delta
+			if((paramName == \dur).or(paramName == \delta), {
+				if(value.class == Symbol, {
+					//Using a symbol (like, \manual) as \dur key
+					manualDur = true
+				}, {
+					foundDurOrDelta = true;
+					this.setDur(value, newInterpStreams);
+				});
+				isAlgaParam = true;
+			});
+
+			//Add \fx key (parsing everything correctly)
+			if(paramName == \fx, {
+				parsedFX = this.parseFX(value);
+				if(parsedFX != nil, {
+					patternPairs = patternPairs.add(\fx).add(parsedFX);
+					foundFX = true;
+				});
+				isAlgaParam = true;
+			});
+
+			//Add \out key
+			if(paramName == \out, {
+				parsedOut = this.parseOut(value);
+				if(parsedOut != nil, {
+					patternPairs = patternPairs.add(\algaOut).add(parsedOut); //can't use \out
+					foundOut = true;
+				});
+				isAlgaParam = true;
+			});
+
+			//All other entries that user wants to set and retrieve from within the pattern.
+			//This includes things like \lag and \timingOffset
+			if(isAlgaParam.not, {
+				patternPairs = patternPairs.add(paramName).add(value);
+			});
+		});
+
+		//Store current FX for replaces
+		if(foundFX, { currentFX = parsedFX }, { parsedFX = nil; currentFX = nil });
+
+		//Store current out for replaces
+		if(foundOut, { currentOut = parsedOut }, { parsedOut = nil; currentOut = nil });
+
+		//If no dur and replace, get it from previous interpStreams
+		if(replace, {
+			if(foundDurOrDelta.not, {
+				if((interpStreams == nil).or(algaWasBeingCleared), {
+					this.setDur(1, newInterpStreams)
+				}, {
+					this.setDur(interpStreams.dur, newInterpStreams)
+				});
+			});
+
+			//No \fx from user, use currentFX if available
+			if(foundFX.not, {
+				if(currentFX != nil, {
+					patternPairs = patternPairs.add(\fx).add(currentFX);
+				});
+			});
+
+			//No \out from user, use currentOut if available
+			if(foundOut.not, {
+				if(currentOut != nil, {
+					patternPairs = patternPairs.add(\algaOut).add(currentOut);
+				});
+			});
+		}, {
+			//Else, default it to 1
+			if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
 		});
 
 		//Set the correct synthBus in newInterpStreams!!!
@@ -2083,8 +2093,10 @@ AlgaPattern : AlgaNode {
 
 		//Manual or automatic dur management
 		if(manualDur.not, {
-			//Pfunc allows to modify the value
-			patternPairs = patternPairs.add(\dur).add(Pfuncn( { newInterpStreams.dur.next }, inf));
+			//Pfuncn allows to modify the value
+			patternPairs = patternPairs.add(\dur).add(
+				Pfuncn( { newInterpStreams.dur.next }, inf)
+			);
 		});
 
 		//Create the Pattern by calling .next from the streams
@@ -2198,9 +2210,24 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Interpolate out
+	//Interpolate out == replace
 	interpolateOut { | value, time, sched |
+		"AlgaPattern: changing the 'out' key. This will trigger 'replace'.".warn;
+		^this.replace(
+			def: (def: this.getSynthDef, out: value),
+			time: time,
+			sched: sched
+		);
+	}
 
+	//Interpolate a parameter that is not in controlNames (like \lag)
+	interpolateGenericParam { | sender, param, time, sched |
+		("AlgaPattern: changing the '" ++ param.asString ++ "' key. This will trigger 'replace'.").warn;
+		^this.replace(
+			def: (def: this.getSynthDef, (param): sender), //escape param with ()
+			time: time,
+			sched: sched
+		);
 	}
 
 	//ListPattern that contains Buffers
@@ -2303,7 +2330,7 @@ AlgaPattern : AlgaNode {
 	from { | sender, param = \in, chans, scale, sampleAndHold, time, sched |
 		//delta == dur
 		if(param == \delta, {
-			param = \dur
+			param = \dur;
 		});
 
 		//Special case, \dur
@@ -2328,7 +2355,12 @@ AlgaPattern : AlgaNode {
 
 		//Entry is a Buffer == replace
 		if(sender.isBuffer, {
-			^this.interpolateBuffer(sender, param, time, sched)
+			^this.interpolateBuffer(sender, param, time, sched);
+		});
+
+		//Param is not in controlNames. Probably setting another kind of parameter (like \lag)
+		if(controlNames[param] == nil, {
+			^this.interpolateGenericParam(sender, param, time, sched);
 		});
 
 		//Force Pattern / AlgaPatternArg / AlgaTemp dispatch
@@ -2614,18 +2646,20 @@ AMP : AlgaMonoPattern {}
 	//This must be triggered when replacing the sender AlgaPattern:
 	//Trigger the release of all active out: synths at specific param
 	removeAllPatternOuts { | algaPattern, param = \in, time |
+		/*
 		var outEnvSynth = outEnvSynths[param][algaPattern];
 		var outEnvBus   = outEnvBusses[param][algaPattern];
 
-		if(outEnvSynth != nil, { outEnvSynth.set(\fadeTime, time) });
-
-		outEnvSynth.onFree({
-			if(outEnvBus != nil, {
-				outEnvBus.free; //free bus when synth is done
-				outEnvBusses[param].removeAt(algaPattern);
+		if(outEnvSynth != nil, {
+			outEnvSynth.set(\t_release, 1, \fadeTime, time);
+			//free bus when synth is done
+			outEnvSynth.onFree({
+				if(outEnvBus != nil, { outEnvBus.free });
 			});
 			outEnvSynths[param].removeAt(algaPattern);
+			outEnvBusses[param].removeAt(algaPattern);
 		});
+		*/
 	}
 
 	//Triggered every patternSynth. algaSynthBus is only used as a "indexer"
