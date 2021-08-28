@@ -515,6 +515,15 @@ AlgaPattern : AlgaNode {
 	//Current \out
 	var <currentOut;
 
+	//Current nodes of used in currentOut
+	var <currentOutNodes;
+
+	//Current time used for \out replacement
+	var <currentOutTime;
+
+	//Needed needed to store reset for various alga params (\out, \fx, etc...)
+	var <currentReset;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -1484,6 +1493,9 @@ AlgaPattern : AlgaNode {
 		//Parse reset
 		this.parseResetOnReplace(reset);
 
+		//Also store reset as it's needed to reset algaParams (\out, \fx, etc...)
+		currentReset = reset;
+
 		//Create args dict
 		this.createDefArgs(args);
 
@@ -1822,17 +1834,8 @@ AlgaPattern : AlgaNode {
 					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
 					^nil
 				});
-
-				scheduler.addAction(
-					condition: { node.algaInstantiatedAsReceiver }, //controlNames must be defined
-					func: {
-						node.receivePatternOut(
-							algaPattern: this,
-							param: param
-						)
-					}
-				);
 				alreadyParsed[node] = true;
+				currentOutNodes.add([node, param]);
 			});
 		}
 		{ node.isListPattern } {
@@ -1855,16 +1858,8 @@ AlgaPattern : AlgaNode {
 					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
 					^nil
 				});
-				scheduler.addAction(
-					condition: { value.algaInstantiatedAsReceiver },
-					func: {
-						value.receivePatternOut(
-							algaPattern: this,
-							param: \in
-						);
-					}
-				);
 				alreadyParsed[value] = true;
+				currentOutNodes.add([value, \in]);
 			});
 			^value
 		}
@@ -1940,6 +1935,62 @@ AlgaPattern : AlgaNode {
 		^listPattern;
 	}
 
+	//Create out: receivers
+	createPatternOutReceivers { | prevOutNodes |
+		var time = currentOutTime ? 0;
+
+		//Fade out (also old synths)
+		if(prevOutNodes != nil, {
+			prevOutNodes.do({ | outNodeAndParam |
+				var outNode = outNodeAndParam[0];
+				var param = outNodeAndParam[1];
+				/*scheduler.addAction(
+					condition: { outNode.algaInstantiatedAsReceiver },
+					func: {*/
+						outNode.removePatternOutsAtParam(
+							algaPattern: this,
+							param: param,
+							time: time
+						)
+					//}
+				//);
+			});
+		});
+
+		//Fade in (also new synths)
+		if(currentOutNodes != nil, {
+			currentOutNodes.do({ | outNodeAndParam |
+				var outNode = outNodeAndParam[0];
+				var param = outNodeAndParam[1];
+				scheduler.addAction(
+					condition: { outNode.algaInstantiatedAsReceiver },
+					func: {
+						outNode.receivePatternOut(
+							algaPattern: this,
+							param: param,
+							time: time
+						)
+					}
+				);
+			});
+		});
+
+		//Reset currentOutTime
+		currentOutTime = 0;
+	}
+
+	//Reset specific algaParams (\out, \fx, etc...)
+	parseResetOnReplaceAlgaParams {
+		case
+		{ currentReset.isArray } {
+			^currentReset.as(IdentitySet);
+		}
+		{ currentReset == true } {
+			^[\fx, \out, \dur].as(IdentitySet);
+		};
+		^nil
+	}
+
 	//Build the actual pattern
 	createPattern { | replace = false, keepChannelsMapping = false, keepScale = false, sched |
 		var foundDurOrDelta = false;
@@ -1947,6 +1998,7 @@ AlgaPattern : AlgaNode {
 		var foundFX = false;
 		var parsedFX;
 		var parsedOut;
+		var prevOutNodes = currentOutNodes.copy;
 		var foundOut = false;
 		var patternPairs = Array.newClear;
 
@@ -2034,6 +2086,8 @@ AlgaPattern : AlgaNode {
 
 			//Add \out key
 			if(paramName == \out, {
+				//Reset currentOutNodes
+				currentOutNodes = IdentitySet();
 				parsedOut = this.parseOut(value);
 				if(parsedOut != nil, {
 					patternPairs = patternPairs.add(\algaOut).add(parsedOut); //can't use \out
@@ -2050,13 +2104,33 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Store current FX for replaces
-		if(foundFX, { currentFX = parsedFX }, { parsedFX = nil; currentFX = nil });
+		if(foundFX, { currentFX = parsedFX });
 
 		//Store current out for replaces
-		if(foundOut, { currentOut = parsedOut }, { parsedOut = nil; currentOut = nil });
+		if(foundOut, { currentOut = parsedOut });
 
 		//If no dur and replace, get it from previous interpStreams
 		if(replace, {
+			//Check reset
+			var resetSet = this.parseResetOnReplaceAlgaParams;
+			if(resetSet != nil, {
+				//reset \fx
+				if((foundFX.not).and(resetSet.findMatch(\fx) != nil), {
+					parsedFX = nil; currentFX = nil
+				});
+
+				//reset \out
+				if((foundOut.not).and(resetSet.findMatch(\out) != nil), {
+					parsedOut = nil; currentOut = nil; currentOutNodes = nil
+				});
+
+				//reset \dur
+				if((foundDurOrDelta.not).and(resetSet.findMatch(\dur) != nil), {
+					interpStreams = nil;
+				});
+			});
+
+			//Set dur according to previous one
 			if(foundDurOrDelta.not, {
 				if((interpStreams == nil).or(algaWasBeingCleared), {
 					this.setDur(1, newInterpStreams)
@@ -2111,12 +2185,15 @@ AlgaPattern : AlgaNode {
 		pattern = Pbind(*patternPairs);
 		patternAsStream = pattern.asStream; //Needed for things like dur: \none
 
+		//Determine if \out interpolation is required
+		this.createPatternOutReceivers(prevOutNodes);
+
 		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
 		//createPattern function is non scheduled as it it better to create it right away.
 		if(manualDur.not, {
 			scheduler.addAction(
 				func: {
-					newInterpStreams.playAlgaReschedulingEventStreamPlayer(pattern, this.clock)
+					newInterpStreams.playAlgaReschedulingEventStreamPlayer(pattern, this.clock);
 				},
 				sched: sched
 			);
@@ -2221,6 +2298,7 @@ AlgaPattern : AlgaNode {
 	//Interpolate out == replace
 	interpolateOut { | value, time, sched |
 		"AlgaPattern: changing the 'out' key. This will trigger 'replace'.".warn;
+		currentOutTime = time; //store time
 		^this.replace(
 			def: (def: this.getSynthDef, out: value),
 			time: time,
@@ -2570,6 +2648,7 @@ AMP : AlgaMonoPattern {}
 	receivePatternOut { | algaPattern, param = \in, time = 0 |
 		var controlNamesAtParam, paramRate, paramNumChannels;
 		var outEnvBussesAtParam, outEnvSynthsAtParam;
+		var outEnvBussesAtParamAlgaPattern, outEnvSynthsAtParamAlgaPattern;
 		var envBus, envSymbol, envSynth;
 		var interpBusAtParam, interpBus;
 		var isFirstConnection = false;
@@ -2616,6 +2695,22 @@ AMP : AlgaMonoPattern {}
 			outEnvSynthsAtParam = outEnvSynths[param]; //update pointer
 		});
 
+		//Check entries at algaPattern
+		outEnvBussesAtParamAlgaPattern = outEnvBussesAtParam[algaPattern];
+		outEnvSynthsAtParamAlgaPattern = outEnvSynthsAtParam[algaPattern];
+
+		//Create dict at param
+		if(outEnvBussesAtParamAlgaPattern == nil, {
+			outEnvBussesAtParam[algaPattern] = IdentityDictionary();
+			outEnvBussesAtParamAlgaPattern = outEnvBussesAtParam[algaPattern]; //update pointer
+		});
+
+		//Create dict at param
+		if(outEnvSynthsAtParamAlgaPattern == nil, {
+			outEnvSynthsAtParam[algaPattern] = IdentityDictionary();
+			outEnvSynthsAtParamAlgaPattern = outEnvSynthsAtParam[algaPattern]; //update pointer
+		});
+
 		//Get controlNames
 		controlNamesAtParam = controlNames[param];
 		if(controlNamesAtParam == nil, { ^this });
@@ -2624,14 +2719,14 @@ AMP : AlgaMonoPattern {}
 		paramNumChannels = controlNamesAtParam.numChannels;
 		paramRate = controlNamesAtParam.rate;
 
-		//Check if first connection from algaPattern
-		isFirstConnection = outEnvBussesAtParam[algaSynthBus] == nil;
+		//Check if first connection with the specific algaSynthBus
+		isFirstConnection = outEnvSynthsAtParamAlgaPattern[algaSynthBus] == nil;
 
 		//First connection
 		if(isFirstConnection, {
 			//envBus... When is this freed?
 			envBus = AlgaBus(server, 1, paramRate);
-			outEnvBussesAtParam[algaSynthBus] = envBus; //add entry for algaPattern
+			outEnvBussesAtParamAlgaPattern[algaSynthBus] = envBus; //add entry for algaSynthBus
 
 			//envSymbol
 			envSymbol = (
@@ -2640,31 +2735,20 @@ AMP : AlgaMonoPattern {}
 				paramNumChannels
 			).asSymbol;
 
+			time.asString.error;
+
 			//envSynth:
 			//This outputs both to interp bus in the form of [0, 0, 0, ..., env]
 			//and both to envBus. envBus is then used as multiplier for the tempSynths later on.
+			//The output to interpBus is fundamental in order for the envelope to be constant, and not
+			//jittery across different triggering of synths (especially if overlapping)
 			envSynth = AlgaSynth(
 				envSymbol,
 				[ \out, interpBus.index, \env_out, envBus.index, \fadeTime, time ],
 				interpGroup,
 				waitForInst:false
 			);
-			outEnvSynthsAtParam[algaSynthBus] = envSynth; //add entry for algaSynthBus
-		}, {
-			//New connection (there already was one in place)
-
-			// 1) trigger \t_release on ALL previous envSynths with correct \fadeTime:time
-			outEnvSynthsAtParam.keysValuesDo({ | prevAlgaSynthBus, prevOutEnvSynth |
-				var prevOutEnvBus = outEnvBussesAtParam[prevAlgaSynthBus];
-				prevOutEnvSynth.set(\t_release, 1, \fadeTime, time);
-				outEnvSynthsAtParam.removeAt(prevAlgaSynthBus);
-				if(prevOutEnvBus != nil, {
-					prevOutEnvSynth.onFree({ prevOutEnvBus.free });
-					outEnvBussesAtParam.removeAt(prevAlgaSynthBus);
-				});
-			});
-
-			// 2) create a new env
+			outEnvSynthsAtParamAlgaPattern[algaSynthBus] = envSynth; //add entry for algaSynthBus
 		});
 
 		//Update inNodes (mix == true)
@@ -2674,23 +2758,28 @@ AMP : AlgaMonoPattern {}
 		AlgaBlocksDict.createNewBlockIfNeeded(this, algaPattern)
 	}
 
-	//This must be triggered when replacing the sender AlgaPattern:
-	//Trigger the release of all active out: synths at specific param
-	removeAllPatternOuts { | algaPattern, param = \in, time |
-		/*
-		var outEnvSynth = outEnvSynths[param][algaPattern];
-		var outEnvBus   = outEnvBusses[param][algaPattern];
+	//Trigger the release of all active out: synths at specific param for a specific algaPattern.
+	//This is called everytime a connection is removed
+	removePatternOutsAtParam { | algaPattern, param = \in, time |
+		var outEnvSynthsAtParamAlgaPattern = outEnvSynths[param][algaPattern];
+		var outEnvBussesAtParamAlgaPattern = outEnvBusses[param][algaPattern];
 
-		if(outEnvSynth != nil, {
-			outEnvSynth.set(\t_release, 1, \fadeTime, time);
-			//free bus when synth is done
-			outEnvSynth.onFree({
-				if(outEnvBus != nil, { outEnvBus.free });
+		if(outEnvSynthsAtParamAlgaPattern != nil, {
+			outEnvSynthsAtParamAlgaPattern.keysValuesDo({ | algaSynthBus, outEnvSynth |
+				var outEnvBus = outEnvBussesAtParamAlgaPattern[algaSynthBus];
+				//Free bus and entries when synth is done,
+				//as it's still used while fade-out interpolation is happening
+				outEnvSynth.set(\t_release, 1, \fadeTime, time);
+				outEnvSynth.onFree({
+					//if(outEnvBus != nil, { outEnvBus.free });
+					//outEnvSynths[param][algaPattern].removeAt(algaSynthBus);
+					//outEnvBusses[param][algaPattern].removeAt(algaSynthBus);
+				});
 			});
-			outEnvSynths[param].removeAt(algaPattern);
-			outEnvBusses[param].removeAt(algaPattern);
 		});
-		*/
+
+		//Update inNodes
+		this.removeInOutNodeAtParam(algaPattern, param);
 	}
 
 	//Triggered every patternSynth. algaSynthBus is only used as a "indexer"
@@ -2704,7 +2793,7 @@ AMP : AlgaMonoPattern {}
 		var tempSynthArgs, tempSynth;
 
 		//Retrieve envBus from outEnvBusses
-		envBus = outEnvBusses[param][algaSynthBus];
+		envBus = outEnvBusses[param][algaPattern][algaSynthBus];
 		if(envBus == nil, { ("AlgaNode: invalid envBus at param '" ++ param ++ "'").error; ^this });
 
 		//Get controlNames

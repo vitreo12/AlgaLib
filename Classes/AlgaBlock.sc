@@ -81,7 +81,7 @@ AlgaBlock {
 
 		//Remove this block from AlgaBlocksDict if it's empty!
 		if(nodesDict.size == 0, {
-			("Deleting empty block: " ++ blockIndex).warn;
+			//("Deleting empty block: " ++ blockIndex).warn;
 			AlgaBlocksDict.blocksDict.removeAt(nodeBlockIndex);
 		});
 	}
@@ -162,7 +162,7 @@ AlgaBlock {
 
 				//Remove node from block
 				if(result.not, {
-					("Removing node at group " ++ node.group ++ " from block number " ++ blockIndex).warn;
+					//("Removing node at group " ++ node.group ++ " from block number " ++ blockIndex).warn;
 					this.removeNode(node);
 				});
 
