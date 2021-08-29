@@ -100,9 +100,10 @@ AlgaNode {
 	//Keep track of the "chans" arg for play so it's kept across .replaces
 	var <playChans;
 
-	//Needed to receive out: from an AlgaPattern. They store the envelope.
-	var <outEnvSynths;
-	var <outEnvBusses;
+	//Needed to receive out: from an AlgaPattern.
+	var <patternOutNodes;
+	var <patternOutEnvSynths;
+	var <patternOutEnvBusses;
 
 	//General state queries
 	var <isPlaying = false;
@@ -1425,6 +1426,13 @@ AlgaNode {
 				//default interpBus
 				var interpBus = interpBusses[paramName][\default];
 
+				//use paramDefault: no replace or no senders in sendersSet
+				var interpSynth = AlgaSynth(
+					interpSymbol,
+					[\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
+					interpGroup
+				);
+
 				//Instantiated right away, with no \fadeTime, as it will directly be connected to
 				//synth's parameter. Synth will read its params from all the normBusses
 				var normSynth = AlgaSynth(
@@ -1432,13 +1440,6 @@ AlgaNode {
 					[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
 					normGroup,
 					waitForInst:false
-				);
-
-				//use paramDefault: no replace or no senders in sendersSet
-				var interpSynth = AlgaSynth(
-					interpSymbol,
-					[\in, paramDefault, \out, interpBus.index, \fadeTime, 0],
-					interpGroup
 				);
 
 				interpSynths[paramName][\default] = interpSynth;
@@ -2563,7 +2564,7 @@ AlgaNode {
 		//When the new synths/busses are surely algaInstantiated on the server!
 		//The cheap solution that it's in place now is to wait 1.0 longer than longestConnectionTime.
 		//Work out a better solution now that AlgaScheduler is well tested!
-		this.freeAllSynths(false, false);
+		this.freeAllSynths(false, false, time);
 		this.freeAllBusses;
 
 		//Reset dict entries

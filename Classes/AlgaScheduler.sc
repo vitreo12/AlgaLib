@@ -457,7 +457,7 @@ AlgaScheduler : AlgaThread {
 		if(currentExecAction != nil, {
 			if(verbose, {
 				("AlgaScheduler: adding function:" + func.def.context.asString +
-					"as child of function:" + currentExecAction[1].def.context.asString).warn;
+					"as child of function:" + currentExecAction[1].def.context.asString).postcln;
 			});
 
 			//Add action after currentExecAction (with correct offset)

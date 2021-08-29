@@ -29,7 +29,7 @@ AlgaBlock {
 	var <runningIndex;
 
 	//bottom most and top most nodes in this block
-	var <bottomOutNodes, <topInNodes;
+	var <bottomOutNodes; //, <topInNodes;
 
 	//the index for this block in the AlgaBlocksDict global dict
 	var <blockIndex;
@@ -45,7 +45,7 @@ AlgaBlock {
 		nodesDict      = IdentityDictionary(20);
 		statesDict     = IdentityDictionary(20);
 		bottomOutNodes = IdentityDictionary();
-		topInNodes     = IdentityDictionary();
+		//topInNodes     = IdentityDictionary();
 	}
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
@@ -134,7 +134,11 @@ AlgaBlock {
 			if(item == nil, {
 				removeCondition = true;
 			}, {
-				removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0);
+				if(item.patternOutNodes != nil, {
+					removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0);
+				}, {
+					removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0).and(item.patternOutNodes == 0);
+				});
 			});
 
 			//removeCondition.postln;
@@ -195,9 +199,18 @@ AlgaBlock {
 				//it's also essential for this to be before the next loop
 				statesDict[node] = true;
 
+				//rearrange inputs to this, this will add the inNodes
 				node.inNodes.nodesLoop ({ | inNode |
-					//rearrangeInputs to this, this will add the inNodes
+					"OHHH".error;
 					this.rearrangeBlockLoop(inNode);
+				});
+
+				//rearrange inputs to this, this will add the patternOutNodes
+				if(node.patternOutNodes != nil, {
+					node.patternOutNodes.nodesLoop ({ | inNode |
+						"PATTTT".error;
+						this.rearrangeBlockLoop(inNode);
+					});
 				});
 
 				//Add this
@@ -222,8 +235,14 @@ AlgaBlock {
 		}, {
 			nodesDict.do({ | node |
 				//Find the ones with no outNodes but at least one inNode
-				if((node.outNodes.size == 0).and(node.inNodes.size > 0), {
-					bottomOutNodes.put(node, node);
+				if(node.patternOutNodes != nil, {
+					if((node.outNodes.size == 0).and(node.inNodes.size > 0), {
+						bottomOutNodes.put(node, node);
+					});
+				}, {
+					if((node.outNodes.size == 0).and(node.inNodes.size > 0).and(node.patternOutNodes.size > 0), {
+						bottomOutNodes.put(node, node);
+					});
 				});
 
 				//init statesDict for all nodes to false
