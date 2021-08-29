@@ -104,6 +104,7 @@ AlgaNode {
 	var <patternOutNodes;
 	var <patternOutEnvSynths;
 	var <patternOutEnvBusses;
+	var <patternOutEnvBussesToBeFreed;
 
 	//General state queries
 	var <isPlaying = false;

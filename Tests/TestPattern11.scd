@@ -15,7 +15,7 @@ Alga.boot({
 	s.sync;
 
 	b = AN({ [(\in.ar * 3).tanh * 0.5, Silent.ar] }).play;
-	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar.poll(3), 0.8) * 10] }).play;
+	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 10] }).play;
 
 	d = AN({ Saw.ar(LFNoise0.kr(3).range(50, 300)) * 0.01 });
 	//b << d;
@@ -45,10 +45,10 @@ Alga.boot({
 });
 )
 
-//With a new connection, what should happen? How to handle a fadeIn / fadeOut?
+//With a new connection?
 a.from(AlgaOut(c, \in), \out, time:2, sched:1)
 
-//When replacing, what should happen? How to handle a fadeIn / fadeOut?
+//When replacing?
 a.replace(\test2, time:3, sched:1)
 
 //When replacing and resetting?
@@ -57,5 +57,5 @@ a.replace(\test, time:3, sched:1, reset:true)
 //Go back
 a.from(b, \out, time:2, sched:1)
 
-//When replacing one of the receivers?
-b.replace({ (\in.ar * 3).clip * 0.5 }, time:2, sched:1);
+//When replacing the receiver?
+b.replace({ (\in.ar * 3).clip * 0.5 }, time:2, sched:1)

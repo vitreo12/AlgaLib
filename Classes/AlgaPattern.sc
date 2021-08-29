@@ -2675,9 +2675,10 @@ AMP : AlgaMonoPattern {}
 		interpBusAtParam = interpBusses[param];
 		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
 
-		//Try to get sender one.
-		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
-		interpBus = interpBusAtParam[algaPattern];
+		//ALWAYS use the \default interpBus, which is connected to the \default normSynth.
+		//Use the algaSynthBus as index, so that it can safely be removed in remove removePatternOutsAtParam.
+		//Using algaPattern as index would not work on .replaces (it would remove it mid-replacement)
+		interpBus = interpBusAtParam[algaSynthBus];
 		if(interpBus == nil, {
 			interpBus = interpBusAtParam[\default];
 			if(interpBus == nil, {
@@ -2687,7 +2688,7 @@ AMP : AlgaMonoPattern {}
 				).error;
 				^this
 			});
-			interpBusAtParam[algaPattern] = interpBus;
+			interpBusAtParam[algaSynthBus] = interpBus;
 		});
 
 		//Check if patternOutEnvBusses needs to be init
@@ -2741,7 +2742,7 @@ AMP : AlgaMonoPattern {}
 
 		//First connection
 		if(isFirstConnection, {
-			//envBus... When is this freed?
+			//envBus
 			envBus = AlgaBus(server, 1, paramRate);
 			patternOutEnvBussesAtParamAlgaPattern[algaSynthBus] = envBus; //add entry for algaSynthBus
 
@@ -2783,16 +2784,22 @@ AMP : AlgaMonoPattern {}
 		if(patternOutEnvSynthsAtParamAlgaPattern != nil, {
 			patternOutEnvSynthsAtParamAlgaPattern.keysValuesDo({ | algaSynthBus, patternOutEnvSynth |
 				var patternOutEnvBus = patternOutEnvBussesAtParamAlgaPattern[algaSynthBus];
-				//Free bus and entries when synth is done,
-				//as it's still used while fade-out interpolation is happening
+				//Free bus and entries when synth is done.
+				//It's still used while fade-out interpolation is happening
 				patternOutEnvSynth.set(\t_release, 1, \fadeTime, time);
 				patternOutEnvSynth.onFree({
-					//if(patternOutEnvBus != nil, { patternOutEnvBus.free });
+					//Add the patternOutEnvBus to patternOutEnvBussesToBeFreed.
+					//It must be a Dictionary cause of the Array key: needs to be checked by value...
+					//This simply frees time of creating multiple IdentityDictionaries instead
+					if(patternOutEnvBussesToBeFreed == nil, { patternOutEnvBussesToBeFreed = Dictionary() });
+					patternOutEnvBussesToBeFreed[[param, algaPattern, algaSynthBus]] = patternOutEnvBus;
+
+					//Remove entries from patternOutEnvSynths and patternOutEnvBusses
 					patternOutEnvSynths[param][algaPattern].removeAt(algaSynthBus);
 					patternOutEnvBusses[param][algaPattern].removeAt(algaSynthBus);
 
-					//Remove interpBusAtParam for algaPattern, but don't free it! It's still used as \default
-					if(interpBusAtParamAtAlgaPattern != nil, { interpBusses[param].removeAt(algaPattern) });
+					//Remove interpBusAtParam for algaSynthBus but don't free it: it's still used as \default
+					if(interpBusAtParamAtAlgaPattern != nil, { interpBusses[param].removeAt(algaSynthBus) });
 				});
 			});
 		});
@@ -2846,20 +2853,9 @@ AMP : AlgaMonoPattern {}
 		interpBusAtParam = interpBusses[param];
 		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
 
-		//Try to get sender one.
-		//If not there, get the default one (and assign it to sender for both interpBus and normSynth at param)
-		interpBus = interpBusAtParam[algaPattern];
-		if(interpBus == nil, {
-			interpBus = interpBusAtParam[\default];
-			if(interpBus == nil, {
-				(
-					"AlgaNode: invalid interp bus at param '" ++
-					param ++ "' and node " ++ algaPattern.asString
-				).error;
-				^this
-			});
-			interpBusAtParam[algaPattern] = interpBus;
-		});
+		//Get the interpBus: it was declared in receivePatternOut
+		interpBus = interpBusAtParam[algaSynthBus];
+		if(interpBus == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
 
 		//Symbol. Don't use the fx version as \env is needed
 		tempSynthSymbol = (
@@ -2897,5 +2893,17 @@ AMP : AlgaMonoPattern {}
 
 		//Add Synth to patternBussesAndSynths
 		patternBussesAndSynths.add(tempSynth);
+
+		//Free dangling patternEnvBusses related to this [param, algaPattern, algaSynthBus] combo
+		tempSynth.onFree({
+			if(patternOutEnvBussesToBeFreed != nil, {
+				var patternEnvBusAtAlgaSynthBus = patternOutEnvBussesToBeFreed[[param, algaPattern, algaSynthBus]];
+				if(patternEnvBusAtAlgaSynthBus != nil, {
+					patternEnvBusAtAlgaSynthBus.free;
+					patternOutEnvBussesToBeFreed.removeAt([param, algaPattern, algaSynthBus]);
+				});
+				if(patternOutEnvBussesToBeFreed.size == 0, { patternOutEnvBussesToBeFreed = nil });
+			});
+		});
 	}
 }
