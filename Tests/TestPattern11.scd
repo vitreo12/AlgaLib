@@ -58,4 +58,4 @@ a.replace(\test, time:3, sched:1, reset:true)
 a.from(b, \out, time:2, sched:1)
 
 //When replacing the receiver?
-b.replace({ (\in.ar * 3).clip * 0.5 }, time:2, sched:1)
+b.replace({ (\in.ar * 3).clip * 0.5 }, time:3, sched:1)

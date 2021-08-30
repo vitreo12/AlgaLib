@@ -201,14 +201,12 @@ AlgaBlock {
 
 				//rearrange inputs to this, this will add the inNodes
 				node.inNodes.nodesLoop ({ | inNode |
-					"OHHH".error;
 					this.rearrangeBlockLoop(inNode);
 				});
 
 				//rearrange inputs to this, this will add the patternOutNodes
 				if(node.patternOutNodes != nil, {
 					node.patternOutNodes.nodesLoop ({ | inNode |
-						"PATTTT".error;
 						this.rearrangeBlockLoop(inNode);
 					});
 				});

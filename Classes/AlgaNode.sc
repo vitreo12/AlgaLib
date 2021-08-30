@@ -197,9 +197,7 @@ AlgaNode {
 		connectionTimeOutNodes = IdentityDictionary(10);
 
 		//AlgaPattern specific
-		if(this.isAlgaPattern, {
-			this.temporaryParamSynths = IdentitySet(10);
-		});
+		if(this.isAlgaPattern, { this.temporaryParamSynths = IdentitySet(10) });
 
 		^true;
 	}
