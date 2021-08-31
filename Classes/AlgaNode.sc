@@ -2516,8 +2516,30 @@ AlgaNode {
 				});
 			});
 		});
+
+		//Re-create previous out: connections with patterns
+		if(patternOutNodes != nil, {
+			patternOutNodes.keysValuesDo({ | param, patternOutNodesAtParam |
+				patternOutNodesAtParam.do({ | algaPattern |
+					this.receivePatternOutNode(algaPattern, param, time);
+				});
+			});
+		});
 	}
 
+	//Free previous out: connections from patterns
+	freeAllPatternOutConnections { | time |
+		time.asString.warn;
+		if(patternOutNodes != nil, {
+			patternOutNodes.keysValuesDo({ | param, patternOutNodesAtParam |
+				patternOutNodesAtParam.do({ | algaPattern |
+					this.removePatternOutNode(algaPattern, param, time);
+				});
+			});
+		});
+	}
+
+	//Replace implementation
 	replaceInner { | def, args, time, outsMapping, reset, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
@@ -2558,19 +2580,23 @@ AlgaNode {
 			wasPlaying = true;
 		});
 
+		//Free all previous out: connections from patterns
+		this.freeAllPatternOutConnections(time);
+
 		//This doesn't work with feedbacks, as synths would be freed slightly before
 		//The new ones finish the rise, generating click. These should be freed
 		//When the new synths/busses are surely algaInstantiated on the server!
 		//The cheap solution that it's in place now is to wait 1.0 longer than longestConnectionTime.
 		//Work out a better solution now that AlgaScheduler is well tested!
 		this.freeAllSynths(false, false, time);
+
+		//Free all previous busses
 		this.freeAllBusses;
 
 		//Reset dict entries
 		this.resetInterpNormDicts;
 
-		//New one
-		//Just pass the entry, not the whole thing
+		//New node
 		this.dispatchNode(
 			def:def,
 			args:args,
@@ -2671,7 +2697,6 @@ AlgaNode {
 
 			//If length is now 2, it means it's just one mixer AND the \default node left in the dicts.
 			//Assign the node to \default and remove the previous mixer.
-			//Should I retrieve inNodes.size == 1 instead?
 			if(interpSynthsAtParam.size == 2, {
 				interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam |
 					if(interpSender != \default, {

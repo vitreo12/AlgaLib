@@ -323,7 +323,7 @@ AlgaPatternInterpStreams {
 		//Add sampleAndHold
 		this.addSampleAndHold(paramName, sampleAndHold);
 
-		//Remove all older inNodes / outNodes... if not mix, in theory.
+		//Remove all older inNodes / outNodes... Doesn't work with mix yet
 		this.removeAllInOutNodesDictAtParam(paramName);
 
 		//Add proper inNodes / outNodes / connectionTimeOutNodes. Use entryOriginal in order
@@ -516,10 +516,10 @@ AlgaPattern : AlgaNode {
 	var <currentOut;
 
 	//Current nodes of used in currentOut
-	var <currentOutNodes;
+	var <currentPatternOutNodes;
 
 	//Current time used for \out replacement
-	var <currentOutTime;
+	var <currentPatternOutTime;
 
 	//Needed needed to store reset for various alga params (\out, \fx, etc...)
 	var <currentReset;
@@ -1835,7 +1835,7 @@ AlgaPattern : AlgaNode {
 					^nil
 				});
 				alreadyParsed[node] = true;
-				currentOutNodes.add([node, param]);
+				currentPatternOutNodes.add([node, param]);
 			});
 		}
 		{ node.isListPattern } {
@@ -1859,7 +1859,7 @@ AlgaPattern : AlgaNode {
 					^nil
 				});
 				alreadyParsed[value] = true;
-				currentOutNodes.add([value, \in]);
+				currentPatternOutNodes.add([value, \in]);
 			});
 			^value
 		}
@@ -1936,12 +1936,12 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create out: receivers
-	createPatternOutReceivers { | prevOutNodes |
-		var time = currentOutTime ? 0;
+	createPatternOutReceivers { | prevPatternOutNodes |
+		var time = currentPatternOutTime ? 0;
 
 		//Fade out (also old synths)
-		if(prevOutNodes != nil, {
-			prevOutNodes.do({ | outNodeAndParam |
+		if(prevPatternOutNodes != nil, {
+			prevPatternOutNodes.do({ | outNodeAndParam |
 				var outNode = outNodeAndParam[0];
 				var param = outNodeAndParam[1];
 				scheduler.addAction(
@@ -1958,14 +1958,14 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Fade in (also new synths)
-		if(currentOutNodes != nil, {
-			currentOutNodes.do({ | outNodeAndParam |
+		if(currentPatternOutNodes != nil, {
+			currentPatternOutNodes.do({ | outNodeAndParam |
 				var outNode = outNodeAndParam[0];
 				var param = outNodeAndParam[1];
 				scheduler.addAction(
 					condition: { outNode.algaInstantiatedAsReceiver },
 					func: {
-						outNode.receivePatternOut(
+						outNode.receivePatternOutNode(
 							algaPattern: this,
 							param: param,
 							time: time
@@ -1975,8 +1975,8 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
-		//Reset currentOutTime
-		currentOutTime = 0;
+		//Reset currentPatternOutTime
+		currentPatternOutTime = 0;
 	}
 
 	//Reset specific algaParams (\out, \fx, etc...)
@@ -1998,7 +1998,7 @@ AlgaPattern : AlgaNode {
 		var foundFX = false;
 		var parsedFX;
 		var parsedOut;
-		var prevOutNodes = currentOutNodes.copy;
+		var prevPatternOutNodes = currentPatternOutNodes.copy;
 		var foundOut = false;
 		var patternPairs = Array.newClear;
 
@@ -2086,8 +2086,8 @@ AlgaPattern : AlgaNode {
 
 			//Add \out key
 			if(paramName == \out, {
-				//Reset currentOutNodes
-				currentOutNodes = IdentitySet();
+				//Reset currentPatternOutNodes
+				currentPatternOutNodes = IdentitySet();
 				parsedOut = this.parseOut(value);
 				if(parsedOut != nil, {
 					patternPairs = patternPairs.add(\algaOut).add(parsedOut); //can't use \out
@@ -2121,7 +2121,7 @@ AlgaPattern : AlgaNode {
 
 				//reset \out
 				if((foundOut.not).and(resetSet.findMatch(\out) != nil), {
-					parsedOut = nil; currentOut = nil; currentOutNodes = nil
+					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil
 				});
 
 				//reset \dur
@@ -2186,7 +2186,7 @@ AlgaPattern : AlgaNode {
 		patternAsStream = pattern.asStream; //Needed for things like dur: \none
 
 		//Determine if \out interpolation is required
-		this.createPatternOutReceivers(prevOutNodes);
+		this.createPatternOutReceivers(prevPatternOutNodes);
 
 		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
 		//createPattern function is non scheduled as it it better to create it right away.
@@ -2512,7 +2512,7 @@ AlgaPattern : AlgaNode {
 
 	//Used when replacing. Free synths and stop the current running pattern
 	stopPattern { | now = true, time |
-		currentOutTime = time; //store time for \out
+		currentPatternOutTime = time; //store time for \out
 		if(interpStreams != nil, {
 			if(now, {
 				interpStreams.algaReschedulingEventStreamPlayer.stop;
@@ -2662,7 +2662,7 @@ AMP : AlgaMonoPattern {}
 	}
 
 	//Triggered when the connection is made
-	receivePatternOut { | algaPattern, param = \in, time = 0 |
+	receivePatternOutNode { | algaPattern, param = \in, time = 0 |
 		var controlNamesAtParam, paramRate, paramNumChannels;
 		var patternOutEnvBussesAtParam, patternOutEnvSynthsAtParam;
 		var patternOutEnvBussesAtParamAlgaPattern, patternOutEnvSynthsAtParamAlgaPattern;
@@ -2678,17 +2678,13 @@ AMP : AlgaMonoPattern {}
 		//ALWAYS use the \default interpBus, which is connected to the \default normSynth.
 		//Use the algaSynthBus as index, so that it can safely be removed in remove removePatternOutsAtParam.
 		//Using algaPattern as index would not work on .replaces (it would remove it mid-replacement)
-		interpBus = interpBusAtParam[algaSynthBus];
+		interpBus = interpBusAtParam[\default];
 		if(interpBus == nil, {
-			interpBus = interpBusAtParam[\default];
-			if(interpBus == nil, {
-				(
-					"AlgaNode: invalid interp bus at param '" ++
-					param ++ "' and node " ++ algaPattern.asString
-				).error;
-				^this
-			});
-			interpBusAtParam[algaSynthBus] = interpBus;
+			(
+				"AlgaNode: invalid interp bus at param '" ++
+				param ++ "' and node " ++ algaPattern.asString
+			).error;
+			^this
 		});
 
 		//Check if patternOutEnvBusses needs to be init
@@ -2820,7 +2816,7 @@ AMP : AlgaMonoPattern {}
 
 		//Retrieve envBus from patternOutEnvBusses
 		envBus = patternOutEnvBusses[param][algaPattern][algaSynthBus];
-		if(envBus == nil, { ("AlgaNode: invalid envBus at param '" ++ param ++ "'").error; ^this });
+		if(envBus == nil, { /*("AlgaNode: invalid envBus at param '" ++ param ++ "'").error;*/ ^this });
 
 		//Get controlNames
 		controlNamesAtParam = controlNames[param];
@@ -2853,8 +2849,8 @@ AMP : AlgaMonoPattern {}
 		interpBusAtParam = interpBusses[param];
 		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
 
-		//Get the interpBus: it was declared in receivePatternOut
-		interpBus = interpBusAtParam[algaSynthBus];
+		//Get the interpBus (always \default, as it's the one connected to \default normSynth)
+		interpBus = interpBusAtParam[\default];
 		if(interpBus == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
 
 		//Symbol. Don't use the fx version as \env is needed

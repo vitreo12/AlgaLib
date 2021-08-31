@@ -18,7 +18,7 @@ Alga.boot({
 	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 10] }).play;
 
 	d = AN({ Saw.ar(LFNoise0.kr(3).range(50, 300)) * 0.01 });
-	//b << d;
+	b << d;
 	c << d;
 
 	a = AlgaPattern((
@@ -44,6 +44,12 @@ Alga.boot({
 	//s.scope;
 });
 )
+
+b.replace({ ((\in.ar * MouseX.kr(1, 12)).clip - 1) * 0.5 }, time:3, sched:0)
+
+
+
+
 
 //With a new connection?
 a.from(AlgaOut(c, \in), \out, time:2, sched:1)
