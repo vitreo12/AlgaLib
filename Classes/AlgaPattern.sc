@@ -1200,7 +1200,7 @@ AlgaPattern : AlgaNode {
 		case
 		{ algaOut.isAlgaNode } {
 			//Only if instantiated (or it will click)
-			if(algaOut.algaInstantiatedAsReceiver, {
+			if(algaOut.algaInstantiatedAsReceiver(\in, this, true), {
 				algaOut.receivePatternOutTempSynth(
 					algaPattern: this,
 					algaSynthBus: algaSynthBus,
@@ -1219,7 +1219,7 @@ AlgaPattern : AlgaNode {
 
 			if(node.isAlgaNode, {
 				//Only if instantiated (or it will click)
-				if(node.algaInstantiatedAsReceiver, {
+				if(node.algaInstantiatedAsReceiver(param, this, true), {
 					node.receivePatternOutTempSynth(
 						algaPattern: this,
 						algaSynthBus: algaSynthBus,
@@ -1945,12 +1945,13 @@ AlgaPattern : AlgaNode {
 				var outNode = outNodeAndParam[0];
 				var param = outNodeAndParam[1];
 				scheduler.addAction(
-					condition: { outNode.algaInstantiatedAsReceiver },
+					condition: { outNode.algaInstantiatedAsReceiver(param, this, true) },
 					func: {
 						outNode.removePatternOutsAtParam(
 							algaPattern: this,
 							param: param,
-							time: time
+							removePatternOutNodeFromDict: true,
+							time: time,
 						)
 					}
 				);
@@ -1963,9 +1964,9 @@ AlgaPattern : AlgaNode {
 				var outNode = outNodeAndParam[0];
 				var param = outNodeAndParam[1];
 				scheduler.addAction(
-					condition: { outNode.algaInstantiatedAsReceiver },
+					condition: { outNode.algaInstantiatedAsReceiver(param, this, true) },
 					func: {
-						outNode.receivePatternOutNode(
+						outNode.receivePatternOutsAtParam(
 							algaPattern: this,
 							param: param,
 							time: time
@@ -2506,7 +2507,6 @@ AlgaPattern : AlgaNode {
 
 	//Called from replaceInner. freeInterpNormSynths is not used for AlgaPatterns
 	freeAllSynths { | useConnectionTime = true, now = true, time |
-		time.asString.warn;
 		this.stopPattern(now, time);
 	}
 
@@ -2645,14 +2645,14 @@ AMP : AlgaMonoPattern {}
 
 //Extension to support out: from AlgaPattern
 +AlgaNode {
-	//Add a node to patternOutNodes (used in AlgaBlock)
+	//Add a node to patternOutNodes
 	addPatternOutNode { | algaPattern, param = \in |
 		if(patternOutNodes == nil, { patternOutNodes = IdentityDictionary() });
 		if(patternOutNodes[param] == nil, { patternOutNodes[param] = IdentitySet() });
 		patternOutNodes[param].add(algaPattern);
 	}
 
-	//Remove a node from patternOutNodes (used in AlgaBlock)
+	//Remove a node from patternOutNodes
 	removePatternOutNode { | algaPattern, param = \in |
 		var patternOutNodesAtParam;
 		if(patternOutNodes == nil, { ^this });
@@ -2661,8 +2661,50 @@ AMP : AlgaMonoPattern {}
 		patternOutNodesAtParam.remove(algaPattern);
 	}
 
+	//Free previous out: connections from patterns
+	freeAllPatternOutConnections { | time |
+		if(patternOutNodes != nil, {
+			patternOutNodes.keysValuesDo({ | param, patternOutNodesAtParam |
+				patternOutNodesAtParam.do({ | algaPattern |
+					this.removePatternOutsAtParam(
+						algaPattern: algaPattern,
+						param: param,
+						removePatternOutNodeFromDict: false,
+						time: time
+					);
+				});
+			});
+		});
+	}
+
+	//Re-create previous out: connections with patterns
+	createAllPatternOutConnections { | time |
+		if(patternOutNodes != nil, {
+			patternOutNodes.keysValuesDo({ | param, patternOutNodesAtParam |
+				patternOutNodesAtParam.do({ | algaPattern |
+					scheduler.addAction(
+						condition: { this.algaInstantiatedAsReceiver(param, algaPattern, true) },
+						func: {
+							this.receivePatternOutsAtParam(
+								algaPattern: algaPattern,
+								param: param,
+								time: time
+							);
+						}
+					)
+				});
+			});
+		});
+	}
+
+	//Lock interpbus
+	lockInterpBus { | uniqueID, interpBus |
+		if(lockInterpBusses == nil, { lockInterpBusses = IdentityDictionary() });
+		lockInterpBusses[uniqueID] = interpBus;
+	}
+
 	//Triggered when the connection is made
-	receivePatternOutNode { | algaPattern, param = \in, time = 0 |
+	receivePatternOutsAtParam { | algaPattern, param = \in, time = 0 |
 		var controlNamesAtParam, paramRate, paramNumChannels;
 		var patternOutEnvBussesAtParam, patternOutEnvSynthsAtParam;
 		var patternOutEnvBussesAtParamAlgaPattern, patternOutEnvSynthsAtParamAlgaPattern;
@@ -2670,9 +2712,14 @@ AMP : AlgaMonoPattern {}
 		var interpBusAtParam, interpBus;
 		var isFirstConnection = false;
 		var algaSynthBus = algaPattern.synthBus;
+		var uniqueID = UniqueID.next;
+
+		//Set time if needed
+		time = time ? 0;
 
 		//Get interpBus at param / sender combination
 		interpBusAtParam = interpBusses[param];
+		interpBusAtParam.asString.warn;
 		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
 
 		//ALWAYS use the \default interpBus, which is connected to the \default normSynth.
@@ -2686,6 +2733,15 @@ AMP : AlgaMonoPattern {}
 			).error;
 			^this
 		});
+
+		//Lock interpBus
+		this.lockInterpBus(uniqueID, interpBus);
+
+		//Check if patternOutUniqueIDs needs to be init
+		if(patternOutUniqueIDs == nil, { patternOutUniqueIDs = IdentitySet() });
+
+		//Add uniqueID
+		patternOutUniqueIDs.add(uniqueID);
 
 		//Check if patternOutEnvBusses needs to be init
 		if(patternOutEnvBusses == nil, { patternOutEnvBusses = IdentityDictionary() });
@@ -2734,13 +2790,13 @@ AMP : AlgaMonoPattern {}
 		paramRate = controlNamesAtParam.rate;
 
 		//Check if first connection with the specific algaSynthBus
-		isFirstConnection = patternOutEnvSynthsAtParamAlgaPattern[algaSynthBus] == nil;
+		isFirstConnection = patternOutEnvSynthsAtParamAlgaPattern[uniqueID] == nil;
 
 		//First connection
 		if(isFirstConnection, {
 			//envBus
 			envBus = AlgaBus(server, 1, paramRate);
-			patternOutEnvBussesAtParamAlgaPattern[algaSynthBus] = envBus; //add entry for algaSynthBus
+			patternOutEnvBussesAtParamAlgaPattern[uniqueID] = envBus; //add entry for algaSynthBus
 
 			//envSymbol
 			envSymbol = (
@@ -2760,7 +2816,7 @@ AMP : AlgaMonoPattern {}
 				interpGroup,
 				waitForInst:false
 			);
-			patternOutEnvSynthsAtParamAlgaPattern[algaSynthBus] = envSynth; //add entry for algaSynthBus
+			patternOutEnvSynthsAtParamAlgaPattern[uniqueID] = envSynth; //add entry for algaSynthBus
 		});
 
 		//Update patternOutNodes
@@ -2772,14 +2828,17 @@ AMP : AlgaMonoPattern {}
 
 	//Trigger the release of all active out: synths at specific param for a specific algaPattern.
 	//This is called everytime a connection is removed
-	removePatternOutsAtParam { | algaPattern, param = \in, time |
-		var interpBusAtParamAtAlgaPattern = interpBusses[param][algaPattern];
+	removePatternOutsAtParam { | algaPattern, param = \in, removePatternOutNodeFromDict = true, time |
+		var interpBusAtParamAlgaPattern = interpBusses[param][algaPattern];
 		var patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynths[param][algaPattern];
 		var patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBusses[param][algaPattern];
 
+		//Set time if needed
+		time = time ? 0;
+
 		if(patternOutEnvSynthsAtParamAlgaPattern != nil, {
-			patternOutEnvSynthsAtParamAlgaPattern.keysValuesDo({ | algaSynthBus, patternOutEnvSynth |
-				var patternOutEnvBus = patternOutEnvBussesAtParamAlgaPattern[algaSynthBus];
+			patternOutEnvSynthsAtParamAlgaPattern.keysValuesDo({ | uniqueID, patternOutEnvSynth |
+				var patternOutEnvBus = patternOutEnvBussesAtParamAlgaPattern[uniqueID];
 				//Free bus and entries when synth is done.
 				//It's still used while fade-out interpolation is happening
 				patternOutEnvSynth.set(\t_release, 1, \fadeTime, time);
@@ -2788,117 +2847,128 @@ AMP : AlgaMonoPattern {}
 					//It must be a Dictionary cause of the Array key: needs to be checked by value...
 					//This simply frees time of creating multiple IdentityDictionaries instead
 					if(patternOutEnvBussesToBeFreed == nil, { patternOutEnvBussesToBeFreed = Dictionary() });
-					patternOutEnvBussesToBeFreed[[param, algaPattern, algaSynthBus]] = patternOutEnvBus;
+					patternOutEnvBussesToBeFreed[[param, algaPattern, uniqueID]] = patternOutEnvBus;
 
 					//Remove entries from patternOutEnvSynths and patternOutEnvBusses
-					patternOutEnvSynths[param][algaPattern].removeAt(algaSynthBus);
-					patternOutEnvBusses[param][algaPattern].removeAt(algaSynthBus);
+					patternOutEnvSynths[param][algaPattern].removeAt(uniqueID);
+					patternOutEnvBusses[param][algaPattern].removeAt(uniqueID);
+
+					//Remove entries from lockInterpBusses
+					if(lockInterpBusses != nil, { lockInterpBusses.removeAt(uniqueID) });
+
+					//Remove uniqueID
+					if(patternOutUniqueIDs != nil, { patternOutUniqueIDs.remove(uniqueID) });
 
 					//Remove interpBusAtParam for algaSynthBus but don't free it: it's still used as \default
-					if(interpBusAtParamAtAlgaPattern != nil, { interpBusses[param].removeAt(algaSynthBus) });
+					//if(interpBusAtParamAtAlgaPattern != nil, { interpBusses[param].removeAt(algaSynthBus) });
 				});
 			});
 		});
 
-		//Update patternOutNodes
-		this.removePatternOutNode(algaPattern, param);
+		//Update patternOutNodes if needed
+		if(removePatternOutNodeFromDict, {
+			this.removePatternOutNode(algaPattern, param);
+		});
 	}
 
 	//Triggered every patternSynth. algaSynthBus is only used as a "indexer"
 	receivePatternOutTempSynth { | algaPattern, algaSynthBus, outTempBus, algaNumChannels, algaRate,
 		param = \in, patternBussesAndSynths, chans, scale |
 
-		var envBus;
-		var controlNamesAtParam, paramNumChannels, paramRate;
-		var interpBusAtParam, interpBus;
-		var tempSynthSymbol;
-		var tempSynthArgs, tempSynth;
+		if(patternOutUniqueIDs != nil, {
+			patternOutUniqueIDs.do({ | uniqueID |
+				var envBus;
+				var controlNamesAtParam, paramNumChannels, paramRate;
+				var interpBusAtParam, interpBus;
+				var tempSynthSymbol;
+				var tempSynthArgs, tempSynth;
 
-		//Retrieve envBus from patternOutEnvBusses
-		envBus = patternOutEnvBusses[param][algaPattern][algaSynthBus];
-		if(envBus == nil, { /*("AlgaNode: invalid envBus at param '" ++ param ++ "'").error;*/ ^this });
+				uniqueID.asString.error;
 
-		//Get controlNames
-		controlNamesAtParam = controlNames[param];
-		if(controlNamesAtParam == nil, { ^this });
+				//Retrieve envBus from patternOutEnvBusses
+				envBus = patternOutEnvBusses[param][algaPattern][uniqueID];
+				if(envBus == nil, { /*("AlgaNode: invalid envBus at param '" ++ param ++ "'").error;*/ ^this });
 
-		//Get channels / rate of param
-		paramNumChannels = controlNamesAtParam.numChannels;
-		paramRate = controlNamesAtParam.rate;
+				//Get controlNames
+				controlNamesAtParam = controlNames[param];
+				if(controlNamesAtParam == nil, { ^this });
 
-		//Calculate scale / chans
-		chans = chans.next; //Pattern support
-		scale = scale.next; //Pattern support
-		scale = this.calculateScaling(
-			param,
-			nil,
-			paramNumChannels,
-			scale,
-			false //don't update the AlgaNode's scalings dict
-		);
-		chans = this.calculateSenderChansMappingArray(
-			param,
-			nil,
-			chans,
-			algaNumChannels,
-			paramNumChannels,
-			false //don't update the AlgaNode's chans dict
-		);
+				//Get channels / rate of param
+				paramNumChannels = controlNamesAtParam.numChannels;
+				paramRate = controlNamesAtParam.rate;
 
-		//Get interpbus at param / sender combination
-		interpBusAtParam = interpBusses[param];
-		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
+				//Calculate scale / chans
+				chans = chans.next; //Pattern support
+				scale = scale.next; //Pattern support
+				scale = this.calculateScaling(
+					param,
+					nil,
+					paramNumChannels,
+					scale,
+					false //don't update the AlgaNode's scalings dict
+				);
+				chans = this.calculateSenderChansMappingArray(
+					param,
+					nil,
+					chans,
+					algaNumChannels,
+					paramNumChannels,
+					false //don't update the AlgaNode's chans dict
+				);
 
-		//Get the interpBus (always \default, as it's the one connected to \default normSynth)
-		interpBus = interpBusAtParam[\default];
-		if(interpBus == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
+				//Get the locked interpBus (which is always \default, as it's the one connected to \default normSynth).
+				//However, this will also work across .replace calls.
+				interpBus = lockInterpBusses[uniqueID];
+				if(interpBus == nil, { ("AlgaNode: invalid locked interp bus at param '" ++ param ++ "'").error; ^this });
 
-		//Symbol. Don't use the fx version as \env is needed
-		tempSynthSymbol = (
-			"alga_pattern_" ++
-			algaRate ++
-			algaNumChannels ++
-			"_" ++
-			paramRate ++
-			paramNumChannels ++
-			"_out"
-		).asSymbol;
+				//Symbol. Don't use the fx version as \env is needed
+				tempSynthSymbol = (
+					"alga_pattern_" ++
+					algaRate ++
+					algaNumChannels ++
+					"_" ++
+					paramRate ++
+					paramNumChannels ++
+					"_out"
+				).asSymbol;
 
-		//Read from outTempBus and envBus, write to interpBus
-		tempSynthArgs = [
-			\in, outTempBus.busArg,
-			\out, interpBus.index,
-			\fadeTime, 0,
-			\env, envBus.busArg
-		];
+				//Read from outTempBus and envBus, write to interpBus
+				tempSynthArgs = [
+					\in, outTempBus.busArg,
+					\out, interpBus.index,
+					\fadeTime, 0,
+					\env, envBus.busArg
+				];
 
-		//Add scaling and chans (scale is an array already containing the symbol)
-		tempSynthArgs = tempSynthArgs.addAll(scale).add(\indices).add(chans);
+				//Add scaling and chans (scale is an array already containing the symbol)
+				tempSynthArgs = tempSynthArgs.addAll(scale).add(\indices).add(chans);
 
-		//Create the tempSynth
-		tempSynth = AlgaSynth(
-			tempSynthSymbol,
-			tempSynthArgs,
-			interpGroup,
-			\addToTail,
-			waitForInst:false
-		);
+				//Create the tempSynth
+				tempSynth = AlgaSynth(
+					tempSynthSymbol,
+					tempSynthArgs,
+					interpGroup,
+					\addToTail,
+					waitForInst:false
+				);
 
-		//Add Synth to activeInterpSynthsAtParam
-		this.addActiveInterpSynthOnFree(param, algaPattern, tempSynth);
+				//Add Synth to activeInterpSynthsAtParam
+				this.addActiveInterpSynthOnFree(param, algaPattern, tempSynth);
 
-		//Add Synth to patternBussesAndSynths
-		patternBussesAndSynths.add(tempSynth);
+				//Add Synth to patternBussesAndSynths
+				patternBussesAndSynths.add(tempSynth);
 
-		//Free dangling patternEnvBusses related to this [param, algaPattern, algaSynthBus] combo
-		tempSynth.onFree({
-			if(patternOutEnvBussesToBeFreed != nil, {
-				var patternEnvBusAtAlgaSynthBus = patternOutEnvBussesToBeFreed[[param, algaPattern, algaSynthBus]];
-				if(patternEnvBusAtAlgaSynthBus != nil, {
-					patternEnvBusAtAlgaSynthBus.free;
-					patternOutEnvBussesToBeFreed.removeAt([param, algaPattern, algaSynthBus]);
+				//Free dangling patternEnvBusses related to this [param, algaPattern, uniqueID] combo
+				tempSynth.onFree({
+					if(patternOutEnvBussesToBeFreed != nil, {
+						var patternEnvBusAtAlgaSynthBus = patternOutEnvBussesToBeFreed[[param, algaPattern, uniqueID]];
+						if(patternEnvBusAtAlgaSynthBus != nil, {
+							patternEnvBusAtAlgaSynthBus.free;
+							patternOutEnvBussesToBeFreed.removeAt([param, algaPattern, uniqueID]);
+						});
+						if(patternOutEnvBussesToBeFreed.size == 0, { patternOutEnvBussesToBeFreed = nil });
+					});
 				});
-				if(patternOutEnvBussesToBeFreed.size == 0, { patternOutEnvBussesToBeFreed = nil });
 			});
 		});
 	}

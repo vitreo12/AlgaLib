@@ -41,11 +41,11 @@ Alga.boot({
 	));
 
 	//s.plotTree;
-	//s.scope;
+	s.scope;
 });
 )
 
-b.replace({ ((\in.ar * MouseX.kr(1, 12)).clip - 1) * 0.5 }, time:3, sched:0)
+b.replace({ ((\in.ar * MouseX.kr(1, 12)).clip) * 0.5 }, time:1, sched:0)
 
 
 

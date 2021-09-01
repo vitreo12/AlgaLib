@@ -105,6 +105,8 @@ AlgaNode {
 	var <patternOutEnvSynths;
 	var <patternOutEnvBusses;
 	var <patternOutEnvBussesToBeFreed;
+	var <lockInterpBusses;
+	var <patternOutUniqueIDs;
 
 	//General state queries
 	var <isPlaying = false;
@@ -813,13 +815,16 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		scheduler.addAction(func: {
-			this.createAllSynths(
-				replace,
-				keepChannelsMapping:keepChannelsMapping,
-				keepScale:keepScale
-			);
-		}, sched: sched);
+		scheduler.addAction(
+			func: {
+				this.createAllSynths(
+					replace,
+					keepChannelsMapping:keepChannelsMapping,
+					keepScale:keepScale
+				);
+			},
+			sched: sched
+		);
 	}
 
 	//Dispatch a SynthDef (symbol)
@@ -931,6 +936,7 @@ AlgaNode {
 		);
 	}
 
+	//Reset the interp / norm dicts
 	resetInterpNormDicts {
 		interpSynths.clear;
 		normSynths.clear;
@@ -2517,26 +2523,8 @@ AlgaNode {
 			});
 		});
 
-		//Re-create previous out: connections with patterns
-		if(patternOutNodes != nil, {
-			patternOutNodes.keysValuesDo({ | param, patternOutNodesAtParam |
-				patternOutNodesAtParam.do({ | algaPattern |
-					this.receivePatternOutNode(algaPattern, param, time);
-				});
-			});
-		});
-	}
-
-	//Free previous out: connections from patterns
-	freeAllPatternOutConnections { | time |
-		time.asString.warn;
-		if(patternOutNodes != nil, {
-			patternOutNodes.keysValuesDo({ | param, patternOutNodesAtParam |
-				patternOutNodesAtParam.do({ | algaPattern |
-					this.removePatternOutNode(algaPattern, param, time);
-				});
-			});
-		});
+		//Re-create previous out: connectionswith patterns
+		this.createAllPatternOutConnections(time);
 	}
 
 	//Replace implementation
@@ -2593,7 +2581,7 @@ AlgaNode {
 		//Free all previous busses
 		this.freeAllBusses;
 
-		//Reset dict entries
+		//Reset interp / norm dictionaries
 		this.resetInterpNormDicts;
 
 		//New node
