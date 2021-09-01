@@ -623,7 +623,7 @@ AlgaPattern : AlgaNode {
 		//There are cases with very quick durs where the sync is wrong, but this fixes it,
 		//albeit being non elegant at all (find a better solution, perhaps).
 		fork {
-			0.5.wait;
+			1.0.wait;
 			interpBussesToFree.do({ | interpBus | interpBus.free });
 		}
 	}
@@ -1939,8 +1939,6 @@ AlgaPattern : AlgaNode {
 	createPatternOutReceivers { | prevPatternOutNodes |
 		var time = currentPatternOutTime ? 0;
 
-		currentPatternOutTime.asString.warn;
-
 		//Fade out (also old synths)
 		if(prevPatternOutNodes != nil, {
 			prevPatternOutNodes.do({ | outNodeAndParam |
@@ -2708,7 +2706,6 @@ AMP : AlgaMonoPattern {}
 	//Triggered when the connection is made
 	receivePatternOutsAtParam { | algaPattern, param = \in, time = 0 |
 		var controlNamesAtParam, paramRate, paramNumChannels;
-		var patternOutEnvBussesAtParam, patternOutEnvSynthsAtParam;
 		var patternOutEnvBussesAtParamAlgaPattern, patternOutEnvSynthsAtParamAlgaPattern;
 		var patternOutUniqueIDsAtParam;
 		var envBus, envSymbol, envSynth;
@@ -2725,7 +2722,7 @@ AMP : AlgaMonoPattern {}
 
 		//Get interpBus at param / sender combination
 		interpBusAtParam = interpBusses[param];
-		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
+		if(interpBusAtParam == nil, { ("AlgaNode: 'out': invalid interp bus at param '" ++ param ++ "'").error; ^this });
 
 		//ALWAYS use the \default interpBus, which is connected to the \default normSynth.
 		//Use the algaSynthBus as index, so that it can safely be removed in remove removePatternOutsAtParam.
@@ -2733,7 +2730,7 @@ AMP : AlgaMonoPattern {}
 		interpBus = interpBusAtParam[\default];
 		if(interpBus == nil, {
 			(
-				"AlgaNode: invalid interp bus at param '" ++
+				"AlgaNode: 'out': invalid interp bus at param '" ++
 				param ++ "' and node " ++ algaPattern.asString
 			).error;
 			^this
@@ -2761,20 +2758,20 @@ AMP : AlgaMonoPattern {}
 
 		//Check entries at [param, algaPattern]
 		patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBusses[paramAlgaPattern];
-		patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynthsAtParam[paramAlgaPattern];
+		patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynths[paramAlgaPattern];
 
 		//Create dict at [param, algaPattern].
 		//Using dictionary to index with [uniqueID, algaSynthBus]
 		if(patternOutEnvBussesAtParamAlgaPattern == nil, {
-			patternOutEnvBussesAtParam[paramAlgaPattern] = Dictionary();
-			patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBussesAtParam[paramAlgaPattern]; //update pointer
+			patternOutEnvBusses[paramAlgaPattern] = Dictionary();
+			patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBusses[paramAlgaPattern]; //update pointer
 		});
 
 		//Create dict at [param, algaPattern].
 		//Using dictionary to index with [uniqueID, algaSynthBus]
 		if(patternOutEnvSynthsAtParamAlgaPattern == nil, {
-			patternOutEnvSynthsAtParam[paramAlgaPattern] = Dictionary();
-			patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynthsAtParam[paramAlgaPattern]; //update pointer
+			patternOutEnvSynths[paramAlgaPattern] = Dictionary();
+			patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynths[paramAlgaPattern]; //update pointer
 		});
 
 		//Get controlNames
@@ -2790,6 +2787,8 @@ AMP : AlgaMonoPattern {}
 
 		//Create the envBus
 		envBus = AlgaBus(server, 1, paramRate);
+
+		//Add to patternOutEnvBusses
 		patternOutEnvBussesAtParamAlgaPattern[uniqueIDAlgaSynthBus] = envBus;
 
 		//envSymbol
@@ -2810,6 +2809,8 @@ AMP : AlgaMonoPattern {}
 			interpGroup,
 			waitForInst:false
 		);
+
+		//Add to patternOutEnvSynths
 		patternOutEnvSynthsAtParamAlgaPattern[uniqueIDAlgaSynthBus] = envSynth;
 
 		//Update patternOutNodes
@@ -2846,11 +2847,13 @@ AMP : AlgaMonoPattern {}
 					//It must be a Dictionary cause of the Array key: needs to be checked by value...
 					//This simply frees time of creating multiple IdentityDictionaries instead
 					if(patternOutEnvBussesToBeFreed == nil, { patternOutEnvBussesToBeFreed = Dictionary() });
-					patternOutEnvBussesToBeFreed[paramAlgaPatternUniqueID] = patternOutEnvBus;
+
+					//REVIEW THIS WITH THE NEW DICT MECHANISM: IT CREATES CLICKS AT TIMES!
+					patternOutEnvBussesToBeFreed[uniqueIDAlgaSynthBus] = patternOutEnvBus;
 
 					//Remove entries from patternOutEnvSynths and patternOutEnvBusses
-					patternOutEnvSynths[param][algaPattern].removeAt(uniqueIDAlgaSynthBus);
-					patternOutEnvBusses[param][algaPattern].removeAt(uniqueIDAlgaSynthBus);
+					patternOutEnvSynths[paramAlgaPattern].removeAt(uniqueIDAlgaSynthBus);
+					patternOutEnvBusses[paramAlgaPattern].removeAt(uniqueIDAlgaSynthBus);
 
 					//Remove entries from lockInterpBusses
 					if(lockInterpBusses != nil, { lockInterpBusses.removeAt(uniqueID) });
@@ -2862,9 +2865,6 @@ AMP : AlgaMonoPattern {}
 							patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus].remove(uniqueID)
 						});
 					});
-
-					//Remove interpBusAtParam for algaSynthBus but don't free it: it's still used as \default
-					//if(interpBusAtParamAtAlgaPattern != nil, { interpBusses[param].removeAt(algaSynthBus) });
 				});
 			});
 		});
@@ -2883,9 +2883,9 @@ AMP : AlgaMonoPattern {}
 		//This allows for .replaces of receiver (this AlgaNode) to work.
 		if(patternOutUniqueIDs != nil, {
 			var paramAlgaPatternAlgaSynthBus = [param, algaPattern, algaSynthBus];
-			var patternOutUniqueIDsAtParamAlgaPattern = patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus];
-			if(patternOutUniqueIDsAtParamAlgaPattern != nil, {
-				patternOutUniqueIDsAtParamAlgaPattern.do({ | uniqueID |
+			var patternOutUniqueIDsAtParamAlgaPatternAlgaSynthBus = patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus];
+			if(patternOutUniqueIDsAtParamAlgaPatternAlgaSynthBus != nil, {
+				patternOutUniqueIDsAtParamAlgaPatternAlgaSynthBus.do({ | uniqueID |
 					var envBus;
 					var controlNamesAtParam, paramNumChannels, paramRate;
 					var interpBusAtParam, interpBus;
@@ -2897,7 +2897,7 @@ AMP : AlgaMonoPattern {}
 
 					//Retrieve envBus from patternOutEnvBusses
 					envBus = patternOutEnvBusses[paramAlgaPattern][uniqueIDAlgaSynthBus];
-					if(envBus == nil, { ("AlgaNode: invalid envBus at param '" ++ param ++ "'").error; ^this });
+					if(envBus == nil, { ("AlgaNode: 'out': invalid envBus at param '" ++ param ++ "'").error; ^this });
 
 					//Get controlNames
 					controlNamesAtParam = controlNames[param];
@@ -2929,7 +2929,7 @@ AMP : AlgaMonoPattern {}
 					//Get the locked interpBus (which is always \default, as it's the one connected to \default normSynth).
 					//However, this will also work across .replace calls.
 					interpBus = lockInterpBusses[uniqueID];
-					if(interpBus == nil, { ("AlgaNode: invalid locked interp bus at param '" ++ param ++ "'").error; ^this });
+					if(interpBus == nil, { ("AlgaNode: 'out': invalid locked interp bus at param '" ++ param ++ "'").error; ^this });
 
 					//Symbol. Don't use the fx version as \env is needed
 					tempSynthSymbol = (
@@ -2968,16 +2968,19 @@ AMP : AlgaMonoPattern {}
 					//Add Synth to patternBussesAndSynths
 					patternBussesAndSynths.add(tempSynth);
 
-					//Free dangling patternEnvBusses related to this [param, algaPattern, uniqueID] combo
+					//Free dangling patternEnvBusses related to this [uniqueID, algaSynthBus] pair
 					tempSynth.onFree({
 						if(patternOutEnvBussesToBeFreed != nil, {
-							var paramAlgaPatternUniqueID = [param, algaPattern, uniqueID];
-							var patternEnvBusAtUniqueID = patternOutEnvBussesToBeFreed[paramAlgaPatternUniqueID];
+							var patternEnvBusAtUniqueID = patternOutEnvBussesToBeFreed[uniqueIDAlgaSynthBus];
 							if(patternEnvBusAtUniqueID != nil, {
-								patternEnvBusAtUniqueID.free;
-								patternOutEnvBussesToBeFreed.removeAt(paramAlgaPatternUniqueID);
+								patternOutEnvBussesToBeFreed.removeAt(uniqueIDAlgaSynthBus);
+								//There still is the need of waiting a bit more, or it will click...
+								//Just like freeUnusedInterpBusses: it's a syncing problem
+								fork {
+									1.wait;
+									patternEnvBusAtUniqueID.free;
+								};
 							});
-							if(patternOutEnvBussesToBeFreed.size == 0, { patternOutEnvBussesToBeFreed = nil });
 						});
 					});
 				});

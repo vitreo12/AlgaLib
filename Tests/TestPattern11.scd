@@ -35,32 +35,45 @@ Alga.boot({
 				param: \in
 			),
 			b,
-			\none,
-			AlgaOut(
+			//\none,
+			/*AlgaOut(
 				node: c,
 				param: \in
 			),
-			c
+			c*/
 		], inf)
 	));
+
+	//0.1.wait;
+
+	//a.from(AlgaOut(c, \in), \out, time:2, sched:1)
 
 	//s.plotTree;
 	//s.scope;
 });
 )
 
-a.replace(\test2, time:3, sched:1)
+
+a.from(AlgaOut(c, \in), \out, time:2, sched:1)
+
+a.replace(\test2, time:5, sched:1)
+
+a.replace(\test, time:3, sched:1)
+
+a.from(AlgaOut(b, \in), \out, time:2, sched:1)
+
+b.replace({ [(\in.ar * 5).clip * 0.5, Silent.ar] }, time:5)
 
 
 
 //With a new connection?
-a.from(AlgaOut(c, \in), \out, time:2, sched:1)
+a.from(AlgaOut(b, \in), \out, time:2, sched:1)
 
 //When replacing?
 a.replace(\test2, time:3, sched:1)
 
 //When replacing and resetting?
-a.replace(\test, time:3, sched:1, reset:true)
+a.replace(\test, time:3, sched:1)
 
 //Go back
 a.from(b, \out, time:2, sched:1)
