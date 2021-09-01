@@ -14,12 +14,16 @@ Alga.boot({
 
 	s.sync;
 
-	b = AN({ [(\in.ar * 3).tanh * 0.5, Silent.ar] }).play;
-	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 10] }).play;
+	b = AN({ [(\in.ar * 3).tanh * 0.5, Silent.ar] });
+	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 10] });
 
 	d = AN({ Saw.ar(LFNoise0.kr(3).range(50, 300)) * 0.01 });
 	b << d;
 	c << d;
+
+	//mixer to avoid all things with playTime
+	h = AN({\in.ar([0,0])}).play;
+	h << b; h <<+c;
 
 	a = AlgaPattern((
 		def: \test,
@@ -41,14 +45,9 @@ Alga.boot({
 	));
 
 	//s.plotTree;
-	s.scope;
+	//s.scope;
 });
 )
-
-b.replace({ ((\in.ar * MouseX.kr(1, 12)).clip) * 0.5 }, time:4, sched:1)
-
-
-
 
 
 //With a new connection?
@@ -64,4 +63,5 @@ a.replace(\test, time:3, sched:1, reset:true)
 a.from(b, \out, time:2, sched:1)
 
 //When replacing the receiver?
-b.replace({ (\in.ar * 3).clip * 0.5 }, time:3, sched:1)
+b.replace({ [(\in.ar * 5).clip * 0.5, Silent.ar] }, time:5)
+b.replace({ [\in.ar * 3, Silent.ar] }, time:10)

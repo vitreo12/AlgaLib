@@ -1203,7 +1203,6 @@ AlgaPattern : AlgaNode {
 			if(algaOut.algaInstantiatedAsReceiver(\in, this, true), {
 				algaOut.receivePatternOutTempSynth(
 					algaPattern: this,
-					algaSynthBus: algaSynthBus,
 					outTempBus: outTempBus,
 					algaNumChannels: numChannels,
 					algaRate: rate,
@@ -1222,7 +1221,6 @@ AlgaPattern : AlgaNode {
 				if(node.algaInstantiatedAsReceiver(param, this, true), {
 					node.receivePatternOutTempSynth(
 						algaPattern: this,
-						algaSynthBus: algaSynthBus,
 						outTempBus: outTempBus,
 						algaNumChannels: numChannels,
 						algaRate: rate,
@@ -2711,8 +2709,6 @@ AMP : AlgaMonoPattern {}
 		var patternOutUniqueIDsAtParam;
 		var envBus, envSymbol, envSynth;
 		var interpBusAtParam, interpBus;
-		var isFirstConnection = false;
-		var algaSynthBus = algaPattern.synthBus;
 		var uniqueID = UniqueID.next;
 
 		//Set time if needed
@@ -2875,7 +2871,7 @@ AMP : AlgaMonoPattern {}
 	}
 
 	//Triggered every patternSynth. algaSynthBus is only used as a "indexer"
-	receivePatternOutTempSynth { | algaPattern, algaSynthBus, outTempBus, algaNumChannels, algaRate,
+	receivePatternOutTempSynth { | algaPattern, outTempBus, algaNumChannels, algaRate,
 		param = \in, patternBussesAndSynths, chans, scale |
 
 		//Loop around the uniqueIDs for this specific [param, algaPattern] combo
@@ -2965,9 +2961,9 @@ AMP : AlgaMonoPattern {}
 					//Free dangling patternEnvBusses related to this [param, algaPattern, uniqueID] combo
 					tempSynth.onFree({
 						if(patternOutEnvBussesToBeFreed != nil, {
-							var patternEnvBusAtAlgaSynthBus = patternOutEnvBussesToBeFreed[[param, algaPattern, uniqueID]];
-							if(patternEnvBusAtAlgaSynthBus != nil, {
-								patternEnvBusAtAlgaSynthBus.free;
+							var patternEnvBusAtUniqueID = patternOutEnvBussesToBeFreed[[param, algaPattern, uniqueID]];
+							if(patternEnvBusAtUniqueID != nil, {
+								patternEnvBusAtUniqueID.free;
 								patternOutEnvBussesToBeFreed.removeAt([param, algaPattern, uniqueID]);
 							});
 							if(patternOutEnvBussesToBeFreed.size == 0, { patternOutEnvBussesToBeFreed = nil });
