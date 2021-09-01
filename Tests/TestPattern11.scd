@@ -22,7 +22,7 @@ Alga.boot({
 	c << d;
 
 	//mixer to avoid all things with playTime
-	h = AN({\in.ar([0,0])}).play;
+	h = AN({\in.ar([0, 0])}).play;
 	h << b; h <<+c;
 
 	a = AlgaPattern((
@@ -48,6 +48,9 @@ Alga.boot({
 	//s.scope;
 });
 )
+
+a.replace(\test2, time:3, sched:1)
+
 
 
 //With a new connection?

@@ -1200,9 +1200,10 @@ AlgaPattern : AlgaNode {
 		case
 		{ algaOut.isAlgaNode } {
 			//Only if instantiated (or it will click)
-			if(algaOut.algaInstantiatedAsReceiver(\in, this, true), {
+			if(algaOut.algaInstantiatedAsReceiver(\in), {
 				algaOut.receivePatternOutTempSynth(
 					algaPattern: this,
+					algaSynthBus: algaSynthBus,
 					outTempBus: outTempBus,
 					algaNumChannels: numChannels,
 					algaRate: rate,
@@ -1218,9 +1219,10 @@ AlgaPattern : AlgaNode {
 
 			if(node.isAlgaNode, {
 				//Only if instantiated (or it will click)
-				if(node.algaInstantiatedAsReceiver(param, this, true), {
+				if(node.algaInstantiatedAsReceiver(param), {
 					node.receivePatternOutTempSynth(
 						algaPattern: this,
+						algaSynthBus: algaSynthBus,
 						outTempBus: outTempBus,
 						algaNumChannels: numChannels,
 						algaRate: rate,
@@ -1937,13 +1939,15 @@ AlgaPattern : AlgaNode {
 	createPatternOutReceivers { | prevPatternOutNodes |
 		var time = currentPatternOutTime ? 0;
 
+		currentPatternOutTime.asString.warn;
+
 		//Fade out (also old synths)
 		if(prevPatternOutNodes != nil, {
 			prevPatternOutNodes.do({ | outNodeAndParam |
 				var outNode = outNodeAndParam[0];
 				var param = outNodeAndParam[1];
 				scheduler.addAction(
-					condition: { outNode.algaInstantiatedAsReceiver(param, this, true) },
+					//condition: { outNode.algaInstantiatedAsReceiver(param) },
 					func: {
 						outNode.removePatternOutsAtParam(
 							algaPattern: this,
@@ -1962,7 +1966,7 @@ AlgaPattern : AlgaNode {
 				var outNode = outNodeAndParam[0];
 				var param = outNodeAndParam[1];
 				scheduler.addAction(
-					condition: { outNode.algaInstantiatedAsReceiver(param, this, true) },
+					condition: { outNode.algaInstantiatedAsReceiver(param) },
 					func: {
 						outNode.receivePatternOutsAtParam(
 							algaPattern: this,
@@ -2681,7 +2685,7 @@ AMP : AlgaMonoPattern {}
 			patternOutNodes.keysValuesDo({ | param, patternOutNodesAtParam |
 				patternOutNodesAtParam.do({ | algaPattern |
 					scheduler.addAction(
-						condition: { this.algaInstantiatedAsReceiver(param, algaPattern, true) },
+						condition: { this.algaInstantiatedAsReceiver(param) },
 						func: {
 							this.receivePatternOutsAtParam(
 								algaPattern: algaPattern,
@@ -2709,14 +2713,18 @@ AMP : AlgaMonoPattern {}
 		var patternOutUniqueIDsAtParam;
 		var envBus, envSymbol, envSynth;
 		var interpBusAtParam, interpBus;
+
+		var algaSynthBus = algaPattern.synthBus;
 		var uniqueID = UniqueID.next;
+		var uniqueIDAlgaSynthBus = [uniqueID, algaSynthBus];
+		var paramAlgaPatternAlgaSynthBus = [param, algaPattern, algaSynthBus];
+		var paramAlgaPattern = [param, algaPattern];
 
 		//Set time if needed
 		time = time ? 0;
 
 		//Get interpBus at param / sender combination
 		interpBusAtParam = interpBusses[param];
-		interpBusAtParam.asString.warn;
 		if(interpBusAtParam == nil, { ("AlgaNode: invalid interp bus at param '" ++ param ++ "'").error; ^this });
 
 		//ALWAYS use the \default interpBus, which is connected to the \default normSynth.
@@ -2731,51 +2739,42 @@ AMP : AlgaMonoPattern {}
 			^this
 		});
 
-		//Check if patternOutUniqueIDs needs to be init. Using dictionary to index as value with [param, algaPattern]
+		//Check if patternOutUniqueIDs needs to be init.
+		//Using dictionary to index with [param, algaPattern, algaSynthBus]
 		if(patternOutUniqueIDs == nil, { patternOutUniqueIDs = Dictionary() });
 
-		//Set of uniqueIDs at specific [param, algaPattern]
-		if(patternOutUniqueIDs[[param, algaPattern]] == nil, { patternOutUniqueIDs[[param, algaPattern]] = IdentitySet() });
+		//Set of uniqueIDs at specific [param, algaPattern, algaSynthBus]
+		if(patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus] == nil, {
+			patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus] = IdentitySet()
+		});
 
 		//Add uniqueID to IdentitySet
-		(patternOutUniqueIDs[[param, algaPattern]]).add(uniqueID);
+		(patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus]).add(uniqueID);
 
-		//Check if patternOutEnvBusses needs to be init
-		if(patternOutEnvBusses == nil, { patternOutEnvBusses = IdentityDictionary() });
+		//Check if patternOutEnvBusses needs to be init.
+		//Using dictionary to index with [param, algaPattern]
+		if(patternOutEnvBusses == nil, { patternOutEnvBusses = Dictionary() });
 
-		//Check if patternOutEnvSynths needs to be init
-		if(patternOutEnvSynths == nil, { patternOutEnvSynths = IdentityDictionary() });
+		//Check if patternOutEnvSynths needs to be init.
+		//Using dictionary to index with [param, algaPattern]
+		if(patternOutEnvSynths == nil, { patternOutEnvSynths = Dictionary() });
 
-		//Check entries at param
-		patternOutEnvBussesAtParam = patternOutEnvBusses[param];
-		patternOutEnvSynthsAtParam = patternOutEnvSynths[param];
+		//Check entries at [param, algaPattern]
+		patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBusses[paramAlgaPattern];
+		patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynthsAtParam[paramAlgaPattern];
 
-		//Create dict at param
-		if(patternOutEnvBussesAtParam == nil, {
-			patternOutEnvBusses[param] = IdentityDictionary();
-			patternOutEnvBussesAtParam = patternOutEnvBusses[param]; //update pointer
-		});
-
-		//Create dict at param
-		if(patternOutEnvSynthsAtParam == nil, {
-			patternOutEnvSynths[param] = IdentityDictionary();
-			patternOutEnvSynthsAtParam = patternOutEnvSynths[param]; //update pointer
-		});
-
-		//Check entries at algaPattern
-		patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBussesAtParam[algaPattern];
-		patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynthsAtParam[algaPattern];
-
-		//Create dict at param
+		//Create dict at [param, algaPattern].
+		//Using dictionary to index with [uniqueID, algaSynthBus]
 		if(patternOutEnvBussesAtParamAlgaPattern == nil, {
-			patternOutEnvBussesAtParam[algaPattern] = IdentityDictionary();
-			patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBussesAtParam[algaPattern]; //update pointer
+			patternOutEnvBussesAtParam[paramAlgaPattern] = Dictionary();
+			patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBussesAtParam[paramAlgaPattern]; //update pointer
 		});
 
-		//Create dict at param
+		//Create dict at [param, algaPattern].
+		//Using dictionary to index with [uniqueID, algaSynthBus]
 		if(patternOutEnvSynthsAtParamAlgaPattern == nil, {
-			patternOutEnvSynthsAtParam[algaPattern] = IdentityDictionary();
-			patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynthsAtParam[algaPattern]; //update pointer
+			patternOutEnvSynthsAtParam[paramAlgaPattern] = Dictionary();
+			patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynthsAtParam[paramAlgaPattern]; //update pointer
 		});
 
 		//Get controlNames
@@ -2786,12 +2785,12 @@ AMP : AlgaMonoPattern {}
 		paramNumChannels = controlNamesAtParam.numChannels;
 		paramRate = controlNamesAtParam.rate;
 
-		//Lock interpBus
+		//Lock interpBus with uniqueID
 		this.lockInterpBus(uniqueID, interpBus);
 
 		//Create the envBus
 		envBus = AlgaBus(server, 1, paramRate);
-		patternOutEnvBussesAtParamAlgaPattern[uniqueID] = envBus;
+		patternOutEnvBussesAtParamAlgaPattern[uniqueIDAlgaSynthBus] = envBus;
 
 		//envSymbol
 		envSymbol = (
@@ -2811,7 +2810,7 @@ AMP : AlgaMonoPattern {}
 			interpGroup,
 			waitForInst:false
 		);
-		patternOutEnvSynthsAtParamAlgaPattern[uniqueID] = envSynth;
+		patternOutEnvSynthsAtParamAlgaPattern[uniqueIDAlgaSynthBus] = envSynth;
 
 		//Update patternOutNodes
 		this.addPatternOutNode(algaPattern, param);
@@ -2823,16 +2822,22 @@ AMP : AlgaMonoPattern {}
 	//Trigger the release of all active out: synths at specific param for a specific algaPattern.
 	//This is called everytime a connection is removed
 	removePatternOutsAtParam { | algaPattern, param = \in, removePatternOutNodeFromDict = true, time |
-		var interpBusAtParamAlgaPattern = interpBusses[param][algaPattern];
-		var patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynths[param][algaPattern];
-		var patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBusses[param][algaPattern];
+		var paramAlgaPattern = [param, algaPattern];
+		var patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynths[paramAlgaPattern];
+		var patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBusses[paramAlgaPattern];
 
 		//Set time if needed
 		time = time ? 0;
 
 		if(patternOutEnvSynthsAtParamAlgaPattern != nil, {
-			patternOutEnvSynthsAtParamAlgaPattern.keysValuesDo({ | uniqueID, patternOutEnvSynth |
-				var patternOutEnvBus = patternOutEnvBussesAtParamAlgaPattern[uniqueID];
+			patternOutEnvSynthsAtParamAlgaPattern.keysValuesDo({ | uniqueIDAlgaSynthBus, patternOutEnvSynth |
+				var uniqueID = uniqueIDAlgaSynthBus[0];
+				var algaSynthBus = uniqueIDAlgaSynthBus[1];
+				var paramAlgaPatternUniqueID = [param, algaPattern, uniqueID];
+				var paramAlgaPatternAlgaSynthBus = [param, algaPattern, algaSynthBus];
+
+				var patternOutEnvBus = patternOutEnvBussesAtParamAlgaPattern[uniqueIDAlgaSynthBus];
+
 				//Free bus and entries when synth is done.
 				//It's still used while fade-out interpolation is happening
 				patternOutEnvSynth.set(\t_release, 1, \fadeTime, time);
@@ -2841,20 +2846,20 @@ AMP : AlgaMonoPattern {}
 					//It must be a Dictionary cause of the Array key: needs to be checked by value...
 					//This simply frees time of creating multiple IdentityDictionaries instead
 					if(patternOutEnvBussesToBeFreed == nil, { patternOutEnvBussesToBeFreed = Dictionary() });
-					patternOutEnvBussesToBeFreed[[param, algaPattern, uniqueID]] = patternOutEnvBus;
+					patternOutEnvBussesToBeFreed[paramAlgaPatternUniqueID] = patternOutEnvBus;
 
 					//Remove entries from patternOutEnvSynths and patternOutEnvBusses
-					patternOutEnvSynths[param][algaPattern].removeAt(uniqueID);
-					patternOutEnvBusses[param][algaPattern].removeAt(uniqueID);
+					patternOutEnvSynths[param][algaPattern].removeAt(uniqueIDAlgaSynthBus);
+					patternOutEnvBusses[param][algaPattern].removeAt(uniqueIDAlgaSynthBus);
 
 					//Remove entries from lockInterpBusses
 					if(lockInterpBusses != nil, { lockInterpBusses.removeAt(uniqueID) });
 
 					//Remove uniqueID from patternOutUniqueIDs
 					if(patternOutUniqueIDs != nil, {
-						var patternOutUniqueIDsAtParamAlgaPattern = patternOutUniqueIDs[[param, algaPattern]];
+						var patternOutUniqueIDsAtParamAlgaPattern = patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus];
 						if(patternOutUniqueIDsAtParamAlgaPattern != nil, {
-							patternOutUniqueIDs[[param, algaPattern]].remove(uniqueID)
+							patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus].remove(uniqueID)
 						});
 					});
 
@@ -2871,12 +2876,14 @@ AMP : AlgaMonoPattern {}
 	}
 
 	//Triggered every patternSynth. algaSynthBus is only used as a "indexer"
-	receivePatternOutTempSynth { | algaPattern, outTempBus, algaNumChannels, algaRate,
+	receivePatternOutTempSynth { | algaPattern, algaSynthBus, outTempBus, algaNumChannels, algaRate,
 		param = \in, patternBussesAndSynths, chans, scale |
 
-		//Loop around the uniqueIDs for this specific [param, algaPattern] combo
+		//Loop around the uniqueIDs for this specific [param, algaPattern] combo.
+		//This allows for .replaces of receiver (this AlgaNode) to work.
 		if(patternOutUniqueIDs != nil, {
-			var patternOutUniqueIDsAtParamAlgaPattern = patternOutUniqueIDs[[param, algaPattern]];
+			var paramAlgaPatternAlgaSynthBus = [param, algaPattern, algaSynthBus];
+			var patternOutUniqueIDsAtParamAlgaPattern = patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus];
 			if(patternOutUniqueIDsAtParamAlgaPattern != nil, {
 				patternOutUniqueIDsAtParamAlgaPattern.do({ | uniqueID |
 					var envBus;
@@ -2885,8 +2892,11 @@ AMP : AlgaMonoPattern {}
 					var tempSynthSymbol;
 					var tempSynthArgs, tempSynth;
 
+					var uniqueIDAlgaSynthBus = [uniqueID, algaSynthBus];
+					var paramAlgaPattern = [param, algaPattern];
+
 					//Retrieve envBus from patternOutEnvBusses
-					envBus = patternOutEnvBusses[param][algaPattern][uniqueID];
+					envBus = patternOutEnvBusses[paramAlgaPattern][uniqueIDAlgaSynthBus];
 					if(envBus == nil, { ("AlgaNode: invalid envBus at param '" ++ param ++ "'").error; ^this });
 
 					//Get controlNames
@@ -2961,10 +2971,11 @@ AMP : AlgaMonoPattern {}
 					//Free dangling patternEnvBusses related to this [param, algaPattern, uniqueID] combo
 					tempSynth.onFree({
 						if(patternOutEnvBussesToBeFreed != nil, {
-							var patternEnvBusAtUniqueID = patternOutEnvBussesToBeFreed[[param, algaPattern, uniqueID]];
+							var paramAlgaPatternUniqueID = [param, algaPattern, uniqueID];
+							var patternEnvBusAtUniqueID = patternOutEnvBussesToBeFreed[paramAlgaPatternUniqueID];
 							if(patternEnvBusAtUniqueID != nil, {
 								patternEnvBusAtUniqueID.free;
-								patternOutEnvBussesToBeFreed.removeAt([param, algaPattern, uniqueID]);
+								patternOutEnvBussesToBeFreed.removeAt(paramAlgaPatternUniqueID);
 							});
 							if(patternOutEnvBussesToBeFreed.size == 0, { patternOutEnvBussesToBeFreed = nil });
 						});
