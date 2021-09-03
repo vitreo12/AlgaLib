@@ -8,10 +8,6 @@ Alga.boot({
 		Saw.ar(\freq.ar([440, 441])) * EnvGen.ar(Env.perc(0.01, 1), doneAction:2) * 0.5
 	}, sampleAccurate:true).add;
 
-	SynthDef(\debug, {
-		\in.ar(0).poll
-	}).add;
-
 	s.sync;
 
 	b = AN({ [(\in.ar * 3).tanh * 0.5, Silent.ar] });
@@ -35,49 +31,29 @@ Alga.boot({
 				param: \in
 			),
 			b,
-			//\none,
-			/*AlgaOut(
+			\none,
+			AlgaOut(
 				node: c,
 				param: \in
 			),
-			c*/
+			c
 		], inf)
 	));
-
-	//0.1.wait;
-
-	//a.from(AlgaOut(c, \in), \out, time:2, sched:1)
 
 	//s.plotTree;
 	//s.scope;
 });
 )
 
-
-a.from(AlgaOut(c, \in), \out, time:2, sched:1)
-
-a.replace(\test2, time:5, sched:1)
-
-a.replace(\test, time:3, sched:1)
-
+//New connection
 a.from(AlgaOut(b, \in), \out, time:2, sched:1)
 
-b.replace({ [(\in.ar * 5).clip * 0.5, Silent.ar] }, time:5)
-
-
-
-//With a new connection?
-a.from(AlgaOut(b, \in), \out, time:2, sched:1)
-
-//When replacing?
+//Replacing the pattern
 a.replace(\test2, time:3, sched:1)
 
-//When replacing and resetting?
-a.replace(\test, time:3, sched:1)
+//New connection
+a.from(PSeq([b, c]), \out, time:2, sched:1)
 
-//Go back
-a.from(b, \out, time:2, sched:1)
-
-//When replacing the receiver?
+//Replacing a receiver
 b.replace({ [(\in.ar * 5).clip * 0.5, Silent.ar] }, time:5)
 b.replace({ [\in.ar * 3, Silent.ar] }, time:10)
