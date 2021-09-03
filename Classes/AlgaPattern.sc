@@ -521,8 +521,11 @@ AlgaPattern : AlgaNode {
 	//Current time used for \out replacement
 	var <currentPatternOutTime;
 
-	//Needed needed to store reset for various alga params (\out, \fx, etc...)
+	//Needed to store reset for various alga params (\out, \fx, etc...)
 	var <currentReset;
+
+	//Needed to store current generic params
+	var <currentGenericParams;
 
 	//Add the \algaNote event to Event
 	*initClass {
@@ -1980,16 +1983,22 @@ AlgaPattern : AlgaNode {
 		currentPatternOutTime = 0;
 	}
 
-	//Reset specific algaParams (\out, \fx, etc...)
-	parseResetOnReplaceAlgaParams {
+	//Reset specific algaParams (\out, \fx, etc...) and genericParams
+	parseResetOnReplaceParams {
 		case
 		{ currentReset.isArray } {
 			^currentReset.as(IdentitySet);
 		}
 		{ currentReset == true } {
-			^[\fx, \out, \dur].as(IdentitySet);
+			^true;
 		};
 		^nil
+	}
+
+	//Store generic params for replaces
+	storeCurrentGenericParams { | key, value |
+		currentGenericParams = currentGenericParams ? IdentityDictionary();
+		currentGenericParams[key] = value;
 	}
 
 	//Build the actual pattern
@@ -2001,6 +2010,7 @@ AlgaPattern : AlgaNode {
 		var parsedOut;
 		var prevPatternOutNodes = currentPatternOutNodes.copy;
 		var foundOut = false;
+		var foundGenericParams = IdentitySet();
 		var patternPairs = Array.newClear;
 
 		//Create new interpStreams. NOTE that the Pfunc in dur uses this, as interpStreams
@@ -2101,6 +2111,8 @@ AlgaPattern : AlgaNode {
 			//This includes things like \lag and \timingOffset
 			if(isAlgaParam.not, {
 				patternPairs = patternPairs.add(paramName).add(value);
+				this.storeCurrentGenericParams(paramName, value); //Store it for replaces
+				foundGenericParams.add(paramName);
 			});
 		});
 
@@ -2112,23 +2124,37 @@ AlgaPattern : AlgaNode {
 
 		//If no dur and replace, get it from previous interpStreams
 		if(replace, {
-			//Check reset
-			var resetSet = this.parseResetOnReplaceAlgaParams;
+			//Check reset for alga params
+			var resetSet = this.parseResetOnReplaceParams;
 			if(resetSet != nil, {
-				//reset \fx
-				if((foundFX.not).and(resetSet.findMatch(\fx) != nil), {
-					parsedFX = nil; currentFX = nil
-				});
+				case
+				{ resetSet.class == IdentitySet } {
+					//reset \fx
+					if((foundFX.not).and(resetSet.findMatch(\fx) != nil), {
+						parsedFX = nil; currentFX = nil
+					});
 
-				//reset \out
-				if((foundOut.not).and(resetSet.findMatch(\out) != nil), {
-					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil
-				});
+					//reset \out
+					if((foundOut.not).and(resetSet.findMatch(\out) != nil), {
+						parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil
+					});
 
-				//reset \dur
-				if((foundDurOrDelta.not).and(resetSet.findMatch(\dur) != nil), {
-					interpStreams = nil;
-				});
+					//reset \dur
+					if((foundDurOrDelta.not).and(resetSet.findMatch(\dur) != nil), {
+						interpStreams = nil;
+					});
+
+					//reset generic params
+					resetSet.do({ | entry | currentGenericParams.removeAt(entry) });
+				}
+				{ resetSet == true } {
+					parsedFX = nil; currentFX = nil; //reset \fx
+					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil; //reset \out
+					interpStreams = nil; //reset \dur
+
+					//reset all generic params
+					if(currentGenericParams != nil, { currentGenericParams.clear });
+				};
 			});
 
 			//Set dur according to previous one
@@ -2152,6 +2178,19 @@ AlgaPattern : AlgaNode {
 				if(currentOut != nil, {
 					patternPairs = patternPairs.add(\algaOut).add(currentOut);
 				});
+			});
+
+			//Add old genericParams
+			if(currentGenericParams != nil, {
+				if(currentGenericParams.size > 0, {
+					currentGenericParams.keysValuesDo({ | key, value |
+						//If that specific generic param hasn't been set from user,
+						//use the one from currentGenericParams if available
+						if(foundGenericParams.findMatch(key) == nil, {
+							patternPairs = patternPairs.add(key).add(value)
+						})
+					})
+				})
 			});
 		}, {
 			//Else, default it to 1
@@ -2276,11 +2315,12 @@ AlgaPattern : AlgaNode {
 
 	//Buffer == replace
 	interpolateBuffer { | sender, param, time, sched |
-		//var args = [ param, sender ]; //New buffer connection... Should it be set in the def? (param: sender)?
+		//New buffer connection. Should it be set in the def? (param: sender)? NO, it won't work!
+		var args = [ param, sender ];
 		("AlgaPattern: changing a Buffer parameter: '" + param.asString ++ ". This will trigger 'replace'.").warn;
 		^this.replace(
-			def: (def: this.getSynthDef, param: sender),
-			//args: args,
+			def: (def: this.getSynthDef),
+			args: args,
 			time: time,
 			sched: sched
 		);
