@@ -1,4 +1,90 @@
-//Same as ProxySynthDef, but with AlgaEnvGate only used to free the synth, not multiplying output.
+// AlgaLib: SuperCollider implementation of the Alga live coding language
+// Copyright (C) 2020-2021 Francesco Cameli
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+//Stores both synthDef and synthDef with \out control (for AlgaPattern).
+//and dispatches the methods to both of them.
+AlgaSynthDefSpec {
+	var <synthDef, <synthDefPatternOut;
+
+	*new { | synthDef, synthDefPatternOut |
+		^super.new.init(synthDef, synthDefPatternOut)
+	}
+
+	init { | argSynthDef, argSynthDefPatternOut |
+		synthDef = argSynthDef;
+		synthDefPatternOut = argSynthDefPatternOut;
+	}
+
+	add { | libname, completionMsg, keepDef = true |
+		synthDef.add(libname, completionMsg, keepDef);
+		synthDefPatternOut.add(libname, completionMsg, keepDef);
+	}
+
+	send { | server, completionMsg |
+		synthDef.send(server, completionMsg);
+		synthDefPatternOut.send(server, completionMsg);
+	}
+
+	load { | server, completionMsg, dir |
+		dir = dir ? AlgaSynthDef.synthDefDir;
+		synthDef.load(server, completionMsg, dir);
+		synthDefPatternOut.load(server, completionMsg, dir);
+	}
+
+	store { | libname=\global, dir, completionMsg, mdPlugin |
+		dir = dir ? AlgaSynthDef.synthDefDir;
+		synthDef.store(libname, dir, completionMsg, mdPlugin);
+		synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin);
+	}
+
+	asSynthDesc { | libname=\global, keepDef = true |
+		^synthDef.asSynthDesc(libname, keepDef)
+	}
+
+	name {
+		^synthDef.name
+	}
+
+	numChannels {
+		^synthDef.numChannels
+	}
+
+	rate {
+		^synthDef.rate
+	}
+
+	explicitFree {
+		^synthDef.explicitFree
+	}
+
+	outsMapping {
+		^synthDef.outsMapping
+	}
+
+	//This doesn't work actually
+	/*
+	doesNotUnderstand { | selector ...args |
+		^synthDef.perform(selector, args)
+	}
+	*/
+}
+
+//Hybrid between a normal SynthDef and a ProxySynthDef (makeFadeEnv).
+//makeFadeEnv, however, does not multiply the output, but it is only used for Alga's internal
+//freeing mechanism. Furthermore, outsMapping is provided.
 AlgaSynthDef : SynthDef {
 
 	var <>rate, <>numChannels;
@@ -8,18 +94,63 @@ AlgaSynthDef : SynthDef {
 
 	var <>outsMapping;
 
-	//Use OffsetOut by default!
-	classvar <>sampleAccurate=true;
+	//Default sampleAccurate to false. If user needs OffsetOut (for pattern accuracy), he must set it to true.
+	*new { | name, func, rates, prependArgs, outsMapping, sampleAccurate = false, variants, metadata |
+		^this.new_inner(
+			name: name,
+			func: func,
+			rates: rates,
+			prependArgs: prependArgs,
+			outsMapping: outsMapping,
+			sampleAccurate: sampleAccurate,
+			variants: variants,
+			metadata: metadata
+		)
+	}
 
-	*new { | name, func, rates, prependArgs, makeFadeEnv = true, channelOffset = 0,
-		chanConstraint, rateConstraint, outsMapping |
+	*new_inner { | name, func, rates, prependArgs, outsMapping,
+		sampleAccurate = false, variants, metadata, makeFadeEnv = true, makeOutDef = true |
+		var def = this.new_inner_inner(
+			name: name,
+			func: func,
+			rates: rates,
+			prependArgs: prependArgs,
+			outsMapping: outsMapping,
+			sampleAccurate: sampleAccurate,
+			variants: variants,
+			metadata: metadata,
+			makeFadeEnv: makeFadeEnv,
+			makeOutDef: false
+		);
 
+		if(makeOutDef, {
+			var defOut;
+			name = (name.asString ++ "_patternTempOut").asSymbol;
+			defOut = this.new_inner_inner(
+				name: name,
+				func: func,
+				rates: rates,
+				prependArgs: prependArgs,
+				outsMapping: outsMapping,
+				sampleAccurate: sampleAccurate,
+				variants: variants,
+				metadata: metadata,
+				makeFadeEnv: makeFadeEnv,
+				makeOutDef: true
+			);
+			^AlgaSynthDefSpec(def, defOut);
+		});
+
+		^def;
+	}
+
+	*new_inner_inner { | name, func, rates, prependArgs, outsMapping,
+		sampleAccurate = false, variants, metadata, makeFadeEnv = true, makeOutDef = false, ignoreOutWarning = false |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
-		var hasGateArg=false, hasOutArg=false;
 		var outerBuildSynthDef = UGen.buildSynthDef;
 
 		def = super.new(name, {
-			var out, outCtl;
+			var out, outCtl, buildSynthDef;
 
 			// build the controls from args
 			output = SynthDef.wrap(func, rates, prependArgs);
@@ -27,8 +158,36 @@ AlgaSynthDef : SynthDef {
 
 			// protect from user error
 			if(output.isKindOf(UGen) and: { output.synthDef != UGen.buildSynthDef }) {
-				Error("Cannot share UGens between NodeProxies:" + output).throw
+				Error("AlgaSynthdef: cannot share UGens between AlgaNodes:" + output).throw
 			};
+
+			buildSynthDef = UGen.buildSynthDef;
+
+			//Check for invalid controlNames set by user (\out, \gate, ...)
+			buildSynthDef.allControlNames.do({ | controlName |
+				var error = false;
+				var controlNameName = controlName.name;
+
+				//Don't \gate arg when makeFadeEnv is true, otherwise it's fine (it's used in AlgaStartup)
+				if((makeFadeEnv.and(controlNameName == \gate)).or(controlNameName == \out).or(controlNameName == \patternTempOut), {
+					error = true
+				});
+
+				if(error, {
+					("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally.").error;
+					^nil
+				});
+			});
+
+			//Check if user has explicit Outs, this is not permitted
+			if(ignoreOutWarning.not, {
+				buildSynthDef.children.do({ | ugen |
+					if(ugen.isKindOf(AbstractOut), {
+						"AlgaSynthDef: Out / OffsetOut cannot be explicitly set. They are declared internally.".error;
+						^nil;
+					});
+				});
+			});
 
 			// protect from accidentally returning wrong array shapes
 			if(output.containsSeqColl) {
@@ -36,8 +195,7 @@ AlgaSynthDef : SynthDef {
 				output = output.collect { |each| each.unbubble };
 				// otherwise flatten, but warn
 				if(output.containsSeqColl) {
-					"Synth output should be a flat array.\n%\nFlattened to: %\n"
-					"See NodeProxy helpfile:routing\n\n".format(output, output.flat).warn;
+					"AlgaSynthDef: Synth output should be a flat array.\n%\nFlattened to: %".format(output, output.flat).warn;
 					output = output.flat;
 				};
 			};
@@ -49,101 +207,51 @@ AlgaSynthDef : SynthDef {
 			rate = output.rate;
 			isScalar = rate === 'scalar';
 
-			// check for out key. this is used by internal control.
-			func.def.argNames.do { arg name;
-				if(name === \out) { hasOutArg = true };
-				if(name === \gate) { hasGateArg = true };
-			};
-
-			if(isScalar.not and: hasOutArg)
-			{
-				"out argument is provided internally!".error; // avoid overriding generated out
-				^nil
-			};
-
 			// rate is only scalar if output was nil or if it was directly produced by an out ugen
 			// this allows us to conveniently write constant numbers to a bus from the synth
 			// if you want the synth to write nothing, return nil from the UGen function.
-
-			if(isScalar and: { output.notNil } and: { UGen.buildSynthDef.children.last.isKindOf(AbstractOut).not }) {
+			if(isScalar and: { output.notNil } and: { buildSynthDef.children.last.isKindOf(AbstractOut).not }) {
 				rate = 'control';
 				isScalar = false;
 			};
 
-			//detect inner gates
+			//Only makeFadeEnv if the Synth can't free itself
 			canFree = UGen.buildSynthDef.children.canFreeSynth;
-			hasOwnGate = UGen.buildSynthDef.hasGateControl;
-			makeFadeEnv = if(hasOwnGate and: { canFree.not }) {
-				"The gate control should be able to free the synth!\n%".format(func).warn; false
-			} {
-				makeFadeEnv and: { (isScalar || canFree).not };
-			};
-
-			hasOwnGate = canFree && hasOwnGate; //only counts when it can actually free synth.
-			if(hasOwnGate.not && hasGateArg) {
-				"supplied gate overrides inner gate.".error;
-				^nil
-			};
+			makeFadeEnv = makeFadeEnv and: { (isScalar || canFree).not };
 
 			//the AlgaEnvGate will take care of freeing the synth, even if not used to multiply
-			//with output!
+			//with output! This is fundamental for the \fadeTime mechanism in Alga to work,
+			//freeing synths at the right time.
 			envgen = if(makeFadeEnv, {
 				AlgaEnvGate.kr(i_level: 0, doneAction:2);
 			}, {
 				1.0;
 			});
 
-			if(chanConstraint.notNil
-				and: { chanConstraint < numChannels }
-				and: { isScalar.not },
-				{
-					if(rate === 'audio') {
-						postf("%: wrapped channels from % to % channels\n", NodeProxy.buildProxy, numChannels, chanConstraint);
-						output = NumChannels.ar(output, chanConstraint, true);
-						numChannels = chanConstraint;
-					} {
-						postf("%: kept first % channels from % channel input\n", NodeProxy.buildProxy, chanConstraint, numChannels);
-						output = output.keep(chanConstraint);
-						numChannels = chanConstraint;
-					}
-
-			});
-
-			//"passed in rate: % output rate: %\n".postf(rateConstraint, rate);
-
 			if(isScalar, {
 				output
 			}, {
-				// rate adaption. \scalar proxy means neutral
-				if(rateConstraint.notNil and: { rateConstraint != \scalar and: { rateConstraint !== rate }}) {
-					if(rate === 'audio') {
-						output = A2K.kr(output);
-						rate = 'control';
-						postf("%: adopted proxy input to control rate\n", NodeProxy.buildProxy);
-					} {
-						if(rateConstraint === 'audio') {
-							output = K2A.ar(output);
-							rate = 'audio';
-							postf("%: adopted proxy input to audio rate\n", NodeProxy.buildProxy);
-						}
-					}
-				};
-				outCtl = Control.names(\out).ir(0) + channelOffset;
-				(if(rate === \audio and: { sampleAccurate }) { OffsetOut } { Out }).multiNewList([rate, outCtl] ++ output)
+				outCtl = Control.names(\out).ir(0);
+				(if(rate === \audio and: { sampleAccurate }) { OffsetOut } { Out }).multiNewList([rate, outCtl] ++ output);
+				if(makeOutDef, {
+					var outTempCtl = Control.names(\patternTempOut).ir(0);
+					(if(rate === \audio and: { sampleAccurate }) { OffsetOut } { Out }).multiNewList([rate, outTempCtl] ++ output)
+				});
 			})
 		});
 
+		//Reset
 		UGen.buildSynthDef = outerBuildSynthDef;
 
 		// set the synthDefs instvars, so they can be used later
-
 		def.rate = rate;
 		def.numChannels = numChannels;
-		def.canReleaseSynth = makeFadeEnv || hasOwnGate;
+		def.canReleaseSynth = makeFadeEnv;
 		def.canFreeSynth = def.canReleaseSynth || canFree;
 
-		//this is used for AlgaPattern...
+		//this is used for AlgaPattern.
 		//makeFadeEnv = true can be deceiving.
+		//AlgaPatterns' AlgaSynthDefs should just set it to false
 		def.explicitFree = canFree;
 
 		//Set outsMapping as \out1 -> 0, etc...
@@ -190,7 +298,10 @@ AlgaSynthDef : SynthDef {
 			});
 		});
 
-		//[\defcanReleaseSynth, def.canReleaseSynth, \defcanFreeSynth, def.canFreeSynth].debug;
+		//Add variants and metadata
+		if(variants != nil, { def.variants = variants });
+		if(metadata != nil, { def.metadata = metadata });
+
 		^def
 	}
 }

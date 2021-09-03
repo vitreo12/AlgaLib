@@ -1,3 +1,19 @@
+// AlgaLib: SuperCollider implementation of the Alga live coding language
+// Copyright (C) 2020-2021 Francesco Cameli
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 AlgaBlock {
 
 	//all the nodes for this block
@@ -13,7 +29,7 @@ AlgaBlock {
 	var <runningIndex;
 
 	//bottom most and top most nodes in this block
-	var <bottomOutNodes, <topInNodes;
+	var <bottomOutNodes; //, <topInNodes;
 
 	//the index for this block in the AlgaBlocksDict global dict
 	var <blockIndex;
@@ -29,7 +45,7 @@ AlgaBlock {
 		nodesDict      = IdentityDictionary(20);
 		statesDict     = IdentityDictionary(20);
 		bottomOutNodes = IdentityDictionary();
-		topInNodes     = IdentityDictionary();
+		//topInNodes     = IdentityDictionary();
 	}
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
@@ -65,7 +81,7 @@ AlgaBlock {
 
 		//Remove this block from AlgaBlocksDict if it's empty!
 		if(nodesDict.size == 0, {
-			("Deleting empty block: " ++ blockIndex).warn;
+			//("Deleting empty block: " ++ blockIndex).warn;
 			AlgaBlocksDict.blocksDict.removeAt(nodeBlockIndex);
 		});
 	}
@@ -118,7 +134,11 @@ AlgaBlock {
 			if(item == nil, {
 				removeCondition = true;
 			}, {
-				removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0);
+				if(item.patternOutNodes != nil, {
+					removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0);
+				}, {
+					removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0).and(item.patternOutNodes == 0);
+				});
 			});
 
 			//removeCondition.postln;
@@ -146,7 +166,7 @@ AlgaBlock {
 
 				//Remove node from block
 				if(result.not, {
-					("Removing node at group " ++ node.group ++ " from block number " ++ blockIndex).warn;
+					//("Removing node at group " ++ node.group ++ " from block number " ++ blockIndex).warn;
 					this.removeNode(node);
 				});
 
@@ -179,9 +199,16 @@ AlgaBlock {
 				//it's also essential for this to be before the next loop
 				statesDict[node] = true;
 
+				//rearrange inputs to this, this will add the inNodes
 				node.inNodes.nodesLoop ({ | inNode |
-					//rearrangeInputs to this, this will add the inNodes
 					this.rearrangeBlockLoop(inNode);
+				});
+
+				//rearrange inputs to this, this will add the patternOutNodes
+				if(node.patternOutNodes != nil, {
+					node.patternOutNodes.nodesLoop ({ | inNode |
+						this.rearrangeBlockLoop(inNode);
+					});
 				});
 
 				//Add this
@@ -206,8 +233,14 @@ AlgaBlock {
 		}, {
 			nodesDict.do({ | node |
 				//Find the ones with no outNodes but at least one inNode
-				if((node.outNodes.size == 0).and(node.inNodes.size > 0), {
-					bottomOutNodes.put(node, node);
+				if(node.patternOutNodes != nil, {
+					if((node.outNodes.size == 0).and(node.inNodes.size > 0), {
+						bottomOutNodes.put(node, node);
+					});
+				}, {
+					if((node.outNodes.size == 0).and(node.inNodes.size > 0).and(node.patternOutNodes.size > 0), {
+						bottomOutNodes.put(node, node);
+					});
 				});
 
 				//init statesDict for all nodes to false
@@ -226,14 +259,6 @@ AlgaBlocksDict {
 	}
 
 	*createNewBlockIfNeeded { | receiver, sender |
-		var newBlockIndex;
-		var newBlock;
-
-		var receiverBlockIndex;
-		var senderBlockIndex;
-		var receiverBlock;
-		var senderBlock;
-
 		//This happens when patching a simple number or array in to set a param
 		if((receiver.isAlgaNode.not).or(sender.isAlgaNode.not), { ^nil });
 
@@ -242,6 +267,28 @@ AlgaBlocksDict {
 			("AlgaBlocksDict: Trying to create a block between two AlgaNodes on different servers").error;
 			^receiver;
 		});
+
+		//Check if groups are instantiated, otherwise push action to scheduler
+		if((receiver.group != nil).and(sender.group != nil), {
+			this.createNewBlockIfNeeded_inner(receiver, sender)
+		}, {
+			receiver.scheduler.addAction(
+				condition: { (receiver.group != nil).and(sender.group != nil) },
+				func: {
+					this.createNewBlockIfNeeded_inner(receiver, sender)
+				}
+			)
+		});
+	}
+
+	*createNewBlockIfNeeded_inner { | receiver, sender |
+		var newBlockIndex;
+		var newBlock;
+
+		var receiverBlockIndex;
+		var senderBlockIndex;
+		var receiverBlock;
+		var senderBlock;
 
 		//Unpack things
 		receiverBlockIndex = receiver.blockIndex;
