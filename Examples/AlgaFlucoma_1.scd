@@ -16,7 +16,7 @@ Alga.boot({
 	c >>.freq b;
 
 	//Create feedback: patch b's output to a's \fm input, mapping -1 / 1 to -200 / 300
-	a.from(b, \fm, scale:[-200, 300], time: 0.5);
+	a.from(b, \fm, scale:[-200, 300], time:0.5);
 });
 )
 
@@ -24,7 +24,7 @@ Alga.boot({
 a.from(b, \fm, scale:[-1432, 679], time:3);
 
 //Try new base frequencies (change the value)
-a.from(1, \freq, time:2);
+a.from(100, \freq, time:2);
 
 //Bye bye
 a.clear(time:3);

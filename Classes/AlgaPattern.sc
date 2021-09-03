@@ -2315,12 +2315,9 @@ AlgaPattern : AlgaNode {
 
 	//Buffer == replace
 	interpolateBuffer { | sender, param, time, sched |
-		//New buffer connection. Should it be set in the def? (param: sender)? NO, it won't work!
-		var args = [ param, sender ];
 		("AlgaPattern: changing a Buffer parameter: '" + param.asString ++ ". This will trigger 'replace'.").warn;
 		^this.replace(
-			def: (def: this.getSynthDef),
-			args: args,
+			def: (def: this.getSynthDef, (param): sender), //escape param with ()
 			time: time,
 			sched: sched
 		);
