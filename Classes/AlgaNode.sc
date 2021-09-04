@@ -2564,7 +2564,7 @@ AlgaNode {
 
 		//If it was playing, free previous playSynth
 		if(isPlaying, {
-			this.stop;
+			this.stopInner(replace: true);
 			wasPlaying = true;
 		});
 
@@ -2604,7 +2604,7 @@ AlgaNode {
 
 		//If node was playing, or .replace has been called while .stop / .clear, play again
 		if(wasPlaying/*.or(beingStopped)*/, {
-			this.playInner(replace:true)
+			//this.playInner(replace: true)
 		});
 
 		//Reset flag
@@ -2629,7 +2629,8 @@ AlgaNode {
 					keepScalesIn:keepScalesIn, keepScalesOut:keepScalesOut
 				)
 			},
-			sched: sched
+			sched: sched,
+			topPriority: true //always top priority
 		);
 
 		//Not cleared
@@ -2900,18 +2901,6 @@ AlgaNode {
 		})
 	}
 
-	freePlaySynth { | time, isClear |
-		if(isPlaying, {
-			if(isClear.not, {
-				//time has already been calculated if isClear == true
-				time = this.calculateTemporaryLongestWaitTime(time, playTime);
-			});
-			playSynth.set(\gate, 0, \fadeTime, time);
-			isPlaying = false;
-			beingStopped = true;
-		})
-	}
-
 	playInner { | time, channelsToPlay, sched, replace = false |
 		//Check only for synthBus, it makes more sense than also checking for synth.algaIstantiated,
 		//As it allows meanwhile to create the play synth while synth is getting instantiated
@@ -2920,24 +2909,47 @@ AlgaNode {
 			func: { this.createPlaySynth(time, channelsToPlay, replace) },
 			sched: sched
 		);
-
 	}
 
 	play { | time, chans, sched |
 		this.playInner(time, chans, sched);
 	}
 
-	stopInner { | time, sched, isClear = false |
-		if(isClear, {
+	freePlaySynth { | time, isClear |
+		if(isPlaying, {
+			if(isClear.not, {
+				//time has already been calculated if isClear == true
+				time = this.calculateTemporaryLongestWaitTime(time, playTime);
+			});
+			if(time == 0, {
+				//If time == 0, free right away (or it will be freed next block with \fadeTime, 0)
+				playSynth.free
+			}, {
+				//Set \fadeTime
+				playSynth.set(\gate, 0, \fadeTime, time)
+			});
+			isPlaying = false;
+			beingStopped = true;
+		})
+	}
+
+	stopInner { | time, sched, isClear = false, replace = false |
+		case
+		{ replace == true } {
 			//Already in a scheduled action
-			this.freePlaySynth(time, true);
-		}, {
-			scheduler.addAction(
-				condition: { this.isPlaying },
-				func: { this.freePlaySynth(time, false); },
-				sched: sched
-			);
-		});
+			^this.freePlaySynth(time, false);
+		}
+		{ isClear == true } {
+			//Already in a scheduled action
+			^this.freePlaySynth(time, true);
+		};
+
+		//Normal case
+		scheduler.addAction(
+			condition: { this.isPlaying },
+			func: { this.freePlaySynth(time, false); },
+			sched: sched
+		);
 	}
 
 	stop { | time, sched |

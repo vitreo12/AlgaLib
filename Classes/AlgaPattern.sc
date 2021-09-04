@@ -825,6 +825,8 @@ AlgaPattern : AlgaNode {
 			senderRate = "control";
 			senderNumChannels = paramNumChannels;
 			entry = paramDefault;
+			("AlgaPattern: trying to set 'nil' for param '" ++ paramName ++
+				"'. Using default value(" ++ paramDefault.asString ++") instead").error;
 			validParam = true;
 		};
 
@@ -2557,12 +2559,11 @@ AlgaPattern : AlgaNode {
 				interpStreams.freeAllSynthsAndBussesOnReplace;
 			}, {
 				var interpStreamsOld = interpStreams;
-				var algaReschedulingEventStreamPlayerOld = interpStreams.algaReschedulingEventStreamPlayer;
 				if(time == nil, { time = longestWaitTime });
-				if(algaReschedulingEventStreamPlayerOld != nil, {
+				if(interpStreamsOld != nil, {
 					fork {
 						(time + 1.0).wait;
-						algaReschedulingEventStreamPlayerOld.stop;
+						interpStreamsOld.algaReschedulingEventStreamPlayer.stop;
 						//freeAllSynthsAndBussesOnReplace MUST come after algaReschedulingEventStreamPlayer.stop!
 						interpStreamsOld.freeAllSynthsAndBussesOnReplace;
 					}

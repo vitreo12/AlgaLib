@@ -306,7 +306,7 @@ AlgaScheduler : AlgaThread {
 				//This will be the core of clock / server syncing of actions
 				//Consume actions (they are ordered thanks to OrderedIdentitySet)
 				while({ actions.size > 0 }, {
-					var action, sched;
+					var action, sched, topPriority;
 
 					if(cascadeMode, {
 						//if cascading, pop action from top of the list.
@@ -326,8 +326,13 @@ AlgaScheduler : AlgaThread {
 					//Individual sched for the action
 					sched = action[2];
 
+					//Check if the specific action has to be executed with top priority
+					topPriority = action[3];
+
 					//Found a sched value (run in the future on the clock)
 					if(sched > 0, {
+						var functionOnSched;
+
 						if(interruptOnSched, {
 							//Interrupt here until clock releases.
 							//New actions will be pushed to interruptOnSchedActions
@@ -345,8 +350,8 @@ AlgaScheduler : AlgaThread {
 							actions.clear;
 							spinningActions.clear;
 
-							//Sched the unhanging in the future
-							clock.algaSchedAtQuantOnce(sched, {
+							//Function to execute on sched
+							functionOnSched = {
 								//If condition is met, execute the scheduled action
 								if(action[0].value, {
 									this.executeFunc(
@@ -373,14 +378,21 @@ AlgaScheduler : AlgaThread {
 
 								//Unhang if needed
 								this.unhangSemaphore;
+							};
+
+							//In sched time, execute the function
+							if(topPriority, {
+								clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
+							}, {
+								clock.algaSchedAtQuantOnce(sched, functionOnSched)
 							});
 						}, {
 							//Only remove the one action and postpone it in the future.
 							//Other actions would still go on!
 							this.removeAction(action);
 
-							//In sched time, execute the function!
-							clock.algaSchedAtQuantOnce(sched, {
+							//Function to execute on sched
+							functionOnSched = {
 								//If condition is met, execute the scheduled action
 								if(action[0].value, {
 									this.executeFunc(
@@ -394,6 +406,13 @@ AlgaScheduler : AlgaThread {
 
 								//Unhang if needed
 								this.unhangSemaphore;
+							};
+
+							//In sched time, execute the function
+							if(topPriority, {
+								clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
+							}, {
+								clock.algaSchedAtQuantOnce(sched, functionOnSched)
 							});
 						});
 					}, {
@@ -432,26 +451,30 @@ AlgaScheduler : AlgaThread {
 	}
 
 	//Default condition is just { true }, just execute it when its time comes on the scheduler
-	addAction { | condition, func, sched = 0 |
+	addAction { | condition, func, sched = 0, topPriority = false |
 		var action;
 
+		//Only numbers
+		if(sched.isNumber.not, { sched = 0 });
+
+		//Only booleans
+		if((topPriority != false).and(topPriority != true), { topPriority = false });
+
+		//No condition == { true }
 		condition = condition ? { true };
 
-		sched = sched ? 0;
-		if(sched < 0, { sched = 0 });
-
+		//Only functions
 		if((condition.isFunction.not).or(func.isFunction.not), {
 			"AlgaScheduler: addAction only accepts Functions as both the condition and the func arguments".error;
 			^this;
 		});
 
-		if(sched.isNumber.not, {
-			"AlgaScheduler: addAction only accepts Numbers as sched arguments".error;
-			^this;
-		});
+		//Only positive numbers
+		sched = sched ? 0;
+		if(sched < 0, { sched = 0 });
 
-		//new action
-		action = [condition, func, sched];
+		//New action
+		action = [condition, func, sched, topPriority];
 
 		//We're in a callee situation: add this node after the index of currentExecAction
 		if(currentExecAction != nil, {
@@ -502,3 +525,21 @@ AlgaPatch {
 		^nil;
 	}
 }
+
+/*
+//Debug makeBundle to check ordering of bundles
++Server {
+	makeBundle { |time, func, bundle|
+		this.openBundle(bundle);
+		try {
+			func.value(this);
+			bundle = this.closeBundle(time);
+		} {|error|
+			addr = addr.saveAddr; // on error restore the normal NetAddr
+			error.throw
+		};
+		bundle.asString.warn;
+		^bundle
+	}
+}
+*/
