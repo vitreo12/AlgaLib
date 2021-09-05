@@ -1580,7 +1580,12 @@ AlgaPattern : AlgaNode {
 		this.createSynthBus;
 
 		//Create the actual pattern.
-		this.createPattern(replace, keepChannelsMapping, keepScale, sched);
+		this.createPattern(
+			replace: replace,
+			keepChannelsMapping: keepChannelsMapping,
+			keepScale: keepScale,
+			sched: sched
+		);
 	}
 
 	//Build spec from ListPattern
@@ -1601,7 +1606,29 @@ AlgaPattern : AlgaNode {
 		this.createSynthBus;
 
 		//Create the actual pattern.
-		this.createPattern(replace, keepChannelsMapping, keepScale, sched);
+		this.createPattern(
+			replace: replace,
+			keepChannelsMapping: keepChannelsMapping,
+			keepScale: keepScale,
+			sched: sched
+		);
+	}
+
+	//Check functions
+	checkListPatternFunctions { | listPattern, functions |
+		functions = functions ? IdentityDictionary();
+		listPattern.list.do({ | entry, i |
+			if(entry.isListPattern, {
+				this.checkListPatternFunctions(entry, functions)
+			}, {
+				if(entry.class == Function, {
+					var defName = ("alga_" ++ UniqueID.next).asSymbol;
+					functions[defName] = entry;
+					listPattern.list[i] = defName; //replace entry in listPattern with the synthDef symbol
+				});
+			});
+		});
+		^[functions, listPattern]
 	}
 
 	//Check rates, numChannels, Symbols and controlNames
@@ -1702,29 +1729,78 @@ AlgaPattern : AlgaNode {
 	//Multiple Symbols over a ListPattern
 	dispatchListPattern { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
-		var controlNamesSum;
+		var functionsAndListPattern;
+		var functions;
+		var validFuncs = false;
 
-		//Create numChannelsList, rateList and controlNamesList (they're nil otherwise)
-		numChannelsList  = IdentityDictionary();
-		rateList         = IdentityDictionary();
-		controlNamesList = IdentityDictionary();
+		//The function that checks validity and builds pattern from ListPattern
+		var checkValidityAndBuildFromListPattern = {
+			var controlNamesSum;
 
-		//Check rates, numChannels, Symbols and controlNames
-		controlNamesSum = this.checkListPatternValidityAndReturnControlNames(def);
-		if(controlNamesSum == nil, { ^this });
+			//Create numChannelsList, rateList and controlNamesList (they're nil otherwise)
+			numChannelsList  = IdentityDictionary();
+			rateList         = IdentityDictionary();
+			controlNamesList = IdentityDictionary();
 
-		//Create controlNames from controlNamesSum
-		this.createControlNamesAndParamsConnectionTime(controlNamesSum);
+			//Check rates, numChannels, Symbols and controlNames
+			controlNamesSum = this.checkListPatternValidityAndReturnControlNames(def);
+			if(controlNamesSum != nil, {
+				//Create controlNames from controlNamesSum
+				this.createControlNamesAndParamsConnectionTime(controlNamesSum);
 
-		//synthDef will be the ListPattern
-		synthDef = def;
+				//synthDef will be the ListPattern
+				synthDef = def;
 
-		this.buildFromListPattern(
-			initGroups, replace,
-			keepChannelsMapping:keepChannelsMapping,
-			keepScale:keepScale,
-			sched:sched
-		);
+				//Build pattern from ListPattern
+				this.buildFromListPattern(
+					initGroups: initGroups,
+					replace: replace,
+					keepChannelsMapping:keepChannelsMapping,
+					keepScale:keepScale,
+					sched:sched
+				);
+			});
+		};
+
+		//Check if there are Functions to be sent to server as AlgaSynthDefs
+		functionsAndListPattern = this.checkListPatternFunctions(def);
+		functions = functionsAndListPattern[0];
+		if(functions.size > 0, {
+			validFuncs = true;
+			def = functionsAndListPattern[1]; //contains the symbols in place of the functions
+		});
+
+		//Contains Functions: they need to be sent to server and waited
+		if(validFuncs, {
+			var dispatchCondition = Condition();
+
+			//Need to wait for server to receive the sdefs
+			fork {
+				//Send all AlgaSynthDefs
+				functions.keysValuesDo({ | defName, func |
+					AlgaSynthDef(
+						defName,
+						func
+					).send(server);
+				});
+
+				"aah".error;
+
+				//Wait
+				server.sync(dispatchCondition);
+			};
+
+			//All good: go ahead with checking validity of all compiled synthDefs
+			scheduler.addAction(
+				condition: { dispatchCondition.test == true },
+				func: {
+					checkValidityAndBuildFromListPattern.value;
+				}
+			);
+		}, {
+			//Doesn't contain Functions, just go ahead
+			checkValidityAndBuildFromListPattern.value;
+		});
 	}
 
 	//Parse a single \fx event
