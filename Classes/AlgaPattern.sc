@@ -1755,9 +1755,9 @@ AlgaPattern : AlgaNode {
 				this.buildFromListPattern(
 					initGroups: initGroups,
 					replace: replace,
-					keepChannelsMapping:keepChannelsMapping,
-					keepScale:keepScale,
-					sched:sched
+					keepChannelsMapping: keepChannelsMapping,
+					keepScale: keepScale,
+					sched: sched
 				);
 			});
 		};
@@ -1781,16 +1781,14 @@ AlgaPattern : AlgaNode {
 					AlgaSynthDef(
 						defName,
 						func
-					).send(server);
+					).sendAndAddToGlobalDescLib(server);
 				});
-
-				"aah".error;
 
 				//Wait
 				server.sync(dispatchCondition);
 			};
 
-			//All good: go ahead with checking validity of all compiled synthDefs
+			//All SynthDefs sent: go ahead with validity check and building
 			scheduler.addAction(
 				condition: { dispatchCondition.test == true },
 				func: {
@@ -1798,7 +1796,7 @@ AlgaPattern : AlgaNode {
 				}
 			);
 		}, {
-			//Doesn't contain Functions, just go ahead
+			//Doesn't contain Functions, just go ahead with validity check and building
 			checkValidityAndBuildFromListPattern.value;
 		});
 	}

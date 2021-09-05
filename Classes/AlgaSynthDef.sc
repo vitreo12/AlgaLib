@@ -34,8 +34,13 @@ AlgaSynthDefSpec {
 	}
 
 	send { | server, completionMsg |
-		synthDef.send(server, completionMsg);
+		synthDef.send(server, completionMsg.value(server));
 		synthDefPatternOut.send(server, completionMsg);
+	}
+
+	sendAndAddToGlobalDescLib { | server, completionMsg |
+		synthDef.sendAndAddToGlobalDescLib(server, completionMsg);
+		synthDefPatternOut.sendAndAddToGlobalDescLib(server, completionMsg);
 	}
 
 	load { | server, completionMsg, dir |
@@ -303,5 +308,16 @@ AlgaSynthDef : SynthDef {
 		if(metadata != nil, { def.metadata = metadata });
 
 		^def
+	}
+
+	//Always store in global libname
+	sendAndAddToGlobalDescLib { | server, completionMsg |
+		desc = this.asSynthDesc(\global, true);
+		this.send(server, completionMsg)
+	}
+
+	//Always store in global libname
+	add { | libname, completionMsg, keepDef = true |
+		^super.add(\global, completionMsg, keepDef)
 	}
 }

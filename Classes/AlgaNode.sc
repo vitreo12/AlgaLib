@@ -870,13 +870,16 @@ AlgaNode {
 				("alga_" ++ UniqueID.next).asSymbol,
 				def,
 				outsMapping:outsMapping
-			).send(server);
+			).sendAndAddToGlobalDescLib(server);
 
+			//Just get standard SynthDef
 			if(synthDef.class == AlgaSynthDefSpec, { synthDef = synthDef.synthDef });
 
+			//Wait
 			server.sync(dispatchCondition);
 		};
 
+		//All good, go ahead with the build function
 		scheduler.addAction(
 			condition: { dispatchCondition.test == true },
 			func: {
