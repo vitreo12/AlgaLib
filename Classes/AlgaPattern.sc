@@ -388,7 +388,18 @@ AlgaPatternArg {
 	isAlgaPatternArg { ^true }
 }
 
-//This class is used for the \out parameter
+//This class is used for the \out parameter... Should it also store time?
+//Perhaps, the first node -> time pair should be considered if using a ListPattern:
+/*
+out: (
+Pseq([
+AlgaOut(a, \freq, scale:[20, 30], time:2),
+AlgaOut(b, \freq, scale:[10, 50], time:3),
+b,
+a
+], inf)
+)
+*/
 AlgaOut {
 	var <node, <param, <chans, <scale;
 
@@ -458,23 +469,11 @@ AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
-	1) out: (See next)
+	1) allow Functions in AlgaTemp and ListPatterns for 'def'
 
-	2) allow Functions in AlgaTemp and ListPatterns for 'def'
+	2) detune / scale / ... / -> freq (https://doc.sccode.org/Classes/Event.html)
 
-	3) detune / scale / ... / -> freq (https://doc.sccode.org/Classes/Event.html)
-
-	4) mixFrom()
-
-	- out: (
-	node: Pseq([a, b], inf),
-	param: \freq,
-	scale: Pseq([[20, 400], [30, 500]], inf),
-	chans: Pseq([1, 2], inf).
-	time: 1
-	)
-
-	- out: Pseq([a, b], inf)
+	3) mixFrom()
 	*/
 
 	//The actual Patterns to be manipulated
