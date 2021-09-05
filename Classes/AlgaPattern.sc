@@ -473,11 +473,7 @@ AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
-	1) allow Functions in AlgaTemp and ListPatterns for 'def'
-
-	2) detune / scale / ... / -> freq (https://doc.sccode.org/Classes/Event.html)
-
-	3) mixFrom()
+	1) mixFrom()
 	*/
 
 	//The actual Patterns to be manipulated
