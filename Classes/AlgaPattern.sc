@@ -437,6 +437,10 @@ AlgaTemp {
 		scale  = argScale.asStream;  //Pattern support
 	}
 
+	setDef { | argDef |
+		def = argDef
+	}
+
 	checkValidSynthDef { | def |
 		var synthDesc = SynthDescLib.global.at(def);
 		var synthDef;
@@ -636,7 +640,8 @@ AlgaPattern : AlgaNode {
 		var tempSynthArgs = Array.newClear;
 		var tempNumChannels = algaTemp.numChannels;
 		var tempRate = algaTemp.rate;
-		var def, params, controlNames;
+		var def, algaTempDef, controlNames;
+		var defIsEvent = false;
 
 		//Check AlgaTemp validity
 		if(algaTemp.valid.not, {
@@ -644,9 +649,17 @@ AlgaPattern : AlgaNode {
 			^nil
 		});
 
-		//Unpack relevant params
-		params = algaTemp.def;
-		def = params[\def];
+		//Unpack SynthDef
+		algaTempDef = algaTemp.def;
+		def = algaTempDef;
+
+		//If Event, SynthDef is under [\def]
+		if(algaTempDef.class == Event, {
+			def = algaTempDef[\def];
+			defIsEvent = true;
+		});
+
+		//Unpack controlNames
 		controlNames = algaTemp.controlNames;
 
 		//Loop around the controlNames to set relevant parameters
@@ -655,7 +668,10 @@ AlgaPattern : AlgaNode {
 			var paramNumChannels = controlName.numChannels;
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
-			var entry = params[paramName];
+			var entry;
+
+			//Retrieve param if entry is Event
+			if(defIsEvent, { entry = algaTempDef[paramName] });
 
 			//If entry is nil, the tempSynth will already use the default value
 			if(entry != nil, {
@@ -825,7 +841,7 @@ AlgaPattern : AlgaNode {
 			senderNumChannels = paramNumChannels;
 			entry = paramDefault;
 			("AlgaPattern: trying to set 'nil' for param '" ++ paramName ++
-				"'. Using default value(" ++ paramDefault.asString ++") instead").error;
+				"'. Using default value " ++ paramDefault.asString ++" instead").error;
 			validParam = true;
 		};
 
@@ -1932,6 +1948,7 @@ AlgaPattern : AlgaNode {
 
 	//Parse an AlgaTemp
 	parseAlgaTempParam { | algaTemp |
+		var validAlgaTemp = false;
 		var def = algaTemp.def;
 		var defDef;
 
@@ -1940,25 +1957,35 @@ AlgaPattern : AlgaNode {
 			^nil;
 		});
 
-		if(def.class == Symbol, {
-			defDef = def
-		}, {
-			if(def.class != Event, {
-				"AlgaPattern: AlgaTemp's 'def' argument must either be a Symbol or an Event".error;
-				^nil
-			});
+		case
+		//Symbol
+		{ def.class == Symbol } {
+			defDef = def;
+			validAlgaTemp = true;
+		}
+
+		//Event: if function, compile it. Then, check all entries and unpack them
+		{ def.class == Event } {
 			defDef = def[\def];
 			if(defDef == nil, {
 				"AlgaPattern: AlgaTemp's 'def' Event does not provide a 'def' entry".error;
 				^nil
-			})
-		});
+			});
 
-		//Check if the synthDef is valid
-		algaTemp.checkValidSynthDef(defDef);
+			//Compile function and subsitute \def with the new symbol
+			if(defDef.class == Function, {
+				var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
-		//Loop around the event entries and use .asStream
-		if(def.class == Event, {
+				AlgaSynthDef(
+					defName,
+					defDef
+				).sendAndAddToGlobalDescLib(server);
+
+				defDef = defName;
+				def[\def] = defName;
+			});
+
+			//Loop around the event entries and use .asStream, substituting entries
 			def.keysValuesDo({ | key, entry |
 				if(key != \def, {
 					var parsedEntry = entry;
@@ -1967,8 +1994,40 @@ AlgaPattern : AlgaNode {
 					def[key] = parsedEntry.asStream;
 				});
 			});
+
+			validAlgaTemp = true;
+		}
+
+		//Function: compile function and subsitute \def with the new symbol
+		{ def.class == Function } {
+			var defName = ("alga_" ++ UniqueID.next).asSymbol;
+
+			AlgaSynthDef(
+				defName,
+				def
+			).sendAndAddToGlobalDescLib(server);
+
+			defDef = defName;
+			algaTemp.setDef(defName); //Substitute .def with the Symbol
+			validAlgaTemp = true;
+		};
+
+		//Check validity
+		if(validAlgaTemp.not, {
+			("AlgaPattern: AlgaTemp's 'def' argument must either be a Symbol, Event or Function").error;
+			^nil
 		});
 
+		//Check if actually a symbol now
+		if(defDef.class != Symbol, {
+			("AlgaPattern: Invalid AlgaTemp's definition: '" ++ defDef.asString ++ "'").error;
+			^nil
+		});
+
+		//Check if the synthDef is valid
+		algaTemp.checkValidSynthDef(defDef);
+
+		//Return the modified algaTemp (in case of Event / Function)
 		^algaTemp;
 	}
 
