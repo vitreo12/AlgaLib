@@ -1798,29 +1798,39 @@ AlgaPattern : AlgaNode {
 			^nil
 		});
 
-		//Don't support ListPatterns for now...
+		//If it's a Function, send def to server and replace entries
+		if(def.class == Function, {
+			var defName = ("alga_" ++ UniqueID.next).asSymbol;
+
+			AlgaSynthDef(
+				defName,
+				def
+			).sendAndAddToGlobalDescLib(server);
+
+			def = defName;
+			value[\def] = defName;
+		});
+
+		//Don't support ListPatterns for now
 		if(def.class != Symbol, {
-			("AlgaPattern: 'fx' only supports symbols as 'def'").error;
+			("AlgaPattern: 'fx' only supports Symbols and Functions as 'def'").error;
 			^nil
 		});
 
 		//Check that \def is valid
 		synthDescFx = SynthDescLib.global.at(def);
-
 		if(synthDescFx == nil, {
 			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "'").error;
 			^nil;
 		});
 
 		synthDefFx = synthDescFx.def;
-
 		if(synthDefFx.class != AlgaSynthDef, {
 			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++"'").error;
 			^nil;
 		});
 
 		controlNamesFx = synthDescFx.controls;
-
 		controlNamesFx.do({ | controlName |
 			if(controlName.name == \in, {
 				foundInParam = true;
@@ -1830,6 +1840,7 @@ AlgaPattern : AlgaNode {
 			})
 		});
 
+		//Not found the \in parameter
 		if(foundInParam.not, {
 			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "': It does not provide an 'in' parameter").error;
 			^nil;
@@ -1843,7 +1854,7 @@ AlgaPattern : AlgaNode {
 		//Pass explicitFree to Event
 		value[\explicitFree] = synthDefFx.explicitFree;
 
-		//Loop over the event and parse listPatterns / algaTemps. Also use .asStream for the final entry.
+		//Loop over the event and parse ListPatterns / AlgaTemps. Also use .asStream for the final entry.
 		value.keysValuesDo({ | key, entry |
 			var parsedEntry = entry;
 			if(parsedEntry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry) });
@@ -1857,6 +1868,7 @@ AlgaPattern : AlgaNode {
 	//Parse the \fx key
 	parseFX { | value |
 		case
+
 		//Single Event
 		{ value.class == Event } {
 			^this.parseFXEvent(value);
@@ -1872,9 +1884,17 @@ AlgaPattern : AlgaNode {
 			^value;
 		}
 
-		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
+		//If individual Symbol, if it's in DescLib, use it as Event. Otherwise, passthrough (like, \none, \dry)
 		{ value.class == Symbol } {
+			if(SynthDescLib.global.at(value) != nil, {
+				^this.parseFXEvent((def: value))
+			});
 			^value
+		}
+
+		//If individual Function, wrap in Event
+		{ value.class == Function } {
+			^this.parseFXEvent((def: value))
 		};
 	}
 

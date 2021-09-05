@@ -2590,7 +2590,7 @@ AlgaNode {
 
 		//If node was playing, or .replace has been called while .stop / .clear, play again
 		if(wasPlaying/*.or(beingStopped)*/, {
-			//this.playInner(replace: true)
+			this.playInner(replace: true)
 		});
 
 		//Reset flag
