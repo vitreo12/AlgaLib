@@ -1729,75 +1729,47 @@ AlgaPattern : AlgaNode {
 	//Multiple Symbols over a ListPattern
 	dispatchListPattern { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
+		var controlNamesSum;
 		var functionsAndListPattern;
 		var functions;
-		var validFuncs = false;
-
-		//The function that checks validity and builds pattern from ListPattern
-		var checkValidityAndBuildFromListPattern = {
-			var controlNamesSum;
-
-			//Create numChannelsList, rateList and controlNamesList (they're nil otherwise)
-			numChannelsList  = IdentityDictionary();
-			rateList         = IdentityDictionary();
-			controlNamesList = IdentityDictionary();
-
-			//Check rates, numChannels, Symbols and controlNames
-			controlNamesSum = this.checkListPatternValidityAndReturnControlNames(def);
-			if(controlNamesSum != nil, {
-				//Create controlNames from controlNamesSum
-				this.createControlNamesAndParamsConnectionTime(controlNamesSum);
-
-				//synthDef will be the ListPattern
-				synthDef = def;
-
-				//Build pattern from ListPattern
-				this.buildFromListPattern(
-					initGroups: initGroups,
-					replace: replace,
-					keepChannelsMapping: keepChannelsMapping,
-					keepScale: keepScale,
-					sched: sched
-				);
-			});
-		};
 
 		//Check if there are Functions to be sent to server as AlgaSynthDefs
 		functionsAndListPattern = this.checkListPatternFunctions(def);
 		functions = functionsAndListPattern[0];
 		if(functions.size > 0, {
-			validFuncs = true;
+			//Send the synthdefs right away.
+			//There's no need to wait for response from server, as only the desc is needed
+			functions.keysValuesDo({ | defName, func |
+				AlgaSynthDef(
+					defName,
+					func
+				).sendAndAddToGlobalDescLib(server);
+			});
 			def = functionsAndListPattern[1]; //contains the symbols in place of the functions
 		});
 
-		//Contains Functions: they need to be sent to server and waited
-		if(validFuncs, {
-			var dispatchCondition = Condition();
+		//Create numChannelsList, rateList and controlNamesList (they're nil otherwise)
+		numChannelsList  = IdentityDictionary();
+		rateList         = IdentityDictionary();
+		controlNamesList = IdentityDictionary();
 
-			//Need to wait for server to receive the sdefs
-			fork {
-				//Send all AlgaSynthDefs
-				functions.keysValuesDo({ | defName, func |
-					AlgaSynthDef(
-						defName,
-						func
-					).sendAndAddToGlobalDescLib(server);
-				});
+		//Check rates, numChannels, Symbols and controlNames
+		controlNamesSum = this.checkListPatternValidityAndReturnControlNames(def);
+		if(controlNamesSum != nil, {
+			//Create controlNames from controlNamesSum
+			this.createControlNamesAndParamsConnectionTime(controlNamesSum);
 
-				//Wait
-				server.sync(dispatchCondition);
-			};
+			//synthDef will be the ListPattern
+			synthDef = def;
 
-			//All SynthDefs sent: go ahead with validity check and building
-			scheduler.addAction(
-				condition: { dispatchCondition.test == true },
-				func: {
-					checkValidityAndBuildFromListPattern.value;
-				}
+			//Build pattern from ListPattern
+			this.buildFromListPattern(
+				initGroups: initGroups,
+				replace: replace,
+				keepChannelsMapping: keepChannelsMapping,
+				keepScale: keepScale,
+				sched: sched
 			);
-		}, {
-			//Doesn't contain Functions, just go ahead with validity check and building
-			checkValidityAndBuildFromListPattern.value;
 		});
 	}
 

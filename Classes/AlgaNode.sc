@@ -857,39 +857,22 @@ AlgaNode {
 	dispatchFunction { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
-		var dispatchCondition = Condition();
+		//Send the SynthDef and store it. There's no need to wait response from server
+		synthDef = AlgaSynthDef(
+			("alga_" ++ UniqueID.next).asSymbol,
+			def,
+			outsMapping:outsMapping
+		).sendAndAddToGlobalDescLib(server);
 
-		//Note that this forking mechanism is not robust on \udp
-		if(server.options.protocol == \udp, {
-			"AlgaNode: using a server with UDP protocol. The handling of 'server.sync' can be lost if multiple packets are sent together. It's suggested to use Alga with a server booted with the TCP protocol instead.".warn;
-		});
+		//Just get standard SynthDef
+		if(synthDef.class == AlgaSynthDefSpec, { synthDef = synthDef.synthDef });
 
-		//Need to wait for server to receive the sdef
-		fork {
-			synthDef = AlgaSynthDef(
-				("alga_" ++ UniqueID.next).asSymbol,
-				def,
-				outsMapping:outsMapping
-			).sendAndAddToGlobalDescLib(server);
-
-			//Just get standard SynthDef
-			if(synthDef.class == AlgaSynthDefSpec, { synthDef = synthDef.synthDef });
-
-			//Wait
-			server.sync(dispatchCondition);
-		};
-
-		//All good, go ahead with the build function
-		scheduler.addAction(
-			condition: { dispatchCondition.test == true },
-			func: {
-				this.buildFromSynthDef(
-					initGroups, replace,
-					keepChannelsMapping:keepChannelsMapping,
-					keepScale:keepScale,
-					sched:sched
-				);
-			}
+		//Go ahead with the build function
+		this.buildFromSynthDef(
+			initGroups, replace,
+			keepChannelsMapping:keepChannelsMapping,
+			keepScale:keepScale,
+			sched:sched
 		);
 	}
 
