@@ -35,6 +35,9 @@
 	algaCleared { ^false }
 	algaToBeCleared { ^false }
 
+	//Like asStream, but also converts inner elements of an Array
+	algaAsStream { ^(this.asStream) }
+
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
 	addAction { | condition, func, sched = 0 |
 		if(sched != 0, {
@@ -72,6 +75,13 @@
 //For Array lincurve
 +SequenceableCollection {
 	algaLinCurve { arg ... args; ^this.multiChannelPerform('algaLinCurve', *args) }
+
+	//Also converts each inner element to Streams recursively
+	algaAsStream {
+		this.do({ | entry, i |
+			this[i] = entry.algaAsStream
+		});
+	}
 }
 
 //PlayBuf bug with canFreeSynth

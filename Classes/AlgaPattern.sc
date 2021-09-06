@@ -258,8 +258,8 @@ AlgaPatternInterpStreams {
 		var scaleArraysAndChansAtParam = scaleArraysAndChans[paramName];
 
 		//Pattern support
-		chans = chans.asStream;
-		scale = scale.asStream;
+		chans = chans.algaAsStream;
+		scale = scale.algaAsStream;
 
 		if(scaleArraysAndChansAtParam == nil, {
 			scaleArraysAndChans[paramName] = IdentityDictionary().put(uniqueID, [scale, chans]);
@@ -292,7 +292,7 @@ AlgaPatternInterpStreams {
 		var paramName, paramRate, paramNumChannels, paramDefault;
 		var uniqueID;
 
-		var entryOriginal = entry; //Original entry, not .asStream. Needed for addInOutNodesDictAtParam
+		var entryOriginal = entry; //Original entry, not as Stream. Needed for addInOutNodesDictAtParam
 		var isFirstEntry;
 
 		if(controlName == nil, {
@@ -307,8 +307,8 @@ AlgaPatternInterpStreams {
 		//If entry is nil, use paramDefault (used for .reset)
 		if(entry == nil, { entry = paramDefault; entryOriginal = paramDefault });
 
-		//Interpret entry asStream
-		entry = entry.asStream;
+		//Interpret entry as Stream
+		entry = entry.algaAsStream;
 
 		//Use an unique id as index as it's more reliable than using the entry as key:
 		//entry could very well be a number (like 440), screwing things up in IdentityDict.
@@ -380,9 +380,9 @@ AlgaPatternArg {
 	}
 
 	init { | argSender, argChans, argScale |
-		sender = argSender.asStream; //Pattern support
-		chans  = argChans.asStream;  //Pattern support
-		scale  = argScale.asStream;  //Pattern support
+		sender = argSender.algaAsStream; //Pattern support
+		chans  = argChans.algaAsStream;  //Pattern support
+		scale  = argScale.algaAsStream;  //Pattern support
 	}
 
 	isAlgaPatternArg { ^true }
@@ -408,10 +408,10 @@ AlgaOut {
 	}
 
 	init { | argNode, argParam, argChans, argScale |
-		node   = argNode.asStream;  //Pattern support
-		param  = argParam.asStream; //Pattern support
-		chans  = argChans.asStream; //Pattern support
-		scale  = argScale.asStream; //Pattern support
+		node   = argNode.algaAsStream;  //Pattern support
+		param  = argParam.algaAsStream; //Pattern support
+		chans  = argChans.algaAsStream; //Pattern support
+		scale  = argScale.algaAsStream; //Pattern support
 	}
 
 	isAlgaOut { ^true }
@@ -433,8 +433,8 @@ AlgaTemp {
 
 	init { | argDef, argChans, argScale |
 		def    = argDef;
-		chans  = argChans.asStream;  //Pattern support
-		scale  = argScale.asStream;  //Pattern support
+		chans  = argChans.algaAsStream;  //Pattern support
+		scale  = argScale.algaAsStream;  //Pattern support
 	}
 
 	setDef { | argDef |
@@ -601,9 +601,9 @@ AlgaPattern : AlgaNode {
 	//Set dur asStream for it to work within Pfuncn
 	setDur { | value, newInterpStreams |
 		if(newInterpStreams == nil, {
-			interpStreams.dur = value.asStream
+			interpStreams.dur = value.algaAsStream
 		}, {
-			newInterpStreams.dur = value.asStream
+			newInterpStreams.dur = value.algaAsStream
 		});
 	}
 
@@ -1485,8 +1485,8 @@ AlgaPattern : AlgaNode {
 
 		var defEntry;
 
-		//Just a Symbol for a SynthDef: wrap it in an Event
-		if(def.class == Symbol, { def = (\def: def) });
+		//Not an event, just wrap in one for def:
+		if(def.class != Event, { def = (def: def) });
 
 		//def: entry
 		defEntry = def[\def];
@@ -1547,7 +1547,7 @@ AlgaPattern : AlgaNode {
 				initGroups: initGroups,
 				replace: replace,
 				keepChannelsMapping:keepChannelsMapping,
-				outsMapping:outsMapping,
+				outsMapping: outsMapping,
 				keepScale:keepScale,
 				sched:sched
 			)
@@ -1738,6 +1738,37 @@ AlgaPattern : AlgaNode {
 		^controlNamesSum;
 	}
 
+	//Dispatch a Function (it's different from AlgaNode's)
+	dispatchFunction { | def, initGroups = false, replace = false,
+		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
+
+		//New defName
+		var defName = ("alga_" ++ UniqueID.next).asSymbol;
+
+		//Send the SynthDef and store it. There's no need to wait response from server
+		synthDef = AlgaSynthDef(
+			defName,
+			def,
+			outsMapping: outsMapping,
+			sampleAccurate: true
+		).sendAndAddToGlobalDescLib(server);
+
+		//Just get standard SynthDef
+		if(synthDef.class == AlgaSynthDefSpec, { synthDef = synthDef.synthDef });
+
+		//Replace entry in the Event
+		eventPairs[\def] = defName;
+
+		//Build from synth def
+		this.buildFromSynthDef(
+			initGroups: initGroups,
+			replace: replace,
+			keepChannelsMapping: keepChannelsMapping,
+			keepScale: keepScale,
+			sched: sched
+		);
+	}
+
 	//Multiple Symbols over a ListPattern
 	dispatchListPattern { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
@@ -1754,10 +1785,11 @@ AlgaPattern : AlgaNode {
 			functions.keysValuesDo({ | defName, func |
 				AlgaSynthDef(
 					defName,
-					func
+					func,
+					sampleAccurate: true
 				).sendAndAddToGlobalDescLib(server);
 			});
-			def = functionsAndListPattern[1]; //contains the symbols in place of the functions
+			def = functionsAndListPattern[1]; //Replace the symbols in place of the functions
 		});
 
 		//Create numChannelsList, rateList and controlNamesList (they're nil otherwise)
@@ -1773,6 +1805,9 @@ AlgaPattern : AlgaNode {
 
 			//synthDef will be the ListPattern
 			synthDef = def;
+
+			//Substitute the eventPairs entry with the new ListPattern
+			eventPairs[\def] = def;
 
 			//Build pattern from ListPattern
 			this.buildFromListPattern(
@@ -1802,11 +1837,13 @@ AlgaPattern : AlgaNode {
 		if(def.class == Function, {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
+			//Important: NO sampleAccurate!
 			AlgaSynthDef(
 				defName,
 				def
 			).sendAndAddToGlobalDescLib(server);
 
+			//Replace the def: with the symbol
 			def = defName;
 			value[\def] = defName;
 		});
@@ -1854,12 +1891,12 @@ AlgaPattern : AlgaNode {
 		//Pass explicitFree to Event
 		value[\explicitFree] = synthDefFx.explicitFree;
 
-		//Loop over the event and parse ListPatterns / AlgaTemps. Also use .asStream for the final entry.
+		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
 		value.keysValuesDo({ | key, entry |
 			var parsedEntry = entry;
 			if(parsedEntry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry) });
 			if(parsedEntry.isAlgaTemp, { parsedEntry = this.parseAlgaTempParam(parsedEntry) });
-			value[key] = parsedEntry.asStream
+			value[key] = parsedEntry.algaAsStream;
 		});
 
 		^value;
@@ -1874,16 +1911,6 @@ AlgaPattern : AlgaNode {
 			^this.parseFXEvent(value);
 		}
 
-		//ListPattern of Events
-		{ value.isListPattern } {
-			value.list.do({ | listEntry, i |
-				var result = this.parseFX(listEntry); //recursive, so it picks up other ListPatterns if needed
-				if(result == nil, { ^nil });
-				value.list[i] = result;
-			});
-			^value;
-		}
-
 		//If individual Symbol, if it's in DescLib, use it as Event. Otherwise, passthrough (like, \none, \dry)
 		{ value.class == Symbol } {
 			if(SynthDescLib.global.at(value) != nil, {
@@ -1895,6 +1922,16 @@ AlgaPattern : AlgaNode {
 		//If individual Function, wrap in Event
 		{ value.class == Function } {
 			^this.parseFXEvent((def: value))
+		}
+
+		//ListPattern of any of the above
+		{ value.isListPattern } {
+			value.list.do({ | listEntry, i |
+				var result = this.parseFX(listEntry); //recursive, so it picks up other ListPatterns if needed
+				if(result == nil, { ^nil });
+				value.list[i] = result;
+			});
+			^value;
 		};
 	}
 
@@ -1926,7 +1963,7 @@ AlgaPattern : AlgaNode {
 			});
 		};
 
-		^value.asStream;
+		^value.algaAsStream;
 	}
 
 	//Parse the \out key
@@ -1954,7 +1991,7 @@ AlgaPattern : AlgaNode {
 				if(result == nil, { ^nil });
 				value.list[i] = result;
 			});
-			^value.asStream; //return the stream
+			^value.algaAsStream; //return the Stream
 		}
 		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
 		{ value.class == Symbol } {
@@ -1992,6 +2029,7 @@ AlgaPattern : AlgaNode {
 			if(defDef.class == Function, {
 				var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
+				//Important: NO sampleAccurate
 				AlgaSynthDef(
 					defName,
 					defDef
@@ -2001,13 +2039,13 @@ AlgaPattern : AlgaNode {
 				def[\def] = defName;
 			});
 
-			//Loop around the event entries and use .asStream, substituting entries
+			//Loop around the event entries and use as Stream, substituting entries
 			def.keysValuesDo({ | key, entry |
 				if(key != \def, {
 					var parsedEntry = entry;
 					if(entry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry) });
 					if(entry.isAlgaTemp, { parsedEntry = this.parseAlgaTempParam(parsedEntry) });
-					def[key] = parsedEntry.asStream;
+					def[key] = parsedEntry.algaAsStream;
 				});
 			});
 
@@ -2018,6 +2056,7 @@ AlgaPattern : AlgaNode {
 		{ def.class == Function } {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
+			//Important: NO sampleAccurate
 			AlgaSynthDef(
 				defName,
 				def
@@ -2345,7 +2384,7 @@ AlgaPattern : AlgaNode {
 
 		//Create the Pattern by calling .next from the streams
 		pattern = Pbind(*patternPairs);
-		patternAsStream = pattern.asStream; //Needed for things like dur: \none
+		patternAsStream = pattern.algaAsStream; //Needed for things like dur: \none
 
 		//Determine if \out interpolation is required
 		this.createPatternOutReceivers(prevPatternOutNodes);

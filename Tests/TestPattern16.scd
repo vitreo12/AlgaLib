@@ -36,7 +36,7 @@ Alga.boot({
 			AlgaTemp((
 				def: { SinOsc.kr(\freq.kr(1)) },
 				freq: Pwhite(1, 5)
-			), scale: Prand([[250, 650], [100, 3500]]))
+			), scale: [Pwhite(100, 200), Pwhite(500, 1000)])
 		], inf)
 	)).play(chans:2)
 })

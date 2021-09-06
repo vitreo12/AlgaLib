@@ -846,7 +846,8 @@ AlgaNode {
 		});
 
 		this.buildFromSynthDef(
-			initGroups, replace,
+			initGroups: initGroups,
+			replace: replace,
 			keepChannelsMapping:keepChannelsMapping,
 			keepScale:keepScale,
 			sched:sched
@@ -861,7 +862,7 @@ AlgaNode {
 		synthDef = AlgaSynthDef(
 			("alga_" ++ UniqueID.next).asSymbol,
 			def,
-			outsMapping:outsMapping
+			outsMapping:outsMapping,
 		).sendAndAddToGlobalDescLib(server);
 
 		//Just get standard SynthDef
@@ -869,7 +870,8 @@ AlgaNode {
 
 		//Go ahead with the build function
 		this.buildFromSynthDef(
-			initGroups, replace,
+			initGroups: initGroups,
+			replace: replace,
 			keepChannelsMapping:keepChannelsMapping,
 			keepScale:keepScale,
 			sched:sched
@@ -977,9 +979,10 @@ AlgaNode {
 		if(paramNumChannels == nil, {
 			^scaleEntry
 		});
+		scaleEntry = scaleEntry.next; //Patten support
 		if(scaleEntry.isSequenceableCollection, {
 			var scaleEntrySize = scaleEntry.size;
-			if(scaleEntry.size != paramNumChannels, {
+			if(scaleEntrySize != paramNumChannels, {
 				("AlgaNode: the " ++ name ++ " entry of the scale parameter has less channels(" ++
 					scaleEntrySize ++ ") than param " ++ param ++
 					". Wrapping around " ++ paramNumChannels ++ " number of channels."
@@ -1021,6 +1024,8 @@ AlgaNode {
 
 	//Calculate scale to send to interp synth
 	calculateScaling { | param, sender, paramNumChannels, scale, addScaling = true |
+		var scaleCopy = scale.copy;
+
 		if(scale.isNil, { ^nil });
 
 		if(scale.isNumberOrArray.not, {
@@ -1051,10 +1056,10 @@ AlgaNode {
 			outArray[2] = \highMax;    outArray[3] = newHighMax;
 			outArray[4] = \useScaling; outArray[5] = 1;
 
-			scale[0] = newHighMin;
-			scale[1] = newHighMax;
+			scaleCopy[0] = newHighMin;
+			scaleCopy[1] = newHighMax;
 
-			if(addScaling, { this.addScaling(param, sender, scale) });
+			if(addScaling, { this.addScaling(param, sender, scaleCopy) });
 
 			^outArray;
 		});
@@ -1076,11 +1081,11 @@ AlgaNode {
 			outArray[4] = \scaleCurve; outArray[5] = newScaleCurve;
 			outArray[6] = \useScaling; outArray[7] = 1;
 
-			scale[0] = newHighMin;
-			scale[1] = newHighMax;
-			scale[2] = newScaleCurve;
+			scaleCopy[0] = newHighMin;
+			scaleCopy[1] = newHighMax;
+			scaleCopy[2] = newScaleCurve;
 
-			if(addScaling, { this.addScaling(param, sender, scale) });
+			if(addScaling, { this.addScaling(param, sender, scaleCopy) });
 
 			^outArray;
 		});
@@ -1107,12 +1112,12 @@ AlgaNode {
 			outArray[6] = \highMax;    outArray[7] = newHighMax;
 			outArray[8] = \useScaling; outArray[9] = 1;
 
-			scale[0] = newLowMin;
-			scale[1] = newLowMax;
-			scale[2] = newHighMin;
-			scale[3] = newHighMax;
+			scaleCopy[0] = newLowMin;
+			scaleCopy[1] = newLowMax;
+			scaleCopy[2] = newHighMin;
+			scaleCopy[3] = newHighMax;
 
-			if(addScaling, { this.addScaling(param, sender, scale) });
+			if(addScaling, { this.addScaling(param, sender, scaleCopy) });
 
 			^outArray;
 		});
@@ -1142,13 +1147,13 @@ AlgaNode {
 			outArray[8] = \scaleCurve;  outArray[9] = newScaleCurve;
 			outArray[10] = \useScaling; outArray[11] = 1;
 
-			scale[0] = newLowMin;
-			scale[1] = newLowMax;
-			scale[2] = newHighMin;
-			scale[3] = newHighMax;
-			scale[4] = newScaleCurve;
+			scaleCopy[0] = newLowMin;
+			scaleCopy[1] = newLowMax;
+			scaleCopy[2] = newHighMin;
+			scaleCopy[3] = newHighMax;
+			scaleCopy[4] = newScaleCurve;
 
-			if(addScaling, { this.addScaling(param, sender, scale) });
+			if(addScaling, { this.addScaling(param, sender, scaleCopy) });
 
 			^outArray;
 		});
@@ -1170,7 +1175,11 @@ AlgaNode {
 	calculateSenderChansMappingArray { | param, sender, senderChansMapping,
 		senderNumChans, paramNumChans, updateParamsChansMapping = true |
 
-		var actualSenderChansMapping = senderChansMapping;
+		var actualSenderChansMapping;
+
+		senderChansMapping = senderChansMapping.next; //Pattern support
+
+		actualSenderChansMapping = senderChansMapping.copy;
 
 		//If senderChansMapping is nil or sender is not an AlgaNode, use default, modulo around senderNumChans
 		if((actualSenderChansMapping == nil).or(sender.isAlgaNode.not), {
