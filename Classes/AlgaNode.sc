@@ -204,6 +204,46 @@ AlgaNode {
 		^true;
 	}
 
+	//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
+	//Otherwise, it will just execute func
+	compileFunctionSynthDefDictIfNeeded { | func, functionSynthDefDict |
+		//If functionSynthDefDict has elements, it means that there are AlgaSynthDefs with Functions to be waited for
+		if(functionSynthDefDict != nil, {
+			if(functionSynthDefDict.size > 0, {
+				var wait = Condition();
+
+				fork {
+					//Loop over and compile fFunctions and AlgaTemps
+					functionSynthDefDict.keysValuesDo({ | name, sdef |
+						//AlgaTemp
+						if(sdef.isArray, {
+							var algaTemp = sdef[1];
+							sdef = sdef[0];
+							sdef.sendAndAddToGlobalDescLib(server);
+							algaTemp.checkValidSynthDef(name);
+						}, {
+							//Just AlgaSynthDef
+							sdef.sendAndAddToGlobalDescLib(server);
+						})
+					});
+
+					//Unlock condition
+					server.sync(wait);
+				};
+
+				scheduler.addAction(
+					condition: { wait.test == true },
+					func: { func.value }
+				);
+
+				^this
+			});
+		});
+
+		//No Functions to consume
+		^func.value;
+	}
+
 	init { | argDef, argArgs, argConnectionTime = 0, argPlayTime = 0,
 		argSched = 0, argOutsMapping, argServer |
 
@@ -234,18 +274,34 @@ AlgaNode {
 		this.connectionTime_(argConnectionTime, all:true);
 		this.playTime_(argPlayTime);
 
-		//If AlgaPattern, parse the def
-		if(this.isAlgaPattern, { argDef = this.parseDef(argDef) });
+		//If AlgaPattern, parse the def and then dispatch accordingly (waiting for server if needed)
+		if(this.isAlgaPattern, {
+			var argDefAndFunctionSynthDefDict = this.parseDef(argDef);
+			var functionSynthDefDict;
 
-		//Dispatch node creation
-		if(argDef != nil, {
-			this.dispatchNode(
-				argDef, argArgs,
-				initGroups: true,
-				outsMapping: argOutsMapping,
-				sched: argSched
-			);
+			argDef = argDefAndFunctionSynthDefDict[0];
+			functionSynthDefDict = argDefAndFunctionSynthDefDict[1];
+
+			^this.compileFunctionSynthDefDictIfNeeded(
+				func: {
+					this.dispatchNode(
+						argDef, argArgs,
+						initGroups: true,
+						outsMapping: argOutsMapping,
+						sched: argSched
+					);
+				},
+				functionSynthDefDict: functionSynthDefDict
+			)
 		});
+
+		//AlgaNode dispatch
+		this.dispatchNode(
+			argDef, argArgs,
+			initGroups: true,
+			outsMapping: argOutsMapping,
+			sched: argSched
+		);
 	}
 
 	setParamsConnectionTime { | value, param, all = false |
@@ -863,23 +919,36 @@ AlgaNode {
 	dispatchFunction { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
-		//Send the SynthDef and store it. There's no need to wait response from server
-		synthDef = AlgaSynthDef(
-			("alga_" ++ UniqueID.next).asSymbol,
-			def,
-			outsMapping:outsMapping,
-		).sendAndAddToGlobalDescLib(server);
+		//Wait condition
+		var wait = Condition();
 
-		//Just get standard SynthDef
-		if(synthDef.class == AlgaSynthDefSpec, { synthDef = synthDef.synthDef });
+		fork {
+			//Send the SynthDef, store it and wait for completion
+			synthDef = AlgaSynthDef(
+				("alga_" ++ UniqueID.next).asSymbol,
+				def,
+				outsMapping:outsMapping,
+			).sendAndAddToGlobalDescLib(server);
 
-		//Go ahead with the build function
-		this.buildFromSynthDef(
-			initGroups: initGroups,
-			replace: replace,
-			keepChannelsMapping:keepChannelsMapping,
-			keepScale:keepScale,
-			sched:sched
+			//Just get standard SynthDef
+			if(synthDef.class == AlgaSynthDefSpec, { synthDef = synthDef.synthDef });
+
+			//Unlock condition
+			server.sync(wait);
+		};
+
+		//Go ahead with the build function when Sdef is sent
+		scheduler.addAction(
+			condition: { wait.test == true },
+			func: {
+				this.buildFromSynthDef(
+					initGroups: initGroups,
+					replace: replace,
+					keepChannelsMapping:keepChannelsMapping,
+					keepScale:keepScale,
+					sched:sched
+				)
+			}
 		);
 	}
 

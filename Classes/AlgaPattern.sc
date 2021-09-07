@@ -393,7 +393,7 @@ AlgaPatternArg {
 /*
 out: (
 Pseq([
-AlgaOut(a, \freq, scale:[20, 30], time:2),
+AlgaOut(a, \freq, scale:[20, 30], time:2),   <-- uses time: 2 also for the later 'b'
 AlgaOut(b, \freq, scale:[10, 50], time:3),
 b,
 a
@@ -2047,9 +2047,10 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Parse a single \fx event
-	parseFXEvent { | value |
+	parseFXEvent { | value, functionSynthDefDict |
 		var foundInParam = false;
 		var synthDescFx, synthDefFx, controlNamesFx;
+		var isFunction = false;
 		var def;
 
 		//Find \def
@@ -2063,15 +2064,23 @@ AlgaPattern : AlgaNode {
 		if(def.class == Function, {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
-			//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
-			AlgaSynthDef(
+			//The synthDef will be sent later! just use the def and the desc for now
+			synthDefFx = AlgaSynthDef(
 				defName,
 				def
-			).sendAndAddToGlobalDescLib(server);
+			).synthDef; //Ignore AlgaSynthDefSpec
+
+			//Get the desc
+			synthDescFx = synthDefFx.asSynthDesc;
+
+			//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
+			functionSynthDefDict[defName] = synthDefFx;
 
 			//Replace the def: with the symbol
 			def = defName;
 			value[\def] = defName;
+
+			isFunction = true;
 		});
 
 		//Don't support ListPatterns for now
@@ -2081,13 +2090,19 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Check that \def is valid
-		synthDescFx = SynthDescLib.global.at(def);
+		if(isFunction.not, {
+			synthDescFx = SynthDescLib.global.at(def);
+		});
+
 		if(synthDescFx == nil, {
 			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "'").error;
 			^nil;
 		});
 
-		synthDefFx = synthDescFx.def;
+		if(isFunction.not, {
+			synthDefFx = synthDescFx.def;
+		});
+
 		if(synthDefFx.class != AlgaSynthDef, {
 			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++"'").error;
 			^nil;
@@ -2129,31 +2144,31 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Parse the \fx key
-	parseFX { | value |
+	parseFX { | value, functionSynthDefDict |
 		case
 
 		//Single Event
 		{ value.class == Event } {
-			^this.parseFXEvent(value);
+			^this.parseFXEvent(value, functionSynthDefDict);
 		}
 
 		//If individual Symbol, if it's in DescLib, use it as Event. Otherwise, passthrough (like, \none, \dry)
 		{ value.class == Symbol } {
 			if(SynthDescLib.global.at(value) != nil, {
-				^this.parseFXEvent((def: value))
+				^this.parseFXEvent((def: value), functionSynthDefDict)
 			});
 			^value
 		}
 
 		//If individual Function, wrap in Event
 		{ value.class == Function } {
-			^this.parseFXEvent((def: value))
+			^this.parseFXEvent((def: value), functionSynthDefDict)
 		}
 
 		//ListPattern of any of the above
 		{ value.isListPattern } {
 			value.list.do({ | listEntry, i |
-				var result = this.parseFX(listEntry); //recursive, so it picks up other ListPatterns if needed
+				var result = this.parseFX(listEntry, functionSynthDefDict); //recursive, so it picks up other ListPatterns if needed
 				if(result == nil, { ^nil });
 				value.list[i] = result;
 			});
@@ -2229,10 +2244,12 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Parse an AlgaTemp
-	parseAlgaTempParam { | algaTemp |
+	parseAlgaTempParam { | algaTemp, functionSynthDefDict |
 		var validAlgaTemp = false;
 		var def = algaTemp.def;
 		var defDef;
+
+		functionSynthDefDict.asString.warn;
 
 		if(def == nil, {
 			"AlgaPattern: AlgaTemp has a nil 'def' argument".error;
@@ -2254,15 +2271,18 @@ AlgaPattern : AlgaNode {
 				^nil
 			});
 
-			//Compile function and subsitute \def with the new symbol
+			//Sbsitute \def with the new symbol
 			if(defDef.class == Function, {
 				var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
 				//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
-				AlgaSynthDef(
-					defName,
-					defDef
-				).sendAndAddToGlobalDescLib(server);
+				functionSynthDefDict[defName] = [
+					AlgaSynthDef(
+						defName,
+						defDef
+					).synthDef, //Ignore AlgaSynthDefSpec
+					algaTemp
+				];
 
 				defDef = defName;
 				def[\def] = defName;
@@ -2281,15 +2301,18 @@ AlgaPattern : AlgaNode {
 			validAlgaTemp = true;
 		}
 
-		//Function: compile function and subsitute \def with the new symbol
+		//Function: subsitute \def with the new symbol
 		{ def.class == Function } {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
 			//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
-			AlgaSynthDef(
-				defName,
-				def
-			).sendAndAddToGlobalDescLib(server);
+			functionSynthDefDict[defName] = [
+				AlgaSynthDef(
+					defName,
+					def
+				).synthDef, //Ignore AlgaSynthDefSpec
+				algaTemp
+			];
 
 			defDef = defName;
 			algaTemp.setDef(defName); //Substitute .def with the Symbol
@@ -2308,73 +2331,83 @@ AlgaPattern : AlgaNode {
 			^nil
 		});
 
-		//Check if the synthDef is valid
-		algaTemp.checkValidSynthDef(defDef);
-
 		//Return the modified algaTemp (in case of Event / Function)
 		^algaTemp;
 	}
 
 	//Parse a ListPattern
-	parseListPatternParam { | listPattern |
+	parseListPatternParam { | listPattern, functionSynthDefDict |
 		listPattern.list.do({ | listEntry, i |
 			if(listEntry.isListPattern, {
-				listPattern.list[i] = this.parseListPatternParam(listEntry)
+				listPattern.list[i] = this.parseListPatternParam(listEntry, functionSynthDefDict)
 			});
 			if(listEntry.isAlgaTemp, {
-				listPattern.list[i] = this.parseAlgaTempParam(listEntry)
+				listPattern.list[i] = this.parseAlgaTempParam(listEntry, functionSynthDefDict)
 			});
 		});
 		^listPattern;
 	}
 
 	//Parse a param looking for AlgaTemps and ListPatterns
-	parseAlgaTempListPatternParam { | value |
+	parseAlgaTempListPatternParam { | value, functionSynthDefDict |
+
+		//Used in from {}
+		var returnBoth = false;
+		if(functionSynthDefDict == nil, {
+			returnBoth = true;
+			functionSynthDefDict = IdentityDictionary();
+		});
+
 		case
 		{ value.class == AlgaTemp } {
-			^this.parseAlgaTempParam(value)
+			value = this.parseAlgaTempParam(value, functionSynthDefDict)
 		}
 		{ value.isListPattern } {
-			^this.parseListPatternParam(value)
+			value = this.parseListPatternParam(value, functionSynthDefDict)
 		};
 
-		^value
+		//Used in from {}
+		if(returnBoth, {
+			^[value, functionSynthDefDict]
+		}, {
+			^value
+		})
 	}
 
 	//Parse a Function \def entry
-	parseFunctionDefEntry { | def |
+	parseFunctionDefEntry { | def, functionSynthDefDict |
 		//New defName
 		var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
-		//Send the SynthDef and store it. There's no need to wait response from server
-		AlgaSynthDef(
+		//Important: use sampleAccurate!
+		functionSynthDefDict[defName] = AlgaSynthDef(
 			defName,
 			def,
 			outsMapping: outsMapping,
 			sampleAccurate: true
-		).sendAndAddToGlobalDescLib(server);
+		).synthDef; //Ignore AlgaSynthDefSpec
 
 		//Return the Symbol
 		^defName
 	}
 
 	//Parse a ListPattern \def entry
-	parseListPatternDefEntry { | def |
+	parseListPatternDefEntry { | def, functionSynthDefDict |
 		def.list.do({ | entry, i |
-			def.list[i] = this.parseDefEntry(entry)
+			def.list[i] = this.parseDefEntry(entry, functionSynthDefDict)
 		});
 
 		^def
 	}
 
 	//Parse the \def entry
-	parseDefEntry { | def |
+	parseDefEntry { | def, functionSynthDefDict |
 		case
 		{ def.class == Function } {
-			^this.parseFunctionDefEntry(def)
+			^this.parseFunctionDefEntry(def, functionSynthDefDict)
 		}
 		{ def.isListPattern } {
-			^this.parseListPatternDefEntry(def)
+			^this.parseListPatternDefEntry(def, functionSynthDefDict)
 		};
 
 		^def
@@ -2385,6 +2418,9 @@ AlgaPattern : AlgaNode {
 		var defDef;
 		var defFX;
 		var defOut;
+
+		//Store [defName] -> AlgaSynthDef
+		var functionSynthDefDict = IdentityDictionary();
 
 		//Wrap in an Event if not an Event already
 		if(def.class != Event, { def = (def: def) });
@@ -2401,20 +2437,20 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Parse and replace \def
-		def[\def] = this.parseDefEntry(defDef);
+		def[\def] = this.parseDefEntry(defDef, functionSynthDefDict);
 
 		//Parse \fx
-		if(defFX != nil, { def[\fx] = this.parseFX(defFX) });
+		if(defFX != nil, { def[\fx] = this.parseFX(defFX, functionSynthDefDict) });
 
 		//Parse \out
 		if(defOut != nil, { def[\out] = this.parseOut(defOut) });
 
 		//Parse all the other entries looking for AlgaTemps / ListPatterns
 		def.keysValuesDo({ | key, value |
-			def[key] = this.parseAlgaTempListPatternParam(value)
+			def[key] = this.parseAlgaTempListPatternParam(value, functionSynthDefDict)
 		});
 
-		^def;
+		^[def, functionSynthDefDict];
 	}
 
 	//Get valid synthDef name
@@ -2580,16 +2616,10 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Only from is needed: to already calls into makeConnection
-	from { | sender, param = \in, chans, scale, sampleAndHold, time, sched |
+	//from implementation
+	fromInner { | sender, param = \in, chans, scale, sampleAndHold, time, sched |
 		//delta == dur
 		if(param == \delta, { param = \dur });
-
-		//Parse the sender looking for AlgaTemps and ListPatterns
-		sender = this.parseAlgaTempListPatternParam(sender);
-
-		//If sender is nil, don't do anything
-		if(sender == nil, { ^this });
 
 		//Special case, \dur
 		if(param == \dur, {
@@ -2652,6 +2682,37 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
+	//Only from is needed: to already calls into makeConnection
+	from { | sender, param = \in, chans, scale, sampleAndHold, time, sched |
+		//Parse the sender looking for AlgaTemps and ListPatterns
+		var senderAndFunctionSynthDefDict = this.parseAlgaTempListPatternParam(sender);
+		var functionSynthDefDict;
+
+		//Unpack
+		sender = senderAndFunctionSynthDefDict[0];
+		functionSynthDefDict = senderAndFunctionSynthDefDict[1];
+
+		//If sender is nil, don't do anything
+		if(sender == nil, { ^this });
+
+		//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
+		//Otherwise, it will just execute func
+		^this.compileFunctionSynthDefDictIfNeeded(
+			func: {
+				this.fromInner(
+					sender: sender,
+					param: param,
+					chans: chans,
+					scale: scale,
+					sampleAndHold: sampleAndHold,
+					time: time,
+					sched: sched
+				)
+			},
+			functionSynthDefDict: functionSynthDefDict
+		)
+	}
+
 	//Don't support <<+ for now
 	mixFrom { | sender, param = \in, inChans, scale, time |
 		"AlgaPattern: mixFrom is not supported yet".error;
@@ -2679,23 +2740,32 @@ AlgaPattern : AlgaNode {
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
 		//Parse the def
-		def = this.parseDef(def);
+		var defAndFunctionSynthDefDict = this.parseDef(def);
+		var functionSynthDefDict;
 
-		//If it's a good def, go on with the replace
-		if(def != nil, {
-			^super.replace(
-				def: def,
-				args: args,
-				time: time,
-				sched: sched,
-				outsMapping: outsMapping,
-				reset: reset,
-				keepOutsMappingIn: keepOutsMappingIn,
-				keepOutsMappingOut: keepOutsMappingOut,
-				keepScalesIn: keepScalesIn,
-				keepScalesOut: keepScalesOut
-			)
-		});
+		//Unpack
+		def = defAndFunctionSynthDefDict[0];
+		functionSynthDefDict = defAndFunctionSynthDefDict[1];
+
+		//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
+		//Otherwise, it will just execute func
+		^this.compileFunctionSynthDefDictIfNeeded(
+			func: {
+				super.replace(
+					def: def,
+					args: args,
+					time: time,
+					sched: sched,
+					outsMapping: outsMapping,
+					reset: reset,
+					keepOutsMappingIn: keepOutsMappingIn,
+					keepOutsMappingOut: keepOutsMappingOut,
+					keepScalesIn: keepScalesIn,
+					keepScalesOut: keepScalesOut
+				)
+			},
+			functionSynthDefDict: functionSynthDefDict
+		)
 	}
 
 	//IMPORTANT: this function must be empty. It's called from replaceInner, but synthBus is actually
