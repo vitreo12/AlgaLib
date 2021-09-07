@@ -474,6 +474,16 @@ AlgaPattern : AlgaNode {
 	TODOs:
 
 	1) mixFrom()
+
+	2) Should there be a wait behaviour for the parsing? It would only be needed to sync
+	Functions in \def, AlgaTemps, etc... :
+
+	var wait = Condition();
+
+	fork { def = parseDef(def); server.sync(wait) };
+
+	scheduler.addAction({ wait.test == true }, { ... })
+
 	*/
 
 	//The actual Patterns to be manipulated
@@ -1742,377 +1752,6 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Parse a single \fx event
-	parseFXEvent { | value |
-		var foundInParam = false;
-		var synthDescFx, synthDefFx, controlNamesFx;
-		var def;
-
-		//Find \def
-		def = value[\def];
-		if(def == nil, {
-			("AlgaPattern: no 'def' entry in 'fx': '" ++ value.asString ++ "'").error;
-			^nil
-		});
-
-		//If it's a Function, send def to server and replace entries
-		if(def.class == Function, {
-			var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-			//Important: NO sampleAccurate!
-			AlgaSynthDef(
-				defName,
-				def
-			).sendAndAddToGlobalDescLib(server);
-
-			//Replace the def: with the symbol
-			def = defName;
-			value[\def] = defName;
-		});
-
-		//Don't support ListPatterns for now
-		if(def.class != Symbol, {
-			("AlgaPattern: 'fx' only supports Symbols and Functions as 'def'").error;
-			^nil
-		});
-
-		//Check that \def is valid
-		synthDescFx = SynthDescLib.global.at(def);
-		if(synthDescFx == nil, {
-			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "'").error;
-			^nil;
-		});
-
-		synthDefFx = synthDescFx.def;
-		if(synthDefFx.class != AlgaSynthDef, {
-			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++"'").error;
-			^nil;
-		});
-
-		controlNamesFx = synthDescFx.controls;
-		controlNamesFx.do({ | controlName |
-			if(controlName.name == \in, {
-				foundInParam = true;
-				//Pass numChannels / rate of in param to Event
-				value[\inNumChannels] = controlName.numChannels;
-				value[\inRate] = controlName.rate;
-			})
-		});
-
-		//Not found the \in parameter
-		if(foundInParam.not, {
-			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "': It does not provide an 'in' parameter").error;
-			^nil;
-		});
-
-		//Pass controlNames / numChannels / rate to Event
-		value[\controlNames] = controlNamesFx;
-		value[\numChannels] = synthDefFx.numChannels;
-		value[\rate] = synthDefFx.rate;
-
-		//Pass explicitFree to Event
-		value[\explicitFree] = synthDefFx.explicitFree;
-
-		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
-		value.keysValuesDo({ | key, entry |
-			var parsedEntry = entry;
-			if(parsedEntry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry) });
-			if(parsedEntry.isAlgaTemp, { parsedEntry = this.parseAlgaTempParam(parsedEntry) });
-			value[key] = parsedEntry.algaAsStream;
-		});
-
-		^value;
-	}
-
-	//Parse the \fx key
-	parseFX { | value |
-		case
-
-		//Single Event
-		{ value.class == Event } {
-			^this.parseFXEvent(value);
-		}
-
-		//If individual Symbol, if it's in DescLib, use it as Event. Otherwise, passthrough (like, \none, \dry)
-		{ value.class == Symbol } {
-			if(SynthDescLib.global.at(value) != nil, {
-				^this.parseFXEvent((def: value))
-			});
-			^value
-		}
-
-		//If individual Function, wrap in Event
-		{ value.class == Function } {
-			^this.parseFXEvent((def: value))
-		}
-
-		//ListPattern of any of the above
-		{ value.isListPattern } {
-			value.list.do({ | listEntry, i |
-				var result = this.parseFX(listEntry); //recursive, so it picks up other ListPatterns if needed
-				if(result == nil, { ^nil });
-				value.list[i] = result;
-			});
-			^value;
-		};
-	}
-
-	//Parse a single \out event
-	parseOutAlgaOut { | value, alreadyParsed |
-		var node = value.node;
-		var param = value.param;
-
-		if(param == nil, param = \in);
-		if(param.class != Symbol, {
-			"AlgaPattern: the 'param' argument in AlgaOut can only be a Symbol. Using 'in'".error;
-			param = \in
-		});
-
-		case
-		{ node.isAlgaNode } {
-			if(alreadyParsed[node] == nil, {
-				if(node.isAlgaPattern, {
-					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
-					^nil
-				});
-				alreadyParsed[node] = true;
-				currentPatternOutNodes.add([node, param]);
-			});
-		}
-		{ node.isListPattern } {
-			node.list.do({ | listEntry, i |
-				node.list[i] = this.parseOut(listEntry, alreadyParsed)
-			});
-		};
-
-		^value.algaAsStream;
-	}
-
-	//Parse the \out key
-	parseOut { | value, alreadyParsed |
-		//Reset currentPatternOutNodes
-		currentPatternOutNodes = currentPatternOutNodes ? IdentitySet();
-
-		alreadyParsed = alreadyParsed ? IdentityDictionary();
-
-		case
-		{ value.isAlgaNode } {
-			if(alreadyParsed[value] == nil, {
-				if(value.isAlgaPattern, {
-					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
-					^nil
-				});
-				alreadyParsed[value] = true;
-				currentPatternOutNodes.add([value, \in]);
-			});
-			^value
-		}
-		{ value.isAlgaOut } {
-			^this.parseOutAlgaOut(value, alreadyParsed);
-		}
-		{ value.isListPattern } {
-			value.list.do({ | listEntry, i |
-				var result = this.parseOut(listEntry, alreadyParsed); //recursive, so it picks up other ListPatterns if needed
-				if(result == nil, { ^nil });
-				value.list[i] = result;
-			});
-			^value.algaAsStream; //return the Stream
-		}
-		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
-		{ value.class == Symbol } {
-			^value
-		};
-	}
-
-	//Parse an AlgaTemp
-	parseAlgaTempParam { | algaTemp |
-		var validAlgaTemp = false;
-		var def = algaTemp.def;
-		var defDef;
-
-		if(def == nil, {
-			"AlgaPattern: AlgaTemp has a nil 'def' argument".error;
-			^nil;
-		});
-
-		case
-		//Symbol
-		{ def.class == Symbol } {
-			defDef = def;
-			validAlgaTemp = true;
-		}
-
-		//Event: if function, compile it. Then, check all entries and unpack them
-		{ def.class == Event } {
-			defDef = def[\def];
-			if(defDef == nil, {
-				"AlgaPattern: AlgaTemp's 'def' Event does not provide a 'def' entry".error;
-				^nil
-			});
-
-			//Compile function and subsitute \def with the new symbol
-			if(defDef.class == Function, {
-				var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-				//Important: NO sampleAccurate
-				AlgaSynthDef(
-					defName,
-					defDef
-				).sendAndAddToGlobalDescLib(server);
-
-				defDef = defName;
-				def[\def] = defName;
-			});
-
-			//Loop around the event entries and use as Stream, substituting entries
-			def.keysValuesDo({ | key, entry |
-				if(key != \def, {
-					var parsedEntry = entry;
-					if(entry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry) });
-					if(entry.isAlgaTemp, { parsedEntry = this.parseAlgaTempParam(parsedEntry) });
-					def[key] = parsedEntry.algaAsStream;
-				});
-			});
-
-			validAlgaTemp = true;
-		}
-
-		//Function: compile function and subsitute \def with the new symbol
-		{ def.class == Function } {
-			var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-			//Important: NO sampleAccurate
-			AlgaSynthDef(
-				defName,
-				def
-			).sendAndAddToGlobalDescLib(server);
-
-			defDef = defName;
-			algaTemp.setDef(defName); //Substitute .def with the Symbol
-			validAlgaTemp = true;
-		};
-
-		//Check validity
-		if(validAlgaTemp.not, {
-			("AlgaPattern: AlgaTemp's 'def' argument must either be a Symbol, Event or Function").error;
-			^nil
-		});
-
-		//Check if actually a symbol now
-		if(defDef.class != Symbol, {
-			("AlgaPattern: Invalid AlgaTemp's definition: '" ++ defDef.asString ++ "'").error;
-			^nil
-		});
-
-		//Check if the synthDef is valid
-		algaTemp.checkValidSynthDef(defDef);
-
-		//Return the modified algaTemp (in case of Event / Function)
-		^algaTemp;
-	}
-
-	//Parse a ListPattern
-	parseListPatternParam { | listPattern |
-		listPattern.list.do({ | listEntry, i |
-			if(listEntry.isListPattern, {
-				listPattern.list[i] = this.parseListPatternParam(listEntry)
-			});
-			if(listEntry.isAlgaTemp, {
-				listPattern.list[i] = this.parseAlgaTempParam(listEntry)
-			});
-		});
-		^listPattern;
-	}
-
-	//Parse a param looking for AlgaTemps and ListPatterns
-	parseParam { | value |
-		case
-		{ value.class == AlgaTemp } {
-			^this.parseAlgaTempParam(value)
-		}
-		{ value.isListPattern } {
-			^this.parseListPatternParam(value)
-		};
-
-		^value
-	}
-
-	//Parse a Function \def entry
-	parseFunctionDefEntry { | def |
-		//New defName
-		var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-		//Send the SynthDef and store it. There's no need to wait response from server
-		AlgaSynthDef(
-			defName,
-			def,
-			outsMapping: outsMapping,
-			sampleAccurate: true
-		).sendAndAddToGlobalDescLib(server);
-
-		//Return the Symbol
-		^defName
-	}
-
-	//Parse a ListPattern \def entry
-	parseListPatternDefEntry { | def |
-		def.list.do({ | entry, i |
-			def.list[i] = this.parseDefEntry(entry)
-		});
-
-		^def
-	}
-
-	//Parse the \def entry
-	parseDefEntry { | def |
-		case
-		{ def.class == Function } {
-			^this.parseFunctionDefEntry(def)
-		}
-		{ def.isListPattern } {
-			^this.parseListPatternDefEntry(def)
-		};
-
-		^def
-	}
-
-	//Parse an entire def
-	parseDef { | def |
-		var defDef;
-		var defFX;
-		var defOut;
-
-		//Wrap in an Event if not an Event already
-		if(def.class != Event, { def = (def: def) });
-
-		//Retrieve entries that need specific parsing
-		defDef = def[\def];
-		defFX  = def[\fx];
-		defOut = def[\out];
-
-		//Return nil if no def
-		if(defDef == nil, {
-			"AlgaPattern: the Event does not provide a 'def' entry".error;
-			^nil
-		});
-
-		//Parse and replace \def
-		def[\def] = this.parseDefEntry(defDef);
-
-		//Parse \fx
-		if(defFX != nil, { def[\fx] = this.parseFX(defFX) });
-
-		//Parse \out
-		if(defOut != nil, { def[\out] = this.parseOut(defOut) });
-
-		//Parse all the other entries looking for AlgaTemps / ListPatterns
-		def.keysValuesDo({ | key, value |
-			def[key] = this.parseParam(value)
-		});
-
-		^def;
-	}
-
 	//Create out: receivers
 	createPatternOutReceivers { | prevPatternOutNodes |
 		var time = currentPatternOutTime ? 0;
@@ -2407,21 +2046,376 @@ AlgaPattern : AlgaNode {
 		interpStreams = newInterpStreams;
 	}
 
-	//Manually advance the pattern. 'next' as name won't work as it's reserved, apparently
-	advance { | sched |
-		sched = sched ? 0;
-		if(patternAsStream != nil, {
-			scheduler.addAction(
-				func: {
-					patternAsStream.next(()).play; //Empty event as protoEvent!
-				},
-				sched: sched
-			);
+	//Parse a single \fx event
+	parseFXEvent { | value |
+		var foundInParam = false;
+		var synthDescFx, synthDefFx, controlNamesFx;
+		var def;
+
+		//Find \def
+		def = value[\def];
+		if(def == nil, {
+			("AlgaPattern: no 'def' entry in 'fx': '" ++ value.asString ++ "'").error;
+			^nil
 		});
+
+		//If it's a Function, send def to server and replace entries
+		if(def.class == Function, {
+			var defName = ("alga_" ++ UniqueID.next).asSymbol;
+
+			//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
+			AlgaSynthDef(
+				defName,
+				def
+			).sendAndAddToGlobalDescLib(server);
+
+			//Replace the def: with the symbol
+			def = defName;
+			value[\def] = defName;
+		});
+
+		//Don't support ListPatterns for now
+		if(def.class != Symbol, {
+			("AlgaPattern: 'fx' only supports Symbols and Functions as 'def'").error;
+			^nil
+		});
+
+		//Check that \def is valid
+		synthDescFx = SynthDescLib.global.at(def);
+		if(synthDescFx == nil, {
+			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "'").error;
+			^nil;
+		});
+
+		synthDefFx = synthDescFx.def;
+		if(synthDefFx.class != AlgaSynthDef, {
+			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++"'").error;
+			^nil;
+		});
+
+		controlNamesFx = synthDescFx.controls;
+		controlNamesFx.do({ | controlName |
+			if(controlName.name == \in, {
+				foundInParam = true;
+				//Pass numChannels / rate of in param to Event
+				value[\inNumChannels] = controlName.numChannels;
+				value[\inRate] = controlName.rate;
+			})
+		});
+
+		//Not found the \in parameter
+		if(foundInParam.not, {
+			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "': It does not provide an 'in' parameter").error;
+			^nil;
+		});
+
+		//Pass controlNames / numChannels / rate to Event
+		value[\controlNames] = controlNamesFx;
+		value[\numChannels] = synthDefFx.numChannels;
+		value[\rate] = synthDefFx.rate;
+
+		//Pass explicitFree to Event
+		value[\explicitFree] = synthDefFx.explicitFree;
+
+		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
+		value.keysValuesDo({ | key, entry |
+			var parsedEntry = entry;
+			if(parsedEntry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry) });
+			if(parsedEntry.isAlgaTemp, { parsedEntry = this.parseAlgaTempParam(parsedEntry) });
+			value[key] = parsedEntry.algaAsStream;
+		});
+
+		^value;
 	}
 
-	//Alias of advance
-	step { | sched | this.advance(sched) }
+	//Parse the \fx key
+	parseFX { | value |
+		case
+
+		//Single Event
+		{ value.class == Event } {
+			^this.parseFXEvent(value);
+		}
+
+		//If individual Symbol, if it's in DescLib, use it as Event. Otherwise, passthrough (like, \none, \dry)
+		{ value.class == Symbol } {
+			if(SynthDescLib.global.at(value) != nil, {
+				^this.parseFXEvent((def: value))
+			});
+			^value
+		}
+
+		//If individual Function, wrap in Event
+		{ value.class == Function } {
+			^this.parseFXEvent((def: value))
+		}
+
+		//ListPattern of any of the above
+		{ value.isListPattern } {
+			value.list.do({ | listEntry, i |
+				var result = this.parseFX(listEntry); //recursive, so it picks up other ListPatterns if needed
+				if(result == nil, { ^nil });
+				value.list[i] = result;
+			});
+			^value;
+		};
+	}
+
+	//Parse a single \out event
+	parseOutAlgaOut { | value, alreadyParsed |
+		var node = value.node;
+		var param = value.param;
+
+		if(param == nil, param = \in);
+		if(param.class != Symbol, {
+			"AlgaPattern: the 'param' argument in AlgaOut can only be a Symbol. Using 'in'".error;
+			param = \in
+		});
+
+		case
+		{ node.isAlgaNode } {
+			if(alreadyParsed[node] == nil, {
+				if(node.isAlgaPattern, {
+					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
+					^nil
+				});
+				alreadyParsed[node] = true;
+				currentPatternOutNodes.add([node, param]);
+			});
+		}
+		{ node.isListPattern } {
+			node.list.do({ | listEntry, i |
+				node.list[i] = this.parseOut(listEntry, alreadyParsed)
+			});
+		};
+
+		^value.algaAsStream;
+	}
+
+	//Parse the \out key
+	parseOut { | value, alreadyParsed |
+		//Reset currentPatternOutNodes
+		currentPatternOutNodes = currentPatternOutNodes ? IdentitySet();
+
+		alreadyParsed = alreadyParsed ? IdentityDictionary();
+
+		case
+		{ value.isAlgaNode } {
+			if(alreadyParsed[value] == nil, {
+				if(value.isAlgaPattern, {
+					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
+					^nil
+				});
+				alreadyParsed[value] = true;
+				currentPatternOutNodes.add([value, \in]);
+			});
+			^value
+		}
+		{ value.isAlgaOut } {
+			^this.parseOutAlgaOut(value, alreadyParsed);
+		}
+		{ value.isListPattern } {
+			value.list.do({ | listEntry, i |
+				var result = this.parseOut(listEntry, alreadyParsed); //recursive, so it picks up other ListPatterns if needed
+				if(result == nil, { ^nil });
+				value.list[i] = result;
+			});
+			^value.algaAsStream; //return the Stream
+		}
+		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
+		{ value.class == Symbol } {
+			^value
+		};
+	}
+
+	//Parse an AlgaTemp
+	parseAlgaTempParam { | algaTemp |
+		var validAlgaTemp = false;
+		var def = algaTemp.def;
+		var defDef;
+
+		if(def == nil, {
+			"AlgaPattern: AlgaTemp has a nil 'def' argument".error;
+			^nil;
+		});
+
+		case
+		//Symbol
+		{ def.class == Symbol } {
+			defDef = def;
+			validAlgaTemp = true;
+		}
+
+		//Event: if function, compile it. Then, check all entries and unpack them
+		{ def.class == Event } {
+			defDef = def[\def];
+			if(defDef == nil, {
+				"AlgaPattern: AlgaTemp's 'def' Event does not provide a 'def' entry".error;
+				^nil
+			});
+
+			//Compile function and subsitute \def with the new symbol
+			if(defDef.class == Function, {
+				var defName = ("alga_" ++ UniqueID.next).asSymbol;
+
+				//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
+				AlgaSynthDef(
+					defName,
+					defDef
+				).sendAndAddToGlobalDescLib(server);
+
+				defDef = defName;
+				def[\def] = defName;
+			});
+
+			//Loop around the event entries and use as Stream, substituting entries
+			def.keysValuesDo({ | key, entry |
+				if(key != \def, {
+					var parsedEntry = entry;
+					if(entry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry) });
+					if(entry.isAlgaTemp, { parsedEntry = this.parseAlgaTempParam(parsedEntry) });
+					def[key] = parsedEntry.algaAsStream;
+				});
+			});
+
+			validAlgaTemp = true;
+		}
+
+		//Function: compile function and subsitute \def with the new symbol
+		{ def.class == Function } {
+			var defName = ("alga_" ++ UniqueID.next).asSymbol;
+
+			//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
+			AlgaSynthDef(
+				defName,
+				def
+			).sendAndAddToGlobalDescLib(server);
+
+			defDef = defName;
+			algaTemp.setDef(defName); //Substitute .def with the Symbol
+			validAlgaTemp = true;
+		};
+
+		//Check validity
+		if(validAlgaTemp.not, {
+			("AlgaPattern: AlgaTemp's 'def' argument must either be a Symbol, Event or Function").error;
+			^nil
+		});
+
+		//Check if actually a symbol now
+		if(defDef.class != Symbol, {
+			("AlgaPattern: Invalid AlgaTemp's definition: '" ++ defDef.asString ++ "'").error;
+			^nil
+		});
+
+		//Check if the synthDef is valid
+		algaTemp.checkValidSynthDef(defDef);
+
+		//Return the modified algaTemp (in case of Event / Function)
+		^algaTemp;
+	}
+
+	//Parse a ListPattern
+	parseListPatternParam { | listPattern |
+		listPattern.list.do({ | listEntry, i |
+			if(listEntry.isListPattern, {
+				listPattern.list[i] = this.parseListPatternParam(listEntry)
+			});
+			if(listEntry.isAlgaTemp, {
+				listPattern.list[i] = this.parseAlgaTempParam(listEntry)
+			});
+		});
+		^listPattern;
+	}
+
+	//Parse a param looking for AlgaTemps and ListPatterns
+	parseAlgaTempListPatternParam { | value |
+		case
+		{ value.class == AlgaTemp } {
+			^this.parseAlgaTempParam(value)
+		}
+		{ value.isListPattern } {
+			^this.parseListPatternParam(value)
+		};
+
+		^value
+	}
+
+	//Parse a Function \def entry
+	parseFunctionDefEntry { | def |
+		//New defName
+		var defName = ("alga_" ++ UniqueID.next).asSymbol;
+
+		//Send the SynthDef and store it. There's no need to wait response from server
+		AlgaSynthDef(
+			defName,
+			def,
+			outsMapping: outsMapping,
+			sampleAccurate: true
+		).sendAndAddToGlobalDescLib(server);
+
+		//Return the Symbol
+		^defName
+	}
+
+	//Parse a ListPattern \def entry
+	parseListPatternDefEntry { | def |
+		def.list.do({ | entry, i |
+			def.list[i] = this.parseDefEntry(entry)
+		});
+
+		^def
+	}
+
+	//Parse the \def entry
+	parseDefEntry { | def |
+		case
+		{ def.class == Function } {
+			^this.parseFunctionDefEntry(def)
+		}
+		{ def.isListPattern } {
+			^this.parseListPatternDefEntry(def)
+		};
+
+		^def
+	}
+
+	//Parse an entire def
+	parseDef { | def |
+		var defDef;
+		var defFX;
+		var defOut;
+
+		//Wrap in an Event if not an Event already
+		if(def.class != Event, { def = (def: def) });
+
+		//Retrieve entries that need specific parsing
+		defDef = def[\def];
+		defFX  = def[\fx];
+		defOut = def[\out];
+
+		//Return nil if no def
+		if(defDef == nil, {
+			"AlgaPattern: the Event does not provide a 'def' entry".error;
+			^nil
+		});
+
+		//Parse and replace \def
+		def[\def] = this.parseDefEntry(defDef);
+
+		//Parse \fx
+		if(defFX != nil, { def[\fx] = this.parseFX(defFX) });
+
+		//Parse \out
+		if(defOut != nil, { def[\out] = this.parseOut(defOut) });
+
+		//Parse all the other entries looking for AlgaTemps / ListPatterns
+		def.keysValuesDo({ | key, value |
+			def[key] = this.parseAlgaTempListPatternParam(value)
+		});
+
+		^def;
+	}
 
 	//Get valid synthDef name
 	getSynthDef {
@@ -2432,23 +2426,6 @@ AlgaPattern : AlgaNode {
 			//ListPatterns
 			^synthDef
 		});
-	}
-
-	//Set dur at sched
-	setDurAtSched { | value, sched |
-		//Set new \dur
-		this.setDur(value);
-
-		//Add to scheduler just to make cascadeMode work
-		scheduler.addAction(
-			condition: { this.algaInstantiated },
-			func: {
-				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
-				if(algaReschedulingEventStreamPlayer != nil, {
-					algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
-				})
-			}
-		);
 	}
 
 	//Interpolate dur, either replace OR substitute at sched
@@ -2555,16 +2532,6 @@ AlgaPattern : AlgaNode {
 		//Add scaling to Dicts
 		if(scale != nil, { this.addScaling(param, sender, scale) });
 
-		//Parse ListPattern
-		if(sender.isListPattern, {
-			sender = this.parseListPatternParam(sender)
-		});
-
-		//Parse AlgaTemp
-		if(sender.isAlgaTemp, {
-			sender = this.parseAlgaTempParam(sender)
-		});
-
 		//Add to interpStreams (which also creates interpBus / interpSynth)
 		interpStreams.add(
 			entry: sender,
@@ -2619,7 +2586,7 @@ AlgaPattern : AlgaNode {
 		if(param == \delta, { param = \dur });
 
 		//Parse the sender looking for AlgaTemps and ListPatterns
-		sender = this.parseParam(sender);
+		sender = this.parseAlgaTempListPatternParam(sender);
 
 		//If sender is nil, don't do anything
 		if(sender == nil, { ^this });
@@ -2683,6 +2650,11 @@ AlgaPattern : AlgaNode {
 				("AlgaPattern: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
 			});
 		});
+	}
+
+	//Don't support <<+ for now
+	mixFrom { | sender, param = \in, inChans, scale, time |
+		"AlgaPattern: mixFrom is not supported yet".error;
 	}
 
 	// <<| \param (goes back to defaults)
@@ -2759,9 +2731,37 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Don't support <<+ for now
-	mixFrom { | sender, param = \in, inChans, scale, time |
-		"AlgaPattern: mixFrom is not supported yet".error;
+	//Manually advance the pattern. 'next' as function name won't work as it's reserved, apparently
+	advance { | sched |
+		sched = sched ? 0;
+		if(patternAsStream != nil, {
+			scheduler.addAction(
+				func: {
+					patternAsStream.next(()).play; //Empty event as protoEvent!
+				},
+				sched: sched
+			);
+		});
+	}
+
+	//Alias of advance
+	step { | sched | this.advance(sched) }
+
+	//Set dur at sched
+	setDurAtSched { | value, sched |
+		//Set new \dur
+		this.setDur(value);
+
+		//Add to scheduler just to make cascadeMode work
+		scheduler.addAction(
+			condition: { this.algaInstantiated },
+			func: {
+				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
+				if(algaReschedulingEventStreamPlayer != nil, {
+					algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
+				})
+			}
+		);
 	}
 
 	//stop and reschedule in the future
