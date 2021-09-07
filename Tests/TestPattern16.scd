@@ -42,9 +42,6 @@ Alga.boot({
 })
 )
 
-//Support this too
-scale:[Pwhite(10, 20), Pwhite(200, 40)]
-
 //Funcs with \fx
 (
 Alga.boot({
