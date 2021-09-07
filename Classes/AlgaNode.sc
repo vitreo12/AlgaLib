@@ -211,8 +211,8 @@ AlgaNode {
 		//Also check for AlgaPattern
 		if(this.isAlgaPattern, {
 			//AlgaPattern init
-			if((argDef.class != Event).and(argDef.class != Symbol), {
-				"AlgaPattern: first argument must be an Event describing the pattern or a Symbol pointing to a SynthDef".error;
+			if((argDef.class != Event).and(argDef.class != Symbol).and(argDef.class != Function), {
+				"AlgaPattern: first argument must be an Event describing the pattern, a Symbol or a Function".error;
 				^this;
 			});
 		}, {
@@ -234,13 +234,18 @@ AlgaNode {
 		this.connectionTime_(argConnectionTime, all:true);
 		this.playTime_(argPlayTime);
 
+		//If AlgaPattern, parse the def
+		if(this.isAlgaPattern, { argDef = this.parseDef(argDef) });
+
 		//Dispatch node creation
-		this.dispatchNode(
-			argDef, argArgs,
-			initGroups: true,
-			outsMapping: argOutsMapping,
-			sched: argSched
-		);
+		if(argDef != nil, {
+			this.dispatchNode(
+				argDef, argArgs,
+				initGroups: true,
+				outsMapping: argOutsMapping,
+				sched: argSched
+			);
+		});
 	}
 
 	setParamsConnectionTime { | value, param, all = false |

@@ -1,8 +1,8 @@
 (
 Alga.boot({
-	a = AlgaPattern((
-		def: { SinOsc.ar(\freq.kr(223)) * EnvGen.ar(Env.perc(releaseTime:0.5), doneAction:2) }
-	)).play;
+	a = AlgaPattern(
+		{ SinOsc.ar(\freq.kr(440)) * EnvGen.ar(Env.perc(releaseTime:0.5), doneAction:2) }
+	).play;
 })
 )
 

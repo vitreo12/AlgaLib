@@ -1483,13 +1483,8 @@ AlgaPattern : AlgaNode {
 	dispatchNode { | def, args, initGroups = false, replace = false, reset = false,
 		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
 
-		var defEntry;
-
-		//Not an event, just wrap in one for def:
-		if(def.class != Event, { def = (def: def) });
-
 		//def: entry
-		defEntry = def[\def];
+		var defEntry = def[\def];
 		if(defEntry == nil, {
 			"AlgaPattern: no 'def' entry in the Event".error;
 			^this;
@@ -1540,18 +1535,9 @@ AlgaPattern : AlgaNode {
 				keepScale:keepScale,
 				sched:sched
 			)
-		}
-		{ defClass == Function } {
-			^this.dispatchFunction(
-				def: defEntry,
-				initGroups: initGroups,
-				replace: replace,
-				keepChannelsMapping:keepChannelsMapping,
-				outsMapping: outsMapping,
-				keepScale:keepScale,
-				sched:sched
-			)
 		};
+
+		//No dispatchFunction, as the parsing has already happened and def contains only Symbols
 
 		("AlgaPattern: class '" ++ defClass ++ "' is an invalid 'def'").error;
 	}
@@ -1624,23 +1610,6 @@ AlgaPattern : AlgaNode {
 			keepScale: keepScale,
 			sched: sched
 		);
-	}
-
-	//Check functions
-	checkListPatternFunctions { | listPattern, functions |
-		functions = functions ? IdentityDictionary();
-		listPattern.list.do({ | entry, i |
-			if(entry.isListPattern, {
-				this.checkListPatternFunctions(entry, functions)
-			}, {
-				if(entry.class == Function, {
-					var defName = ("alga_" ++ UniqueID.next).asSymbol;
-					functions[defName] = entry;
-					listPattern.list[i] = defName; //replace entry in listPattern with the synthDef symbol
-				});
-			});
-		});
-		^[functions, listPattern]
 	}
 
 	//Check rates, numChannels, Symbols and controlNames
@@ -1738,59 +1707,12 @@ AlgaPattern : AlgaNode {
 		^controlNamesSum;
 	}
 
-	//Dispatch a Function (it's different from AlgaNode's)
-	dispatchFunction { | def, initGroups = false, replace = false,
-		keepChannelsMapping = false, outsMapping, keepScale = false, sched = 0 |
-
-		//New defName
-		var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-		//Send the SynthDef and store it. There's no need to wait response from server
-		synthDef = AlgaSynthDef(
-			defName,
-			def,
-			outsMapping: outsMapping,
-			sampleAccurate: true
-		).sendAndAddToGlobalDescLib(server);
-
-		//Just get standard SynthDef
-		if(synthDef.class == AlgaSynthDefSpec, { synthDef = synthDef.synthDef });
-
-		//Replace entry in the Event
-		eventPairs[\def] = defName;
-
-		//Build from synth def
-		this.buildFromSynthDef(
-			initGroups: initGroups,
-			replace: replace,
-			keepChannelsMapping: keepChannelsMapping,
-			keepScale: keepScale,
-			sched: sched
-		);
-	}
-
 	//Multiple Symbols over a ListPattern
 	dispatchListPattern { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 		var controlNamesSum;
 		var functionsAndListPattern;
 		var functions;
-
-		//Check if there are Functions to be sent to server as AlgaSynthDefs
-		functionsAndListPattern = this.checkListPatternFunctions(def);
-		functions = functionsAndListPattern[0];
-		if(functions.size > 0, {
-			//Send the synthdefs right away.
-			//There's no need to wait for response from server, as only the desc is needed
-			functions.keysValuesDo({ | defName, func |
-				AlgaSynthDef(
-					defName,
-					func,
-					sampleAccurate: true
-				).sendAndAddToGlobalDescLib(server);
-			});
-			def = functionsAndListPattern[1]; //Replace the symbols in place of the functions
-		});
 
 		//Create numChannelsList, rateList and controlNamesList (they're nil otherwise)
 		numChannelsList  = IdentityDictionary();
@@ -1968,6 +1890,9 @@ AlgaPattern : AlgaNode {
 
 	//Parse the \out key
 	parseOut { | value, alreadyParsed |
+		//Reset currentPatternOutNodes
+		currentPatternOutNodes = currentPatternOutNodes ? IdentitySet();
+
 		alreadyParsed = alreadyParsed ? IdentityDictionary();
 
 		case
@@ -2099,6 +2024,95 @@ AlgaPattern : AlgaNode {
 		^listPattern;
 	}
 
+	//Parse a param looking for AlgaTemps and ListPatterns
+	parseParam { | value |
+		case
+		{ value.class == AlgaTemp } {
+			^this.parseAlgaTempParam(value)
+		}
+		{ value.isListPattern } {
+			^this.parseListPatternParam(value)
+		};
+
+		^value
+	}
+
+	//Parse a Function \def entry
+	parseFunctionDefEntry { | def |
+		//New defName
+		var defName = ("alga_" ++ UniqueID.next).asSymbol;
+
+		//Send the SynthDef and store it. There's no need to wait response from server
+		AlgaSynthDef(
+			defName,
+			def,
+			outsMapping: outsMapping,
+			sampleAccurate: true
+		).sendAndAddToGlobalDescLib(server);
+
+		//Return the Symbol
+		^defName
+	}
+
+	//Parse a ListPattern \def entry
+	parseListPatternDefEntry { | def |
+		def.list.do({ | entry, i |
+			def.list[i] = this.parseDefEntry(entry)
+		});
+
+		^def
+	}
+
+	//Parse the \def entry
+	parseDefEntry { | def |
+		case
+		{ def.class == Function } {
+			^this.parseFunctionDefEntry(def)
+		}
+		{ def.isListPattern } {
+			^this.parseListPatternDefEntry(def)
+		};
+
+		^def
+	}
+
+	//Parse an entire def
+	parseDef { | def |
+		var defDef;
+		var defFX;
+		var defOut;
+
+		//Wrap in an Event if not an Event already
+		if(def.class != Event, { def = (def: def) });
+
+		//Retrieve entries that need specific parsing
+		defDef = def[\def];
+		defFX  = def[\fx];
+		defOut = def[\out];
+
+		//Return nil if no def
+		if(defDef == nil, {
+			"AlgaPattern: the Event does not provide a 'def' entry".error;
+			^nil
+		});
+
+		//Parse and replace \def
+		def[\def] = this.parseDefEntry(defDef);
+
+		//Parse \fx
+		if(defFX != nil, { def[\fx] = this.parseFX(defFX) });
+
+		//Parse \out
+		if(defOut != nil, { def[\out] = this.parseOut(defOut) });
+
+		//Parse all the other entries looking for AlgaTemps / ListPatterns
+		def.keysValuesDo({ | key, value |
+			def[key] = this.parseParam(value)
+		});
+
+		^def;
+	}
+
 	//Create out: receivers
 	createPatternOutReceivers { | prevPatternOutNodes |
 		var time = currentPatternOutTime ? 0;
@@ -2153,6 +2167,7 @@ AlgaPattern : AlgaNode {
 		{ currentReset == true } {
 			^true;
 		};
+
 		^nil
 	}
 
@@ -2185,16 +2200,6 @@ AlgaPattern : AlgaNode {
 			var paramName = controlName.name;
 			var paramValue = eventPairs[paramName]; //Retrieve it directly from eventPairs
 			var chansMapping, scale;
-
-			//Parse a ListPattern
-			if(paramValue.isListPattern, {
-				paramValue = this.parseListPatternParam(paramValue);
-			});
-
-			//Parse an AlgaTemp
-			if(paramValue.isAlgaTemp, {
-				paramValue = this.parseAlgaTempParam(paramValue);
-			});
 
 			//if not set explicitly yet
 			if(paramValue == nil, {
@@ -2248,7 +2253,7 @@ AlgaPattern : AlgaNode {
 
 			//Add \fx key (parsing everything correctly)
 			if(paramName == \fx, {
-				parsedFX = this.parseFX(value);
+				parsedFX = value;
 				if(parsedFX != nil, {
 					patternPairs = patternPairs.add(\fx).add(parsedFX);
 					foundFX = true;
@@ -2258,9 +2263,7 @@ AlgaPattern : AlgaNode {
 
 			//Add \out key
 			if(paramName == \out, {
-				//Reset currentPatternOutNodes
-				currentPatternOutNodes = IdentitySet();
-				parsedOut = this.parseOut(value);
+				parsedOut = value;
 				if(parsedOut != nil, {
 					patternPairs = patternPairs.add(\algaOut).add(parsedOut); //can't use \out
 					foundOut = true;
@@ -2426,7 +2429,7 @@ AlgaPattern : AlgaNode {
 			//Normal synthDef
 			^synthDef.name
 		}, {
-			//ListPatterns, mainly
+			//ListPatterns
 			^synthDef
 		});
 	}
@@ -2613,9 +2616,13 @@ AlgaPattern : AlgaNode {
 	//Only from is needed: to already calls into makeConnection
 	from { | sender, param = \in, chans, scale, sampleAndHold, time, sched |
 		//delta == dur
-		if(param == \delta, {
-			param = \dur;
-		});
+		if(param == \delta, { param = \dur });
+
+		//Parse the sender looking for AlgaTemps and ListPatterns
+		sender = this.parseParam(sender);
+
+		//If sender is nil, don't do anything
+		if(sender == nil, { ^this });
 
 		//Special case, \dur
 		if(param == \dur, {
@@ -2649,8 +2656,9 @@ AlgaPattern : AlgaNode {
 
 		//Force Pattern / AlgaPatternArg / AlgaTemp dispatch
 		if((sender.isPattern).or(sender.isAlgaPatternArg).or(sender.isAlgaTemp), {
-			^this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, sampleAndHold:sampleAndHold, time:time, sched:sched
+			^this.makeConnection(
+				sender: sender, param: param, senderChansMapping: chans,
+				scale: scale, sampleAndHold: sampleAndHold, time: time, sched: sched
 			);
 		});
 
@@ -2660,14 +2668,16 @@ AlgaPattern : AlgaNode {
 				("AlgaPattern: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
-			this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, sampleAndHold:sampleAndHold, sched:sched
+			this.makeConnection(
+				sender: sender, param: param, senderChansMapping: chans,
+				scale: scale, time: time, sampleAndHold: sampleAndHold, sched: sched
 			);
 		}, {
 			//sender == symbol is used for \def
 			if(sender.isNumberOrArray, {
-				this.makeConnection(sender, param, senderChansMapping:chans,
-					scale:scale, time:time, sampleAndHold:sampleAndHold, sched:sched
+				this.makeConnection(
+					sender: sender, param: param, senderChansMapping: chans,
+					scale: scale, time: time, sampleAndHold: sampleAndHold, sched: sched
 				);
 			}, {
 				("AlgaPattern: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
@@ -2692,11 +2702,29 @@ AlgaPattern : AlgaNode {
 		this.resetParam(param, sampleAndHold, time, sched)
 	}
 
-	//replace:
-	// 1) replace the entire AlgaPattern with a new one (like AlgaNode.replace)
-	// 2) replace just the SynthDef with either a new SynthDef or a ListPattern with JUST SynthDefs.
-	//    This would be equivalent to <<.def \newSynthDef
-	//    OR <<.def Pseq([\newSynthDef1, \newSynthDef2])
+	//Replace: run parsing of def before running (so the SynthDefs of Functions are sent right away)
+	replace { | def, args, time, sched, outsMapping, reset = false, keepOutsMappingIn = true,
+		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
+
+		//Parse the def
+		def = this.parseDef(def);
+
+		//If it's a good def, go on with the replace
+		if(def != nil, {
+			^super.replace(
+				def: def,
+				args: args,
+				time: time,
+				sched: sched,
+				outsMapping: outsMapping,
+				reset: reset,
+				keepOutsMappingIn: keepOutsMappingIn,
+				keepOutsMappingOut: keepOutsMappingOut,
+				keepScalesIn: keepScalesIn,
+				keepScalesOut: keepScalesOut
+			)
+		});
+	}
 
 	//IMPORTANT: this function must be empty. It's called from replaceInner, but synthBus is actually
 	//still being used by the pattern. It should only be freed when the pattern is freed, as it's done

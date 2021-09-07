@@ -56,10 +56,10 @@ Alga.boot({
 		),
 
 		fx: Pseq([
-			{ (\in.ar * 10).tanh * 0.5 },
+			{ (\in.ar * 10).tanh * 0.2 },
 			(
 				def: { CombC.ar(\in.ar, delaytime:\dt.kr(0.05)) },
-				dt: Pwhite(0.001, 0.2)
+				dt: Pwhite(0.001, 0.05)
 			)
 		], inf),
 
