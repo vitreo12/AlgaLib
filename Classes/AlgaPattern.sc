@@ -2249,8 +2249,6 @@ AlgaPattern : AlgaNode {
 		var def = algaTemp.def;
 		var defDef;
 
-		functionSynthDefDict.asString.warn;
-
 		if(def == nil, {
 			"AlgaPattern: AlgaTemp has a nil 'def' argument".error;
 			^nil;
