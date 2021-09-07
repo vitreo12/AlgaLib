@@ -475,8 +475,8 @@ AlgaPattern : AlgaNode {
 
 	1) mixFrom()
 
-	2) Should there be a wait behaviour for the parsing? It would only be needed to sync
-	Functions in \def, AlgaTemps, etc... :
+	2) Should there be a wait behaviour for the parsing (parseDef and parseAlgaTempListPatternParam)?
+	It would only be needed to sync Functions for \def, \fx and AlgaTemps. It should run in init(), replace() and from():
 
 	var wait = Condition();
 
