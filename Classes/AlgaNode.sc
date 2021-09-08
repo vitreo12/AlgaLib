@@ -2692,10 +2692,12 @@ AlgaNode {
 				if(key != \def, {
 					var parsedEntry = entry;
 					if(entry.isListPattern, {
-						parsedEntry = this.parseListPatternParam(parsedEntry, functionSynthDefDict)
+						parsedEntry = this.parseListPatternParam(parsedEntry, functionSynthDefDict);
+						if(parsedEntry == nil, { ^nil })
 					});
 					if(entry.isAlgaTemp, {
-						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict)
+						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict);
+						if(parsedEntry == nil, { ^nil })
 					});
 					def[key] = parsedEntry.algaAsStream;
 				});
@@ -2741,13 +2743,13 @@ AlgaNode {
 	//Overload so that it errors out
 	parseListPatternParam { | listPattern, functionSynthDefDict |
 		"AlgaNode: AlgaTemp does not support ListPatterns".error;
-		^this
+		^nil
 	}
 
 
 	parseAlgaTempListPatternParam { | value, functionSynthDefDict |
 		"AlgaNode: AlgaTemp does not support ListPatterns".error;
-		^this
+		^nil
 	}
 
 	//<<.param AlgaTemp
@@ -2756,6 +2758,8 @@ AlgaNode {
 
 		var functionSynthDefDict = IdentityDictionary();
 		var algaTemp = this.parseAlgaTempParam(sender, functionSynthDefDict);
+
+		if(algaTemp == nil, { ^this });
 
 		//Pass scale / chans through
 		scale = algaTemp.scale ? scale;
