@@ -474,16 +474,6 @@ AlgaPattern : AlgaNode {
 	TODOs:
 
 	1) mixFrom()
-
-	2) Should there be a wait behaviour for the parsing (parseDef and parseAlgaTempListPatternParam)?
-	It would only be needed to sync Functions for \def, \fx and AlgaTemps. It should run in init(), replace() and from():
-
-	var wait = Condition();
-
-	fork { def = parseDef(def); server.sync(wait) };
-
-	scheduler.addAction({ wait.test == true }, { ... })
-
 	*/
 
 	//The actual Patterns to be manipulated
