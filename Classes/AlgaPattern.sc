@@ -650,7 +650,7 @@ AlgaPattern : AlgaNode {
 		def = algaTempDef;
 
 		//If Event, SynthDef is under [\def]
-		if(algaTempDef.class == Event, {
+		if(algaTempDef.isEvent, {
 			def = algaTempDef[\def];
 			defIsEvent = true;
 		});
@@ -1382,7 +1382,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Check validFX
-		if((fx != nil).and(fx.class == Event), { validFX = true });
+		if((fx != nil).and(fx.isEvent), { validFX = true });
 
 		//Check validOut
 		if((algaOut != nil).and((algaOut.isAlgaOut).or(algaOut.isAlgaNode)), { validOut = true });
@@ -1493,9 +1493,6 @@ AlgaPattern : AlgaNode {
 		//Store the Event
 		eventPairs = def;
 
-		//Store class of the synthEntry
-		defClass = defEntry.class;
-
 		//If there is a synth playing, set its algaInstantiated status to false:
 		//this is mostly needed for .replace to work properly and wait for the new synth
 		//to be algaInstantiated!
@@ -1516,7 +1513,7 @@ AlgaPattern : AlgaNode {
 		controlNamesList = nil;
 
 		case
-		{ defClass == Symbol } {
+		{ defEntry.isSymbol } {
 			^this.dispatchSynthDef(
 				def: defEntry,
 				initGroups: initGroups,
@@ -1539,7 +1536,7 @@ AlgaPattern : AlgaNode {
 
 		//No dispatchFunction, as the parsing has already happened and def contains only Symbols
 
-		("AlgaPattern: class '" ++ defClass ++ "' is an invalid 'def'").error;
+		("AlgaPattern: '" ++ defEntry.asString ++ "' is an invalid 'def'").error;
 	}
 
 	//Overloaded function
@@ -1870,7 +1867,7 @@ AlgaPattern : AlgaNode {
 
 			//Found \dur or \delta
 			if((paramName == \dur).or(paramName == \delta), {
-				if(value.class == Symbol, {
+				if(value.isSymbol, {
 					//Using a symbol (like, \manual) as \dur key
 					manualDur = true
 				}, {
@@ -2051,7 +2048,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//If it's a Function, send def to server and replace entries
-		if(def.class == Function, {
+		if(def.isFunction, {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
 			//The synthDef will be sent later! just use the def and the desc for now
@@ -2074,7 +2071,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Don't support ListPatterns for now
-		if(def.class != Symbol, {
+		if(def.isSymbol.not, {
 			("AlgaPattern: 'fx' only supports Symbols and Functions as 'def'").error;
 			^nil
 		});
@@ -2138,12 +2135,12 @@ AlgaPattern : AlgaNode {
 		case
 
 		//Single Event
-		{ value.class == Event } {
+		{ value.isEvent } {
 			^this.parseFXEvent(value, functionSynthDefDict);
 		}
 
 		//If individual Symbol, if it's in DescLib, use it as Event. Otherwise, passthrough (like, \none, \dry)
-		{ value.class == Symbol } {
+		{ value.isSymbol } {
 			if(SynthDescLib.global.at(value) != nil, {
 				^this.parseFXEvent((def: value), functionSynthDefDict)
 			});
@@ -2151,7 +2148,7 @@ AlgaPattern : AlgaNode {
 		}
 
 		//If individual Function, wrap in Event
-		{ value.class == Function } {
+		{ value.isFunction } {
 			^this.parseFXEvent((def: value), functionSynthDefDict)
 		}
 
@@ -2228,7 +2225,7 @@ AlgaPattern : AlgaNode {
 			^value.algaAsStream; //return the Stream
 		}
 		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
-		{ value.class == Symbol } {
+		{ value.isSymbol } {
 			^value
 		};
 	}
@@ -2246,13 +2243,13 @@ AlgaPattern : AlgaNode {
 
 		case
 		//Symbol
-		{ def.class == Symbol } {
+		{ def.isSymbol } {
 			defDef = def;
 			validAlgaTemp = true;
 		}
 
 		//Event: if function, compile it. Then, check all entries and unpack them
-		{ def.class == Event } {
+		{ def.isEvent } {
 			defDef = def[\def];
 			if(defDef == nil, {
 				"AlgaPattern: AlgaTemp's 'def' Event does not provide a 'def' entry".error;
@@ -2260,7 +2257,7 @@ AlgaPattern : AlgaNode {
 			});
 
 			//Sbsitute \def with the new symbol
-			if(defDef.class == Function, {
+			if(defDef.isFunction, {
 				var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
 				//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
@@ -2290,7 +2287,7 @@ AlgaPattern : AlgaNode {
 		}
 
 		//Function: subsitute \def with the new symbol
-		{ def.class == Function } {
+		{ def.isFunction } {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
 			//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
@@ -2391,7 +2388,7 @@ AlgaPattern : AlgaNode {
 	//Parse the \def entry
 	parseDefEntry { | def, functionSynthDefDict |
 		case
-		{ def.class == Function } {
+		{ def.isFunction } {
 			^this.parseFunctionDefEntry(def, functionSynthDefDict)
 		}
 		{ def.isListPattern } {

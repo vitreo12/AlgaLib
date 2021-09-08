@@ -23,6 +23,8 @@
 	isBuffer { ^false }
 	isPattern { ^false }
 	isStream { ^false }
+	isSymbol { ^false }
+	isEvent { ^false }
 	isListPattern { ^false }
 	isTempoClock { ^false }
 	def { ^nil }
@@ -70,6 +72,16 @@
 			curvedResult
 		])
 	}
+}
+
+//Better than checking .class == Symbol
++Symbol {
+	isSymbol { ^true }
+}
+
+//Bettern than checking .class == Event
++Event {
+	isEvent { ^true }
 }
 
 //For Array lincurve
