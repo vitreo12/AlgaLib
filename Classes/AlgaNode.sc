@@ -1509,11 +1509,12 @@ AlgaNode {
 				var defaultRate = paramRate;
 				var channelsMapping, scaleArray;
 				var interpSymbol, normSymbol, interpBus, interpSynthArgs, interpSynth, normSynth;
+				var tempSynthsAndBusses;
 
 				//AlgaTemp
 				case
 				{ paramDefault.isAlgaTemp } {
-					var tempSynthsAndBusses = IdentitySet(8);
+					tempSynthsAndBusses = IdentitySet(8);
 
 					//If invalid, exit
 					if(paramDefault.valid.not, {
@@ -1626,6 +1627,18 @@ AlgaNode {
 
 				//Add interpSynth to the current active ones for specific param / sender combination
 				this.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
+
+				//When interpSynth is freed, free the synths / busses for AlgaTemps
+				if(tempSynthsAndBusses != nil, {
+					interpSynth.onFree({
+						fork {
+							0.5.wait;
+							tempSynthsAndBusses.do({ | tempSynthOrBus |
+								tempSynthOrBus.free
+							})
+						}
+					});
+				});
 			});
 		});
 	}
