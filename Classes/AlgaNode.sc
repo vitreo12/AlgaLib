@@ -1559,11 +1559,13 @@ AlgaNode {
 				//Use previous entry for the channel mapping, otherwise, nil.
 				//nil will generate Array.series(...) in calculateSenderChansMappingArray
 				if(keepChannelsMapping, {
+					//Might have been defined by AlgaTemp
 					oldParamsChansMapping = oldParamsChansMapping ? this.getParamChansMapping(paramName, \default);
 				});
 
 				//Use previous entry for inputs scaling
 				if(keepScale, {
+					//Might have been defined by AlgaTemp
 					oldParamScale = oldParamScale ? this.getParamScaling(paramName, \default);
 				});
 
@@ -1574,7 +1576,7 @@ AlgaNode {
 					oldParamsChansMapping,
 					defaultNumChannels,
 					paramNumChannels,
-					false
+					false //Always false, either if keeping the old one or using AlgaTemp's
 				);
 
 				//calculate scale array (use senderSym (\default))
@@ -1582,7 +1584,8 @@ AlgaNode {
 					paramName,
 					\default,
 					paramNumChannels,
-					oldParamScale
+					oldParamScale,
+					false //Always false, either if keeping the old one or using AlgaTemp's
 				);
 
 				//default interpBus
@@ -2042,6 +2045,8 @@ AlgaNode {
 			//if sender is nil, restore the original default value. This is used in <|
 			var paramVal;
 			var tempSynthsAndBusses;
+			var updateScale = true;
+			var updateChans = true;
 
 			//Use default value if sender == nil
 			if(sender == nil, {
@@ -2065,6 +2070,15 @@ AlgaNode {
 				tempSynthsAndBusses = IdentitySet(8);
 				senderNumChannels = sender.numChannels;
 				senderRate = sender.rate;
+
+				//Used to avoid updating scale / chans if retrieving from AlgaTemp's
+				if(sender.scale != nil, { updateScale = false });
+				if(sender.chans != nil, { updateChans = false });
+
+				//Use AlgaTemp's scale / chans if provided
+				scale = sender.scale ? scale;
+				senderChansMapping = sender.chans ? senderChansMapping;
+
 				paramVal = this.createAlgaTempSynth(
 					algaTemp: sender,
 					tempSynthsAndBusses: tempSynthsAndBusses
@@ -2088,6 +2102,7 @@ AlgaNode {
 				senderChansMapping,
 				senderNumChannels,
 				paramNumChannels,
+				updateChans //Don't add to global if using AlgaTemp's chans
 			);
 
 			//args
@@ -2103,7 +2118,8 @@ AlgaNode {
 				param,
 				\default, //Pass \default !
 				paramNumChannels,
-				scale
+				scale,
+				updateScale //Don't add to global if using AlgaTemp's scale
 			);
 
 			//add scaleArray to args
@@ -2890,10 +2906,6 @@ AlgaNode {
 		var algaTemp = this.parseAlgaTempParam(sender, functionSynthDefDict);
 
 		if(algaTemp == nil, { ^this });
-
-		//Pass scale / chans through
-		scale = algaTemp.scale ? scale;
-		senderChansMapping = algaTemp.chans ? senderChansMapping;
 
 		^this.compileFunctionSynthDefDictIfNeeded(
 			{
