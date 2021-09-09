@@ -292,6 +292,32 @@ AlgaNode {
 			)
 		});
 
+		//Parse args looking for AlgaTemps
+		if(argArgs.isArray, {
+			var functionSynthDefDict;
+			argArgs.do({ | entry, i |
+				if(entry.isAlgaTemp, {
+					functionSynthDefDict = functionSynthDefDict ? IdentityDictionary();
+					entry = this.parseAlgaTempParam(entry, functionSynthDefDict);
+					argArgs[i] = entry;
+				});
+			});
+
+			if(functionSynthDefDict != nil, {
+				^this.compileFunctionSynthDefDictIfNeeded(
+					func: {
+						this.dispatchNode(
+							argDef, argArgs,
+							initGroups: true,
+							outsMapping: argOutsMapping,
+							sched: argSched
+						);
+					},
+					functionSynthDefDict: functionSynthDefDict
+				)
+			});
+		});
+
 		//AlgaNode dispatch
 		this.dispatchNode(
 			argDef, argArgs,
@@ -635,7 +661,7 @@ AlgaNode {
 								defArgs[param] = value;
 								explicitArgs[param] = true;
 							}, {
-								("AlgaPattern: args at param '" ++ param ++ "' must be an AlgaNode, AlgaPattern, Number, Array, Pattern, AlgaPatternArg or Buffer").error
+								("AlgaPattern: args at param '" ++ param ++ "' must be an AlgaNode, AlgaPattern, Number, Array, Pattern, AlgaPatternArg, AlgaTemp, or Buffer").error
 							});
 						}, {
 							//AlgaNode
@@ -643,7 +669,7 @@ AlgaNode {
 								defArgs[param] = value;
 								explicitArgs[param] = true;
 							}, {
-								("AlgaNode: args at param '" ++ param ++ "' must be an AlgaNode, AlgaPattern, Number, Array or Buffer").error;
+								("AlgaNode: args at param '" ++ param ++ "' must be an AlgaNode, AlgaPattern, AlgaTemp, Number, Array or Buffer").error;
 							});
 						});
 					});
@@ -1489,7 +1515,7 @@ AlgaNode {
 				{ paramDefault.isAlgaTemp } {
 					var tempSynthsAndBusses = IdentitySet(8);
 
-					//If invalid, use from
+					//If invalid, exit
 					if(paramDefault.valid.not, {
 						("AlgaNode: invalid AlgaTemp for parameter '" ++ paramName.asString ++ "'").error;
 						^this;
@@ -1497,6 +1523,10 @@ AlgaNode {
 
 					defaultNumChannels = paramDefault.numChannels;
 					defaultRate = paramDefault.rate;
+
+					//Make sure to use AlgaTemp's scaling if possible (it will be nil otherwise)
+					oldParamsChansMapping = paramDefault.chans;
+					oldParamScale = paramDefault.scale;
 
 					paramDefault = this.createAlgaTempSynth(
 						algaTemp: paramDefault,

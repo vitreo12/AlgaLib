@@ -4,7 +4,7 @@ Alga.boot({
 
 	b = AN({ SinOsc.ar(10) });
 
-	a = AN({ SinOsc.ar(\freq.ar(440)) }, [\freq, AlgaTemp({ LFNoise0.ar(1) }, scale:[450, 1000])], playTime:2 ).play;
+	a = AN({ SinOsc.ar(\freq.ar(440)) }, [\freq, AlgaTemp({ LFNoise2.ar(1000) }, scale:[450, 1000])], playTime:2 ).play;
 
 	//a.from(b, \freq, scale:[250, 1000], time:2);
 })
