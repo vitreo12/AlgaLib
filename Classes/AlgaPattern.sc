@@ -372,7 +372,7 @@ AlgaPatternInterpStreams {
 
 //This class is used to specify individual parameters of a pattern argument.
 //It can be used to dynamically set parameters of a connected Node (like scale and chans).
-AlgaPatternArg {
+AlgaArg {
 	var <sender, <chans, <scale;
 
 	*new { | node, chans, scale |
@@ -385,7 +385,12 @@ AlgaPatternArg {
 		scale  = argScale.algaAsStream;  //Pattern support
 	}
 
-	isAlgaPatternArg { ^true }
+	isAlgaArg { ^true }
+
+	algaInstantiatedAsSender {
+		if(sender.isAlgaNode, { ^sender.algaInstantiatedAsSender });
+		^false
+	}
 }
 
 //This class is used for the \out parameter... Should it also store time?
@@ -416,9 +421,6 @@ AlgaOut {
 
 	isAlgaOut { ^true }
 }
-
-//Alias for AlgaPatternArg
-AlgaArg : AlgaPatternArg {}
 
 //This class is used to create a temporary AlgaNode for a parameter in an AlgaPattern
 AlgaTemp {
@@ -533,10 +535,10 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
-	*new { | def, args, connectionTime = 0, playTime = 0, sched = 1, server |
+	*new { | def, /*args,*/ connectionTime = 0, playTime = 0, sched = 1, server |
 		^super.new(
 			def: def,
-			args: args,
+			//args: args,
 			connectionTime: connectionTime,
 			playTime: playTime,
 			server: server,
@@ -737,8 +739,8 @@ AlgaPattern : AlgaNode {
 		//Unpack Pattern value
 		if(entry.isStream, { entry = entry.next });
 
-		//Check if it's an AlgaPatternArg. Unpack it.
-		if(entry.isAlgaPatternArg, {
+		//Check if it's an AlgaArg. Unpack it.
+		if(entry.isAlgaArg, {
 			chansMapping = entry.chans;
 			scale        = entry.scale;
 			entry        = entry.sender;
@@ -2427,11 +2429,11 @@ AlgaPattern : AlgaNode {
 
 	//ListPattern that contains Buffers
 	patternOrAlgaPatternArgContainsBuffers { | pattern |
-		if(pattern.isAlgaPatternArg, { if(pattern.sender.isBuffer, { ^true }) });
+		if(pattern.isAlgaArg, { if(pattern.sender.isBuffer, { ^true }) });
 		if(pattern.isListPattern, {
 			pattern.list.do({ | entry |
 				if(entry.isBuffer, { ^true });
-				if(entry.isAlgaPatternArg, { if(entry.sender.isBuffer, { ^true }) });
+				if(entry.isAlgaArg, { if(entry.sender.isBuffer, { ^true }) });
 			});
 		});
 		^false
@@ -2452,7 +2454,7 @@ AlgaPattern : AlgaNode {
 		//Check valid class
 		if(isDefault.not, {
 			if((sender.isAlgaNode.not).and(sender.isPattern.not).and(
-				sender.isAlgaPatternArg.not).and(
+				sender.isAlgaArg.not).and(
 				sender.isAlgaTemp.not).and(
 				sender.isNumberOrArray.not).and(sender.isBuffer.not), {
 				"AlgaPattern: makeConnection only works with AlgaNodes, AlgaPatterns, AlgaPatternArgs, AlgaTemps, Patterns, Numbers, Arrays and Buffers".error;
@@ -2546,8 +2548,8 @@ AlgaPattern : AlgaNode {
 			^this.interpolateGenericParam(sender, param, time, sched);
 		});
 
-		//Force Pattern / AlgaPatternArg / AlgaTemp dispatch
-		if((sender.isPattern).or(sender.isAlgaPatternArg).or(sender.isAlgaTemp), {
+		//Force Pattern / AlgaArg / AlgaTemp dispatch
+		if((sender.isPattern).or(sender.isAlgaArg).or(sender.isAlgaTemp), {
 			^this.makeConnection(
 				sender: sender, param: param, senderChansMapping: chans,
 				scale: scale, sampleAndHold: sampleAndHold, time: time, sched: sched
@@ -2750,7 +2752,7 @@ AlgaPattern : AlgaNode {
 	//Add entries to inNodes
 	addInNodeListPattern { | sender, param = \in |
 		sender.list.do({ | listEntry |
-			if(listEntry.isAlgaPatternArg, { listEntry = listEntry.sender });
+			if(listEntry.isAlgaArg, { listEntry = listEntry.sender });
 			if(listEntry.isAlgaNode, {
 				if(inNodes.size == 0, {
 					this.addInNodeAlgaNode(listEntry, param, mix:false);
@@ -2781,7 +2783,7 @@ AlgaPattern : AlgaNode {
 		if(sender.isAlgaNode, {
 			this.addInNodeAlgaNode(sender, param, mix);
 		}, {
-			if(sender.isAlgaPatternArg, {
+			if(sender.isAlgaArg, {
 				this.addInNodeAlgaNode(sender.sender, param, mix);
 			}, {
 				if(sender.isListPattern, {

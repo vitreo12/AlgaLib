@@ -17,7 +17,7 @@
 +Object {
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
-	isAlgaPatternArg { ^false }
+	isAlgaArg { ^false }
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
 	isBuffer { ^false }
