@@ -391,6 +391,29 @@ AlgaArg {
 		if(sender.isAlgaNode, { ^sender.algaInstantiatedAsSender });
 		^false
 	}
+
+	//Used in AlgaBlock
+	blockIndex {
+		if(sender.isAlgaNode, { ^sender.blockIndex });
+		^(-1);
+	}
+
+	//Used in AlgaBlock
+	blockIndex_ { | val |
+		if(sender.isAlgaNode, { sender.blockIndex_(val) });
+	}
+
+	//Used in AlgaBlock
+	inNodes {
+		if(sender.isAlgaNode, { ^sender.inNodes });
+		^nil
+	}
+
+	//Used in AlgaBlock
+	outNodes {
+		if(sender.isAlgaNode, { ^sender.outNodes });
+		^nil
+	}
 }
 
 //This class is used for the \out parameter... Should it also store time?
@@ -2736,7 +2759,8 @@ AlgaPattern : AlgaNode {
 		interpStreams.algaReschedulingEventStreamPlayer.reschedule(sched);
 	}
 
-	//Add entry to inNodes
+	//Add entry to inNodes. Unlike AlgaNodes, inNodes can here contain AlgaArgs, as the .replace
+	//mechanism is difference. For AlgaNodes, AlgaArgs can only be used in the args initialization
 	addInNodeAlgaNode { | sender, param = \in, mix = false |
 		//Empty entry OR not doing mixing, create new IdentitySet. Otherwise, add to existing
 		if((inNodes[param] == nil).or(mix.not), {
@@ -2752,17 +2776,20 @@ AlgaPattern : AlgaNode {
 	//Add entries to inNodes
 	addInNodeListPattern { | sender, param = \in |
 		sender.list.do({ | listEntry |
-			if(listEntry.isAlgaArg, { listEntry = listEntry.sender });
-			if(listEntry.isAlgaNode, {
+			case
+			{ listEntry.isAlgaArg} {
+				listEntry = listEntry.sender
+			}
+			{ listEntry.isAlgaNode } {
 				if(inNodes.size == 0, {
 					this.addInNodeAlgaNode(listEntry, param, mix:false);
 				}, {
 					this.addInNodeAlgaNode(listEntry, param, mix:true);
 				});
-			});
-			if(listEntry.isListPattern, {
+			}
+			{ listEntry.isListPattern } {
 				this.addInNodeListPattern(listEntry)
-			});
+			};
 		});
 	}
 
@@ -2784,7 +2811,7 @@ AlgaPattern : AlgaNode {
 			this.addInNodeAlgaNode(sender, param, mix);
 		}, {
 			if(sender.isAlgaArg, {
-				this.addInNodeAlgaNode(sender.sender, param, mix);
+				this.addInNode(sender.sender, param, mix);
 			}, {
 				if(sender.isListPattern, {
 					this.addInNodeListPattern(sender, param);
@@ -2820,6 +2847,7 @@ AlgaPattern : AlgaNode {
 
 	//To send signal. algaInstantiatedAsReceiver is same as AlgaNode
 	algaInstantiatedAsSender {
+		if(algaCleared, { ^false });
 		^((this.algaInstantiated).and(synthBus != nil));
 	}
 
@@ -2851,6 +2879,16 @@ AMP : AlgaMonoPattern {}
 		patternOutNodesAtParam = patternOutNodes[param];
 		if(patternOutNodesAtParam == nil, { ^this });
 		patternOutNodesAtParam.remove(algaPattern);
+	}
+
+	//Used in AlgaBlock
+	isContainedInPatternOut { | sender |
+		if(patternOutNodes != nil, {
+			patternOutNodes.do({ | algaNode |
+				if(algaNode === sender, { ^true })
+			})
+		});
+		^false
 	}
 
 	//Free previous out: connections from patterns (called in AlgaNode.replace)

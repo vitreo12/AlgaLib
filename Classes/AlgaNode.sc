@@ -279,7 +279,7 @@ AlgaNode {
 			argDef = argDefAndFunctionSynthDefDict[0];
 			functionSynthDefDict = argDefAndFunctionSynthDefDict[1];
 
-			^this.compileFunctionSynthDefDictIfNeeded(
+			this.compileFunctionSynthDefDictIfNeeded(
 				func: {
 					this.dispatchNode(
 						argDef, argArgs,
@@ -290,6 +290,8 @@ AlgaNode {
 				},
 				functionSynthDefDict: functionSynthDefDict
 			)
+
+			^this;
 		});
 
 		//Parse args looking for AlgaTemps / AlgaArgs / AlgaNodes
@@ -319,12 +321,13 @@ AlgaNode {
 					algaArgs = algaArgs ? IdentitySet();
 
 					if(entry.isAlgaArg, { sender = entry.sender });
-
-					if(entry.isAlgaNode, {
+					if(sender.isAlgaNode, {
 						var param = argArgs[i-1];
-						algaArgs.add(entry);
+						algaArgs.add(sender); //This is used later to check instantiation
+						//If previous entry was symbol, use that to map inNodes
 						if(param.isSymbol, {
-							this.addInNode(entry, param); //Also add to inNodes
+							this.addInOutNodesDict(entry, param); //Add entry to inNodes. entry MUST be the AlgaArg!
+							AlgaBlocksDict.createNewBlockIfNeeded(this, sender); //Use sender
 						});
 					});
 				};
@@ -1079,8 +1082,8 @@ AlgaNode {
 
 	//Either retrieve default value from controlName or from args
 	getDefaultOrArg { | controlName, param = \in, replace = false |
-		var defaultOrArg = controlName.defaultValue;
 		var defArg;
+		var defaultOrArg = controlName.defaultValue;
 		var explicitArg = explicitArgs[param];
 
 		if(defArgs != nil, {
@@ -1100,18 +1103,12 @@ AlgaNode {
 
 			//If defArgs has entry, use that one as default instead
 			if(defArg != nil, {
-				//AlgaPattern needs the value to be returned, not to make a connection!
+				//Pattern needs to be returned whatever the case (it's parsed later)
 				if(this.isAlgaPattern, { ^defArg });
 
-				case
-				//AlgaNode: schedule a new connection
-				{ defArg.isAlgaNode } {
-					this.makeConnection(defArg, param);
-				}
-				//AlgaTemp / Number / Array: return it
-				{ (defArg.isAlgaTemp).or(defArg.isNumberOrArray).or(defArg.isAlgaArg) } {
+				if((defArg.isAlgaNode).or(defArg.isAlgaTemp).or(defArg.isNumberOrArray).or(defArg.isAlgaArg), {
 					defaultOrArg = defArg;
-				};
+				});
 			});
 		});
 
@@ -1419,7 +1416,8 @@ AlgaNode {
 				^this
 			});
 
-			//If replace and sendersSet contains inNodes, connect back to the .synthBus of the AlgaNode
+			//If replace and sendersSet contains inNodes, connect back to the .synthBus of the AlgaNode.
+			//Note that an inNode can also be an AlgaArg, in which case it also gets unpacked accordingly
 			if(replace, {
 				var sendersSet = inNodes[paramName];
 
@@ -1434,6 +1432,8 @@ AlgaNode {
 						sendersSet.do({ | prevSender |
 							var interpBus, interpSynth, normSynth;
 							var interpSymbol, normSymbol;
+
+							var prevSenderNumChannels, prevSenderRate;
 
 							var oldParamsChansMapping = nil;
 							var oldParamScale = nil;
@@ -1452,102 +1452,119 @@ AlgaNode {
 								interpBusses[paramName][prevSender] = interpBus;
 							});
 
-							//Use previous entry for the channel mapping, otherwise, nil.
-							//nil will generate Array.series(...) in calculateSenderChansMappingArray
-							if(keepChannelsMapping, {
-								oldParamsChansMapping = this.getParamChansMapping(paramName, prevSender);
+							//If AlgaArg, unpack
+							if(prevSender.isAlgaArg, {
+								oldParamsChansMapping = prevSender.chans;
+								oldParamScale = prevSender.scale;
+								prevSender = prevSender.sender;
 							});
 
-							//Use previous entry for inputs scaling
-							if(keepScale, {
-								oldParamScale = this.getParamScaling(paramName, prevSender);
-							});
+							//Make sure that the algaNode can actually send the connection
+							if(prevSender.isAlgaNode.and(prevSender.algaInstantiatedAsSender), {
+								prevSenderRate = prevSender.rate;
+								prevSenderNumChannels = prevSender.numChannels;
 
-							//overwrite interp symbol considering the senders' num channels!
-							interpSymbol = (
-								"alga_interp_" ++
-								prevSender.rate ++
-								prevSender.numChannels ++
-								"_" ++
-								paramRate ++
-								paramNumChannels
-							).asSymbol;
+								//Use previous entry for the channel mapping, otherwise, nil.
+								//nil will generate Array.series(...) in calculateSenderChansMappingArray
+								if(keepChannelsMapping, {
+									oldParamsChansMapping = oldParamsChansMapping ?
+									this.getParamChansMapping(paramName, prevSender);
+								});
 
-							normSymbol = (
-								"alga_norm_" ++
-								paramRate ++
-								paramNumChannels
-							).asSymbol;
+								//Use previous entry for inputs scaling
+								if(keepScale, {
+									oldParamScale = oldParamScale ?
+									this.getParamScaling(paramName, prevSender);
+								});
 
-							//Calculate the array for channelsMapping
-							channelsMapping = this.calculateSenderChansMappingArray(
-								paramName,
-								prevSender,
-								oldParamsChansMapping,
-								prevSender.numChannels,
-								paramNumChannels,
-								false
-							);
+								//overwrite interp symbol considering the senders' num channels!
+								interpSymbol = (
+									"alga_interp_" ++
+									prevSenderRate ++
+									prevSenderNumChannels ++
+									"_" ++
+									paramRate ++
+									paramNumChannels
+								).asSymbol;
 
-							scaleArray = this.calculateScaling(
-								paramName, prevSender,
-								paramNumChannels, oldParamScale
-							);
+								normSymbol = (
+									"alga_norm_" ++
+									paramRate ++
+									paramNumChannels
+								).asSymbol;
 
-							interpSynthArgs = [
-								\in, prevSender.synthBus.busArg,
-								\out, interpBus.index,
-								\indices, channelsMapping,
-								\fadeTime, 0
-							];
+								//Calculate the array for channelsMapping
+								channelsMapping = this.calculateSenderChansMappingArray(
+									paramName,
+									prevSender,
+									oldParamsChansMapping,
+									prevSenderNumChannels,
+									paramNumChannels,
+									false
+								);
 
-							//Add scale array to args
-							if(scaleArray != nil, {
-								interpSynthArgs = interpSynthArgs.addAll(scaleArray);
-							});
+								scaleArray = this.calculateScaling(
+									paramName,
+									prevSender,
+									paramNumChannels,
+									oldParamScale
+								);
 
-							interpSynth = AlgaSynth(
-								interpSymbol,
-								interpSynthArgs,
-								interpGroup
-							);
+								interpSynthArgs = [
+									\in, prevSender.synthBus.busArg,
+									\out, interpBus.index,
+									\indices, channelsMapping,
+									\fadeTime, 0
+								];
 
-							//Instantiated right away, with no \fadeTime, as it will directly be connected to
-							//synth's parameter. Synth will read its params from all the normBusses
-							normSynth = AlgaSynth(
-								normSymbol,
-								[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-								normGroup,
-								waitForInst:false
-							);
+								//Add scale array to args
+								if(scaleArray != nil, {
+									interpSynthArgs = interpSynthArgs.addAll(scaleArray);
+								});
 
-							if(onlyEntry, {
-								//normal param
-								interpSynths[paramName][\default] = interpSynth;
-								normSynths[paramName][\default] = normSynth;
+								interpSynth = AlgaSynth(
+									interpSymbol,
+									interpSynthArgs,
+									interpGroup
+								);
 
-								//Add interpSynth to the current active ones for specific param / sender combination
-								this.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
-							}, {
-								//mix param
-								interpSynths[paramName][prevSender] = interpSynth;
-								normSynths[paramName][prevSender] = normSynth;
+								//Instantiated right away, with no \fadeTime, as it will directly be connected to
+								//synth's parameter. Synth will read its params from all the normBusses
+								normSynth = AlgaSynth(
+									normSymbol,
+									[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
+									normGroup,
+									waitForInst:false
+								);
 
-								//Add interpSynth to the current active ones for specific param / sender combination
-								this.addActiveInterpSynthOnFree(paramName, prevSender, interpSynth);
-
-								//And update the ones in \default if this sender is the currentDefaultNode!!!
-								//This is essential, because otherwise interpBusses[paramName][\default]
-								//would be a bus reading from nothing!
-								if(currentDefaultNodes[paramName] == prevSender, {
-									interpBusses[paramName][\default] = interpBus; //previous' \default should be freed
+								if(onlyEntry, {
+									//normal param
 									interpSynths[paramName][\default] = interpSynth;
 									normSynths[paramName][\default] = normSynth;
+
+									//Add interpSynth to the current active ones for specific param / sender combination
+									this.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
+								}, {
+									//mix param
+									interpSynths[paramName][prevSender] = interpSynth;
+									normSynths[paramName][prevSender] = normSynth;
+
+									//Add interpSynth to the current active ones for specific param / sender combination
+									this.addActiveInterpSynthOnFree(paramName, prevSender, interpSynth);
+
+									//And update the ones in \default if this sender is the currentDefaultNode!!!
+									//This is essential, because otherwise interpBusses[paramName][\default]
+									//would be a bus reading from nothing!
+									if(currentDefaultNodes[paramName] == prevSender, {
+										interpBusses[paramName][\default] = interpBus; //previous' \default should be freed
+										interpSynths[paramName][\default] = interpSynth;
+										normSynths[paramName][\default] = normSynth;
+									});
 								});
 							});
-						}, {
-							noSenders = true
-						});
+						})
+					}, {
+						noSenders = true
 					});
 				}, {
 					noSenders = true;
@@ -1563,9 +1580,25 @@ AlgaNode {
 				var channelsMapping, scaleArray;
 				var interpSymbol, normSymbol, interpBus, interpSynthArgs, interpSynth, normSynth;
 				var tempSynthsAndBusses;
+				var isValid = false;
+				var storeCurrentDefaultForMix = false;
+				var senderToStoreForMix;
+
+				case
+				//AlgaNode
+				{ paramDefault.isAlgaNode } {
+					if(paramDefault.algaInstantiatedAsSender, {
+						var algaNodeSynthBus = paramDefault.synthBus;
+						senderToStoreForMix = paramDefault;
+						defaultNumChannels = paramDefault.numChannels;
+						defaultRate = paramDefault.rate;
+						paramDefault = algaNodeSynthBus.busArg;
+						isValid = true;
+						storeCurrentDefaultForMix = true;
+					});
+				}
 
 				//AlgaTemp
-				case
 				{ paramDefault.isAlgaTemp } {
 					tempSynthsAndBusses = IdentitySet(8);
 
@@ -1586,11 +1619,15 @@ AlgaNode {
 						algaTemp: paramDefault,
 						tempSynthsAndBusses: tempSynthsAndBusses
 					); //returns the bus that tempSynth is writing to
+
+					isValid = true;
 				}
 
 				//AlgaArg
 				{ paramDefault.isAlgaArg } {
+					var algaNodeSynthBus;
 					var algaNode = paramDefault.sender;
+
 					if(algaNode.isAlgaNode.not, {
 						("AlgaNode: invalid AlgaArg for parameter '" ++ paramName.asString ++ "'").error;
 						^this
@@ -1609,13 +1646,36 @@ AlgaNode {
 					oldParamScale = paramDefault.scale;
 
 					//Get the busArg of the synthBus
-					paramDefault = algaNode.synthBus.busArg;
+					if(algaNode.algaInstantiatedAsSender, {
+						var algaNodeSynthBus = algaNode.synthBus;
+						senderToStoreForMix = algaNode;
+						paramDefault = algaNodeSynthBus.busArg;
+						isValid = true;
+						storeCurrentDefaultForMix = true;
+					});
 				}
 
 				//Array
 				{ paramDefault.isArray } {
 					defaultNumChannels = paramDefault.size;
+					defaultRate = controlName.rate;
+					isValid = true;
+				}
+
+				//Number
+				{ paramDefault.isNumber } {
+					defaultNumChannels = controlName.numChannels;
+					defaultRate = controlName.rate;
+					isValid = true;
 				};
+
+				//If valid is false, use default from controlNames
+				if(isValid.not, {
+					paramDefault = controlName.defaultValue;
+					defaultNumChannels = controlName.numChannels;
+					defaultRate = controlName.rate;
+					("AlgaNode: invalid default value retrieved. Using the definition's one").warn;
+				});
 
 				//e.g. \alga_interp_audio1_control1
 				interpSymbol = (
@@ -1716,6 +1776,10 @@ AlgaNode {
 						}
 					});
 				});
+
+				//Store current \default: this is needed for .mixFrom.
+				//It's only true for AlgaNodes and AlgaArgs
+				if(storeCurrentDefaultForMix, { currentDefaultNodes[paramName] = senderToStoreForMix });
 			});
 		});
 	}
@@ -2059,7 +2123,7 @@ AlgaNode {
 
 		//new interp synth, with input connected to sender and output to the interpBus
 		//THIS USES connectionTime!!
-		if((sender.isAlgaNode).or(sender.isAlgaArg), {
+		if(sender.isAlgaNode, {
 			var updateScale = true;
 			var updateChans = true;
 
@@ -2081,17 +2145,6 @@ AlgaNode {
 					interpGroup,
 					waitForInst:false
 				);
-			});
-
-			//Unpack AlgaArg if needed
-			if(sender.isAlgaArg, {
-				//Used to avoid updating scale / chans if retrieving from AlgaTemp's
-				if(sender.scale != nil, { updateScale = false });
-				if(sender.chans != nil, { updateChans = false });
-
-				senderChansMapping = sender.chans ? senderChansMapping;
-				scale = sender.scale ? scale;
-				sender = sender.sender;
 			});
 
 			//Take numChannels / rate of AlgaNode
@@ -2153,6 +2206,7 @@ AlgaNode {
 			var tempSynthsAndBusses;
 			var updateScale = true;
 			var updateChans = true;
+			var isValid = false;
 
 			//Use default value if sender == nil
 			if(sender == nil, {
@@ -2161,6 +2215,17 @@ AlgaNode {
 			});
 
 			case
+			//AlgaNode (can come from getDefaultOrArg)
+			{ sender.isAlgaNode } {
+				if(sender.algaInstantiatedAsSender, {
+					var algaNodeSynthBus = sender.synthBus;
+					senderNumChannels = sender.numChannels;
+					senderRate = sender.rate;
+					paramVal = algaNodeSynthBus.busArg;
+					isValid = true
+				});
+			}
+
 			//Just a Number / Array
 			{ sender.isNumberOrArray } {
 				if(sender.isArray, {
@@ -2170,6 +2235,7 @@ AlgaNode {
 				});
 				senderRate = paramRate;
 				paramVal = sender;
+				isValid = true;
 			}
 
 			//Function / Symbol / AlgaTemp
@@ -2190,7 +2256,41 @@ AlgaNode {
 					algaTemp: sender,
 					tempSynthsAndBusses: tempSynthsAndBusses
 				); //returns the bus that tempSynth is writing to
+
+				isValid = true;
+			}
+
+			//AlgaArg
+			{ sender.isAlgaArg } {
+				var algaNode = sender.sender;
+				if(algaNode.isAlgaNode.not, { ^nil });
+
+				senderNumChannels = algaNode.numChannels;
+				senderRate = algaNode.rate;
+
+				//Used to avoid updating scale / chans if retrieving from AlgaTemp's
+				if(sender.scale != nil, { updateScale = false });
+				if(sender.chans != nil, { updateChans = false });
+
+				//Use AlgaTemp's scale / chans if provided
+				scale = sender.scale ? scale;
+				senderChansMapping = sender.chans ? senderChansMapping;
+
+				//Get the busArg of the synthBus
+				if(algaNode.algaInstantiatedAsSender, {
+					var algaNodeSynthBus = algaNode.synthBus;
+					paramVal = algaNodeSynthBus.busArg;
+					isValid = true
+				});
 			};
+
+			//If valid is false, use default from controlNames
+			if(isValid.not, {
+				paramVal = controlName.defaultValue;
+				senderNumChannels = controlName.numChannels;
+				senderRate = controlName.rate;
+				("AlgaNode: invalid default value retrieved. Using the definition's one").warn;
+			});
 
 			//Symbol for the interpSynth
 			interpSymbol = (
@@ -2503,7 +2603,7 @@ AlgaNode {
 			});
 		});
 
-		if(sender.isAlgaNode, {
+		if((sender.isAlgaNode).or(sender.isAlgaArg), {
 			//Empty entry OR not doing mixing, create new IdentitySet. Otherwise, add to existing
 			if((inNodes[param] == nil).or(mix.not), {
 				inNodes[param] = IdentitySet[sender];
@@ -2511,19 +2611,6 @@ AlgaNode {
 				inNodes[param].add(sender);
 			})
 		}, {
-			//AlgaArg: use its sender
-			if(sender.isAlgaArg, {
-				sender = sender.sender;
-				if(sender.isAlgaNode, {
-					//Empty entry OR not doing mixing, create new IdentitySet. Otherwise, add to existing
-					if((inNodes[param] == nil).or(mix.not), {
-						inNodes[param] = IdentitySet[sender];
-					}, {
-						inNodes[param].add(sender);
-					})
-				});
-			});
-
 			//Number / AlgaTemp. Always replace as mixing is not supported for numbers
 			replaceArgs[param] = sender;
 
@@ -2546,6 +2633,9 @@ AlgaNode {
 	addInOutNodesDict { | sender, param = \in, mix = false |
 		//This will replace the entries on new connection (when mix == false)
 		this.addInNode(sender, param, mix);
+
+		//Unpack AlgaArg
+		if(sender.isAlgaArg, { sender = sender.sender });
 
 		//This will add the entries to the existing IdentitySet, or create a new one
 		if(sender.isAlgaNode, {
@@ -3049,7 +3139,6 @@ AlgaNode {
 
 	//Receive a connection
 	from { | sender, param = \in, chans, scale, time, sched |
-		interpSynths.asString.error;
 		case
 		{ sender.isAlgaNode } {
 			if(this.server != sender.server, {
@@ -3061,20 +3150,18 @@ AlgaNode {
 			);
 		}
 		{ sender.isAlgaArg } {
-			var senderServer;
 			if(sender.sender.isAlgaNode, {
-				senderServer = sender.sender.server
-			}, {
-				("AlgaNode: AlgaArg is invalid: it does not contain a valid AlgaNode").error;
-				^this
+				var senderServer = sender.sender.server;
+				if(this.server != senderServer, {
+					("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
+					^this;
+				});
+				^this.makeConnection(sender, param, senderChansMapping:chans,
+					scale:scale, time:time, sched:sched
+				)
 			});
-			if(this.server != senderServer, {
-				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
-				^this;
-			});
-			^this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
-			);
+			("AlgaNode: AlgaArg must only contain an AlgaNode as sender").error;
+			^this;
 		}
 		{ sender.isNumberOrArray } {
 			^this.makeConnection(sender, param, senderChansMapping:chans,
@@ -3144,20 +3231,18 @@ AlgaNode {
 			);
 		}
 		{ sender.isAlgaArg } {
-			var senderServer;
 			if(sender.sender.isAlgaNode, {
-				senderServer = sender.sender.server
-			}, {
-				("AlgaNode: AlgaArg is invalid: it does not contain a valid AlgaNode").error;
-				^this
+				var senderServer = sender.sender.server;
+				if(this.server != senderServer, {
+					("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
+					^this;
+				});
+				^this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
+					scale:scale, time:time, sched:sched
+				);
 			});
-			if(this.server != senderServer, {
-				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
-				^this;
-			});
-			^this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
-			);
+			("AlgaNode: AlgaArg must only contain an AlgaNode as sender").error;
+			^this;
 		}
 		{ sender.isNumberOrArray } {
 			^this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
@@ -3794,6 +3879,7 @@ AlgaNode {
 	//To send signal, only the synth and synthBus are needed to be surely insantiated
 	algaInstantiatedAsSender {
 		if(synth == nil, { ^false });
+		if(algaCleared, { ^false });
 		^((synth.algaInstantiated).and(synthBus != nil));
 	}
 
@@ -3802,9 +3888,6 @@ AlgaNode {
 	algaInstantiatedAsReceiver { | param = \in, sender, mix = false |
 		var interpSynthsAtParam = interpSynths[param];
 		var inNodesAtParam = inNodes[param];
-
-		//Check the AlgaNode within AlgaArg
-		if(sender.isAlgaArg, { sender = sender.sender });
 
 		//Has been cleared
 		if(algaCleared, { ^false });

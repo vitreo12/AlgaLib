@@ -111,6 +111,9 @@
 
 	//Needed for scaleCurve (reduce code boilerplate)
 	clip { | min, max | ^nil }
+
+	//This avoids many problems when .clearing a node used in connections
+	busArg { ^nil }
 }
 
 +SynthDef {
