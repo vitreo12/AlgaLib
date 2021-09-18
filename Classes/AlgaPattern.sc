@@ -2485,6 +2485,12 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
+		//Check parameter in controlNames
+		if(this.checkParamExists(param).not, {
+			("AlgaPattern: '" ++ param ++ "' is not a valid parameter, it is not defined in the 'def'.").error;
+			^this
+		});
+
 		//Add scaling to Dicts
 		if(scale != nil, { this.addScaling(param, sender, scale) });
 

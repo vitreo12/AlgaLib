@@ -2858,12 +2858,9 @@ AlgaNode {
 			^this
 		});
 
-		//Can't connect AlgaNode to itself (yet)
-		if(this === sender, { "AlgaNode: can't connect an AlgaNode to itself".error; ^this });
-
 		//Check parameter in controlNames
 		if(this.checkParamExists(param).not, {
-			("AlgaNode: '" ++ param ++ "' is not a valid parameter, it is not defined in the def.").error;
+			("AlgaNode: '" ++ param ++ "' is not a valid parameter, it is not defined in the 'def'.").error;
 			^this
 		});
 
