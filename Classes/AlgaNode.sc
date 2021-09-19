@@ -1815,6 +1815,7 @@ AlgaNode {
 			var paramNumChannels, paramRate;
 			var normSymbol, normBus;
 			var interpBus, normSynth;
+			var senderSym = sender;
 
 			controlName = controlNames[param];
 			normBus = normBusses[param];
@@ -1838,8 +1839,11 @@ AlgaNode {
 				waitForInst:false
 			);
 
-			interpBusses[param][sender] = interpBus;
-			normSynths[param][sender] = normSynth;
+			//If AlgaArg, use its AlgaNode as sender
+			if(sender.isAlgaArg, { senderSym = sender.sender });
+
+			interpBusses[param][senderSym] = interpBus;
+			normSynths[param][senderSym] = normSynth;
 		});
 
 		//Make sure to not duplicate something that's already in the mix
@@ -2067,16 +2071,9 @@ AlgaNode {
 
 		var senderSym = sender;
 
+		//senderSym is used to address interpSynthsAtParam. It's either \default or AlgaNode
 		if(mix, {
-			if(sender == nil, {
-				senderSym = \default;
-			}, {
-				//create an ad-hoc entry... This won't ever be triggered for now
-				//(mix has been already set to false in makeConnection for number/array)
-				if(sender.isNumberOrArray, {
-					senderSym = (sender.asString ++ "_" ++ UniqueID.next.asString).asSymbol;
-				});
-			});
+			if(sender == nil, { senderSym = \default });
 		}, {
 			senderSym = \default;
 		});
@@ -2121,31 +2118,31 @@ AlgaNode {
 			interpBusAtParam[senderSym] = interpBus;
 		});
 
+		//If mix and replaceMix, spawn a fadeIn synth.
+		//fadeIn balances out the interpSynth's envelope before normSynth.
+		//A fadeIn synth contains all zeroes, except for the envelope (at last position).
+		if(mix.and(newMixConnectionOrReplaceMix), {
+			var fadeInSymbol = ("alga_fadeIn_" ++
+				paramRate ++
+				paramNumChannels
+			).asSymbol;
+
+			AlgaSynth(
+				fadeInSymbol,
+				[
+					\out, interpBus.index,
+					\fadeTime, time,
+				],
+				interpGroup,
+				waitForInst:false
+			);
+		});
+
 		//new interp synth, with input connected to sender and output to the interpBus
 		//THIS USES connectionTime!!
 		if(sender.isAlgaNode, {
 			var updateScale = true;
 			var updateChans = true;
-
-			//If mix and replaceMix, spawn a fadeIn synth.
-			//fadeIn balances out the interpSynth's envelope before normSynth.
-			//A fadeIn synth contains all zeroes, except for the envelope (at last position).
-			if(mix.and(newMixConnectionOrReplaceMix), {
-				var fadeInSymbol = ("alga_fadeIn_" ++
-					paramRate ++
-					paramNumChannels
-				).asSymbol;
-
-				AlgaSynth(
-					fadeInSymbol,
-					[
-						\out, interpBus.index,
-						\fadeTime, time,
-					],
-					interpGroup,
-					waitForInst:false
-				);
-			});
 
 			//Take numChannels / rate of AlgaNode
 			senderNumChannels = sender.numChannels;
@@ -2280,6 +2277,7 @@ AlgaNode {
 				if(algaNode.algaInstantiatedAsSender, {
 					var algaNodeSynthBus = algaNode.synthBus;
 					paramVal = algaNodeSynthBus.busArg;
+					senderSym = algaNode; //Also senderSym needs to be modified using the AlgaNode
 					isValid = true
 				});
 			};
@@ -2289,6 +2287,7 @@ AlgaNode {
 				paramVal = controlName.defaultValue;
 				senderNumChannels = controlName.numChannels;
 				senderRate = controlName.rate;
+				senderSym = \default;
 				("AlgaNode: invalid default value retrieved. Using the definition's one").warn;
 			});
 
@@ -2462,7 +2461,13 @@ AlgaNode {
 	freeMixNodeAtParam { | sender, param = \in, paramConnectionTime,
 		replace = false, cleanupDicts = false, time |
 
-		var interpSynthAtParam = interpSynths[param][sender];
+		var interpSynthAtParam;
+
+		//If AlgaArg: extract hte node (it's what it's used in interpSynths as index)
+		if(sender.isAlgaArg, { sender = sender.sender });
+
+		//Get the actual interpSynths at parameter
+		interpSynthAtParam = interpSynths[param][sender];
 
 		if(interpSynthAtParam != nil, {
 			//These must be fetched before the addAction (they refer to the current state!)
@@ -2651,7 +2656,9 @@ AlgaNode {
 		var inNodesAtParam = inNodes[param];
 		var senderOutNodesAtThis;
 
-		if(sender.isAlgaNode, { senderOutNodesAtThis = sender.outNodes[this] });
+		if((sender.isAlgaNode).or(sender.isAlgaArg), {
+			senderOutNodesAtThis = sender.outNodes[this]
+		});
 
 		if(senderOutNodesAtThis != nil, {
 			//Just remove one param from sender's set at this entry
@@ -2690,16 +2697,18 @@ AlgaNode {
 		oldSenders.do({ | sender |
 			var sendersParamsSet = sender.outNodes[this];
 			if(sendersParamsSet != nil, {
-				//no oldSender specified: remove them all!
-				if(oldSender == nil, {
+				case
+				//If nil or same sender
+				{ (oldSender == nil).or(sender == oldSender) } {
 					this.removeInOutNodeAtParam(sender, param);
-				}, {
-					//If specified oldSender, only remove that one (in mixing scenarios)
-					if(sender == oldSender, {
+				}
+				//If AlgaArg, look if it's the same sender
+				{ sender.isAlgaArg } {
+					if(sender.sender == oldSender, {
 						this.removeInOutNodeAtParam(sender, param);
 					})
-				})
-			})
+				};
+			});
 		});
 
 		//Remove replaceArgs
@@ -3242,9 +3251,8 @@ AlgaNode {
 			^this;
 		}
 		{ sender.isNumberOrArray } {
-			^this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
-			);
+			"AlgaNode: Numbers and Arrays cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
+			^this.from(sender, param, chans, scale, time, sched);
 		}
 		{ sender.isFunction } {
 			"AlgaNode: Functions cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
@@ -3300,11 +3308,6 @@ AlgaNode {
 		);
 	}
 
-	//Alias for replaceMix (which must be deprecated, collides name with .replace)
-	mixSwap { | param = \in, oldSender, newSender, chans, scale, time, sched |
-		^this.replaceMix(param, oldSender, newSender, chans, scale, time, sched);
-	}
-
 	//Replace a mix entry at param... Practically just freeing the old one and triggering the new one.
 	//This will be useful in the future if wanting to implement some kind of system to retrieve individual
 	//mix entries (like, \in1, \in2). No need it for now
@@ -3335,6 +3338,11 @@ AlgaNode {
 			},
 			sched: sched
 		);
+	}
+
+	//Alias for replaceMix (which should be deprecated, collides name with .replace)
+	mixSwap { | param = \in, oldSender, newSender, chans, scale, time, sched |
+		^this.replaceMix(param, oldSender, newSender, chans, scale, time, sched);
 	}
 
 	resetParamInner { | param = \in, oldSender = nil, time |
@@ -3584,6 +3592,7 @@ AlgaNode {
 		if(replaceMix.not, {
 			var interpSynthsAtParam;
 
+			//First: free the interpSynth previously there
 			this.freeInterpSynthAtParam(oldSender, param, true, time:time);
 
 			//retrieve the updated ones
@@ -3620,12 +3629,13 @@ AlgaNode {
 		if(inNodes[param].size == 1, {
 			if(inNodes[param].findMatch(oldSender) != nil, {
 				"AlgaNode: oldSender was the only entry. Running 'reset' instead".warn;
-				^this.resetParam(param, oldSender, time:time);
+				^this.resetParam(param, oldSender, time:time, sched:sched);
 			});
 		});
 
+		//If nil, reset parameter
 		if(oldSender == nil, {
-			^this.resetParam(param, oldSender, time:time);
+			^this.resetParam(param, oldSender, time:time, sched:sched);
 		});
 
 		//Else, mix param
@@ -3652,7 +3662,17 @@ AlgaNode {
 	mixParamContainsSender { | param = \in, sender |
 		var interpSynthsAtParam = interpSynths[param];
 		if(interpSynthsAtParam == nil, { ^false });
-		^(interpSynthsAtParam[sender] != nil)
+		if(interpSynthsAtParam[sender] != nil, { ^true });
+
+		//Last resort: look at AlgaArgs' senders
+		interpSynthsAtParam.keysValuesDo({ | key, value |
+			if(key.isAlgaArg, {
+				var oldSender = key.sender;
+				if(oldSender == sender, { ^true });
+			})
+		});
+
+		^false;
 	}
 
 	//When clear, run disconnections to nodes connected to this
