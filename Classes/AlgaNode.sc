@@ -1795,8 +1795,45 @@ AlgaNode {
 		this.createSynth;
 	}
 
+	//Create new interpBus and normSynth for mix entry
+	createMixInterpBusAndNormSynthAtParam {  | sender, param = \in |
+		var controlName;
+		var paramNumChannels, paramRate;
+		var normSymbol, normBus;
+		var interpBus, normSynth;
+		var senderSym = sender;
+
+		controlName = controlNames[param];
+		normBus = normBusses[param];
+
+		paramNumChannels = controlName.numChannels;
+		paramRate = controlName.rate;
+
+		normSymbol = (
+			"alga_norm_" ++
+			paramRate ++
+			paramNumChannels
+		).asSymbol;
+
+		//interpBus has always one more channel for the envelope
+		interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+
+		normSynth = AlgaSynth(
+			normSymbol,
+			[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
+			normGroup,
+			waitForInst:false
+		);
+
+		//If AlgaArg, use its AlgaNode as sender
+		if(sender.isAlgaArg, { senderSym = sender.sender });
+
+		interpBusses[param][senderSym] = interpBus;
+		normSynths[param][senderSym] = normSynth;
+	}
+
 	//Run when <<+ / .replace (on mixed connection) / .replaceMix
-	createMixInterpSynthInterpBusBusNormSynthAtParam { | sender, param = \in, replaceMix = false,
+	createMixInterpSynthAndInterpBusAndNormSynthAtParam { | sender, param = \in, replaceMix = false,
 		replace = false, senderChansMapping, scale, time |
 
 		//also check sender is not the default!
@@ -1805,52 +1842,20 @@ AlgaNode {
 			sender != currentDefaultNodes[param]
 		);
 
-		var newMixConnectionOrReplaceMix = newMixConnection.or(replaceMix);
-		var newMixConnectionOrReplace = newMixConnection.or(replace);
-
-		//Only run if replaceMix (meaning, a mix entry has been explicitly replaced)
-		//OR no param/sender combination is present already, otherwise it means it was already connected!
-		if(newMixConnectionOrReplaceMix, {
-			var controlName;
-			var paramNumChannels, paramRate;
-			var normSymbol, normBus;
-			var interpBus, normSynth;
-			var senderSym = sender;
-
-			controlName = controlNames[param];
-			normBus = normBusses[param];
-
-			paramNumChannels = controlName.numChannels;
-			paramRate = controlName.rate;
-
-			normSymbol = (
-				"alga_norm_" ++
-				paramRate ++
-				paramNumChannels
-			).asSymbol;
-
-			//interpBus has always one more channel for the envelope
-			interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
-
-			normSynth = AlgaSynth(
-				normSymbol,
-				[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-				normGroup,
-				waitForInst:false
+		//Only run if in need of a new connection, and not replaceMix.
+		//With replaceMix, normSynth and interpBus are already alive and kept from before
+		if(newMixConnection.and(replaceMix.not), {
+			this.createMixInterpBusAndNormSynthAtParam(
+				sender: sender,
+				param: param
 			);
-
-			//If AlgaArg, use its AlgaNode as sender
-			if(sender.isAlgaArg, { senderSym = sender.sender });
-
-			interpBusses[param][senderSym] = interpBus;
-			normSynths[param][senderSym] = normSynth;
 		});
 
 		//Make sure to not duplicate something that's already in the mix
-		if(newMixConnectionOrReplace.or(newMixConnectionOrReplaceMix), {
+		if(newMixConnection.or(replace).or(replaceMix), {
 			this.createInterpSynthAtParam(
 				sender:sender, param:param,
-				mix:true, newMixConnectionOrReplaceMix:newMixConnectionOrReplaceMix,
+				mix:true, replaceMix:true,
 				senderChansMapping:senderChansMapping, scale:scale, time:time
 			);
 		}, {
@@ -2061,7 +2066,7 @@ AlgaNode {
 
 	//Used at every <<, >>, <<+, >>+, <|
 	createInterpSynthAtParam { | sender, param = \in, mix = false,
-		newMixConnectionOrReplaceMix = false, senderChansMapping, scale, time |
+		replaceMix = false, senderChansMapping, scale, time |
 
 		var controlName, paramConnectionTime;
 		var paramNumChannels, paramRate;
@@ -2126,10 +2131,10 @@ AlgaNode {
 			interpBusAtParam[senderSym] = interpBus;
 		});
 
-		//If mix and replaceMix, spawn a fadeIn synth.
+		//If mix and NOT replaceMix, spawn a fadeIn synth.
 		//fadeIn balances out the interpSynth's envelope before normSynth.
 		//A fadeIn synth contains all zeroes, except for the envelope (at last position).
-		if(mix.and(newMixConnectionOrReplaceMix), {
+		if(mix.and(replaceMix.not), {
 			var fadeInSymbol = (
 				"alga_fadeIn_" ++
 				paramRate ++
@@ -2468,7 +2473,7 @@ AlgaNode {
 
 	//Free the entire mix node at specific param.
 	freeMixNodeAtParam { | sender, param = \in, paramConnectionTime,
-		replace = false, cleanupDicts = false, time |
+		replace = false, cleanupDicts = false, replaceMix = false, time |
 
 		var interpSynthAtParam;
 
@@ -2484,52 +2489,61 @@ AlgaNode {
 			var interpBusAtParam = interpBusses[param][sender];
 			var currentDefaultNode = currentDefaultNodes[param];
 
+			//Store it here cause it can also be executed right away, not only in scheduler
+			var fadeOutFunc = {
+				var notDefaultNode = false;
+
+				//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
+				//This makes sure that \defauls is kept alive at all times
+				if(sender != currentDefaultNode, { notDefaultNode = true });
+
+				//calculate temporary time
+				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
+
+				//Only create fadeOut and free normSynth on .disconnect! (not .replace / .replaceMix).
+				//Also, don't create it for the default node, as that needs to be kept alive at all times!
+				if(notDefaultNode.and(replace.not).and(replaceMix.not), {
+					var fadeOutSymbol = (
+						"alga_fadeOut_" ++
+						interpBusAtParam.rate ++
+						(interpBusAtParam.numChannels - 1) //it has one more for env. need to remove that from symbol
+					).asSymbol;
+
+					AlgaSynth(
+						fadeOutSymbol,
+						[
+							\out, interpBusAtParam.index,
+							\fadeTime, time,
+						],
+						interpGroup,
+						waitForInst:false
+					);
+
+					//Free the normSynth only if not replaceMix. In that case, it must be kept
+					if(replaceMix.not, {
+						normSynthAtParam.set(\gate, 0, \fadeTime, time);
+					});
+				});
+
+				//This has to be surely algaInstantiated before being freed
+				interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
+
+				//Set correct fadeTime for all active interp synths at param / sender combination
+				this.setFadeTimeForAllActiveInterpSynths(param, sender, time);
+			};
+
 			//Make sure all of these are scheduled correctly to each other!
 			if((interpBusAtParam != nil).and(normSynthAtParam != nil), {
-				scheduler.addAction(
-					condition: {
-						interpSynthAtParam.algaInstantiated
-					},
-					func: {
-						var notDefaultNode = false;
-
-						//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
-						//This makes sure that \defauls is kept alive at all times
-						if(sender != currentDefaultNode, { notDefaultNode = true });
-
-						//calculate temporary time
-						time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
-
-						//Only create fadeOut and free normSynth on .replaceMix and .disconnect! (not .replace).
-						//Also, don't create it for the default node, as that needs to be kept alive at all times!
-						if(notDefaultNode.and(replace.not), {
-							var fadeOutSymbol = (
-								"alga_fadeOut_" ++
-								interpBusAtParam.rate ++
-								(interpBusAtParam.numChannels - 1) //it has one more for env. need to remove that from symbol
-							).asSymbol;
-
-							AlgaSynth(
-								fadeOutSymbol,
-								[
-									\out, interpBusAtParam.index,
-									\fadeTime, time,
-								],
-								interpGroup,
-								waitForInst:false
-							);
-
-							//This has to be surely algaInstantiated before being freed
-							normSynthAtParam.set(\gate, 0, \fadeTime, time);
-						});
-
-						//This has to be surely algaInstantiated before being freed
-						interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
-
-						//Set correct fadeTime for all active interp synths at param / sender combination
-						this.setFadeTimeForAllActiveInterpSynths(param, sender, time);
-					}
-				);
+				if(interpSynthAtParam.algaInstantiated, {
+					fadeOutFunc.value
+				}, {
+					scheduler.addAction(
+						condition: {
+							interpSynthAtParam.algaInstantiated
+						},
+						func: fadeOutFunc
+					)
+				});
 			}, {
 				("AlgaNode: invalid interpBus or normSynth at param").error;
 				^this
@@ -2540,14 +2554,17 @@ AlgaNode {
 		if(cleanupDicts, {
 			interpSynths[param].removeAt(sender);
 			activeInterpSynths[param].removeAt(sender);
-			interpBusses[param].removeAt(sender);
-			normSynths[param].removeAt(sender);
+			//Only free interpBus and normSynth if not replaceMix: in that case it must be kept
+			if(replaceMix.not, {
+				interpBusses[param].removeAt(sender);
+				normSynths[param].removeAt(sender);
+			});
 		});
 	}
 
 	//Free interpSynth at param. This is also used in .replace for both mix entries and normal ones
 	//THIS USES connectionTime!!
-	freeInterpSynthAtParam { | sender, param = \in, mix = false, replace = false, time |
+	freeInterpSynthAtParam { | sender, param = \in, mix = false, replaceMix = false, replace = false, time |
 		var interpSynthsAtParam = interpSynths[param];
 		var paramConnectionTime = paramsConnectionTime[param];
 
@@ -2564,25 +2581,19 @@ AlgaNode {
 			if(interpSynthsAtParam.size > 1, {
 				interpSynthsAtParam.keysValuesDo({ | interpSender, interpSynthAtParam  |
 					if(interpSender != \default, { // ignore \default !
-						if(replace, {
-							//on .replace of a mix node, just free that one (without fadeOut)
-							this.freeMixNodeAtParam(interpSender, param,
-								replace:true, cleanupDicts:false
-							);
-						}, {
-							//.disconnect
-							this.freeMixNodeAtParam(interpSender, param,
-								paramConnectionTime:paramConnectionTime,
-								replace:false, cleanupDicts:true, time:time
-							);
-						});
+						this.freeMixNodeAtParam(
+							sender: interpSender,
+							param: param,
+							paramConnectionTime: paramConnectionTime,
+							replace:replace, cleanupDicts:true, time:time
+						);
 					});
 				});
 			}, {
 				//calculate temporary time
 				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
-				//Start the free on the previous interp synth (size is 1 here)
+				//Start the free on the previous individual interp synth (size is ALWAYS 1 here)
 				interpSynthsAtParam.do({ | interpSynthAtParam |
 					interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
 				});
@@ -2591,20 +2602,13 @@ AlgaNode {
 				this.setFadeTimeForAllActiveInterpSynths(param, \default, time);
 			});
 		}, {
-			//mix == true, only free the one (disconnect function)
-			if(replace, {
-				//on .replace of a mix node, just free that one (without fadeOut)
-				this.freeMixNodeAtParam(sender, param,
-					paramConnectionTime:paramConnectionTime,
-					replace:true, cleanupDicts:false, time:time
-				);
-			}, {
-				//.disconnect
-				this.freeMixNodeAtParam(sender, param,
-					paramConnectionTime:paramConnectionTime,
-					replace:false, cleanupDicts:true, time:time
-				);
-			});
+			//mix == true
+			this.freeMixNodeAtParam(
+				sender: sender,
+				param: param,
+				paramConnectionTime:paramConnectionTime,
+				replace:replace, cleanupDicts:false, replaceMix: replaceMix, time:time
+			);
 		});
 	}
 
@@ -2793,13 +2797,14 @@ AlgaNode {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 		});
 
-		//If replaceMix = true, the call comes from replaceMix, which already calls freeInterpSynthAtParam!
+		//Needed for .replace. .replaceMix is already handled by .disconnectInner
 		if(replace, {
 			this.freeInterpSynthAtParam(sender, param, mix:true, replace:true, time:time);
 		});
 
 		//Spawn new interp mix node
-		this.createMixInterpSynthInterpBusBusNormSynthAtParam(sender, param,
+		this.createMixInterpSynthAndInterpBusAndNormSynthAtParam(
+			sender: sender, param: param,
 			replaceMix:replaceMix, replace:replace,
 			senderChansMapping:senderChansMapping, scale:scale, time:time
 		);
@@ -2923,7 +2928,8 @@ AlgaNode {
 			this.moveDefaultNodeToMix(param, sender);
 
 			//Either new one <<+ / .replaceMix OR .replace
-			this.newMixConnectionAtParam(sender, param,
+			this.newMixConnectionAtParam(
+				sender: sender, param: param,
 				replace:replace, replaceMix:replaceMix,
 				senderChansMapping:senderChansMapping,
 				scale:scale, time:time
@@ -2932,7 +2938,8 @@ AlgaNode {
 			//mix == false, clean everything up
 
 			//Connect interpSynth to the sender's synthBus
-			this.newInterpConnectionAtParam(sender, param,
+			this.newInterpConnectionAtParam(
+				sender: sender, param: param,
 				replace:replace, senderChansMapping:senderChansMapping,
 				scale:scale, time:time
 			);
@@ -3292,10 +3299,44 @@ AlgaNode {
 		this.mixTo(receiver: receiver, param: param);
 	}
 
+	//Replace old interpBus and normSynth with the new on
+	//Only do it if oldSender != newSender (or it will empty the entry)
+	replaceInterpBusAndNormSynth { | param, oldSender, newSender |
+		if(oldSender != newSender, {
+			var oldSenderInterpBus = interpBusses[param][oldSender];
+			var oldSenderNormSynth = normSynths[param][oldSender];
+			if(oldSenderInterpBus != nil, {
+				interpBusses[param][newSender] = oldSenderInterpBus;
+				interpBusses[param].removeAt(oldSender);
+			});
+			if(oldSenderNormSynth != nil, {
+				normSynths[param][newSender] = oldSenderNormSynth;
+				normSynths[param].removeAt(oldSender);
+			});
+		});
+	}
+
 	//disconnect + makeConnection, very easy
 	replaceMixInner { | param = \in, oldSender, newSender, chans, scale, time |
-		this.disconnectInner(param, oldSender, true, time:time);
-		this.makeConnectionInner(newSender, param,
+		//Disconnect previous entries (replaceMix == true)
+		this.disconnectInner(
+			param: param,
+			oldSender: oldSender,
+			replaceMix: true,
+			time: time
+		);
+
+		//Replace old interpBus and normSynth with the new one
+		this.replaceInterpBusAndNormSynth(
+			param: param,
+			oldSender: oldSender,
+			newSender: newSender
+		);
+
+		//Make a new connection (replaceMix == true)
+		this.makeConnectionInner(
+			sender:newSender,
+			param:param,
 			replace:false, mix:true, replaceMix:true,
 			senderChansMapping:chans, scale:scale, time:time
 		);
@@ -3612,7 +3653,13 @@ AlgaNode {
 			});
 		}, {
 			//Just free if replaceMix == true
-			this.freeInterpSynthAtParam(oldSender, param, true, time:time);
+			this.freeInterpSynthAtParam(
+				sender: oldSender,
+				param: param,
+				mix: true,
+				replaceMix: true,
+				time: time
+			);
 		});
 	}
 

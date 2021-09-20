@@ -8,14 +8,6 @@ Alga.boot({
 })
 )
 
-a.mixFrom(c, \freq, scale:[100, 700], time:2);
-
-
-
-
-
-
-
 //Remove the initial mix entry by addressing the node of the AlgaArg directly
 a.removeMix(\freq, b, time:2); //1
 
@@ -34,7 +26,3 @@ b.clear(2)
 a.reset(\freq, time:2);
 
 a.clear(2)
-
-
-//This needs fixing too
-mixSwap
