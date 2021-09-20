@@ -1848,7 +1848,8 @@ AlgaNode {
 
 		//Make sure to not duplicate something that's already in the mix
 		if(newMixConnectionOrReplace.or(newMixConnectionOrReplaceMix), {
-			this.createInterpSynthAtParam(sender, param,
+			this.createInterpSynthAtParam(
+				sender:sender, param:param,
 				mix:true, newMixConnectionOrReplaceMix:newMixConnectionOrReplaceMix,
 				senderChansMapping:senderChansMapping, scale:scale, time:time
 			);
@@ -1856,7 +1857,14 @@ AlgaNode {
 			//the alga node is already mixed. run replaceMix with itself
 			//this is useful in case scale parameter has been changed by user
 			"AlgaNode: sender was already mixed. Running 'replaceMix' with itself instead".warn;
-			this.replaceMixInner(param, sender, sender, senderChansMapping, scale, time:time);
+			this.replaceMixInner(
+				param: param,
+				oldSender: sender,
+				newSender: sender,
+				chans: senderChansMapping,
+				scale: scale,
+				time: time
+			);
 		});
 	}
 
@@ -2122,7 +2130,8 @@ AlgaNode {
 		//fadeIn balances out the interpSynth's envelope before normSynth.
 		//A fadeIn synth contains all zeroes, except for the envelope (at last position).
 		if(mix.and(newMixConnectionOrReplaceMix), {
-			var fadeInSymbol = ("alga_fadeIn_" ++
+			var fadeInSymbol = (
+				"alga_fadeIn_" ++
 				paramRate ++
 				paramNumChannels
 			).asSymbol;
@@ -2476,51 +2485,55 @@ AlgaNode {
 			var currentDefaultNode = currentDefaultNodes[param];
 
 			//Make sure all of these are scheduled correctly to each other!
-			scheduler.addAction(
-				condition: {
-					(interpSynthAtParam.algaInstantiated)/*.and(normSynthAtParam.algaInstantiated)*/
-				},
-				func: {
-					var notDefaultNode = false;
+			if((interpBusAtParam != nil).and(normSynthAtParam != nil), {
+				scheduler.addAction(
+					condition: {
+						interpSynthAtParam.algaInstantiated
+					},
+					func: {
+						var notDefaultNode = false;
 
-					//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
-					//This makes sure that \defauls is kept alive at all times
-					if(sender != currentDefaultNode, {
-						notDefaultNode = true;
-					});
+						//Only run fadeOut and remove normSynth if they are also not the ones that are used for \default.
+						//This makes sure that \defauls is kept alive at all times
+						if(sender != currentDefaultNode, { notDefaultNode = true });
 
-					//calculate temporary time
-					time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
+						//calculate temporary time
+						time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
-					//Only create fadeOut and free normSynth on .replaceMix and .disconnect! (not .replace).
-					//Also, don't create it for the default node, as that needs to be kept alive at all times!
-					if(notDefaultNode.and(replace.not), {
-						var fadeOutSymbol = ("alga_fadeOut_" ++
-							interpBusAtParam.rate ++
-							(interpBusAtParam.numChannels - 1) //it has one more for env. need to remove that from symbol
-						).asSymbol;
+						//Only create fadeOut and free normSynth on .replaceMix and .disconnect! (not .replace).
+						//Also, don't create it for the default node, as that needs to be kept alive at all times!
+						if(notDefaultNode.and(replace.not), {
+							var fadeOutSymbol = (
+								"alga_fadeOut_" ++
+								interpBusAtParam.rate ++
+								(interpBusAtParam.numChannels - 1) //it has one more for env. need to remove that from symbol
+							).asSymbol;
 
-						AlgaSynth(
-							fadeOutSymbol,
-							[
-								\out, interpBusAtParam.index,
-								\fadeTime, time,
-							],
-							interpGroup,
-							waitForInst:false
-						);
+							AlgaSynth(
+								fadeOutSymbol,
+								[
+									\out, interpBusAtParam.index,
+									\fadeTime, time,
+								],
+								interpGroup,
+								waitForInst:false
+							);
+
+							//This has to be surely algaInstantiated before being freed
+							normSynthAtParam.set(\gate, 0, \fadeTime, time);
+						});
 
 						//This has to be surely algaInstantiated before being freed
-						normSynthAtParam.set(\gate, 0, \fadeTime, time);
-					});
+						interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
 
-					//This has to be surely algaInstantiated before being freed
-					interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
-
-					//Set correct fadeTime for all active interp synths at param / sender combination
-					this.setFadeTimeForAllActiveInterpSynths(param, sender, time);
-				}
-			);
+						//Set correct fadeTime for all active interp synths at param / sender combination
+						this.setFadeTimeForAllActiveInterpSynths(param, sender, time);
+					}
+				);
+			}, {
+				("AlgaNode: invalid interpBus or normSynth at param").error;
+				^this
+			});
 		});
 
 		//On a .disconnect / .replaceMix, remove the entries
@@ -3156,17 +3169,7 @@ AlgaNode {
 			);
 		}
 		{ sender.isAlgaArg } {
-			if(sender.sender.isAlgaNode, {
-				var senderServer = sender.sender.server;
-				if(this.server != senderServer, {
-					("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
-					^this;
-				});
-				^this.makeConnection(sender, param, senderChansMapping:chans,
-					scale:scale, time:time, sched:sched
-				)
-			});
-			("AlgaNode: AlgaArg must only contain an AlgaNode as sender").error;
+			("AlgaNode: AlgaArgs must only be used as 'args'. Use a normal 'from' connection with an AlgaNode instead").error;
 			^this;
 		}
 		{ sender.isNumberOrArray } {
@@ -3237,17 +3240,7 @@ AlgaNode {
 			);
 		}
 		{ sender.isAlgaArg } {
-			if(sender.sender.isAlgaNode, {
-				var senderServer = sender.sender.server;
-				if(this.server != senderServer, {
-					("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
-					^this;
-				});
-				^this.makeConnection(sender, param, mix:true, senderChansMapping:chans,
-					scale:scale, time:time, sched:sched
-				);
-			});
-			("AlgaNode: AlgaArg must only contain an AlgaNode as sender").error;
+			("AlgaNode: AlgaArgs must only be used as 'args'. Use a normal 'mixFrom' connection with an AlgaNode instead").error;
 			^this;
 		}
 		{ sender.isNumberOrArray } {
