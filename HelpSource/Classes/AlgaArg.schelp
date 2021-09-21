@@ -1,0 +1,16 @@
+TITLE:: AlgaArg
+summary:: Represents a reference to an AlgaNode with custom scaling and channels mapping
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaTemp
+
+
+DESCRIPTION::
+
+
+CLASSMETHODS::
+
+
+INSTANCEMETHODS::
+
+
+EXAMPLES::
