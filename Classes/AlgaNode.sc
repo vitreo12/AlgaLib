@@ -1855,7 +1855,7 @@ AlgaNode {
 		if(newMixConnection.or(replace).or(replaceMix), {
 			this.createInterpSynthAtParam(
 				sender:sender, param:param,
-				mix:true, replaceMix:true,
+				mix:true, replaceMix:replaceMix,
 				senderChansMapping:senderChansMapping, scale:scale, time:time
 			);
 		}, {
