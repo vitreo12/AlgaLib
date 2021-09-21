@@ -1098,7 +1098,7 @@ AlgaNode {
 			if((defArg == nil).or(explicitArg == true), {
 				defArg = defArgs[param];
 				explicitArgs[param] = false; //reset state
-				replaceArgs.removeAt(param); //reset replaceArg
+				//replaceArgs.removeAt(param); //reset replaceArg
 			});
 
 			//If defArgs has entry, use that one as default instead

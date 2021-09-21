@@ -1878,6 +1878,9 @@ AlgaPattern : AlgaNode {
 
 			//Remove param entry from eventPairs
 			eventPairs[paramName] = nil;
+
+			//Add the entry to defaults
+			defArgs[paramName] = paramValue;
 		});
 
 		//Loop over all other input from the user, setting all entries that are not part of controlNames
@@ -2470,9 +2473,13 @@ AlgaPattern : AlgaNode {
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
 
-		//If sender == nil, still pass through. In this case, use default value for param.
-		//This is used in .reset
-		if(sender == nil, { isDefault = true });
+		//This mostly happens on .resetParam. Try to get the default value from defArgs,
+		//restoring the original Pattern's parameter. If it will be nil, the SynthDef's
+		//default will eventually be used in the pattern loop.
+		if(sender == nil, {
+			isDefault = true;
+			sender = defArgs[param];
+		});
 
 		//Check valid class
 		if(isDefault.not, {
