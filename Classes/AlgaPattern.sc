@@ -2728,15 +2728,20 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Manually advance the pattern. 'next' as function name won't work as it's reserved, apparently
-	advance { | sched |
+	advance { | sched = 0 |
 		sched = sched ? 0;
 		if(patternAsStream != nil, {
-			scheduler.addAction(
-				func: {
-					patternAsStream.next(()).play; //Empty event as protoEvent!
-				},
-				sched: sched
-			);
+			//If sched is 0, go right away: user might have its own scheduling setup
+			if(sched == 0, {
+				patternAsStream.next(()).play; //Empty event as protoEvent!
+			}, {
+				scheduler.addAction(
+					func: {
+						patternAsStream.next(()).play; //Empty event as protoEvent!
+					},
+					sched: sched
+				);
+			});
 		});
 	}
 

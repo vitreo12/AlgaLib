@@ -1,7 +1,7 @@
 TITLE:: AlgaNode
 summary:: Alga module representing an instance of a sonic process
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaSynthDef
+related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaArg, Classes/AlgaTemp
 
 
 DESCRIPTION::
@@ -34,7 +34,7 @@ Create a new link::Classes/AlgaNode::.
 ARGUMENT:: def
 Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::.
 ARGUMENT:: args
-Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. If the entry is another link::Classes/AlgaNode::, the connection will be applied in regards to emphasis::connectionTime::, or emphasis::time::, if defined.
+Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. These can be link::Classes/Number::s, link::Classes/Array::s, link::Classes/AlgaNode::s, link::Classes/AlgaTemp::s or link::Classes/AlgaArg::s.
 ARGUMENT:: connectionTime
 Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaNode::.
 ARGUMENT:: playTime
@@ -61,13 +61,13 @@ AlgaNode.ar({ SinOsc.ar([440, 450]) }).play //Play both channels
 
 AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: 2) //Play both channels, explicitly
 
-AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0]) //Play first channel mono
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0]) //Play first channel mono (same as 'chans: 1')
 
-AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0, 0]) //Play first channel stereo
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 0]) //Play first channel stereo
 
-AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0, 1]) //Play both channels, explicitly
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1]) //Play both channels, explicitly (same as 'chans: 2')
 
-AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans:[0, 1, 1, 0]) //Quadraphonic
+AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1, 1, 0]) //Quadraphonic
 ::
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
@@ -106,8 +106,6 @@ Shortcut for emphasis::playTime::.
 
 
 METHOD:: replace
-def, args, time, sched, outsMapping, reset = false, keepOutsMappingIn = true,
-		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true
 Replace the current content of the link::Classes/AlgaNode::. This method also takes care of restoring all running connections, applying the correct connection times and rate / channels conversions.
 ARGUMENT:: def
 Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::.
@@ -132,9 +130,9 @@ Specify whether the emphasis::scales:: of all the link::Classes/AlgaNode::s conn
 
 
 METHOD:: from
-Connect the specific input parameter of this link::Classes/AlgaNode:: to the output of another link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+Connect the specific input parameter of this link::Classes/AlgaNode:: to the output of an link::Classes/AlgaNode::, link::Classes/Number::, link::Classes/Array::, link::Classes/AlgaTemp:: or link::Classes/AlgaArg::.
 ARGUMENT:: sender
-An link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+An link::Classes/AlgaNode::, link::Classes/Number::, link::Classes/Array::, link::Classes/AlgaTemp:: or link::Classes/AlgaArg::.
 ARGUMENT:: param
 Which parameter to connect to.
 ARGUMENT:: chans
@@ -167,9 +165,9 @@ Just like any other link::Classes/AlgaNode:: method, the current function can be
 
 METHOD:: <<
 Shortcut for emphasis::from::, where, due to syntax restrictions, only emphasis::sender:: and emphasis::param:: can be specified.
-Connect the specific input parameter of this link::Classes/AlgaNode:: to the output of another link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+Connect the specific input parameter of this link::Classes/AlgaNode:: to the output of an link::Classes/AlgaNode::, link::Classes/Number::, link::Classes/Array::, link::Classes/AlgaTemp:: or link::Classes/AlgaArg::.
 ARGUMENT:: sender
-An link::Classes/AlgaNode::, link::Classes/Number:: or link::Classes/Array::.
+An link::Classes/AlgaNode::, link::Classes/Number::, link::Classes/Array::, link::Classes/AlgaTemp:: or link::Classes/AlgaArg::.
 ARGUMENT:: param
 Which parameter to connect to.
 
@@ -436,3 +434,38 @@ private:: synth
 private:: synthBus
 private:: synthDef
 private:: synthGroup
+
+private:: addPatternOutNode
+private:: algaWasBeingCleared
+private:: checkParamExists
+private:: compileFunctionSynthDefDictIfNeeded
+private:: createAlgaTempSynth
+private:: createAllPatternOutConnections
+private:: createDefArgs
+private:: defArgs
+private:: explicitArgs
+private:: freeAllPatternOutConnections
+private:: isContainedInPatternOut
+private:: lockInterpBus
+private:: lockInterpBusses
+private:: makeConnectionAlgaTemp
+private:: makeConnectionFunction
+private:: makeConnectionSymbol
+private:: paramsScaling
+private:: parseAlgaTempListPatternParam
+private:: parseAlgaTempParam
+private:: parseListPatternParam
+private:: parseResetOnReplace
+private:: patternOutEnvBusses
+private:: patternOutEnvBussesToBeFreed
+private:: patternOutEnvSynths
+private:: patternOutNodes
+private:: patternOutUniqueIDs
+private:: playChans
+private:: receivePatternOutTempSynth
+private:: receivePatternOutsAtParam
+private:: removePatternOutNode
+private:: removePatternOutsAtParam
+private:: replaceArgs
+private:: unpackListPatternOutsMapping
+private:: unpackListPatternRecursive
