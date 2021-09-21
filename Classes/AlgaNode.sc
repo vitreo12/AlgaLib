@@ -3251,24 +3251,24 @@ AlgaNode {
 			^this;
 		}
 		{ sender.isNumberOrArray } {
-			"AlgaNode: Numbers and Arrays cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
-			^this.from(sender, param, chans, scale, time, sched);
+			"AlgaNode: Numbers and Arrays cannot be mixed to AlgaNodes' parameters. Use 'from' instead.".warn;
+			^this;
 		}
 		{ sender.isFunction } {
-			"AlgaNode: Functions cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
-			^this.from(sender, param, chans, scale, time, sched);
+			"AlgaNode: Functions cannot be mixed to AlgaNodes' parameters. Use 'from' instead.".warn;
+			^this;
 		}
 		{ sender.isSymbol } {
-			"AlgaNode: AlgaSynthDefs cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
-			^this.from(sender, param, chans, scale, time, sched);
+			"AlgaNode: AlgaSynthDefs cannot be mixed to AlgaNodes' parameters. Use 'from' instead.".warn;
+			^this;
 		}
 		{ sender.isAlgaTemp } {
-			"AlgaNode: AlgaTemps cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
-			^this.from(sender, param, chans, scale, time, sched);
+			"AlgaNode: AlgaTemps cannot be mixed to AlgaNodes' parameters. Use 'from' instead.".warn;
+			^this;
 		}
 		{ sender.isBuffer } {
-			"AlgaNode: Buffers cannot be mixed to AlgaNodes' parameters. Running 'from' instead.".warn;
-			^this.from(sender, param, chans, scale, time, sched);
+			"AlgaNode: Buffers cannot be mixed to AlgaNodes' parameters. Use 'from' instead.".warn;
+			^this;
 		};
 
 		("AlgaNode: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
