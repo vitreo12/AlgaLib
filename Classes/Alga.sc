@@ -17,14 +17,16 @@
 Alga {
 	classvar <schedulers;
 	classvar <servers;
+	classvar <clocks;
 
 	*initSynthDefs {
 		AlgaStartup.initSynthDefs;
 	}
 
 	*initClass {
-		schedulers = IdentityDictionary(1);
 		servers = IdentityDictionary(1);
+		schedulers = IdentityDictionary(1);
+		clocks = IdentityDictionary(1);
 	}
 
 	*maxIO {
@@ -35,12 +37,9 @@ Alga {
 		AlgaStartup.algaMaxIO = value
 	}
 
-	*clearScheduler { | server |
-		var scheduler = schedulers[server];
-		if(scheduler != nil, {
-			scheduler.clear;
-			schedulers.removeAt(server);
-		});
+	*newServer { | server |
+		server = server ? Server.default;
+		servers[server] = server;
 	}
 
 	*clearServer { | server, prevServerQuit |
@@ -57,29 +56,42 @@ Alga {
 		});
 	}
 
-	*clearAllSchedulers {
-		if(schedulers != nil, {
-			schedulers.do({ | scheduler |
-				scheduler.clear;
-			});
-
-			schedulers.clear;
-		});
-	}
-
 	*newScheduler { | server, clock, cascadeMode = false |
 		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
-	}
-
-	*newServer { | server |
-		server = server ? Server.default;
-		servers[server] = server;
 	}
 
 	*getScheduler { | server |
 		var scheduler = schedulers[server];
 		if(scheduler.isNil, { ("No AlgaScheduler initialized for server " ++ server.asString).error });
 		^scheduler;
+	}
+
+	*clearScheduler { | server |
+		var scheduler = schedulers[server];
+		if(scheduler != nil, {
+			scheduler.clear;
+			schedulers.removeAt(server);
+		});
+	}
+
+	*clearAllSchedulers {
+		if(schedulers != nil, {
+			schedulers.do({ | scheduler |
+				scheduler.clear;
+			});
+			schedulers.clear;
+		});
+	}
+
+	*newClock { | server, clock |
+		clock = clock ? TempoClock(1, queueSize:16834).permanent_(true);
+		clocks[server] = clock;
+		^clock
+	}
+
+	*clock { | server |
+		if(server.isNil, { server = Server.default });
+		^clocks[server]
 	}
 
 	*boot { | onBoot, server, algaServerOptions, clock |
@@ -89,7 +101,7 @@ Alga {
 		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
 		if(algaServerOptions.class != AlgaServerOptions, {
-			"Use an AlgaServerOptions instance as the algaServerOptions argument".error;
+			"Alga: Use an AlgaServerOptions instance as the algaServerOptions argument".error;
 			^this;
 		});
 
@@ -123,17 +135,20 @@ Alga {
 		//Run CmdPeriod
 		CmdPeriod.run;
 
-		//clear scheduler @server if present
+		//Clear scheduler @server if present
 		this.clearScheduler(server);
 
-		//clear server @server if present, also quit it
+		//Clear server @server if present, also quit it
 		this.clearServer(server, prevServerQuit);
-
-		//Create an AlgaScheduler @ the server (using TempoClock for now...)
-		this.newScheduler(server, clock);
 
 		//Add the server
 		this.newServer(server);
+
+		//Add the clock. Creates a new TempoClock if clock is nil
+		clock = this.newClock(server, clock);
+
+		//Create an AlgaScheduler @ the server
+		this.newScheduler(server, clock);
 
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {

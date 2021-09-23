@@ -1094,11 +1094,11 @@ AlgaNode {
 				defArg = replaceArgs[param];
 			});
 
-			//No values provided in replaceArgs, or new explicit args: have been just set
+			//No values provided in replaceArgs, or new explicit args have been just set
 			if((defArg == nil).or(explicitArg == true), {
 				defArg = defArgs[param];
 				explicitArgs[param] = false; //reset state
-				//replaceArgs.removeAt(param); //reset replaceArg
+				replaceArgs.removeAt(param); //reset replaceArg
 			});
 
 			//If defArgs has entry, use that one as default instead

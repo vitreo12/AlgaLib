@@ -1895,9 +1895,10 @@ AlgaPattern : AlgaNode {
 
 			//Found \dur or \delta
 			if((paramName == \dur).or(paramName == \delta), {
-				if(value.isSymbol, {
-					//Using a symbol (like, \manual) as \dur key
-					manualDur = true
+				if((value.isSymbol).or(value.isNil), {
+					//Using a symbol (like, \manual) as \dur.
+					//Nil doesn't work as it won't even add to the Event
+					manualDur = true;
 				}, {
 					foundDurOrDelta = true;
 					this.setDur(value, newInterpStreams);
