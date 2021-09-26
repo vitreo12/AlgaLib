@@ -104,10 +104,21 @@ AlgaPatternInterpStreams {
 				//Note that only the first call to \t_release will be used as trigger, while
 				//\fadeTime will always be set on any consecutive call,
 				//even after the first trigger of \t_release.
-				interpSynth.set(
-					\t_release, 1,
-					\fadeTime, time,
-				);
+				if(time == 0, {
+					//Quicker: doesn't have to wait one more buffer size for it to execute.
+					//This is essential for time=0 and sched=1 to work!
+					var interpBus = interpBusses[paramName][uniqueID];
+					interpSynth.free; //Free synth right now!
+					//ONLY set the env to 0: it will be freed later when possible!
+					//It should never be freed now, as it can be picked up by something else.
+					//Basically, this allows both the interp synth and its env to have 0
+					if(interpBus != nil, { interpBus.free(true) });
+				}, {
+					interpSynth.set(
+						\t_release, 1,
+						\fadeTime, time,
+					);
+				});
 			});
 		});
 	}
@@ -115,28 +126,44 @@ AlgaPatternInterpStreams {
 	//This creates a temporary patternSynth for mid-pattern interpolation.
 	//It will be freed at the start of the NEXT paramSynth.
 	createTemporaryPatternParamSynthAtParam { | entry, uniqueID, paramName, paramNumChannels, paramRate, paramDefault |
-		var scaleArraysAndChansAtParam = scaleArraysAndChans[paramName];
-		var patternInterpSumBus = algaPattern.currentPatternInterpSumBus;  //Use currentPatternInterpSumBus
-		if(patternInterpSumBus != nil, {
-			//FUNDAMENTAL: check that the bus is still actually valid and hasn't been freed yet.
-			//In case it's been freed, it means the synths have already been freed
-			if(patternInterpSumBus.bus != nil, {
-				algaPattern.createPatternParamSynth(
-					entry: entry,
-					uniqueID: uniqueID,
-					paramName: paramName,
-					paramNumChannels: paramNumChannels,
-					paramRate: paramRate,
-					paramDefault: paramDefault,
-					patternInterpSumBus: patternInterpSumBus,
-					patternBussesAndSynths: nil,
-					scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
-					sampleAndHold: false,
-					algaPatternInterpStreams: this,
-					isTemporary: true
-				)
-			});
-		});
+		var clock = algaPattern.clock;
+
+		//It's essential that this is scheduled at the bottom of the Clock.
+		//This allows this action to always be executed AFTER the pattern triggers.
+		clock.algaSchedAtQuantOnce(
+			quant: 0, //RIGHT NOW, at the bottom of the stack (after all eventual pattern triggers)
+			task: {
+				var scaleArraysAndChansAtParam = scaleArraysAndChans[paramName];
+				var patternInterpSumBus = algaPattern.currentPatternInterpSumBusses[paramName];  //Use currentPatternInterpSumBus
+				var latestPatternTime = algaPattern.latestPatternTime; //Use latestPatternTime
+
+				//FUNDAMENTAL:
+				//Only schedule if the same pattern HAS NOT been triggered at this very time.
+				//This solves sched:1 issues!
+				if(latestPatternTime != clock.seconds, {
+					if(patternInterpSumBus != nil, {
+						//FUNDAMENTAL: check that the bus is still actually valid and hasn't been freed yet.
+						//In case it's been freed, it means the synths have already been freed
+						if(patternInterpSumBus.bus != nil, {
+							algaPattern.createPatternParamSynth(
+								entry: entry,
+								uniqueID: uniqueID,
+								paramName: paramName,
+								paramNumChannels: paramNumChannels,
+								paramRate: paramRate,
+								paramDefault: paramDefault,
+								patternInterpSumBus: patternInterpSumBus,
+								patternBussesAndSynths: nil,
+								scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
+								sampleAndHold: false,
+								algaPatternInterpStreams: this,
+								isTemporary: true
+							)
+						});
+					});
+				});
+			}
+		);
 	}
 
 	//Each param has its own interpSynth and bus. These differ from AlgaNode's ones,
@@ -528,10 +555,13 @@ AlgaPattern : AlgaNode {
 	//IdentitySet of paramSynths that get temporarily created for mid-pattern interpolation
 	var <>temporaryParamSynths;
 
-	//Keep track of the CURRENT patternInterpSumBus AlgaBus. This is updated every pattern trigger.
+	//Keep track of the CURRENT patternInterpSumBus AlgaBus per-param. This is updated every pattern trigger.
 	//It is fundamental to have the current one in order to add do it a mid-pattern synth when user
 	//changes a param mid-pattern.
-	var <currentPatternInterpSumBus;
+	var <>currentPatternInterpSumBusses;
+
+	//Keep track of time
+	var <latestPatternTime;
 
 	//Current fx
 	var <currentFX;
@@ -874,16 +904,16 @@ AlgaPattern : AlgaNode {
 			//from interpBusses, which gets replaced in language, but should implement the same
 			//behaviour of activeInterpSynths and get busses from there.
 			var patternParamEnvBus;
+			var validPatternParamEnvBus = true;
 
 			if(isFX.not, {
 				//Not \fx parameter: retrieve correct envelope bus
-				patternParamEnvBus = algaPatternInterpStreams.interpBusses[paramName][uniqueID]
-			}, {
-				//\fx parameter, envelope is not used
-				patternParamEnvBus = 0 //still != nil, just to get it through. It's not used in FX.
+				patternParamEnvBus = algaPatternInterpStreams.interpBusses[paramName][uniqueID];
+				validPatternParamEnvBus = patternParamEnvBus != nil;
+				if(validPatternParamEnvBus, { validPatternParamEnvBus = patternParamEnvBus.bus != nil });
 			});
 
-			if(patternParamEnvBus != nil, {
+			if(validPatternParamEnvBus, {
 				var patternParamSynth;
 				var patternParamSymbol;
 				var patternParamSynthArgs;
@@ -1384,7 +1414,7 @@ AlgaPattern : AlgaNode {
 			patternBussesAndSynths.add(patternInterpSumBus);
 
 			//Current patternInterpSumBus
-			currentPatternInterpSumBus = patternInterpSumBus;
+			currentPatternInterpSumBusses[paramName] = patternInterpSumBus;
 		});
 
 		//If ListPattern, retrieve correct numChannels
@@ -1487,10 +1517,18 @@ AlgaPattern : AlgaNode {
 		//Add pattern synth to algaPatternSynths, and free it when patternSynth gets freed
 		algaPatternInterpStreams.algaPatternSynths.add(patternSynth);
 
+		//Update latest time
+		latestPatternTime = this.clock.seconds;
+
 		//Free all normBusses, normSynths, interpBusses and interpSynths on patternSynth's release
 		patternSynth.onFree( {
+			//var interpSumBus = currentPatternInterpSumBusses[\freq];
+
 			//Free all Synths and Busses
-			patternBussesAndSynths.do({ | synthOrBus | synthOrBus.free });
+			patternBussesAndSynths.do({ | synthOrBus |
+				//if(synthOrBus == interpSumBus, { "YE".error });
+				synthOrBus.free;
+			});
 
 			//IMPORTANT: free the unused interpBusses of the interpStreams.
 			//This needs to happen on patternSynth's free as that's the notice
@@ -2545,7 +2583,8 @@ AlgaPattern : AlgaNode {
 						time: time
 					)
 				},
-				sched: sched
+				sched: sched,
+				topPriority: true //This is essential for scheduled times!
 			)
 		});
 	}
@@ -2847,7 +2886,7 @@ AlgaPattern : AlgaNode {
 	//Called from clearInner
 	resetAlgaPattern {
 		temporaryParamSynths.clear;
-		currentPatternInterpSumBus = nil;
+		currentPatternInterpSumBusses.clear;
 		interpStreams = nil;
 	}
 

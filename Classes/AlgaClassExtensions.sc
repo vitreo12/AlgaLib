@@ -230,14 +230,6 @@
 	isBuffer { ^true }
 }
 
-+SystemClock {
-	//If using a SystemClock in AlgaScheduler, just schedule as if quant is time
-	*algaSchedAtQuantOnce { | quant, task |
-		var taskOnce = { task.value; nil };
-		this.sched(quant, taskOnce)
-	}
-}
-
 +Clock {
 	algaSchedAtQuant { | quant, task |
 		if(this.isTempoClock, {
@@ -303,6 +295,21 @@
 			"Clock is not a TempoClock. Can't schedule with top priority".warn;
 			this.algaSched(when, taskOnce)
 		});
+	}
+}
+
++SystemClock {
+	//If using the SystemClock in AlgaScheduler, just schedule as if quant is time
+	*algaSchedAtQuantOnce { | quant, task |
+		var taskOnce = { task.value; nil };
+		this.sched(quant, taskOnce)
+	}
+
+	//If using the SystemClock in AlgaScheduler, just schedule as if quant is time
+	*algaSchedAtQuantOnceWithTopPriority { | quant, task |
+		var taskOnce = { task.value; nil };
+		"SystemClock is not a TempoClock. Can't schedule with top priority".warn;
+		this.sched(quant, taskOnce)
 	}
 }
 

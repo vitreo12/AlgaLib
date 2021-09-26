@@ -526,7 +526,7 @@ AlgaPatch {
 	}
 }
 
-/*
+
 //Debug makeBundle to check ordering of bundles
 +Server {
 	makeBundle { |time, func, bundle|
@@ -542,4 +542,3 @@ AlgaPatch {
 		^bundle
 	}
 }
-*/

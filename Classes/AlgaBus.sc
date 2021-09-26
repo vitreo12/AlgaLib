@@ -44,6 +44,11 @@ AlgaBus {
 		busArg = nil;
 	}
 
+	//set to 0
+	setAll { | val |
+		bus.setAll(val)
+	}
+
 	//Define getter
 	busArg { ^busArg ?? { this.makeBusArg } }
 
