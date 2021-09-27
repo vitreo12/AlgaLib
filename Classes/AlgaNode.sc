@@ -197,8 +197,12 @@ AlgaNode {
 
 		//AlgaPattern specific
 		if(this.isAlgaPattern, {
-			this.temporaryParamSynths = IdentitySet(10);
-			this.currentPatternInterpSumBusses = IdentityDictionary(10);
+			this.latestPatternInterpSumBusses = IdentityDictionary(10);
+			this.latestEntries = IdentityDictionary(10);
+			this.latestScales = IdentityDictionary(10);
+			this.latestChans = IdentityDictionary(10);
+			this.currentActivePatternInterpSumBusses = IdentityDictionary(10);
+			this.currentPatternBussesAndSynths = IdentityDictionary(10);
 		});
 
 		^true;
@@ -1167,15 +1171,28 @@ AlgaNode {
 	}
 
 	//Calculate scale to send to interp synth
-	calculateScaling { | param, sender, paramNumChannels, scale, addScaling = true |
-		var scaleCopy = scale.copy;
+	calculateScaling { | param, sender, paramNumChannels, scale, addScaling = true, storeLatestScale = true |
+		var scaleCopy;
 
-		if(scale.isNil, { ^nil });
+		if(storeLatestScale, {
+			scale = scale.next; //Pattern support
+			if(this.isAlgaPattern, { this.latestScales[param] = scale });
+		}, {
+			if(this.isAlgaPattern, {
+				scale = this.latestScales[param];
+				scale.asString.error;
+			});
+		});
+
+		if(scale == nil, { ^nil });
 
 		if(scale.isNumberOrArray.not, {
 			"AlgaNode: the scale parameter must be a Number or an Array".error;
 			^nil
 		});
+
+		//Essential
+		scaleCopy = scale.copy;
 
 		//just a number: act like a multiplier
 		if(scale.isNumber, {
@@ -1317,13 +1334,20 @@ AlgaNode {
 
 	//Calculate the array to be used as \indices param for interpSynth
 	calculateSenderChansMappingArray { | param, sender, senderChansMapping,
-		senderNumChans, paramNumChans, updateParamsChansMapping = true |
+		senderNumChans, paramNumChans, updateParamsChansMapping = true, storeLatestChans = true |
 
 		var actualSenderChansMapping;
 
-		senderChansMapping = senderChansMapping.next; //Pattern support
+		if(storeLatestChans, {
+			senderChansMapping = senderChansMapping.next; //Pattern support
+			if(this.isAlgaPattern, { this.latestChans[param] = senderChansMapping });
+		}, {
+			senderChansMapping = this.latestChans[param];
+		});
 
 		actualSenderChansMapping = senderChansMapping.copy;
+
+		senderNumChans.asString.warn;
 
 		//If senderChansMapping is nil or sender is not an AlgaNode, use default, modulo around senderNumChans
 		if((actualSenderChansMapping == nil).or(sender.isAlgaNode.not), {

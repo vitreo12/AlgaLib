@@ -1,34 +1,20 @@
 (
-Alga.maxIO = 2;
-Alga.initSynthDefs;
 Alga.boot({
 	a = AP((
-		def: { SinOsc.ar(\freq.ar(440).poll) * EnvGen.ar(Env.perc, doneAction:2) },
-		freq: Pseq([440, 220], inf),
+		def: { SinOsc.ar(\freq.ar(10)) * EnvGen.ar(Env.perc, doneAction:2) },
+		freq: 440,
 		dur: 0.5
 	)).play
 });
 )
 
-a.from(Pseq([1000, 300], inf), \freq, time:0, sched:1)
+a.from(100, \freq, time:0.02, sched:1)
 
+a.from(44, \freq, time:0.02, sched:1)
 
-a.from(Pseq([1000, 300], inf), \freq, time:0, sched:0)
-
-
-//What about that sound hole ??
-a.from(Pseq([1000, 300], inf), \freq, time:0.3, sched:1)
-
-a.from(Pseq([440, 300], inf), \freq, time:1, sched:1)
-
-a.from(0.5, \dur, sched:1)
-
-(
-fork {
-	loop {
-		"new".postln;
-		a.from(Pseq([1000, 300], inf), \freq, time:0, sched:1);
-		rrand(0.5, 3).wait;
-	}
-}
-)
+//Repeat this:
+//Note that even the old hanging ones will interpolate to the new value. I don't want that.
+//Only the new ones should. The old ones, however, need to be kept alive for their
+//whole duration, INTERPOLATION TOO! or they will go to 0 if the interpolation is shorter
+//than their remaining length!k
+a.from(AlgaTemp({ DC.ar(1) }, scale:Pseq([200, 500], inf)), \freq, time:0.2, sched:1)

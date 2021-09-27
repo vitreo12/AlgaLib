@@ -28,7 +28,7 @@
 	isListPattern { ^false }
 	isTempoClock { ^false }
 	def { ^nil }
-	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
+	isNumberOrArray { ^((this.isNumber).or(this.isArray)) }
 
 	//AlgaNode / AlgaPattern support
 	algaInstantiated { ^true }
@@ -51,6 +51,11 @@
 			func:func
 		);
 	}
+}
+
+//Essential for 'a16' busses not to be interpreted as an Array!
++String {
+	isNumberOrArray { ^false } //isArray would be true!!
 }
 
 //Fix lincurve with .ir arg

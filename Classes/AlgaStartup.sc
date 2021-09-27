@@ -317,7 +317,6 @@ out = " ++ scaling ++ "
 out = out * outMultiplier;
 env = " ++ env_pattern ++ "
 env = " ++ sampleAndHold ++ "
-env.poll(label:\"env\");
 out = out * env;
 outs = Array.newClear(" ++ (y + 1) ++ ");
 " ++ outs ++ "
