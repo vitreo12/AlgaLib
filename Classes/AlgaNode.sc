@@ -203,6 +203,8 @@ AlgaNode {
 			this.latestChans = IdentityDictionary(10);
 			this.currentActivePatternInterpSumBusses = IdentityDictionary(10);
 			this.currentPatternBussesAndSynths = IdentityDictionary(10);
+			this.currentActivePatternParamSynths = IdentityDictionary(10);
+			this.currentActiveInterpBusses = IdentityDictionary(10);
 		});
 
 		^true;
@@ -1180,7 +1182,6 @@ AlgaNode {
 		}, {
 			if(this.isAlgaPattern, {
 				scale = this.latestScales[param];
-				scale.asString.error;
 			});
 		});
 
@@ -1346,8 +1347,6 @@ AlgaNode {
 		});
 
 		actualSenderChansMapping = senderChansMapping.copy;
-
-		senderNumChans.asString.warn;
 
 		//If senderChansMapping is nil or sender is not an AlgaNode, use default, modulo around senderNumChans
 		if((actualSenderChansMapping == nil).or(sender.isAlgaNode.not), {

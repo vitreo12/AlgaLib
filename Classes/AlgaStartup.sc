@@ -212,8 +212,8 @@ Limiter.ar(input) * AlgaEnvGate.kr
 					var indices_kr = "in;";
 					var env_pattern_ar = "\\env.ar(0);";
 					var env_pattern_kr = "\\env.kr(0);";
-					var sampleAndHold_ar = "Select.ar(\\sampleAndHold.ir(0), [env, Latch.ar(env, 1)]);";
-					var sampleAndHold_kr = "Select.kr(\\sampleAndHold.ir(0), [env, Latch.kr(env, 1)]);";
+					var sampleAndHold_ar = "Select.ar(\\sampleAndHold.kr(0), [env, Latch.ar(env, \\t_sah.tr(0))]);";
+					var sampleAndHold_kr = "Select.kr(\\sampleAndHold.kr(0), [env, Latch.kr(env, \\t_sah.tr(0))]);";
 
 					//constant multiplier. this is set when mix's scale argument is a single Number
 					var multiplier = "\\outMultiplier.ir(1);";
