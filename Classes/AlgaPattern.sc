@@ -44,6 +44,14 @@ AlgaPatternInterpStreams {
 	var <scaleArraysAndChans;
 	var <sampleAndHolds;
 
+	//Used for \freq stuff (\degree, \note, etc...)
+	var <freqParams;
+	var <freqParamsNext;
+
+	//This is used to set freqParams
+	var <currentFreqUniqueID;
+	var <currentFreqEntry;
+
 	*new { | algaPattern |
 		^super.new.init(algaPattern)
 	}
@@ -56,6 +64,8 @@ AlgaPatternInterpStreams {
 		algaPatternSynths   = IdentitySet(10);
 		scaleArraysAndChans = IdentityDictionary(10);
 		sampleAndHolds      = IdentityDictionary(10);
+		freqParams          = IdentityDictionary();
+		freqParamsNext      = IdentityDictionary();
 		algaPattern         = argAlgaPattern;
 		server              = algaPattern.server;
 	}
@@ -365,8 +375,42 @@ AlgaPatternInterpStreams {
 		sampleAndHolds[paramName] = sampleAndHold
 	}
 
+	//Init freqParams and add entry
+	addFreqParam { | entry, paramName |
+		var initParamsAtUniqueID = false;
+
+		if(currentFreqUniqueID != nil, {
+			var freqParamsAtUniqueID = freqParams[currentFreqUniqueID];
+			if(freqParamsAtUniqueID == nil, {
+				initParamsAtUniqueID = true;
+				freqParams[currentFreqUniqueID] = IdentityDictionary();
+				freqParamsNext[currentFreqUniqueID] = IdentityDictionary(); //used in MC
+				freqParamsAtUniqueID = freqParams[currentFreqUniqueID];
+			});
+
+			//Init all entries if needed
+			if(initParamsAtUniqueID, {
+				freqParamsAtUniqueID[\mtranspose] = 0;
+				freqParamsAtUniqueID[\root] = 0.0;
+				freqParamsAtUniqueID[\gtranspose] = 0.0;
+				freqParamsAtUniqueID[\ctranspose] = 0.0;
+				freqParamsAtUniqueID[\harmonic] = 1.0;
+				freqParamsAtUniqueID[\detune] = 0.0;
+				freqParamsAtUniqueID[\octave] = 5.0;
+				freqParamsAtUniqueID[\root] = 0.0;
+				freqParamsAtUniqueID[\degree] = 0;
+				freqParamsAtUniqueID[\scale] = #[0, 2, 4, 5, 7, 9, 11];
+				freqParamsAtUniqueID[\stepsPerOctave] = 12.0;
+				freqParamsAtUniqueID[\octaveRatio] = 2.0;
+			});
+
+			//Finally, add the user entry as Stream
+			freqParamsAtUniqueID[paramName] = entry.algaAsStream;
+		});
+	}
+
 	//Add a new sender interpolation to the current param
-	add { | entry, controlName, chans, scale, sampleAndHold, time = 0 |
+	add { | entry, controlName, chans, scale, sampleAndHold, useCurrentFreqEntry = false, time = 0 |
 		var paramName, paramRate, paramNumChannels, paramDefault;
 		var uniqueID;
 
@@ -377,6 +421,7 @@ AlgaPatternInterpStreams {
 			("AlgaPatternInterpStreams: Invalid controlName for param '" ++ paramName ++ "'").error
 		});
 
+		//Unpack
 		paramName = controlName.name;
 		paramRate = controlName.rate;
 		paramNumChannels = controlName.numChannels;
@@ -391,6 +436,19 @@ AlgaPatternInterpStreams {
 		//Use an unique id as index as it's more reliable than using the entry as key:
 		//entry could very well be a number (like 440), screwing things up in IdentityDict.
 		uniqueID = UniqueID.next;
+
+		//If useCurrentFreqEntry, use currentFreqEntry. This is needed on .from with a param that's not \freq,
+		//but \degree, \note, etc...
+		if(useCurrentFreqEntry, {
+			entry = currentFreqEntry;
+			entryOriginal = currentFreqEntry;
+		});
+
+		//Store it so that it can be used to add \freq params to the same ID
+		if(paramName == \freq, {
+			currentFreqUniqueID = uniqueID;
+			currentFreqEntry = entry;
+		});
 
 		//Add entry to dict
 		isFirstEntry = this.addEntry(entry, paramName, uniqueID);
@@ -431,6 +489,7 @@ AlgaPatternInterpStreams {
 		//triggers new synth. This just avoids to have silences and gaps when modifying a param mid-pattern.
 		//This must come AFTER createPatternInterpSynthAndBusAtParam.
 		if((isFirstEntry.not).and(sampleAndHold.not), {
+			//NOTE: this doesn't support MC yet
 			this.createTemporaryPatternParamSynthAtParam(
 				entry: entry,
 				uniqueID: uniqueID,
@@ -589,6 +648,9 @@ AlgaPattern : AlgaNode {
 	//The Event input
 	var <eventPairs;
 
+	//Use MC expansion or not
+	var <useMultiChannelExpansion = true;
+
 	//interpStreams. These varies on .replace
 	var <interpStreams;
 
@@ -739,17 +801,36 @@ AlgaPattern : AlgaNode {
 	//Set replaceDur
 	replaceDur_ { | value = false |
 		if((value != false).and(value != true), {
-			"AlgaPattern: 'replaceDur' only supports boolean values. Setting it to false".error
-			^nil
+			"AlgaPattern: 'replaceDur' only supports boolean values. Setting it to false".error;
+			value = false;
 		});
 		replaceDur = value
+	}
+
+	//Set useMultiChannelExpansion
+	useMultiChannelExpansion_ { | value = false |
+		if((value != false).and(value != true), {
+			"AlgaPattern: 'useMultiChannelExpansion' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		useMultiChannelExpansion = value
+	}
+
+	//Alias
+	multiChannelExpansion {
+		^useMultiChannelExpansion
+	}
+
+	//Alias
+	multiChannelExpansion_ { | value = false |
+		this.useMultiChannelExpansion(value)
 	}
 
 	//Set interpolateAllActiveSynths
 	interpolateAllActiveSynths_ { | value = false |
 		if((value != false).and(value != true), {
-			"AlgaPattern: 'interpolateAllActiveSynths' only supports boolean values. Setting it to false".error
-			^nil
+			"AlgaPattern: 'interpolateAllActiveSynths' only supports boolean values. Setting it to false".error;
+			value = false;
 		});
 		interpolateAllActiveSynths = value
 	}
@@ -862,6 +943,51 @@ AlgaPattern : AlgaNode {
 		^tempBus.busArg;
 	}
 
+	//Get a freq param
+	getFreqParam { | freqParamsAtUniqueID, param, mcSynthNum |
+		var freqParam = freqParamsAtUniqueID[param];
+		//With MC, .next has already been called
+		if(useMultiChannelExpansion.not, {
+			freqParam = freqParam.next;
+			^freqParam;
+		});
+		if(freqParam.isArray, { if(mcSynthNum != nil, { ^freqParam[mcSynthNum] }) }); //MC
+		^freqParam;
+	}
+
+	//Used for \freq
+	calculateFreqParam { | algaPatternInterpStreams, freq, uniqueID, mcSynthNum |
+		var freqParamsAtUniqueID;
+		var note, midinote;
+
+		//With MC, .next has already been called
+		if(useMultiChannelExpansion, {
+			freqParamsAtUniqueID = algaPatternInterpStreams.freqParamsNext[uniqueID];
+		}, {
+			freqParamsAtUniqueID = algaPatternInterpStreams.freqParams[uniqueID];
+		});
+
+		if(freqParamsAtUniqueID == nil, { ^freq });
+
+		note = this.getFreqParam(freqParamsAtUniqueID, \note, mcSynthNum) ?
+		(this.getFreqParam(freqParamsAtUniqueID, \degree, mcSynthNum) +
+			this.getFreqParam(freqParamsAtUniqueID, \mtranspose, mcSynthNum)).degreeToKey(
+			algaPatternInterpStreams.freqParams[uniqueID][\scale].next, // \scale must be indexed directly
+			this.getFreqParam(freqParamsAtUniqueID, \stepsPerOctave, mcSynthNum));
+
+		midinote = this.getFreqParam(freqParamsAtUniqueID, \midinote, mcSynthNum) ?
+		((note + this.getFreqParam(freqParamsAtUniqueID, \gtranspose, mcSynthNum) +
+			this.getFreqParam(freqParamsAtUniqueID, \root, mcSynthNum)) /
+			this.getFreqParam(freqParamsAtUniqueID, \stepsPerOctave, mcSynthNum) +
+		this.getFreqParam(freqParamsAtUniqueID, \octave, mcSynthNum)) * 12.0;
+
+		freq = freq ?
+		(midinote + this.getFreqParam(freqParamsAtUniqueID, \ctranspose, mcSynthNum)).midicps *
+		this.getFreqParam(freqParamsAtUniqueID, \harmonic, mcSynthNum);
+
+		^(freq + this.getFreqParam(freqParamsAtUniqueID, \detune, mcSynthNum))
+	}
+
 	//Add patternParamSynth as child of patternInterpSumBus (used to create temporary synths)
 	addActivePatternParamSynth { | patternInterpSumBus, patternParamSynth |
 		//Add to currentActivePatternParamSynths
@@ -886,7 +1012,7 @@ AlgaPattern : AlgaNode {
 	//This is the core of the interpolation behaviour for AlgaPattern !!
 	createPatternParamSynth { | entry, uniqueID, paramName, paramNumChannels, paramRate,
 		paramDefault, patternInterpSumBus, patternBussesAndSynths, scaleArraysAndChansAtParam,
-		sampleAndHold, algaPatternInterpStreams, isFX = false, isTemporary = false, storeLatestEntry = true |
+		sampleAndHold, algaPatternInterpStreams, isFX = false, isTemporary = false, storeLatestEntry = true, mcSynthNum = nil |
 
 		var sender, senderNumChannels, senderRate;
 		var chansMapping, scale;
@@ -897,7 +1023,10 @@ AlgaPattern : AlgaNode {
 
 		//Unpack Pattern value
 		if(storeLatestEntry, {
-			if(entry.isStream, { entry = entry.next });
+			//Unpack Pattern value (Only if not using MC, or isFX (no MC in FX) or isTemporary (no MC in temporary))
+			if((useMultiChannelExpansion.not).or(isFX).or(isTemporary), {
+				if(entry.isStream, { entry = entry.next });
+			});
 		});
 
 		//Check if it's an AlgaArg. Unpack it.
@@ -961,6 +1090,13 @@ AlgaPattern : AlgaNode {
 				senderRate = "control";
 			});
 
+			//Check if it's freq, in which case apply conversions
+			if(isFX.not, { //Fx doesn't use this rule
+				if(paramName == \freq, {
+					entry = this.calculateFreqParam(algaPatternInterpStreams, entry, uniqueID, mcSynthNum);
+				});
+			});
+
 			validParam = true;
 		}
 
@@ -1011,6 +1147,8 @@ AlgaPattern : AlgaNode {
 				"'. Using default value " ++ paramDefault.asString ++" instead").error;
 			validParam = true;
 		};
+
+		entry.asString.error;
 
 		if(validParam, {
 			//Get the bus where interpolation envelope is written to...
@@ -1152,30 +1290,56 @@ AlgaPattern : AlgaNode {
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
 		paramDefault, patternInterpSumBus, patternBussesAndSynths,
 		interpStreamsEntriesAtParam, scaleArraysAndChansAtParam, sampleAndHold,
-		algaPatternInterpStreams, fx |
+		algaPatternInterpStreams, fx, mcSynthNum, mcEntriesAtParam |
 
-		if(interpStreamsEntriesAtParam != nil, {
-			interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry | //indexed by uniqueIDs
-				this.createPatternParamSynth(
-					entry: entry,
-					uniqueID: uniqueID,
-					paramName: paramName,
-					paramNumChannels: paramNumChannels,
-					paramRate: paramRate,
-					paramDefault: paramDefault,
-					patternInterpSumBus: patternInterpSumBus,
-					patternBussesAndSynths: patternBussesAndSynths,
-					scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
-					sampleAndHold: sampleAndHold,
-					algaPatternInterpStreams: algaPatternInterpStreams
-				)
+		//If MC, loop from mcEntriesAtParam
+		if(useMultiChannelExpansion, {
+			//MC: loop from mcEntriesAtParam
+			if(mcEntriesAtParam != nil, {
+				mcEntriesAtParam.keysValuesDo({ | uniqueID, entry | //indexed by uniqueIDs
+					if(mcSynthNum != nil, { entry = entry[mcSynthNum] }); //extract from inner array
+					this.createPatternParamSynth(
+						entry: entry,
+						uniqueID: uniqueID,
+						paramName: paramName,
+						paramNumChannels: paramNumChannels,
+						paramRate: paramRate,
+						paramDefault: paramDefault,
+						patternInterpSumBus: patternInterpSumBus,
+						patternBussesAndSynths: patternBussesAndSynths,
+						scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
+						sampleAndHold: sampleAndHold,
+						algaPatternInterpStreams: algaPatternInterpStreams,
+						mcSynthNum: mcSynthNum
+					)
+				});
+			});
+		}, {
+			//No MC: loop from interpStreamsEntriesAtParam
+			if(interpStreamsEntriesAtParam != nil, {
+				interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry | //indexed by uniqueIDs
+					this.createPatternParamSynth(
+						entry: entry,
+						uniqueID: uniqueID,
+						paramName: paramName,
+						paramNumChannels: paramNumChannels,
+						paramRate: paramRate,
+						paramDefault: paramDefault,
+						patternInterpSumBus: patternInterpSumBus,
+						patternBussesAndSynths: patternBussesAndSynths,
+						scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
+						sampleAndHold: sampleAndHold,
+						algaPatternInterpStreams: algaPatternInterpStreams
+					)
+				});
 			});
 		});
 	}
 
 	//Create all needed Synths and Busses for an FX
 	createFXSynthAndPatternSynth { | fx, numChannelsToUse, rateToUse,
-		algaSynthDef, algaSynthBus, algaPatternInterpStreams, patternSynthArgs, patternBussesAndSynths |
+		algaSynthDef, algaSynthBus, algaPatternInterpStreams,
+		patternSynthArgs, patternBussesAndSynths |
 
 		var patternBussesAndSynthsFx = IdentitySet();
 		var def = fx[\def];
@@ -1438,13 +1602,13 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
-	createEventSynths { | algaSynthDef, algaSynthBus,
-		algaPatternInterpStreams, fx, algaOut |
+	//Create all needed Synths / Busses for an individual patternSynth
+	createPatternSynth { | algaSynthDef, algaSynthBus,
+		algaPatternInterpStreams, controlNamesToUse, fx, algaOut,
+		mcSynthNum, mcEntries |
 		//Used to check whether using a ListPattern of \defs
 		var numChannelsToUse  = numChannels;
 		var rateToUse = rate;
-		var controlNamesToUse = controlNames;
 
 		//Flag to check for mismatches (and needed conversions) for numChannels / rates
 		var numChannelsOrRateMismatch = false;
@@ -1514,12 +1678,20 @@ AlgaPattern : AlgaNode {
 			//which store all the senders to this param for the interpStream.
 			var interpStreamsEntriesAtParam = algaPatternInterpStreams.entries[paramName];
 
+			//Used in MC
+			var mcEntriesAtParam;
+
 			//scaleArray and chans
 			var scaleArraysAndChansAtParam = algaPatternInterpStreams.scaleArraysAndChans[paramName];
 
 			//sampleAndHold
 			var sampleAndHold = algaPatternInterpStreams.sampleAndHolds[paramName];
 			sampleAndHold = sampleAndHold ? false;
+
+			//MultiChannel: extract from mcEntries
+			if(useMultiChannelExpansion, {
+				mcEntriesAtParam = mcEntries[paramName]
+			});
 
 			//Create all interp synths for current param
 			this.createPatternParamSynths(
@@ -1532,7 +1704,9 @@ AlgaPattern : AlgaNode {
 				interpStreamsEntriesAtParam: interpStreamsEntriesAtParam,
 				scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
 				sampleAndHold: sampleAndHold,
-				algaPatternInterpStreams: algaPatternInterpStreams
+				algaPatternInterpStreams: algaPatternInterpStreams,
+				mcSynthNum: mcSynthNum,
+				mcEntriesAtParam: mcEntriesAtParam
 			);
 
 			//Read from patternParamNormBus
@@ -1579,8 +1753,28 @@ AlgaPattern : AlgaNode {
 			numChannelsOrRateMismatch = true
 		});
 
+		//Extract fx multichannel
+		if(useMultiChannelExpansion, {
+			if(fx.isArray, {
+				if(mcSynthNum != nil, { fx = fx[mcSynthNum] })
+			});
+		}, {
+			//Or use first entry if not MC
+			if(fx.isArray, { fx = fx[0] });
+		});
+
 		//Check validFX
 		if((fx != nil).and(fx.isEvent), { validFX = true });
+
+		//Extract out multichannel (not valid in FX)
+		if(useMultiChannelExpansion, {
+			if(algaOut.isArray, {
+				if(mcSynthNum != nil, { algaOut = algaOut[mcSynthNum] })
+			});
+		}, {
+			//Or use first entry if not MC
+			if(algaOut.isArray, { algaOut = algaOut[0] });
+		});
 
 		//Check validOut
 		if((algaOut != nil).and((algaOut.isAlgaOut).or(algaOut.isAlgaNode)), { validOut = true });
@@ -1689,6 +1883,206 @@ AlgaPattern : AlgaNode {
 			//to free all used things!
 			this.freeUnusedInterpBusses(algaPatternInterpStreams, patternSynth);
 		});
+	}
+
+	//Calculate the MC mismatches and return a new array with all the correct settings.
+	//Each entry will be used to create an individual patternSynth
+	calculateMultiChannelMismatches { | controlNamesToUse, algaPatternInterpStreams,
+		fx, algaOut |
+		var numOfSynths = 0;
+		var entries = IdentityDictionary();
+		var freqArray = [\midinote, \ctranspose, \harmonic, \detune, \note, \root, \octave, \gtranspose,
+			\stepsPerOctave, \octaveRatio, \degree, /*\scale,*/ \mtranspose];
+
+		//Loop over the actual control names
+		controlNamesToUse.do({ | controlName |
+			var paramName = controlName.name;
+			var paramNumChannels = controlName.numChannels;
+			var interpStreamsEntriesAtParam = algaPatternInterpStreams.entries[paramName];
+			if(interpStreamsEntriesAtParam != nil, {
+				interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry |
+					//Unpack Pattern value
+					if(entry.isStream, { entry = entry.next });
+
+					//Set entries at paramName
+					entries[paramName] = entries[paramName] ? IdentityDictionary();
+
+					//Use uniqueID
+					entries[paramName][uniqueID] = [entry, paramNumChannels];
+
+					//Retrieve the highest numOfSynths to spawn
+					if(entry.isArray, {
+						var arraySize = entry.size;
+						if(arraySize > paramNumChannels, {
+							numOfSynths = max(
+								arraySize - (paramNumChannels - 1),
+								numOfSynths
+							)
+						});
+					});
+
+					//If param is \freq, also check its accompanying params
+					if(paramName == \freq, {
+						var freqParams = algaPatternInterpStreams.freqParams;
+						if(freqParams != nil, {
+							freqArray.do({ | freqParamName |
+								var freqParam = freqParams[uniqueID][freqParamName];
+								if(freqParam != nil, {
+									freqParam = freqParam.next;
+									if(freqParamName == \detune, {
+										freqParam.asString.error;
+									});
+									algaPatternInterpStreams.freqParamsNext[uniqueID][freqParamName] = freqParam;
+									if(freqParam.isArray, {
+										var arraySize = freqParam.size;
+										if(arraySize > paramNumChannels, {
+											numOfSynths = max(
+												arraySize - (paramNumChannels - 1),
+												numOfSynths
+											)
+										});
+									});
+								});
+							});
+						});
+					});
+				});
+			});
+		});
+
+		//Also check \fx
+		if(fx.isArray, {
+			var arraySize = fx.size;
+			entries[\fx] = entries[\fx] ? IdentityDictionary();
+			numOfSynths = max(arraySize, numOfSynths);
+			entries[\fx] = fx.reshape(numOfSynths);
+		});
+
+		//Also check \out
+		if(algaOut.isArray, {
+			var arraySize = algaOut.size;
+			entries[\algaOut] = entries[\algaOut] ? IdentityDictionary();
+			numOfSynths = max(arraySize, numOfSynths);
+			entries[\algaOut] = algaOut.reshape(numOfSynths);
+			if(arraySize > numOfSynths, { //needs to be re-done, overwritten
+				entries[\fx] = fx.reshape(numOfSynths);
+			});
+		});
+
+		//Loop over entries and distribute the values across the synths to spawn
+		entries.keysValuesDo({ | paramName, entriesAtParamName |
+			if((paramName != \fx).and(paramName != \algaOut), {
+				entriesAtParamName.keysValuesDo({ | uniqueID, entryAndParamNumChannels |
+					var entry = entryAndParamNumChannels[0];
+					var paramNumChannels = entryAndParamNumChannels[1];
+					var newEntry = Array.newClear(numOfSynths);
+					if(numOfSynths > 0, {
+						numOfSynths.do({ | i |
+							if(entry.isArray, {
+								var subEntry = entry[0..paramNumChannels-1]; //sub entry
+								entry = entry[paramNumChannels..entry.size-1]; //shift
+								if(subEntry.size == 1, { subEntry = subEntry[0] }); //extract single entries
+								newEntry[i] = subEntry;
+							}, {
+								newEntry[i] = entry;
+							});
+						});
+					}, {
+						newEntry = entry;
+					});
+					entries[paramName][uniqueID] = newEntry;
+				});
+			});
+		});
+
+		//Add numOfSynths
+		entries[\numOfSynths] = numOfSynths;
+
+		//Return the correct entries
+		^entries;
+	}
+
+	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
+	createEventSynths { | algaSynthDef, algaSynthBus,
+		algaPatternInterpStreams, fx, algaOut |
+
+		//Get controlNames and check if it's a ListPattern
+		//(in case for multiple SynthDefs). Get the correct one if available.
+		var controlNamesToUse = controlNames;
+		if(controlNamesList != nil, {
+			controlNamesToUse = controlNamesList[algaSynthDef];
+			if(controlNamesToUse == nil, { controlNamesToUse = controlNames });
+		});
+
+		//Check MC mismatches and create patternSynths accordingly
+		if(useMultiChannelExpansion, {
+			//Each entry will be used to create a single patternSynth
+			var entries = this.calculateMultiChannelMismatches(
+				controlNamesToUse: controlNamesToUse,
+				algaPatternInterpStreams: algaPatternInterpStreams,
+				fx: fx,
+				algaOut: algaOut
+			);
+
+			//Get numOfSynths
+			var numOfSynths = entries[\numOfSynths] ? 0;
+
+			//Remove it
+			entries.removeAt(\numOfSynths);
+
+			//Get fx
+			if(entries[\fx] != nil, {
+				fx = entries[\fx];
+				entries.removeAt(\fx);
+			});
+
+			//Get out
+			if(entries[\algaOut] != nil, {
+				algaOut = entries[\algaOut];
+				entries.removeAt(\algaOut);
+			});
+
+			//Create MC expansion. If it fails (numSynths == 0)
+			//it will execute the next createPatternSynth, the one with no MC
+			if(numOfSynths > 0, {
+				numOfSynths.do({ | synthNum |
+					this.createPatternSynth(
+						algaSynthDef: algaSynthDef,
+						algaSynthBus: algaSynthBus,
+						algaPatternInterpStreams: algaPatternInterpStreams,
+						controlNamesToUse: controlNamesToUse,
+						fx: fx,
+						algaOut: algaOut,
+						mcSynthNum: synthNum,
+						mcEntries: entries
+					);
+				});
+
+				^this;
+			}, {
+				//numOfSynths == 0, mcSynthNum is then nil
+				^this.createPatternSynth(
+					algaSynthDef: algaSynthDef,
+					algaSynthBus: algaSynthBus,
+					algaPatternInterpStreams: algaPatternInterpStreams,
+					controlNamesToUse: controlNamesToUse,
+					fx: fx,
+					algaOut: algaOut,
+					mcSynthNum: nil,
+					mcEntries: entries
+				);
+			});
+		});
+
+		//No MC expansion used: create the single patternSynth with all its params
+		this.createPatternSynth(
+			algaSynthDef: algaSynthDef,
+			algaSynthBus: algaSynthBus,
+			algaPatternInterpStreams: algaPatternInterpStreams,
+			controlNamesToUse: controlNamesToUse,
+			fx: fx,
+			algaOut: algaOut
+		)
 	}
 
 	//dispatchNode: first argument is an Event or SynthDef
@@ -2009,6 +2403,17 @@ AlgaPattern : AlgaNode {
 		^nil
 	}
 
+	//Check if param is a \freq type
+	isFreqParam { | param = \in |
+		^(
+			(param == \midinote).or(param == \ctranspose).or(
+				param == \harmonic).or(param == \detune).or(param == \note).or(
+				param == \root).or(param == \octave).or(param == \gtranspose).or(
+				param == \stepsPerOctave).or(param == \octaveRatio).or(
+				param == \degree).or(param == \scale).or(param == \mtranspose)
+		)
+	}
+
 	//Store generic params for replaces
 	storeCurrentGenericParams { | key, value |
 		currentGenericParams = currentGenericParams ? IdentityDictionary();
@@ -2038,11 +2443,15 @@ AlgaPattern : AlgaNode {
 			var paramName = controlName.name;
 			var paramValue = eventPairs[paramName]; //Retrieve it directly from eventPairs
 			var chansMapping, scale;
+			var addToPatternPairs = true;
 
 			//if not set explicitly yet
 			if(paramValue == nil, {
 				//When replace, getDefaultOrArg will return LATEST set parameter, via replaceArgs
 				paramValue = this.getDefaultOrArg(controlName, paramName, replace);
+
+				//Don't add to patternPairs: it's not set by user
+				addToPatternPairs = false;
 			});
 
 			//If replace, check if keeping chans / scale mappings
@@ -2063,11 +2472,23 @@ AlgaPattern : AlgaNode {
 				time: 0
 			);
 
+			//Add to patternPairs so that it's available for Pfunc { | event | }
+			if(addToPatternPairs, {
+				patternPairs = patternPairs.add(paramName).add(paramValue);
+			});
+
 			//Remove param entry from eventPairs
 			eventPairs[paramName] = nil;
 
 			//Add the entry to defaults
 			defArgs[paramName] = paramValue;
+
+			//Check if it was freq (only do it once despite using \degree, \note, etc...)
+			if(paramName == \freq, {
+				if(addToPatternPairs, {
+					patternPairs = patternPairs.add(\explicitFreq).add(true);
+				});
+			});
 		});
 
 		//Loop over all other input from the user, setting all entries that are not part of controlNames
@@ -2110,6 +2531,13 @@ AlgaPattern : AlgaNode {
 					patternPairs = patternPairs.add(\algaOut).add(parsedOut); //can't use \out
 					foundOut = true;
 				});
+				isAlgaParam = true;
+			});
+
+			//Add all the possible \freq keys
+			if(this.isFreqParam(paramName), {
+				//This will add the param to the latest uniqueID used by \freq
+				newInterpStreams.addFreqParam(value, paramName);
 				isAlgaParam = true;
 			});
 
@@ -2376,7 +2804,21 @@ AlgaPattern : AlgaNode {
 				value.list[i] = result;
 			});
 			^value;
+		}
+
+		//Array
+		{ value.isArray } {
+			value.do({ | entry, i |
+				var result = this.parseFX(entry, functionSynthDefDict);
+				if(result == nil, { ^nil });
+				value[i] = result;
+			});
+			^value;
 		};
+
+		//Fallback
+		("AlgaPattern: invalid Class for the 'fx' entry: '" ++ value.class.asString ++ "'").error;
+		^nil;
 	}
 
 	//Parse a single \out event
@@ -2440,10 +2882,22 @@ AlgaPattern : AlgaNode {
 			});
 			^value.algaAsStream; //return the Stream
 		}
+		{ value.isArray } {
+			value.do({ | entry, i |
+				var result = this.parseOut(entry, alreadyParsed);
+				if(result == nil, { ^nil });
+				value[i] = result;
+			});
+			^value;
+		}
 		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
 		{ value.isSymbol } {
 			^value
 		};
+
+		//Fallback
+		("AlgaPattern: invalid Class for the 'out' entry: '" ++ value.class.asString ++ "'").error;
+		^nil;
 	}
 
 	//Parse a ListPattern
@@ -2496,7 +2950,7 @@ AlgaPattern : AlgaNode {
 			def,
 			outsMapping: outsMapping,
 			sampleAccurate: true
-		).synthDef; //Ignore AlgaSynthDefSpec
+		); //Important: it returns AlgaSynthDefSpec (for pattern_out)
 
 		//Return the Symbol
 		^defName
@@ -2656,7 +3110,9 @@ AlgaPattern : AlgaNode {
 	//<<, <<+ and <|
 	makeConnectionInner { | param = \in, sender, senderChansMapping, scale, sampleAndHold, time = 0 |
 		var isDefault = false;
+		var isFreqParam = this.isFreqParam(param);
 		var paramConnectionTime = paramsConnectionTime[param];
+		var controlName;
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
@@ -2681,28 +3137,50 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Check parameter in controlNames
-		if(this.checkParamExists(param).not, {
+		if((isFreqParam).not.and(this.checkParamExists(param).not), {
 			("AlgaPattern: '" ++ param ++ "' is not a valid parameter, it is not defined in the 'def'.").error;
 			^this
 		});
 
 		//Add scaling to Dicts
-		if(scale != nil, { this.addScaling(param, sender, scale) });
+		if(scale != nil, { if(isFreqParam.not, { this.addScaling(param, sender, scale) }) });
+
+		//Check which controlName to retrieve
+		if(isFreqParam.not, {
+			//If not freq param, get the actual controlName at param
+			controlName = controlNames[param];
+		}, {
+			//If freq param, use controlName[\freq]
+			controlName = controlNames[\freq];
+		});
+
+		//Check validity again
+		if(controlName == nil, {
+			("AlgaPattern: '" ++ param ++ "' is not a valid parameter, it is not defined in the 'def'.").error;
+			^this
+		});
 
 		//Add to interpStreams (which also creates interpBus / interpSynth)
 		interpStreams.add(
 			entry: sender,
-			controlName: controlNames[param],
+			controlName: controlName,
 			chans: senderChansMapping,
 			scale: scale,
 			sampleAndHold: sampleAndHold,
+			useCurrentFreqEntry: isFreqParam, //ESSENTIAL! use current entry for \freq
 			time: time
 		);
+
+		//Add the \freq param
+		if(isFreqParam, { interpStreams.addFreqParam(sender, param) });
 	}
 
 	//<<, <<+ and <|
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, sampleAndHold, time, sched |
+
+		//Mostly needed for \freq stuff
+		var realParam = param;
 
 		//Default to false
 		sampleAndHold = sampleAndHold ? false;
@@ -2718,10 +3196,15 @@ AlgaPattern : AlgaNode {
 			^this.interpolateBuffer(sender, param, time, sched)
 		});
 
+		//Use \freq if it's a freq param to check intantiated
+		if(this.isFreqParam(param), {
+			realParam = \freq
+		});
+
 		//All other cases
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			scheduler.addAction(
-				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
+				condition: { (this.algaInstantiatedAsReceiver(realParam, sender, false)).and(sender.algaInstantiatedAsSender) },
 				func: {
 					this.makeConnectionInner(
 						param: param,
@@ -2769,7 +3252,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Param is not in controlNames. Probably setting another kind of parameter (like \lag)
-		if(controlNames[param] == nil, {
+		if(this.isFreqParam(param).not.and(controlNames[param] == nil), {
 			^this.interpolateGenericParam(sender, param, time, sched);
 		});
 
