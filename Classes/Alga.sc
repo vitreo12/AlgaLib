@@ -18,6 +18,7 @@ Alga {
 	classvar <schedulers;
 	classvar <servers;
 	classvar <clocks;
+	classvar <oldSynthDefDir;
 
 	*initSynthDefs {
 		AlgaStartup.initSynthDefs;
@@ -27,6 +28,9 @@ Alga {
 		servers = IdentityDictionary(1);
 		schedulers = IdentityDictionary(1);
 		clocks = IdentityDictionary(1);
+
+		//Make sure to reset it
+		"SC_SYNTHDEF_PATH".unsetenv;
 	}
 
 	*maxIO {
@@ -35,6 +39,15 @@ Alga {
 
 	*maxIO_ { | value |
 		AlgaStartup.algaMaxIO = value
+	}
+
+	*setAlgaSynthDefsDir {
+		oldSynthDefDir = "SC_SYNTHDEF_PATH".getenv;
+		"SC_SYNTHDEF_PATH".setenv(AlgaStartup.algaSynthDefPath);
+	}
+
+	*restoreSynthDefsDir {
+		"SC_SYNTHDEF_PATH".setenv(oldSynthDefDir);
 	}
 
 	*newServer { | server |
@@ -123,11 +136,14 @@ Alga {
 		server.options.protocol = algaServerOptions.protocol;
 		server.latency = algaServerOptions.latency;
 
-		//Check AlgaSynthDef folder exists...
-		if(File.exists(AlgaStartup.algaSynthDefIOPath) == false, {
-			("Could not retrieve the correct AlgaSyntDef/IO folder. Running 'Alga.initSynthDefs' now...").warn;
+		//Check AlgaSynthDef/IO folder exists...
+		if(File.exists(AlgaStartup.algaSynthDefIO_numberPath) == false, {
+			("Could not retrieve the correct 'AlgaSyntDefs/IO_...' folder. Running 'Alga.initSynthDefs' now...").warn;
 			this.initSynthDefs;
 		});
+
+		//Use AlgaSynthDefs as folder for SynthDefs
+		this.setAlgaSynthDefsDir;
 
 		//Add to SynthDescLib in order for SynthDef.add to work
 		SynthDescLib.global.addServer(server);
@@ -159,6 +175,16 @@ Alga {
 				//Execute onBoot function
 				onBoot.value;
 			});
+		});
+	}
+
+	*quit { | onQuit, server |
+		var prevServerQuit = [false]; //pass by reference: use Array
+		this.clearScheduler(server);
+		this.clearServer(server, prevServerQuit);
+		this.restoreSynthDefsDir;
+		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
+			onQuit.value;
 		});
 	}
 }
