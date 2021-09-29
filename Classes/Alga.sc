@@ -180,6 +180,7 @@ Alga {
 
 	*quit { | onQuit, server |
 		var prevServerQuit = [false]; //pass by reference: use Array
+		server = server ? Server.default;
 		this.clearScheduler(server);
 		this.clearServer(server, prevServerQuit);
 		this.restoreSynthDefsDir;
