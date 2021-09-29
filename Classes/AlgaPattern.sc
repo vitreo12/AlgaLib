@@ -122,26 +122,29 @@ AlgaPatternInterpStreams {
 		//It's essential that this is scheduled at the bottom of the Clock.
 		//This allows this action to always be executed AFTER the pattern triggers.
 		clock.algaSchedAtQuantOnce(
-			quant: 0, //RIGHT NOW, at the bottom of the stack (after all eventual pattern triggers)
+			quant: 0, //RIGHT NOW, at the bottom of the TempoClock stack (after all eventual pattern triggers)
 			task: {
+				//The scale and chans of the interpStream
 				var scaleArraysAndChansAtParam = scaleArraysAndChans[paramName];
 
-				//These belong to the latest patternSynth
-				var latestPatternInterpSumBus = algaPattern.latestPatternInterpSumBusses[paramName];
+				//These belong to the latest patternSynth created. Since the action was executed with
+				//top priority, the latest bus will be the one created by the latest patternSynth.
+				//This will then be used to write to if scheduling happens mid-pattern.
+				var latestPatternInterpSumBusAtParam = algaPattern.latestPatternInterpSumBusses[paramName];
 				var latestPatternTime = algaPattern.latestPatternTime;
 
 				//These belong to all active patternSynths
-				var patternBussesAndSynths = algaPattern.currentPatternBussesAndSynths[latestPatternInterpSumBus];
+				var patternBussesAndSynths = algaPattern.currentPatternBussesAndSynths[latestPatternInterpSumBusAtParam];
 				var activePatternInterpSumBusses = algaPattern.currentActivePatternInterpSumBusses;
 
 				//FUNDAMENTAL:
 				//Only schedule if the same pattern HAS NOT been triggered at this very time.
-				//This solves sched:1 issues!
+				//This solves all scheduling issues, and allows schedule times that are not in sync to work
 				if(latestPatternTime != clock.seconds, {
-					if((latestPatternInterpSumBus != nil).and(patternBussesAndSynths != nil), {
+					if((latestPatternInterpSumBusAtParam != nil).and(patternBussesAndSynths != nil), {
 						//FUNDAMENTAL: check that the bus is still actually valid and hasn't been freed yet.
 						//In case it's been freed, it means the synths have already been freed
-						if(latestPatternInterpSumBus.bus != nil, {
+						if(latestPatternInterpSumBusAtParam.bus != nil, {
 							algaPattern.createPatternParamSynth(
 								entry: entry,
 								uniqueID: uniqueID,
@@ -149,12 +152,13 @@ AlgaPatternInterpStreams {
 								paramNumChannels: paramNumChannels,
 								paramRate: paramRate,
 								paramDefault: paramDefault,
-								patternInterpSumBus: latestPatternInterpSumBus,
+								patternInterpSumBus: latestPatternInterpSumBusAtParam,
 								patternBussesAndSynths: patternBussesAndSynths,
 								scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
 								sampleAndHold: false,
 								algaPatternInterpStreams: this,
-								isTemporary: true
+								isTemporary: true,
+								storeLatestEntry: true //latestEntry will then be this one!
 							)
 						});
 					});
@@ -165,12 +169,14 @@ AlgaPatternInterpStreams {
 					var activePatternInterpSumBussesAtParam = activePatternInterpSumBusses[paramName];
 					if(activePatternInterpSumBussesAtParam != nil, {
 						activePatternInterpSumBussesAtParam.do({ | patternInterpBusAtParam |
-							//Don't do it for the patternInterpBus that's just been done!
-							if(patternInterpBusAtParam != latestPatternInterpSumBus, {
+							//Don't do it for the patternInterpBusAtParam that's just been created!
+							if(patternInterpBusAtParam != latestPatternInterpSumBusAtParam, {
 								if(patternInterpBusAtParam.bus != nil, {
 									if(algaPattern.interpolateAllActiveSynths.not, {
 										//If interpolateAllActiveSynths == false, simply "stop" the envelopes
-										//of all active patternSynths.
+										//of all active patternSynths. This allows them to be kept alive even though
+										//the interpSynth might have been freed meanwhile. This will "freeze" the
+										//interpolation of running patternSynths.
 										var currentActivePatternSynthsAtInterpBus =
 										algaPattern.currentActivePatternParamSynths[patternInterpBusAtParam];
 										if(currentActivePatternSynthsAtInterpBus != nil, {
