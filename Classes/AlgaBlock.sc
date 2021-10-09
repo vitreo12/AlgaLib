@@ -49,6 +49,12 @@ AlgaBlock {
 	}
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
+		//Unpack AlgaArg
+		if(node.isAlgaArg, {
+			node = node.sender;
+			if(node.isAlgaNode.not, { ^nil });
+		});
+
 		//Add to dict
 		nodesDict.put(node, node);
 
@@ -88,7 +94,7 @@ AlgaBlock {
 
 	rearrangeBlock {
 		//ordered collection
-		orderedArray = Array.newClear(nodesDict.size);
+		orderedArray = Array.new;
 
 		//Find the nodes with no outNodes (so, the last ones in the chain!), and init the statesDict
 		this.findBottomMostOutNodesAndInitStatesDict;
@@ -98,7 +104,7 @@ AlgaBlock {
 
 		//Store the rearranging results in this.orderedArray
 		bottomOutNodes.do({ | node |
-			this.rearrangeBlockLoop(node, node);
+			this.rearrangeBlockLoop(node);
 		});
 
 		this.sanitizeArray;
@@ -125,23 +131,30 @@ AlgaBlock {
 		this.sanitizeDict;
 	}
 
-	//Remove nil entries or ones that do not have any in our out connections
+	//Remove nil entries or ones that do not have any in or out connections
 	sanitizeArray {
 		orderedArray.removeAllSuchThat({ | item |
-			var removeCondition;
+			var removeCondition = false;
 
 			//If nil, remove entry anyway. Otherwise, look for the other cases.
 			if(item == nil, {
 				removeCondition = true;
 			}, {
+				removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0);
+
 				if(item.patternOutNodes != nil, {
-					removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0);
-				}, {
-					removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0).and(item.patternOutNodes == 0);
+					removeCondition = removeCondition.and(item.patternOutNodes.size == 0);
+				});
+
+				//Check that the current item is not used for patternOut of other nodes
+				nodesDict.do({ | algaNode |
+					if(algaNode.isAlgaNode, {
+						removeCondition = removeCondition.and(
+							algaNode.isContainedInPatternOut(item).not
+						);
+					});
 				});
 			});
-
-			//removeCondition.postln;
 
 			removeCondition;
 		});
@@ -184,7 +197,10 @@ AlgaBlock {
 
 	//Have something to automatically remove Nodes that haven't been touched from the dict
 	rearrangeBlockLoop { | node |
-		if(node != nil, {
+		//Unpack AlgaArg if needed
+		if(node.isAlgaArg, { node = node.sender });
+
+		if(node.isAlgaNode, {
 			var nodeState = statesDict[node];
 
 			//If for any reason the node wasn't already in the nodesDict, add it
@@ -211,11 +227,8 @@ AlgaBlock {
 					});
 				});
 
-				//Add this
-				orderedArray[runningIndex] = node;
-
-				//Advance counter
-				runningIndex = runningIndex + 1;
+				//Add node to orderedArray
+				orderedArray = orderedArray.add(node);
 			});
 		});
 	}
@@ -232,15 +245,18 @@ AlgaBlock {
 			});
 		}, {
 			nodesDict.do({ | node |
-				//Find the ones with no outNodes but at least one inNode
+				var inNodesCondition = (node.inNodes.size > 0);
+				var condition;
+
 				if(node.patternOutNodes != nil, {
-					if((node.outNodes.size == 0).and(node.inNodes.size > 0), {
-						bottomOutNodes.put(node, node);
-					});
-				}, {
-					if((node.outNodes.size == 0).and(node.inNodes.size > 0).and(node.patternOutNodes.size > 0), {
-						bottomOutNodes.put(node, node);
-					});
+					inNodesCondition = inNodesCondition.or(node.patternOutNodes.size > 0)
+				});
+
+				condition = (node.outNodes.size == 0).and(inNodesCondition);
+
+				//Find the ones with no outNodes but at least one inNode or patternOutNode
+				if(condition, {
+					bottomOutNodes.put(node, node);
 				});
 
 				//init statesDict for all nodes to false

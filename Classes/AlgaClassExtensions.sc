@@ -17,16 +17,18 @@
 +Object {
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
-	isAlgaPatternArg { ^false }
+	isAlgaArg { ^false }
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
 	isBuffer { ^false }
 	isPattern { ^false }
 	isStream { ^false }
+	isSymbol { ^false }
+	isEvent { ^false }
 	isListPattern { ^false }
 	isTempoClock { ^false }
 	def { ^nil }
-	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
+	isNumberOrArray { ^((this.isNumber).or(this.isArray)) }
 
 	//AlgaNode / AlgaPattern support
 	algaInstantiated { ^true }
@@ -51,6 +53,11 @@
 	}
 }
 
+//Essential for 'a16' busses not to be interpreted as an Array!
++String {
+	isNumberOrArray { ^false } //isArray would be true!!
+}
+
 //Fix lincurve with .ir arg
 +UGen {
 	algaLinCurve { arg inMin = 0, inMax = 1, outMin = 0, outMax = 1, curve = -4, clip = \minmax;
@@ -70,6 +77,16 @@
 			curvedResult
 		])
 	}
+}
+
+//Better than checking .class == Symbol
++Symbol {
+	isSymbol { ^true }
+}
+
+//Bettern than checking .class == Event
++Event {
+	isEvent { ^true }
 }
 
 //For Array lincurve
@@ -99,6 +116,9 @@
 
 	//Needed for scaleCurve (reduce code boilerplate)
 	clip { | min, max | ^nil }
+
+	//This avoids many problems when .clearing a node used in connections
+	busArg { ^nil }
 }
 
 +SynthDef {
@@ -215,14 +235,6 @@
 	isBuffer { ^true }
 }
 
-+SystemClock {
-	//If using a SystemClock in AlgaScheduler, just schedule as if quant is time
-	*algaSchedAtQuantOnce { | quant, task |
-		var taskOnce = { task.value; nil };
-		this.sched(quant, taskOnce)
-	}
-}
-
 +Clock {
 	algaSchedAtQuant { | quant, task |
 		if(this.isTempoClock, {
@@ -288,6 +300,21 @@
 			"Clock is not a TempoClock. Can't schedule with top priority".warn;
 			this.algaSched(when, taskOnce)
 		});
+	}
+}
+
++SystemClock {
+	//If using the SystemClock in AlgaScheduler, just schedule as if quant is time
+	*algaSchedAtQuantOnce { | quant, task |
+		var taskOnce = { task.value; nil };
+		this.sched(quant, taskOnce)
+	}
+
+	//If using the SystemClock in AlgaScheduler, just schedule as if quant is time
+	*algaSchedAtQuantOnceWithTopPriority { | quant, task |
+		var taskOnce = { task.value; nil };
+		"SystemClock is not a TempoClock. Can't schedule with top priority".warn;
+		this.sched(quant, taskOnce)
 	}
 }
 
