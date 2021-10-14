@@ -79,12 +79,10 @@ AlgaSynthDefSpec {
 		^synthDef.outsMapping
 	}
 
-	//This doesn't work actually
-	/*
+    //Everything else
 	doesNotUnderstand { | selector ...args |
-		^synthDef.perform(selector, args)
+		^synthDef.perform(selector, *args)
 	}
-	*/
 }
 
 //Hybrid between a normal SynthDef and a ProxySynthDef (makeFadeEnv).

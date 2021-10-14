@@ -1,7 +1,7 @@
 TITLE:: AlgaTemp
-summary:: Represents a temporary AlgaNode to be used for on-the-fly definitions of AlgaNodes' and AlgaPatterns' parameters
+summary:: Represents a temporary AlgaNode to be used for on-the-fly definitions of AlgaNodes' and AlgaPatterns' parameters.
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaArg
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaArg, Classes/AlgaOut
 
 
 DESCRIPTION::
