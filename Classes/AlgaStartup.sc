@@ -30,6 +30,8 @@ AlgaStartup {
 	classvar <algaSynthDefIOPath;
 	classvar <algaSynthDefIO_numberPath;
 
+	classvar percentageSplit;
+
 	*initClass {
 		algaSynthDefPath = File.realpath(Alga.class.filenameSymbol).dirname.withTrailingSlash ++ "../AlgaSynthDefs";
 		algaSynthDefIOPath = (algaSynthDefPath ++ "/IO");
@@ -61,6 +63,8 @@ AlgaStartup {
 			folderDeleted = File.deleteAll(algaSynthDefIOPath);
 		});
 
+		percentageSplit = 100.0 / algaMaxIO;
+
 		if(folderDeleted, {
 			var algaSynthDefFolderCreated = true;
 
@@ -75,13 +79,14 @@ AlgaStartup {
 					var algaSynthDefIO_numberFolderCreated = File.mkdir(algaSynthDefIO_numberPath);
 
 					if(algaSynthDefIO_numberFolderCreated, {
-						("-> Generating all Alga SynthDefs for a max of " ++ algaMaxIO ++ " I/O count, it may take a while...").postln;
+						("\n-> Generating all Alga SynthDefs for a max of " ++ algaMaxIO ++ " I/O count, it may take a while...").postln;
+
 						this.initAlgaPlay;
 						this.initAlgaInterp;
 						this.initAlgaNorm;
 						this.initAlgaMixFades;
 						this.initAlgaPatternInterp;
-						"-> Done!".postln;
+						"\n-> Done!".postln;
 					}, {
 						("Could not create path: " ++ algaSynthDefIO_numberPath).error;
 					});
@@ -100,8 +105,17 @@ AlgaStartup {
 
 		var alreadyDonePairs = IdentityDictionary.new;
 
+		var percentageCounter = 0.0;
+
+		"\n(1/5) Generating the alga_play definitions...".postln;
+
 		algaMaxIO.do({ | i |
 			var arrayOfZeros_in, arrayOfIndices;
+
+			var innerPercentageSplit = percentageSplit / algaMaxIO;
+
+			(percentageCounter.asStringPrec(2) ++ " %").postln;
+			percentageCounter = percentageCounter + percentageSplit;
 
 			i = i + 1;
 
@@ -158,11 +172,18 @@ Limiter.ar(input) * AlgaEnvGate.kr
 				});
 			});
 		});
+
+		("100 %").postln;
 	}
 
 	*initAlgaInterp {
 
 		var alreadyDonePairs = IdentityDictionary.new(algaMaxIO);
+
+		var exponentialPercentageSplit = 100.0 / (algaMaxIO * algaMaxIO);
+		var percentageCounter = 0.0;
+
+		"\n(2/5) Generating the alga_interp definitions (this step takes the longest time)...".postln;
 
 		//var file = File("~/AlgaSynthDefsTest.scd".standardizePath,"w");
 
@@ -191,6 +212,13 @@ Limiter.ar(input) * AlgaEnvGate.kr
 				var arrayOfIndices;
 				var arrayOfMinusOnes, arrayOfOnes;
 				var currentPair, isAlreadyDone;
+
+				if(percentageCounter < 10, {
+					(percentageCounter.asStringPrec(1) ++ " %").postln;
+				}, {
+					(percentageCounter.asStringPrec(2) ++ " %").postln;
+				});
+				percentageCounter = percentageCounter + exponentialPercentageSplit;
 
 				y = y + 1;
 
@@ -382,17 +410,24 @@ out = out * env;
 				});
 
 			});
-
 		});
 
+		("100 %").postln;
 		//file.close; Document.open("~/AlgaSynthDefsTest.scd".standardizePath);
 	}
 
 	*initAlgaNorm {
+		var percentageCounter = 0.0;
+
+		"\n(3/5) Generating the alga_norm definitions...".postln;
+
 		algaMaxIO.do({ | i |
 
 			var result_audio, result_control;
 			var arrayOfZeros = "[";
+
+			(percentageCounter.asStringPrec(2) ++ " %").postln;
+			percentageCounter = percentageCounter + percentageSplit;
 
 			i = i + 1;
 
@@ -450,13 +485,22 @@ out;
 			//result_control.postln;
 
 		});
+
+		("100 %").postln;
 	}
 
 	*initAlgaMixFades {
+		var percentageCounter = 0.0;
+
+		"\n(4/5) Generating the alga_fadeIn / alga_fadeOut definitions...".postln;
+
 		algaMaxIO.do({ | i |
 			var fadein_kr, fadein_ar;
 			var fadeout_kr, fadeout_ar;
 			var fade_patternOutEnv_kr, fade_patternOutEnv_ar;
+
+			(percentageCounter.asStringPrec(2) ++ " %").postln;
+			percentageCounter = percentageCounter + percentageSplit;
 
 			i = i + 1;
 
@@ -527,10 +571,16 @@ val[" ++ i ++ "] = env;
 			fade_patternOutEnv_kr.interpret;
 			fade_patternOutEnv_ar.interpret;
 		});
+
+		("100 %").postln;
 	}
 
 	*initAlgaPatternInterp {
-		var result = "
+		var result;
+
+		"\n(5/5) Generating the alga_pattern_interp definitions...".postln;
+
+		result = "
 AlgaSynthDef.new_inner(\\alga_pattern_interp_env_audio, {
 AlgaDynamicEnvGate.ar(\\t_release.tr(0), \\fadeTime.kr(0));
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);
@@ -540,5 +590,7 @@ AlgaDynamicEnvGate.kr(\\t_release.tr(0), \\fadeTime.kr(0));
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);
 ";
 		result.interpret;
+
+		("100 %").postln;
 	}
 }
