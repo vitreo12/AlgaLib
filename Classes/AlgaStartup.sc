@@ -79,7 +79,7 @@ AlgaStartup {
 					var algaSynthDefIO_numberFolderCreated = File.mkdir(algaSynthDefIO_numberPath);
 
 					if(algaSynthDefIO_numberFolderCreated, {
-						("\n-> Generating all Alga SynthDefs for a max of " ++ algaMaxIO ++ " I/O count, it may take a while...").postln;
+						("\n-> Generating all Alga definitions for a maximum of " ++ algaMaxIO ++ " I/O count, it may take a while...").postln;
 
 						this.initAlgaPlay;
 						this.initAlgaInterp;
