@@ -18,7 +18,7 @@ Alga {
 	classvar <schedulers;
 	classvar <servers;
 	classvar <clocks;
-	classvar <oldSynthDefDir;
+	classvar <oldSynthDefsDir;
 
 	*initSynthDefs {
 		AlgaStartup.initSynthDefs;
@@ -42,12 +42,12 @@ Alga {
 	}
 
 	*setAlgaSynthDefsDir {
-		oldSynthDefDir = "SC_SYNTHDEF_PATH".getenv;
+		oldSynthDefsDir = "SC_SYNTHDEF_PATH".getenv;
 		"SC_SYNTHDEF_PATH".setenv(AlgaStartup.algaSynthDefPath);
 	}
 
 	*restoreSynthDefsDir {
-		"SC_SYNTHDEF_PATH".setenv(oldSynthDefDir);
+		"SC_SYNTHDEF_PATH".setenv(oldSynthDefsDir);
 	}
 
 	*newServer { | server |
@@ -133,7 +133,7 @@ Alga {
 		if(algaServerOptions.supernova, { Server.supernova }, { Server.scsynth });
 		server.options.threads = algaServerOptions.supernovaThreads;
 		server.options.useSystemClock = algaServerOptions.supernovaUseSystemClock;
-		server.options.protocol = algaServerOptions.protocol;
+		server.options.protocol = algaServerOptions.protocol ? \tcp;
 		server.latency = algaServerOptions.latency;
 
 		//Check AlgaSynthDef/IO folder exists...

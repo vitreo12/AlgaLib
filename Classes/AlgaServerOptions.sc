@@ -18,25 +18,25 @@ AlgaServerOptions {
 	var <>sampleRate, <>blockSize, <>memSize, <>numBuffers;
 	var <>numAudioBusChannels, <>numControlBusChannels, <>maxNodes;
 	var <>maxSynthDefs, <>numWireBufs, <>numInputBusChannels, <>numOutputBusChannels;
-	var <>supernova, <>supernovaThreads, <>supernovaUseSystemClock, <>protocol, <>latency;
+	var <>supernova, <>supernovaThreads, <>supernovaUseSystemClock, protocol = \tcp, <>latency;
 
 	*new { | sampleRate, blockSize, numInputBusChannels, numOutputBusChannels,
 		memSize=524288, numAudioBusChannels=24576, numControlBusChannels=24576,
 		numBuffers=24576, maxNodes=32768, maxSynthDefs=32768, numWireBufs=32768,
-		supernova=false, supernovaThreads, supernovaUseSystemClock=true, protocol = \tcp, latency |
+		supernova=false, supernovaThreads, supernovaUseSystemClock=true, latency |
 
 		^super.new.init(
 			sampleRate, blockSize, numInputBusChannels, numOutputBusChannels,
 			memSize, numAudioBusChannels, numControlBusChannels,
 			numBuffers, maxNodes, maxSynthDefs, numWireBufs,
-			supernova, supernovaThreads, supernovaUseSystemClock, protocol, latency
+			supernova, supernovaThreads, supernovaUseSystemClock, latency
 		);
 	}
 
 	init { | argSampleRate, argBlockSize, argNumInputBusChannels, argNumOutputBusChannels,
 		argMemSize=524288, argNumAudioBusChannels=24576, argNumControlBusChannels=24576,
 		argNumBuffers=24576, argMaxNodes=32768, argMaxSynthDefs=32768, argNumWireBufs=32768,
-		argSupernova=false, argSupernovaThreads, argSupernovaUseSystemClock=true, argProtocol = \tcp, argLatency |
+		argSupernova=false, argSupernovaThreads, argSupernovaUseSystemClock=true, argLatency |
 
 		sampleRate = argSampleRate ? Server.default.options.sampleRate;
 		blockSize = argBlockSize ? Server.default.options.blockSize;
@@ -52,7 +52,6 @@ AlgaServerOptions {
 		supernova = argSupernova;
 		supernovaThreads = argSupernovaThreads ? Server.default.options.threads;
 		supernovaUseSystemClock = argSupernovaUseSystemClock;
-		protocol = argProtocol;
 		latency = argLatency ? Server.default.latency;
 	}
 }

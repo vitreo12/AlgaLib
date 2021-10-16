@@ -214,8 +214,7 @@ Shortcut for emphasis::reset::.
 
 EXAMPLES::
 code::
-//Boot Alga. The first time it's booted, it will take some time
-//as it needs to generate various AlgaSynthDefs that are essential for the system to work.
+//Boot Alga and declare an AlgaSynthDef
 (
 Alga.boot({
 	AlgaSynthDef(\mySineOsc, {
