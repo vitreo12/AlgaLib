@@ -3504,6 +3504,7 @@ AlgaNode {
 	replaceInner { | def, args, time, outsMapping, reset, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
+		var argTime = time;
 		var wasPlaying = false;
 
 		//Re-init groups if clear was used or toBeCleared
@@ -3537,7 +3538,7 @@ AlgaNode {
 
 		//If it was playing, free previous playSynth
 		if(isPlaying, {
-			this.stopInner(replace: true);
+			this.stopInner(time: argTime, replace: true); //Fade out with argTime?
 			wasPlaying = true;
 		});
 
@@ -3577,7 +3578,7 @@ AlgaNode {
 
 		//If node was playing, or .replace has been called while .stop / .clear, play again
 		if(wasPlaying/*.or(beingStopped)*/, {
-			this.playInner(replace: true)
+			this.playInner(time: argTime, replace: true) //Fade in with argTime?
 		});
 
 		//Reset flag

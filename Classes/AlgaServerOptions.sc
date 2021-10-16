@@ -18,7 +18,7 @@ AlgaServerOptions {
 	var <>sampleRate, <>blockSize, <>memSize, <>numBuffers;
 	var <>numAudioBusChannels, <>numControlBusChannels, <>maxNodes;
 	var <>maxSynthDefs, <>numWireBufs, <>numInputBusChannels, <>numOutputBusChannels;
-	var <>supernova, <>supernovaThreads, <>supernovaUseSystemClock, protocol = \tcp, <>latency;
+	var <>supernova, <>supernovaThreads, <>supernovaUseSystemClock, <protocol = \tcp, <>latency;
 
 	*new { | sampleRate, blockSize, numInputBusChannels, numOutputBusChannels,
 		memSize=524288, numAudioBusChannels=24576, numControlBusChannels=24576,

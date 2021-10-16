@@ -1,11 +1,11 @@
 TITLE:: AlgaPattern
-summary:: Alga module representing repeatable instances of sonic processes
+summary:: Alga module representing multiple instances of sonic processes
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaArg, Classes/AlgaTemp
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut
 
 
 DESCRIPTION::
-
+An link::Classes/AlgaPattern:: is the
 
 CLASSMETHODS::
 

@@ -1038,8 +1038,6 @@ AlgaPattern : AlgaNode {
 			validParam = true;
 		};
 
-		entry.asString.error;
-
 		if(validParam, {
 			//Get the bus where interpolation envelope is written to...
 			//REMEMBER that for AlgaPattern, interpSynths are actually JUST the
