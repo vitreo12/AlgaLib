@@ -16,7 +16,7 @@ ARGUMENT:: func
 Same as link::Classes/SynthDef::, with two caveats.
 NUMBEREDLIST::
 ## The function should end with a link::Classes/UGen:: or an link::Classes/Array:: of link::Classes/UGen::s. Unlike link::Classes/SynthDef::, an link::Classes/Out:: (or link::Classes/OffsetOut::, depending on the emphasis::sampleAccurate:: value) link::Classes/UGen:: will automatically be created according to the number of channels of the last element of the function.
-## The function must not use the code::\gate::, code::\fadeTime:: and code::\out:: arguments, as they are declared and used internally.
+## The function must not use the code::\gate:: and code::\out:: arguments, as they are declared and used internally.
 ::
 Basically, the function should only describe the actual link::Classes/UGen:: graph.
 ARGUMENT:: rates
@@ -31,10 +31,12 @@ code::
 // \three will have 1 channel, [2]
 // \four will have 1 channel,  [3]
 // \five will have 1 channel,  [0]
+(
 a = AlgaSynthDef(\fourSines,
 	{ SinOsc.ar([220, 440, 880, 1760]) },
 	outsMapping: [\one, [0, 1], \two, [2, 3], \three, 2, \four, 3, \five, 0]
 ).add;
+)
 
 //All the mappings are stored in an IdentityDictionary.
 a.outsMapping.postln;
