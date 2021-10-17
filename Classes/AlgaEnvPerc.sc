@@ -16,12 +16,12 @@
 
 //AlgaEnvPerc
 AlgaEnvPerc {
-	*ar { | attackTime = 0, releaseTime = 1, curve='sin' |
-		^EnvGen.ar(Env.perc(attackTime, releaseTime, 1.0, curve), doneAction: 2)
+	*ar { | attack = 0, release = 1, curve='sin' |
+		^EnvGen.ar(Env.perc(attack, release, 1.0, curve), doneAction: 2)
 	}
 
-	*kr { | attackTime = 0, releaseTime = 1, curve='sin' |
-		^EnvGen.kr(Env.perc(attackTime, releaseTime, 1.0, curve), doneAction: 2)
+	*kr { | attack = 0, release = 1, curve='sin' |
+		^EnvGen.kr(Env.perc(attack, release, 1.0, curve), doneAction: 2)
 	}
 }
 

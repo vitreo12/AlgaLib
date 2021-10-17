@@ -2988,7 +2988,7 @@ AlgaPattern : AlgaNode {
 			controlName: controlNames[param],
 			chans: senderChansMapping,
 			scale: scale,
-			sampleAndHold: sampleAndHold
+			sampleAndHold: sampleAndHold,
 			time: time
 		);
 	}

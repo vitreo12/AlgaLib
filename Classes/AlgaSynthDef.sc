@@ -177,8 +177,7 @@ AlgaSynthDef : SynthDef {
 				});
 
 				if(error, {
-					("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally.").error;
-					^nil
+					Error("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally.").throw;
 				});
 			});
 
@@ -186,8 +185,7 @@ AlgaSynthDef : SynthDef {
 			if(ignoreOutWarning.not, {
 				buildSynthDef.children.do({ | ugen |
 					if(ugen.isKindOf(AbstractOut), {
-						"AlgaSynthDef: Out / OffsetOut cannot be explicitly set. They are declared internally.".error;
-						^nil;
+						Error("AlgaSynthDef: Out / OffsetOut cannot be explicitly set. They are declared internally.").throw;
 					});
 				});
 			});
