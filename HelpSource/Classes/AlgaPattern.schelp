@@ -5,9 +5,34 @@ related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaArg,
 
 
 DESCRIPTION::
-An link::Classes/AlgaPattern:: is the polyphonic counterpart of an link::Classes/AlgaNode::.
+An link::Classes/AlgaPattern:: is the polyphonic counterpart of an link::Classes/AlgaNode::. All the basic concepts that define link::Classes/AlgaNode::s also apply to link::Classes/AlgaPattern::s. However, link::Classes/AlgaPattern::s also support link::Classes/Pattern::s as modifiers for their parameters.
+
 
 CLASSMETHODS::
+
+
+METHOD:: new
+Create a new link::Classes/AlgaPattern::.
+ARGUMENT:: def
+Mandatory argument. It accepts either a emphasis::UGen function::, a symbol to lookup a defined link::Classes/AlgaSynthDef:: or an link::Classes/Event:: describing the pattern.
+ARGUMENT:: connectionTime
+Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaPattern::.
+ARGUMENT:: playTime
+Specify the fading in / fading out time that it takes for this link::Classes/AlgaPattern:: to play through speakers. These values are applied when calling the emphasis::play:: or emphasis::stop:: functions.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaPattern:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+ARGUMENT:: server
+Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaPattern:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
+
+code::
+Alga.boot({
+	a = AlgaPattern((
+		def: { SinOsc.ar(\freq.kr(440)) * EnvGen.kr(Env.perc(releaseTime:0.2), doneAction:2) },
+		freq: Pwhite(440, 880),
+		dur: 0.5
+	)).play;
+});
+::
 
 
 INSTANCEMETHODS::
