@@ -5,7 +5,7 @@ related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaArg,
 
 
 DESCRIPTION::
-An link::Classes/AlgaPattern:: is the
+An link::Classes/AlgaPattern:: is the polyphonic counterpart of an link::Classes/AlgaNode::.
 
 CLASSMETHODS::
 
