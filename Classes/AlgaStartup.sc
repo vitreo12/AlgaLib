@@ -53,7 +53,7 @@ AlgaStartup {
 	}
 
 	*updateAlgaSynthDefIOPath {
-		algaSynthDefIOPath = (algaSynthDefIOPath ++ "/IO_" ++ algaMaxIO ++ "/").asString;
+		algaSynthDefIO_numberPath = (algaSynthDefIOPath ++ "/IO_" ++ algaMaxIO ++ "/").asString;
 	}
 
 	*initSynthDefs {
