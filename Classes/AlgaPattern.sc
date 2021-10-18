@@ -661,6 +661,9 @@ AlgaPattern : AlgaNode {
 	//Needed to store current generic params
 	var <currentGenericParams;
 
+	//Skip an iteration
+	var skipIteration = false;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -1036,6 +1039,14 @@ AlgaPattern : AlgaNode {
 			("AlgaPattern: trying to set 'nil' for param '" ++ paramName ++
 				"'. Using default value " ++ paramDefault.asString ++" instead").error;
 			validParam = true;
+		}
+
+		//Symbol: skip iteration
+		{ entry.isSymbol } {
+			if(isFX.not, {
+				skipIteration = true;
+				^this;
+			});
 		};
 
 		if(validParam, {
@@ -1515,6 +1526,9 @@ AlgaPattern : AlgaNode {
 		var validFX = false;
 		var validOut = false;
 
+		//The final free func
+		var onPatternSynthFreeFunc;
+
 		//Check if it's a ListPattern and retrieve correct controlNames
 		if(controlNamesList != nil, {
 			controlNamesToUse = controlNamesList[algaSynthDef];
@@ -1730,21 +1744,20 @@ AlgaPattern : AlgaNode {
 		});
 
 		//The actual patternSynth according to the user's def
-		patternSynth = AlgaSynth(
-			algaSynthDef,
-			patternSynthArgs,
-			synthGroup,
-			waitForInst: false
-		);
+		if(skipIteration.not, {
+			patternSynth = AlgaSynth(
+				algaSynthDef,
+				patternSynthArgs,
+				synthGroup,
+				waitForInst: false
+			);
 
-		//Add pattern synth to algaPatternSynths, and free it when patternSynth gets freed
-		algaPatternInterpStreams.algaPatternSynths.add(patternSynth);
-
-		//Update latest time
-		latestPatternTime = this.clock.seconds;
+			//Add pattern synth to algaPatternSynths, and free it when patternSynth gets freed
+			algaPatternInterpStreams.algaPatternSynths.add(patternSynth);
+		});
 
 		//Free all normBusses, normSynths, interpBusses and interpSynths on patternSynth's release
-		patternSynth.onFree( {
+		onPatternSynthFreeFunc = {
 			//Free all Synths and Busses
 			patternBussesAndSynths.do({ | synthOrBus | synthOrBus.free });
 
@@ -1767,8 +1780,21 @@ AlgaPattern : AlgaNode {
 			//that no other synths will be using them. Also, this fixes the case where
 			//patternSynth takes longer than \dur. We want to wait for the end of patternSynth
 			//to free all used things!
-			this.freeUnusedInterpBusses(algaPatternInterpStreams, patternSynth);
+			this.freeUnusedInterpBusses(algaPatternInterpStreams);
+		};
+
+		//If not skipping, execute on patternSynth's free.
+		if(skipIteration.not, {
+			patternSynth.onFree(onPatternSynthFreeFunc)
+		}, {
+			onPatternSynthFreeFunc.value;
 		});
+
+		//Update latest time
+		latestPatternTime = this.clock.seconds;
+
+		//Reset
+		skipIteration = false;
 	}
 
 	//Calculate the MC mismatches and return a new array with all the correct settings.
