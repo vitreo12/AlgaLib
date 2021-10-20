@@ -17,7 +17,7 @@
 AlgaBus {
 	var <server;
 	var <bus;
-	var busArg; // cache for "/s_new" bus arg
+	var busArg;
 	var <rate = nil, <numChannels = 0;
 
 	*new { | server, numChannels = 1, rate = \audio |
@@ -50,12 +50,12 @@ AlgaBus {
 	}
 
 	//Define getter
-	busArg { ^busArg ?? { this.makeBusArg } }
+	busArg { ^(busArg ?? { this.makeBusArg }) }
 
 	//This allows multichannel bus to be used when patching them with .busArg !
 	makeBusArg {
 		var index, prefix;
-		if(bus == nil) { ^busArg = "" }; // still neutral
+		if(bus == nil) { ^busArg = nil }; // still neutral
 		prefix = if(rate == \audio) { "\a" } { "\c" };
 		index = bus.index;
 		^busArg = if(numChannels == 1) {
@@ -86,15 +86,15 @@ AlgaBus {
 }
 
 +Bus {
-	busArg {
-		^mapSymbol ?? {
-			if(index.isNil) { MethodError("bus not allocated.", this).throw };
-			mapSymbol = if(rate == \control) { "c" } { "a" };
-			if(numChannels == 1) {
-				mapSymbol = (mapSymbol ++ index).asSymbol;
-			} {
-				{ |i| mapSymbol ++ (index + i) }.dup(numChannels)
-			}
-		}
+	busArg { ^(mapSymbol ?? { this.makeBusArg }) }
+
+	makeBusArg {
+		mapSymbol = if(rate == \audio) { "\a" } { "\c" };
+		mapSymbol = if(numChannels == 1) {
+			mapSymbol ++ index
+		} {
+			{ |i| mapSymbol ++ (index + i) }.dup(numChannels)
+		};
+		^mapSymbol;
 	}
 }
