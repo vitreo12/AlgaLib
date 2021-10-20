@@ -502,8 +502,8 @@ AlgaArg {
 /*
 out: (
 Pseq([
-AlgaOut(a, \freq, scale:[20, 30], time:2),   <-- uses time: 2 also for the later 'b'
-AlgaOut(b, \freq, scale:[10, 50], time:3),
+AlgaOut(a, \freq, scale:[20, 30], time:2),   <-- uses time: 2 also for the later 'a'
+AlgaOut(b, \freq, scale:[10, 50], time:3),   <-- uses time: 3 also for the later 'b'
 b,
 a
 ], inf)
