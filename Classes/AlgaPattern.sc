@@ -1041,7 +1041,9 @@ AlgaPattern : AlgaNode {
 			validParam = true;
 		}
 
-		//Symbol: skip iteration
+		//Symbol (like, \skip or \rest): skip iteration.
+		//It's very important not to use Rest() here, as \dur will also pick it up, generating
+		//an actual double Rest(). Rest() should only be used in \dur / \delta.
 		{ entry.isSymbol } {
 			if(isFX.not, {
 				skipIteration = true;
