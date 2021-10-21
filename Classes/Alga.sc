@@ -107,6 +107,17 @@ Alga {
 		^clocks[server]
 	}
 
+	*checkAlgaAudioControl {
+		if(\AlgaAudioControl.asClass == nil, {
+			"\n************************************************\n".postln;
+			"AlgaAugioControl is not installed. Read the following instructions to install it:".warn;
+			"\n1) Download the AlgaAudioControl UGen from https://github.com/vitreo12/AlgaAudioControl/releases/tag/v0.0.1".postln;
+			"2) Unzip it to your 'Platform.userExtensionDir'".postln;
+			"\nThis UGen fixes some synchronization issues that may result in audio glitches for short enveloped sounds.\nAfter installing it, no further action is required: Alga will detect it and use it internally, and this message will not be shown again.\n".postln;
+			"************************************************\n".postln;
+		});
+	}
+
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
 
@@ -174,6 +185,9 @@ Alga {
 
 				//Execute onBoot function
 				onBoot.value;
+
+				//Check AlgaAudioControl so that it's printed after boot
+				this.checkAlgaAudioControl;
 			});
 		});
 	}
