@@ -664,6 +664,9 @@ AlgaPattern : AlgaNode {
 	//Skip an iteration
 	var skipIteration = false;
 
+	//Skip an iteration for FX
+	var skipIterationFX = false;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -1045,10 +1048,8 @@ AlgaPattern : AlgaNode {
 		//It's very important not to use Rest() here, as \dur will also pick it up, generating
 		//an actual double Rest(). Rest() should only be used in \dur / \delta.
 		{ entry.isSymbol } {
-			if(isFX.not, {
-				skipIteration = true;
-				^this;
-			});
+			if(isFX.not, { skipIteration = true }, { skipIterationFX = true });
+			^this;
 		};
 
 		if(validParam, {
@@ -1269,6 +1270,9 @@ AlgaPattern : AlgaNode {
 		//It uses numChannelsToUse and rateToUse, which are set accordingly to the \def specs
 		var patternBus = AlgaBus(server, numChannelsToUse, rateToUse);
 
+		//The final free func
+		var onFXSynthFreeFunc;
+
 		//Add patternBus to patternBussesAndSynthsFx
 		patternBussesAndSynthsFx.add(patternBus);
 
@@ -1390,50 +1394,63 @@ AlgaPattern : AlgaNode {
 		//The user's def
 		fxSynthSymbol = def;
 
-		//Create fxSynth, addToTail
-		fxSynth = AlgaSynth(
-			fxSynthSymbol,
-			fxSynthArgs,
-			synthGroup,
-			\addToTail,
-			false
-		);
-
-		//If not explicitFree, add fxSynth to the free mechanism.
-		//If explicitFree, it will handle it by itself
-		if(explicitFree.not, { patternBussesAndSynths.add(fxSynth) });
-
-		//FUNDAMENTAL: add fxSynth to the algaPatternSynths so that
-		//algaSynthBus is kept alive for the WHOLE duration of the fx too.
-		algaPatternInterpStreams.algaPatternSynths.add(fxSynth);
-
-		//If there was conversion, create the fxInterpSynth (needs to come after fxSynth !!!)
-		if(fxInterpSynthSymbol != nil, {
-			fxInterpSynth = AlgaSynth(
-				fxInterpSynthSymbol,
-				fxInterpSynthArgs,
+		//If not skipping the iteration
+		if(skipIterationFX.not, {
+			//Create fxSynth, \addToTail
+			fxSynth = AlgaSynth(
+				fxSynthSymbol,
+				fxSynthArgs,
 				synthGroup,
 				\addToTail,
 				false
 			);
 
-			//Add to patternBussesAndSynthsFx
-			patternBussesAndSynthsFx.add(fxInterpSynth);
+			//If not explicitFree, add fxSynth to the free mechanism.
+			//If explicitFree, it will handle it by itself
+			if(explicitFree.not, { patternBussesAndSynths.add(fxSynth) });
+
+			//FUNDAMENTAL: add fxSynth to the algaPatternSynths so that
+			//algaSynthBus is kept alive for the WHOLE duration of the fx too.
+			algaPatternInterpStreams.algaPatternSynths.add(fxSynth);
+
+			//If there was conversion, create the fxInterpSynth (needs to come after fxSynth !!!)
+			if(fxInterpSynthSymbol != nil, {
+				fxInterpSynth = AlgaSynth(
+					fxInterpSynthSymbol,
+					fxInterpSynthArgs,
+					synthGroup,
+					\addToTail,
+					false
+				);
+
+				//Add to patternBussesAndSynthsFx
+				patternBussesAndSynthsFx.add(fxInterpSynth);
+			});
 		});
 
 		//Free all relative synths / busses on fxSynth free.
-		//fxSynth is either freed by itself (if explicitFree),
-		//or when patternSynth is freed.
-		fxSynth.onFree({
+		//fxSynth is either freed by itself (if explicitFree) or when patternSynth is freed.
+		onFXSynthFreeFunc = {
 			//Free synths and busses
 			patternBussesAndSynthsFx.do({ | synthOrBus | synthOrBus.free });
 
 			//Remove fxSynth from algaPatternSynths
 			algaPatternInterpStreams.algaPatternSynths.remove(fxSynth);
+		};
+
+		//Check if skipping the iteration for FX
+		if(skipIterationFX.not, {
+			//Execute func on fxSynth's free
+			fxSynth.onFree(onFXSynthFreeFunc);
+
+			//Use patternBus as \out for patternSynth
+			patternSynthArgs = patternSynthArgs.add(\out).add(patternBus.index);
+		}, {
+			onFXSynthFreeFunc.value;
 		});
 
-		//Use patternBus as \out for patternSynth
-		patternSynthArgs = patternSynthArgs.add(\out).add(patternBus.index);
+		//Reset skipIterationFX
+		skipIterationFX = false;
 
 		//Return patternSynthArgs
 		^patternSynthArgs;
