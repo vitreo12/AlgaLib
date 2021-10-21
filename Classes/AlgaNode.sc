@@ -112,8 +112,8 @@ AlgaNode {
 	var <algaWasBeingCleared = false;
 	var <algaCleared = false;
 
-	*new { | def, args, connectionTime, playTime, sched, outsMapping, server |
-		^super.new.init(def, args, connectionTime, playTime, sched, outsMapping, server)
+	*new { | def, args, interpTime, playTime, sched, outsMapping, server |
+		^super.new.init(def, args, interpTime, playTime, sched, outsMapping, server)
 	}
 
 	initAllVariables { | argServer |
@@ -440,6 +440,12 @@ AlgaNode {
 
 	interpolationTime { ^connectionTime }
 
+	interpTime_ { | value |
+		this.connectionTime_(value)
+	}
+
+	interpTime { ^connectionTime }
+
 	it_ { | value |
 		this.connectionTime_(value)
 	}
@@ -463,6 +469,12 @@ AlgaNode {
 	}
 
 	paramInterpolationTime { | param | ^paramsConnectionTime[param] }
+
+	paramInterpTime_ { | param, value |
+		this.connectionTime_(value, param);
+	}
+
+	paramInterpTime { | param | ^paramsConnectionTime[param] }
 
 	pit_ { | param, value |
 		this.connectionTime_(value, param);

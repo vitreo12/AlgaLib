@@ -35,7 +35,7 @@ ARGUMENT:: def
 Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::.
 ARGUMENT:: args
 Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. These can be link::Classes/Number::s, link::Classes/Array::s, link::Classes/AlgaNode::s, link::Classes/AlgaTemp::s or link::Classes/AlgaArg::s.
-ARGUMENT:: connectionTime
+ARGUMENT:: interpTime
 Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaNode::.
 ARGUMENT:: playTime
 Specify the fading in / fading out time that it takes for this link::Classes/AlgaNode:: to play through speakers. These values are applied when calling the emphasis::play:: or emphasis::stop:: functions.
@@ -81,20 +81,20 @@ METHOD:: clear
 Clear the link::Classes/AlgaNode::, dropping all connections in place (with appropriate interpolation) as well as the output to speakers.
 
 
-METHOD:: connectionTime
+METHOD:: interpTime
 Specify a new time that the connections to any of the parameters will use to perform interpolations.
 
 
-METHOD:: ct
-Shortcut for emphasis::connectionTime::.
+METHOD:: it
+Shortcut for emphasis::interpTime::.
 
 
-method:: paramConnectionTime
+method:: paramInterpTime
 Specify a new time that the connections to the specific emphasis::param:: will use to perform interpolations.
 
 
-method:: pct
-Shortcut for emphasis::paramConnectionTime::.
+method:: pit
+Shortcut for emphasis::paramInterpTime::.
 
 
 METHOD:: playTime
@@ -110,7 +110,7 @@ Replace the current content of the link::Classes/AlgaNode::. This method also ta
 ARGUMENT:: def
 Mandatory argument. It accepts either a emphasis::UGen function:: or a symbol to lookup a defined link::Classes/AlgaSynthDef::.
 ARGUMENT:: args
-Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. Note that these will be applied in regards to emphasis::connectionTime::.
+Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. Note that these will be applied in regards to emphasis::interpTime::.
 ARGUMENT:: time
 Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
 ARGUMENT:: sched
@@ -224,7 +224,7 @@ Alga.boot({
 )
 
 //Declare a node and play to stereo output
-a = AlgaNode(\mySineOsc, connectionTime:2).play(chans:2);
+a = AlgaNode(\mySineOsc, interpTime:2).play(chans:2);
 
 //Change \freq parameter. Note how it interpolates to new value over 2 seconds
 a <<.freq 220;
@@ -240,7 +240,7 @@ a.from(b, \freq, scale: [100, 1000], time:5);
 c = AlgaNode(\mySineOsc, [\freq, 2]);
 
 //Also connect c to a's \freq, mixing with what was already there.
-//This will use a's connectionTime, 2
+//This will use a's interpTime, 2
 a.mixFrom(c, \freq, scale:[-100, 100]);
 
 //Clear over 3 seconds. Note how the interpolation will bring us back
@@ -260,8 +260,8 @@ subsection:: Simple feedback
 code::
 (
 Alga.boot({
-	a = AlgaNode({ SinOsc.ar(\freq.kr(220) + \fm.ar(0)) }, connectionTime:5, playTime:2);
-	b = AlgaNode({ SinOsc.ar(\freq.kr(134) + \fm.ar(0)) }, connectionTime:3);
+	a = AlgaNode({ SinOsc.ar(\freq.kr(220) + \fm.ar(0)) }, interpTime:5, playTime:2);
+	b = AlgaNode({ SinOsc.ar(\freq.kr(134) + \fm.ar(0)) }, interpTime:3);
 	a.from(b, \fm, scale:[-100, 100]);
 	b.from(a, \fm, scale:[-50, 50]); //Feedback connection!
 	a.play(chans:2); //play stereo
@@ -375,8 +375,6 @@ private:: interpolationTime
 private:: interpolationTime
 private:: isAlgaNode
 private:: isPlaying
-private:: it
-private:: it
 private:: longestConnectionTime
 private:: longestWaitTime
 private:: makeConnection
@@ -399,7 +397,9 @@ private:: paramInterpolationTime
 private:: paramsChansMapping
 private:: paramsConnectionTime
 private:: paramsScalings
-private:: pit
+private:: connectionTime
+private:: pct
+private:: paramConnectionTime
 private:: playGroup
 private:: playInner
 private:: playSynth
@@ -468,3 +468,8 @@ private:: removePatternOutsAtParam
 private:: replaceArgs
 private:: unpackListPatternOutsMapping
 private:: unpackListPatternRecursive
+
+private:: createMixInterpBusAndNormSynthAtParam
+private:: createMixInterpSynthAndInterpBusAndNormSynthAtParam
+private:: ct
+private:: replaceInterpBusAndNormSynth

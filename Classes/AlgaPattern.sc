@@ -674,10 +674,10 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
-	*new { | def, connectionTime = 0, playTime = 0, sched = 1, server |
+	*new { | def, interpTime, playTime, sched = 1, server |
 		^super.new(
 			def: def,
-			connectionTime: connectionTime,
+			connectionTime: interpTime,
 			playTime: playTime,
 			server: server,
 			sched: sched

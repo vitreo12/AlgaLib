@@ -26,7 +26,7 @@ METHOD:: new
 Create a new link::Classes/AlgaPattern::.
 ARGUMENT:: def
 Mandatory argument. It accepts either a emphasis::UGen function::, a symbol to lookup a defined link::Classes/AlgaSynthDef:: or an link::Classes/Event:: describing the pattern.
-ARGUMENT:: connectionTime
+ARGUMENT:: interpTime
 Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaPattern::.
 ARGUMENT:: playTime
 Specify the fading in / fading out time that it takes for this link::Classes/AlgaPattern:: to play through speakers. These values are applied when calling the emphasis::play:: or emphasis::stop:: functions.
