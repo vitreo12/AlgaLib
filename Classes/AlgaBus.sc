@@ -36,7 +36,8 @@ AlgaBus {
 		this.makeBusArg;
 	}
 
-	free { | clear = false |
+	//FUNDAMENTAL: clear = true fixes all issues with control busses needed to be reset!
+	free { | clear = true |
 		if(bus != nil, { bus.free(clear) });
 		bus  = nil;
 		rate = nil;
