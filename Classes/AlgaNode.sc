@@ -3933,8 +3933,10 @@ AlgaNode {
 			});
 			isPlaying = false;
 			beingStopped = true;
-			playSynth.onFree({
-				action.value
+			if(action != nil, {
+				playSynth.onFree({
+					action.value
+				});
 			});
 		})
 	}

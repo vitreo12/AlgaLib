@@ -3324,16 +3324,13 @@ AlgaPattern : AlgaNode {
 
 	//Set dur at sched
 	setDurAtSched { | value, sched |
-		//Set new \dur
-		this.setDur(value);
-
 		//Add to scheduler just to make cascadeMode work
 		scheduler.addAction(
 			condition: { this.algaInstantiated },
 			func: {
 				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
 				if(algaReschedulingEventStreamPlayer != nil, {
-					algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
+					algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, { this.setDur(value) });
 				})
 			}
 		);

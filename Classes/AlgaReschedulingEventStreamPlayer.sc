@@ -34,13 +34,14 @@ AlgaReschedulingEventStreamPlayer {
 	reset { player.reset }
 	refresh { player.refresh }
 
-	reschedule { | when = 0 |
+	reschedule { | when = 0, func |
 		var stream = player.stream;
 		var clock  = player.clock;
 
 		clock.algaSchedOnceWithTopPriority(when, {
 			player.stop;
 			this.init(stream, player.event);
+			if(func != nil, { func.value });
 			//play has some overhead, find the leanest way.
 			//Check TempoClockPriority.scd: the example with nested clock shows what happens here.
 			//timing is correct: even if in top priority, play will be pushed to bottom, as it has nested
@@ -49,13 +50,14 @@ AlgaReschedulingEventStreamPlayer {
 		});
 	}
 
-	rescheduleAtQuant { | quant = 0 |
+	rescheduleAtQuant { | quant = 0, func |
 		var stream = player.stream;
 		var clock  = player.clock;
 
 		clock.algaSchedAtQuantOnceWithTopPriority(quant, {
 			player.stop;
 			this.init(stream, player.event);
+			if(func != nil, { func.value });
 			//play has some overhead, find the leanest way.
 			//Check TempoClockPriority.scd: the example with nested clock shows what happens here.
 			//timing is correct: even if in top priority, play will be pushed to bottom, as it has nested
@@ -64,7 +66,7 @@ AlgaReschedulingEventStreamPlayer {
 		});
 	}
 
-	rescheduleAbs { | when = 0 |
+	rescheduleAbs { | when = 0, func |
 		var stream = player.stream;
 		var clock  = player.clock;
 
@@ -79,6 +81,7 @@ AlgaReschedulingEventStreamPlayer {
 		clock.schedAbs(when, {
 			player.stop;
 			this.init(stream, player.event);
+			if(func != nil, { func.value });
 			//play has some overhead, find the leanest way.
 			//Check TempoClockPriority.scd: the example with nested clock shows what happens here.
 			//timing is correct: even if in top priority, play will be pushed to bottom, as it has nested
