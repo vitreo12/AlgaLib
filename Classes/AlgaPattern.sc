@@ -122,7 +122,7 @@ AlgaPatternInterpStreams {
 		//It's essential that this is scheduled at the bottom of the Clock.
 		//This allows this action to always be executed AFTER the pattern triggers.
 		clock.algaSchedAtQuantOnce(
-			quant: 0, //RIGHT NOW, at the bottom of the TempoClock stack (after all eventual pattern triggers)
+			quant: 0, //Execute right now at the bottom of the TempoClock stack (after all eventual pattern triggers)
 			task: {
 				//The scale and chans of the interpStream
 				var scaleArraysAndChansAtParam = scaleArraysAndChans[paramName];
@@ -135,7 +135,7 @@ AlgaPatternInterpStreams {
 
 				//These belong to all active patternSynths
 				var patternBussesAndSynths = algaPattern.currentPatternBussesAndSynths[latestPatternInterpSumBusAtParam];
-				var activePatternInterpSumBusses = algaPattern.currentActivePatternInterpSumBusses;
+				var activePatternInterpSumBusses;
 
 				//FUNDAMENTAL:
 				//Only schedule if the same pattern HAS NOT been triggered at this very time.
@@ -163,6 +163,9 @@ AlgaPatternInterpStreams {
 						});
 					});
 				});
+
+				//Retrieve active ones (including the newly created one)
+				activePatternInterpSumBusses = algaPattern.currentActivePatternInterpSumBusses;
 
 				//Add temporary patterns for all active patternInterpBusses at paramName
 				if(activePatternInterpSumBusses != nil, {
@@ -416,8 +419,7 @@ AlgaPatternInterpStreams {
 			time
 		);
 
-		//Create the interpSynth and interpBus for the new sender and
-		//activate the interpolation processon all the other active interpSynths.
+		//Create the interpSynth and interpBus for the new sender
 		this.createPatternInterpSynthAndBusAtParam(
 			paramName: paramName,
 			paramRate: paramRate,
@@ -678,7 +680,7 @@ AlgaPattern : AlgaNode {
 	*new { | def, interpTime, playTime, sched = 1, server |
 		^super.new(
 			def: def,
-			connectionTime: interpTime,
+			interpTime: interpTime,
 			playTime: playTime,
 			server: server,
 			sched: sched
@@ -790,8 +792,8 @@ AlgaPattern : AlgaNode {
 		var interpBussesToFree = algaPatternInterpStreams.interpBussesToFree;
 		interpBussesToFree.do({ | interpBus |
 			//If the identity set is empty, it needs to be freed
-			var isToBeFreed = currentActiveInterpBusses[interpBus].size == 0;
-			if(isToBeFreed, {
+			var toBeFreed = currentActiveInterpBusses[interpBus].size == 0;
+			if(toBeFreed, {
 				interpBus.free;
 				interpBussesToFree.remove(interpBus);
 				currentActiveInterpBusses.removeAt(interpBus);
@@ -1002,7 +1004,8 @@ AlgaPattern : AlgaNode {
 			sender = entry; //essential for chansMapping (entry gets modified)
 			if(entry.algaInstantiated, {
 				if((entry.algaCleared).or(entry.algaToBeCleared), {
-					("AlgaPattern: can't connect to an AlgaNode that's been cleared").error;
+					//("AlgaPattern: can't connect to an AlgaNode that's been cleared").error;
+					^this;
 				}, {
 					if(entry.synthBus != nil, {
 						if(entry.synthBus.bus != nil, {
@@ -3078,7 +3081,7 @@ AlgaPattern : AlgaNode {
 					)
 				},
 				sched: sched,
-				topPriority: true //This is essential for scheduled times!
+				topPriority: true //This is essential for scheduled times to work correctly!
 			)
 		});
 	}

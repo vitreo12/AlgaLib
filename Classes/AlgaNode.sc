@@ -3769,7 +3769,7 @@ AlgaNode {
 		});
 	}
 
-	clearInner { | time |
+	clearInner { | onClear, time |
 		//calc temporary time
 		var stopTime = this.calculateTemporaryLongestWaitTime(time, playTime);
 		time = max(stopTime, longestWaitTime); //makes sure to wait longest time to run clears
@@ -3781,7 +3781,7 @@ AlgaNode {
 		algaToBeCleared = true;
 
 		//Stop playing (if it was playing at all)
-		this.stopInner(stopTime, isClear:true);
+		this.stopInner(stopTime, isClear:true, action:onClear);
 
 		//Just remove groups, they contain the synths
 		this.freeAllGroups(false, time);
@@ -3809,10 +3809,10 @@ AlgaNode {
 	}
 
 	//for clear, check algaInstantiated and not isPlaying
-	clear { | time, sched |
+	clear { | onClear, time, sched |
 		scheduler.addAction(
 			condition: { this.algaInstantiated },
-			func: { this.clearInner(time) },
+			func: { this.clearInner(onClear, time) },
 			sched: sched
 		);
 	}
@@ -3918,7 +3918,7 @@ AlgaNode {
 		this.playInner(time, chans, sched);
 	}
 
-	freePlaySynth { | time, isClear |
+	freePlaySynth { | time, isClear, action |
 		if(isPlaying, {
 			if(isClear.not, {
 				//time has already been calculated if isClear == true
@@ -3933,24 +3933,27 @@ AlgaNode {
 			});
 			isPlaying = false;
 			beingStopped = true;
+			playSynth.onFree({
+				action.value
+			});
 		})
 	}
 
-	stopInner { | time, sched, isClear = false, replace = false |
+	stopInner { | time, sched, isClear = false, replace = false, action |
 		case
 		{ replace == true } {
 			//Already in a scheduled action
-			^this.freePlaySynth(time, false);
+			^this.freePlaySynth(time, false, action);
 		}
 		{ isClear == true } {
 			//Already in a scheduled action
-			^this.freePlaySynth(time, true);
+			^this.freePlaySynth(time, true, action);
 		};
 
 		//Normal case
 		scheduler.addAction(
 			condition: { this.isPlaying },
-			func: { this.freePlaySynth(time, false); },
+			func: { this.freePlaySynth(time, false, action); },
 			sched: sched
 		);
 	}
