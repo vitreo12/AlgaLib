@@ -38,8 +38,8 @@ b.replace({ Saw.ar(\freq.kr + \fm.ar) })
 
 //Bye bye
 (
-b.clear(2);
-a.clear(2);
+b.clear(time: 2);
+a.clear(time: 2);
 )
 
 //The errors on console are the routines (fork)

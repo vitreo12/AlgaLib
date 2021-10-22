@@ -25,6 +25,9 @@ a.from(Pseq([220, 440, 880], inf), \freq, time: 3, sched: 1);
 //Interpolate over the new Pwhite.
 a.from(Pwhite(220, 880), \freq, time: 3, sched: 1);
 
+//Interpolation can be sampled and held instead of being dynamic
+a.from(Pseq([220, 440, 880], inf), \freq, sampleAndHold: true, time: 3, sched: 1);
+
 //Change \dur does not trigger interpolation (yet), but it applies the changes directly
 a.from(Pwhite(0.03, 0.5), \dur, sched: 1);
 
@@ -35,4 +38,4 @@ a.replaceDur = true;
 a.from(0.25, \dur, time: 3, sched: 1);
 
 //Bye bye
-a.clear(2);
+a.clear(time: 2);
