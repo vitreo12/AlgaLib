@@ -31,6 +31,9 @@ AlgaNode {
 	//This controls the fade in and out when .play / .stop
 	var <playTime = 0;
 
+	//On replace, use time if possible. Otherwise, playTime
+	var <replacePlayTime = true;
+
 	//This is the longestConnectionTime between all the outNodes.
 	//It's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
@@ -493,6 +496,14 @@ AlgaNode {
 	pt { ^playTime }
 
 	pt_ { | value | this.playTime_(value) }
+
+	replacePlayTime_ { | value |
+		if((value != false).and(value != true), {
+			"AlgaNode: 'replacePlayTime' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		replacePlayTime = value
+	}
 
 	//maximum between longestConnectionTime and playTime...
 	//is this necessary? Yes it is, cause if running .clear on the receiver,
@@ -3516,7 +3527,7 @@ AlgaNode {
 	replaceInner { | def, args, time, outsMapping, reset, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
-		var argTime = time;
+		var argTime = if(replacePlayTime, { time }, { nil });
 		var wasPlaying = false;
 
 		//Re-init groups if clear was used or toBeCleared
@@ -3550,7 +3561,7 @@ AlgaNode {
 
 		//If it was playing, free previous playSynth
 		if(isPlaying, {
-			this.stopInner(time: argTime, replace: true); //Fade out with argTime?
+			this.stopInner(time: argTime, replace: true);
 			wasPlaying = true;
 		});
 
@@ -3590,7 +3601,7 @@ AlgaNode {
 
 		//If node was playing, or .replace has been called while .stop / .clear, play again
 		if(wasPlaying/*.or(beingStopped)*/, {
-			this.playInner(time: argTime, replace: true) //Fade in with argTime?
+			this.playInner(time: argTime, replace: true)
 		});
 
 		//Reset flag
