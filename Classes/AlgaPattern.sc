@@ -580,6 +580,7 @@ AlgaPattern : AlgaNode {
 	TODOs:
 
 	1) mixFrom()
+	2) \dur interpolation
 	*/
 
 	//The actual Patterns to be manipulated
