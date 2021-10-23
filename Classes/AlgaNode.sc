@@ -222,7 +222,7 @@ AlgaNode {
 				var wait = Condition();
 
 				fork {
-					//Loop over and compile fFunctions and AlgaTemps
+					//Loop over and compile Functions and AlgaTemps
 					functionSynthDefDict.keysValuesDo({ | name, sdef |
 						//AlgaTemp
 						if(sdef.isArray, {
@@ -3087,13 +3087,16 @@ AlgaNode {
 		});
 
 		case
+
 		//Symbol
 		{ def.isSymbol } {
 			defDef = def;
+			algaTemp.checkValidSynthDef(defDef); //check \def right away
+			if(algaTemp.valid.not, { defDef = nil });
 			validAlgaTemp = true;
 		}
 
-		//Event: if function, compile it. Then, check all entries and unpack them
+		//Event
 		{ def.isEvent } {
 			defDef = def[\def];
 			if(defDef == nil, {
@@ -3101,8 +3104,16 @@ AlgaNode {
 				^nil
 			});
 
-			//Sbsitute \def with the new symbol
-			if(defDef.isFunction, {
+			case
+
+			//Symbol: check \def right away
+			{ defDef.isSymbol } {
+				algaTemp.checkValidSynthDef(defDef); //check \def right away
+				if(algaTemp.valid.not, { defDef = nil });
+			}
+
+			//Substitute \def with the new symbol
+			{ defDef.isFunction } {
 				var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
 				//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
@@ -3116,7 +3127,7 @@ AlgaNode {
 
 				defDef = defName;
 				def[\def] = defName;
-			});
+			};
 
 			//Loop around the event entries and use as Stream, substituting entries
 			def.keysValuesDo({ | key, entry |
