@@ -3,9 +3,11 @@
 Alga.boot({
 	//Declare a simple AlgaSynthDef.
 	//Note that for it to be used in an AlgaPattern it must free itself.
+	//Also, note the 'sampleAccurate' argument. This allows the AlgaSynthDef to use OffsetOut instead of Out
+	//for sample accurate retriggering.
 	AlgaSynthDef(\sine, {
 		SinOsc.ar(\freq.kr(440)) * EnvPerc.ar
-	}).add;
+	}, sampleAccurate: true).add;
 
 	//Wait for definition to be sent to server
 	s.sync;

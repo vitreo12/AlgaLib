@@ -21,7 +21,7 @@ Alga.boot({
 
 a.from(\test, \def, time:2, sched:1)
 
-a.from(\test2, \def, time:3, sched:1).play
+a.from(\test2, \def, time:3, sched:1)
 
 a.from(Pseq([\test, \test2, \test2], inf), \def, time:2, sched:1)
 

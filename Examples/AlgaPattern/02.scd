@@ -3,12 +3,12 @@ Alga.boot({
 	//Declare a simple sine AlgaSynthDef
 	AlgaSynthDef(\sine, {
 		SinOsc.ar(\freq.kr(440)) * EnvPerc.ar
-	}).add;
+	}, sampleAccurate: true).add;
 
 	//Declare a simple saw AlgaSynthDef
 	AlgaSynthDef(\saw, {
 		Saw.ar(\freq.kr(440)) * EnvPerc.ar * 0.4
-	}).add;
+	}, sampleAccurate: true).add;
 
 	//Wait
 	s.sync;
