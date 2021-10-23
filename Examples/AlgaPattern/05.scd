@@ -17,7 +17,12 @@ Alga.boot({
 		comb;
 	}).add;
 
-	//A simple noise
+	//A simple stepped noise
+	AlgaSynthDef(\noise0, {
+		LFNoise0.kr(\freq.kr(1))
+	}).add;
+
+	//A simple linear noise
 	AlgaSynthDef(\noise1, {
 		LFNoise1.kr(\freq.kr(1))
 	}).add;
@@ -36,6 +41,8 @@ Alga.boot({
 			dist: Pseq([1, 2, 4, 6],inf)
 		)
 	)).play(chans: 2);
+
+	s.plotTree
 });
 )
 
@@ -74,12 +81,31 @@ a.from((
 //Again, just like any other AlgaPattern, 'fx' parameters can be modulated using AlgaTemps.
 (
 a.from((
-	def: \tanh,
-	dist: AlgaTemp((
-		def: \noise1,
-		freq: Pwhite([10, 20], [100, 200])
-	), scale: [1, 7])
+	def: {
+		var sig = Pluck.ar(\in.ar, delaytime: \dt.ar(0.1));
+		FreeSelf.kr(DetectSilence.ar(sig));
+		sig
+	},
+	dt: Pseq([
+		AlgaTemp(
+			{ SinOsc.ar(1) },
+			scale: [0.0001, 0.01]
+		),
+
+		AlgaTemp((
+			def: \noise0,
+			freq: Pwhite([1, 5], [5, 10])
+		), scale: [0.0001, 0.02]),
+
+		AlgaTemp((
+			def: \noise1,
+			freq: Pwhite([10, 20], [30, 40])
+		), scale: [0.0001, 0.03])
+	], inf)
 ),
 \fx, time: 2, sched: 1
 )
 )
+
+//BUG: old ones are kept alive!
+a.replace({ Saw.ar(\freq.kr(440)) * EnvPerc.ar }, time: 1, sched: 1)

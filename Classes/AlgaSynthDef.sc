@@ -94,7 +94,7 @@ AlgaSynthDef : SynthDef {
 	var <>canReleaseSynth, <>canFreeSynth;
 
 	var <>explicitFree;
-
+	var <>sampleAccurate;
 	var <>outsMapping;
 
 	//Default sampleAccurate to false. If user needs OffsetOut (for pattern accuracy), he must set it to true.
@@ -249,6 +249,7 @@ AlgaSynthDef : SynthDef {
 		def.numChannels = numChannels;
 		def.canReleaseSynth = makeFadeEnv;
 		def.canFreeSynth = def.canReleaseSynth || canFree;
+		def.sampleAccurate = sampleAccurate;
 
 		//this is used for AlgaPattern.
 		//makeFadeEnv = true can be deceiving.
