@@ -866,7 +866,8 @@ AlgaPattern : AlgaNode {
 						paramDefault: paramDefault,
 						patternInterpSumBus: patternParamBus,
 						patternBussesAndSynths: patternBussesAndSynths,
-						isFX: true //use isFX (it's the same behaviour)
+						isFX: true, //use isFX (it's the same behaviour)
+						storeLatestEntry: false
 					)
 				});
 			});
@@ -929,11 +930,9 @@ AlgaPattern : AlgaNode {
 		if(isFX, { storeLatestEntry = false });
 
 		//Unpack Pattern value
-		if(storeLatestEntry, {
-			//Unpack Pattern value (Only if not using MC, or isFX (no MC in FX) or isTemporary (no MC in temporary))
-			if((useMultiChannelExpansion.not).or(isFX).or(isTemporary), {
-				if(entry.isStream, { entry = entry.next });
-			});
+		//(Only if not using MC, or isFX (no MC in FX) or isTemporary (no MC in temporary))
+		if((storeLatestEntry.and(useMultiChannelExpansion.not)).or(isFX).or(isTemporary), {
+			if(entry.isStream, { entry = entry.next });
 		});
 
 		//Check if it's an AlgaArg. Unpack it.
@@ -1181,11 +1180,14 @@ AlgaPattern : AlgaNode {
 				//Register patternParamSynth to be freed
 				patternBussesAndSynths.add(patternParamSynth);
 
-				//Add patternParamSynth as child of patternInterpSumBus (used to create temporary synths)
-				this.addActivePatternParamSynth(patternInterpSumBus, patternParamSynth);
+				//Don't add the FX patternParamSynths: they're already handled
+				if(isFX.not,{
+					//Add patternParamSynth as child of patternInterpSumBus (used to create temporary synths)
+					this.addActivePatternParamSynth(patternInterpSumBus, patternParamSynth);
 
-				//Add patternParamSynth as child of patternEnvBus (used to free patternEnvBus when appropriate)
-				this.addActiveInterpBus(patternParamEnvBus, patternParamSynth);
+					//Add patternParamSynth as child of patternEnvBus (used to free patternEnvBus when appropriate)
+					this.addActiveInterpBus(patternParamEnvBus, patternParamSynth);
+				});
 			});
 		}, {
 			("AlgaPattern: Invalid class '" ++ entry.class ++ "' for parameter '" ++ paramName.asString ++ "'").error;
@@ -1242,7 +1244,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create all needed Synths and Busses for an FX
-	createFXSynthAndPatternSynth { | fx, numChannelsToUse, rateToUse,
+	createFXSynthAndPatternSynths { | fx, numChannelsToUse, rateToUse,
 		algaSynthDef, algaSynthBus, algaPatternInterpStreams,
 		patternSynthArgs, patternBussesAndSynths |
 
@@ -1315,7 +1317,8 @@ AlgaPattern : AlgaNode {
 						paramDefault: paramDefault,
 						patternInterpSumBus: patternParamBus, //pass the new Bus
 						patternBussesAndSynths: patternBussesAndSynthsFx,
-						isFX: true
+						isFX: true,
+						storeLatestEntry: false
 					)
 				});
 			});
@@ -1705,7 +1708,7 @@ AlgaPattern : AlgaNode {
 		//If fx
 		if(validFX, {
 			//This returns the patternSynthArgs with correct bus to write to (the fx one)
-			patternSynthArgs = this.createFXSynthAndPatternSynth(
+			patternSynthArgs = this.createFXSynthAndPatternSynths(
 				fx: fx,
 				numChannelsToUse: numChannelsToUse,
 				rateToUse: rateToUse,
@@ -2659,8 +2662,8 @@ AlgaPattern : AlgaNode {
 		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
 		value.keysValuesDo({ | key, entry |
 			var parsedEntry = entry;
-			if(parsedEntry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry) });
-			if(parsedEntry.isAlgaTemp, { parsedEntry = this.parseAlgaTempParam(parsedEntry) });
+			if(parsedEntry.isListPattern, { parsedEntry = this.parseListPatternParam(parsedEntry, functionSynthDefDict) });
+			if(parsedEntry.isAlgaTemp, { parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict) });
 			value[key] = parsedEntry.algaAsStream;
 		});
 
