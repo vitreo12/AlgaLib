@@ -53,6 +53,19 @@ a.from(
 )
 )
 
+//Using AlgaTemp to create temporary nodes, instead of relying on 'running' ones.
+//AlgaTep allows to have individual 'scale' and 'chans' control.
+(
+a.from(
+	Pseq([
+		AlgaTemp({ LFNoise0.kr(20) }, scale: [440, 880]),
+		AlgaTemp({ SinOsc.kr(2) }, scale: [330, 660])
+	], inf),
+	\freq,
+	time: 3
+)
+)
+
 //Bye bye
 (
 a.clear({

@@ -2635,6 +2635,10 @@ AlgaPattern : AlgaNode {
 			^nil;
 		});
 
+		if(synthDefFx.sampleAccurate, {
+			("AlgaPattern: AlgaSynthDef in 'fx': '" ++ def.asString ++"' has 'sampleAccurate' on. This causes synchronization errors").warn;
+		});
+
 		controlNamesFx = synthDescFx.controls;
 		controlNamesFx.do({ | controlName |
 			if(controlName.name == \in, {
