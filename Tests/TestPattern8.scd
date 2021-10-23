@@ -25,8 +25,8 @@ Alga.boot({
 		dur: 0.1,
 		freq: Pwhite([100, 220], [440, 880]),
 		fx: Pseq([
-			(def: \tanh, \dist: Pseq([1, 2, 4, 10], inf)),
-			(def: \comb, \dt: Pseq([0.01, 0.05, 0.1], inf))
+			(def: \tanh, dist: Pseq([1, 2, 4, 10], inf)),
+			(def: \comb, dt: Pseq([0.01, 0.05, 0.1], inf))
 		], inf)
 	), playTime:1).play;
 
@@ -38,14 +38,14 @@ Alga.boot({
 
 s.plotTree
 
-a.from((def:\tanh, \dist:Prand([1, 2, 5], inf)), \fx, time:0, sched:1)
-a.from((def:\comb, \dt:Prand([0.01,  0.01], inf)), \fx, time:0, sched:1)
+a.from((def:\tanh, dist:Prand([1, 2, 5], inf)), \fx, time:0, sched:1)
+a.from((def:\comb, dt:Prand([0.01,  0.01], inf)), \fx, time:0, sched:1)
 
 (
 a.from(
 	Prand([
-		(def:\comb, \dt:Prand([0.01, 0.2], inf)),
-		(def:\tanh, \dist:Prand([1, 2], inf)),
+		(def:\comb, dt:Prand([0.01, 0.2], inf)),
+		(def:\tanh, dist:Prand([1, 2], inf)),
 		\none //dry
 	], inf), \fx, time:2, sched:1)
 )
@@ -55,8 +55,8 @@ a.from(
 a.from(
 	(
 		def: \tanh,
-		\dist: Pseq([
-			AlgaPatternArg(b, scale:[1, 10]),
+		dist: Pseq([
+			AlgaArg(b, scale:[1, 10]),
 			b
 		], inf)
 	),
@@ -69,7 +69,7 @@ a.from(
 a.from(
 	(
 		def: \tanh,
-		\dist: AlgaTemp((
+		dist: AlgaTemp((
 			def: \noise1,
 			freq: Pwhite([10, 20], [100, 200])
 		), scale: [1, 7])
