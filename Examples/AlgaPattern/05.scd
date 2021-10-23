@@ -2,7 +2,7 @@
 Alga.boot({
 	//Simple sine perc
 	AlgaSynthDef(\sine, {
-		SinOsc.ar(\freq.ar(440)) * EnvPerc.ar(release: 0.5)
+		SinOsc.ar(\freq.kr(440)) * EnvPerc.ar(release: 0.5)
 	}, sampleAccurate: true).add;
 
 	//Tanh distortion
@@ -12,19 +12,19 @@ Alga.boot({
 
 	//Comb filtering
 	AlgaSynthDef(\comb, {
-		var comb = CombC.ar(\in.ar(0), delaytime: \dt.kr(0.1));
-		FreeSelf.kr(DetectSilence.ar(comb));
+		var comb = LeakDC.ar(CombC.ar(\in.ar(0), delaytime: \dt.kr(0.1)));
+		AlgaDetectSilence.ar(comb);
 		comb;
 	}).add;
 
-	//A simple stepped noise
+	//A simple stepped noise (used later for modulation)
 	AlgaSynthDef(\noise0, {
-		LFNoise0.kr(\freq.kr(1))
+		LFNoise0.ar(\freq.kr(1))
 	}).add;
 
-	//A simple linear noise
+	//A simple linear noise (used later for modulation)
 	AlgaSynthDef(\noise1, {
-		LFNoise1.kr(\freq.kr(1))
+		LFNoise1.ar(\freq.kr(1))
 	}).add;
 
 	//Wait
@@ -41,8 +41,6 @@ Alga.boot({
 			dist: Pseq([1, 2, 4, 6],inf)
 		)
 	)).play(chans: 2);
-
-	s.plotTree
 });
 )
 
@@ -52,7 +50,7 @@ Alga.boot({
 a.from(
 	Pseq([
 		(def: \tanh, dist: Pseq([1, 2, 4, 10], inf)),
-		(def: \comb, dt: Pseq([0.01, 0.05, 0.1], inf)),
+		(def: \comb, dt: Pseq([0.0125, 0.05, 0.02], inf)),
 		\dry
 	], inf),
 	\fx,
@@ -79,33 +77,31 @@ a.from((
 )
 
 //Again, just like any other AlgaPattern, 'fx' parameters can be modulated using AlgaTemps.
+//Also, not that an fx's 'def' supports all entries that an AlgaPattern 'def' does.
 (
 a.from((
 	def: {
-		var sig = Pluck.ar(\in.ar, delaytime: \dt.ar(0.1));
-		FreeSelf.kr(DetectSilence.ar(sig));
-		sig
+		var pluck = LeakDC.ar(Pluck.ar(\in.ar, delaytime: \dt.ar(0.1)));
+		AlgaDetectSilence.ar(pluck);
+		pluck
 	},
 	dt: Pseq([
 		AlgaTemp(
 			{ SinOsc.ar(1) },
-			scale: [0.0001, 0.01]
+			scale: [0.001, 0.03]
 		),
 
 		AlgaTemp((
 			def: \noise0,
 			freq: Pwhite([1, 5], [5, 10])
-		), scale: [0.0001, 0.02]),
+		), scale: [0.001, 0.02]),
 
 		AlgaTemp((
 			def: \noise1,
 			freq: Pwhite([10, 20], [30, 40])
-		), scale: [0.0001, 0.03])
+		), scale: [0.001, 0.01])
 	], inf)
 ),
 \fx, time: 2, sched: 1
 )
 )
-
-//BUG: old ones are kept alive!
-a.replace({ Saw.ar(\freq.kr(440)) * EnvPerc.ar }, time: 1, sched: 1)

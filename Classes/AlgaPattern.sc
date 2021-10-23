@@ -875,7 +875,6 @@ AlgaPattern : AlgaNode {
 		var sender, senderNumChannels, senderRate;
 		var chansMapping, scale;
 		var validParam = false;
-		var isAlgaTempInFX = false;
 
 		//Unpack Pattern value
 		//(Only if not using MC, or isFX (no MC in FX) or isTemporary (no MC in temporary))
@@ -909,7 +908,6 @@ AlgaPattern : AlgaNode {
 				senderRate        = algaTemp.rate;
 				senderNumChannels = algaTemp.numChannels;
 				validParam        = true;
-				if(isFX, { isAlgaTempInFX = true });
 			}, {
 				//entry == nil
 				senderRate = "control";
