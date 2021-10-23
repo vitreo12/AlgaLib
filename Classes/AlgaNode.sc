@@ -201,9 +201,6 @@ AlgaNode {
 		//AlgaPattern specific
 		if(this.isAlgaPattern, {
 			this.latestPatternInterpSumBusses = IdentityDictionary(10);
-			this.latestEntries = IdentityDictionary(10);
-			this.latestScales = IdentityDictionary(10);
-			this.latestChans = IdentityDictionary(10);
 			this.currentActivePatternInterpSumBusses = IdentityDictionary(10);
 			this.currentPatternBussesAndSynths = IdentityDictionary(10);
 			this.currentActivePatternParamSynths = IdentityDictionary(10);
@@ -1196,17 +1193,10 @@ AlgaNode {
 	}
 
 	//Calculate scale to send to interp synth
-	calculateScaling { | param, sender, paramNumChannels, scale, addScaling = true, storeLatestScale = true |
+	calculateScaling { | param, sender, paramNumChannels, scale, addScaling = true |
 		var scaleCopy;
 
-		if(storeLatestScale, {
-			scale = scale.next; //Pattern support
-			if(this.isAlgaPattern, { this.latestScales[param] = scale });
-		}, {
-			if(this.isAlgaPattern, {
-				scale = this.latestScales[param];
-			});
-		});
+		scale = scale.next; //Pattern support
 
 		if(scale == nil, { ^nil });
 
@@ -1358,16 +1348,11 @@ AlgaNode {
 
 	//Calculate the array to be used as \indices param for interpSynth
 	calculateSenderChansMappingArray { | param, sender, senderChansMapping,
-		senderNumChans, paramNumChans, updateParamsChansMapping = true, storeLatestChans = true |
+		senderNumChans, paramNumChans, updateParamsChansMapping = true |
 
 		var actualSenderChansMapping;
 
-		if(storeLatestChans, {
-			senderChansMapping = senderChansMapping.next; //Pattern support
-			if(this.isAlgaPattern, { this.latestChans[param] = senderChansMapping });
-		}, {
-			senderChansMapping = this.latestChans[param];
-		});
+		senderChansMapping = senderChansMapping.next; //Pattern support
 
 		actualSenderChansMapping = senderChansMapping.copy;
 
