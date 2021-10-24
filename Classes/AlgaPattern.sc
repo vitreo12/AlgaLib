@@ -488,7 +488,7 @@ a
 AlgaOut {
 	var <node, <param, <chans, <scale;
 
-	*new { | node, param, chans, scale |
+	*new { | node, param = \in, chans, scale |
 		^super.new.init(node, param, chans, scale)
 	}
 
