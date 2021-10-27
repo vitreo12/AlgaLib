@@ -2869,11 +2869,13 @@ AlgaPattern : AlgaNode {
 //Alias
 AP : AlgaPattern {}
 
+/*
 //Implements Pmono behaviour
 AlgaMonoPattern : AlgaPattern {}
 
 //Alias
 AMP : AlgaMonoPattern {}
+*/
 
 //Extension to support out: from AlgaPattern
 +AlgaNode {
