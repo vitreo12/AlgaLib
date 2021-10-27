@@ -2,7 +2,7 @@
 Alga.boot
 
 //3 seconds of interpolation time
-a = AlgaNode({ SinOsc.ar(\freq.kr(440)) }, connectionTime:3).play(chans:2)
+a = AlgaNode({ SinOsc.ar(\freq.kr(440)) }, interpTime:3).play(chans:2)
 
 //Now it will interpolate
 a <<.freq 220

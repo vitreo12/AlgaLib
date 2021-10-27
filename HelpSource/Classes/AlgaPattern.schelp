@@ -18,6 +18,8 @@ required: emphasis::Alga:: will detect it and use it internally.
 
 An link::Classes/AlgaPattern:: is the polyphonic counterpart of an link::Classes/AlgaNode::. All the basic concepts that define link::Classes/AlgaNode::s also apply to link::Classes/AlgaPattern::s. However, link::Classes/AlgaPattern::s also support link::Classes/Pattern::s as modifiers for their parameters.
 
+It is highly suggested to look into the Examples folder for more advanced usage of link::Classes/AlgaPattern::s.
+
 
 CLASSMETHODS::
 
@@ -35,18 +37,163 @@ Just like any other link::Classes/AlgaPattern:: method, the current function can
 ARGUMENT:: server
 Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaPattern:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
 
-code::
-Alga.boot({
-	a = AlgaPattern((
-		def: { SinOsc.ar(\freq.kr(440)) * EnvGen.kr(Env.perc(releaseTime:0.2), doneAction:2) },
-		freq: Pwhite(440, 880),
-		dur: 0.5
-	)).play;
-});
-::
-
-
 INSTANCEMETHODS::
 
+METHOD:: advance
+Advance the link::Classes/AlgaPattern:: manually.
+ARGUMENT:: sched
+Schedule the triggering at a specific time.
+
+METHOD:: step
+Alias for emphasis::advance::.
+
+METHOD:: stopPattern
+Stop the link::Classes/AlgaPattern::.
+ARGUMENT:: sched
+Schedule the stop at a specific time.
+
+METHOD:: useMultiChannelExpansion
+Set if the link::Classes/AlgaPattern:: should treat multi channel expansion like an link::Classes/AlgaNode:: or not.
+
+METHOD:: multiChannelExpansion
+Alias for emphasis::useMultiChannelExpansion::.
+
+METHOD:: replaceDur
+Set the if emphasis::replace:: should be executed when changing the code::'dur':: parameter.
 
 EXAMPLES::
+code::
+(
+//Boot Alga
+Alga.boot({
+	//Declare a simple AlgaSynthDef.
+	//Note that for it to be used in an AlgaPattern it must free itself.
+	//Also, note the 'sampleAccurate' argument. This allows the AlgaSynthDef to use OffsetOut instead of Out
+	//for sample accurate retriggering.
+	AlgaSynthDef(\sine, {
+		SinOsc.ar(\freq.kr(440)) * EnvPerc.ar
+	}, sampleAccurate: true).add;
+
+	//Wait for definition to be sent to server
+	s.sync;
+
+	//Create an AlgaPattern and play it.
+	//Unlike Pbind, AlgaPatterns use an Event to describe the parameter -> value mapping.
+	a = AlgaPattern((
+		def: \sine,
+		dur: 0.5
+	)).play(chans: 2);
+});
+)
+
+//Interpolate over the new Pseq. 'sched: 1' triggers it at the next beat
+a.from(Pseq([220, 440, 880], inf), \freq, time: 3, sched: 1);
+
+//Interpolate over the new Pwhite.
+a.from(Pwhite(220, 880), \freq, time: 3, sched: 1);
+
+//Interpolation can be sampled and held instead of being dynamic
+a.from(Pseq([220, 440, 880], inf), \freq, sampleAndHold: true, time: 3, sched: 1);
+
+//Change \dur does not trigger interpolation (yet), but it applies the changes directly
+a.from(Pwhite(0.03, 0.5), \dur, sched: 1);
+
+//Alternatively, the 'replaceDur' option can be used to trigger a 'replace' call, allowing for volume transitions
+a.replaceDur = true;
+
+//Now it will 'replace'
+a.from(0.25, \dur, time: 3, sched: 1);
+
+//Bye bye
+a.clear(time: 2);
+::
+
+private:: addActiveInterpBus
+private:: addActivePatternParamSynth
+private:: addCurrentActivePatternInterpSumBussesForThisPatternSynth
+private:: addInNode
+private:: addInNodeAlgaNode
+private:: addInNodeListPattern
+private:: algaInstantiated
+private:: algaInstantiatedAsSender
+private:: buildFromListPattern
+private:: buildFromSynthDef
+private:: calculateMultiChannelMismatches
+private:: checkListPatternValidityAndReturnControlNames
+private:: checkParamExists
+private:: controlNamesList
+private:: createAlgaTempSynth
+private:: createEventSynths
+private:: createFXSynthAndPatternSynths
+private:: createOutConnection
+private:: createPattern
+private:: createPatternOutReceivers
+private:: createPatternParamSynth
+private:: createPatternParamSynths
+private:: createPatternSynth
+private:: currentActiveInterpBusses
+private:: currentActiveInterpBusses
+private:: currentActivePatternInterpSumBusses
+private:: currentActivePatternInterpSumBusses
+private:: currentActivePatternParamSynths
+private:: currentActivePatternParamSynths
+private:: currentFX
+private:: currentGenericParams
+private:: currentOut
+private:: currentPatternBussesAndSynths
+private:: currentPatternBussesAndSynths
+private:: currentPatternOutNodes
+private:: currentPatternOutTime
+private:: currentReset
+private:: dispatchListPattern
+private:: dispatchNode
+private:: eventPairs
+private:: freeAllBusses
+private:: freeAllGroups
+private:: freeAllSynths
+private:: freeUnusedInterpBusses
+private:: from
+private:: fromInner
+private:: getSynthDef
+private:: interpStreams
+private:: interpolateBuffer
+private:: interpolateDef
+private:: interpolateDur
+private:: interpolateFX
+private:: interpolateGenericParam
+private:: interpolateOut
+private:: isAlgaPattern
+private:: latestPatternInterpSumBusses
+private:: latestPatternInterpSumBusses
+private:: latestPatternTime
+private:: makeConnection
+private:: makeConnectionInner
+private:: mixFrom
+private:: numChannelsList
+private:: parseAlgaTempListPatternParam
+private:: parseDef
+private:: parseDefEntry
+private:: parseFX
+private:: parseFXEvent
+private:: parseFunctionDefEntry
+private:: parseListPatternDefEntry
+private:: parseListPatternParam
+private:: parseOut
+private:: parseOutAlgaOut
+private:: parseResetOnReplaceParams
+private:: pattern
+private:: patternAsStream
+private:: patternOrAlgaPatternArgContainsBuffers
+private:: rateList
+private:: removeCurrentActivePatternInterpSumBussesForThisPatternSynth
+private:: replace
+private:: reschedule
+private:: reset
+private:: resetAlgaPattern
+private:: resetParam
+private:: resumePattern
+private:: setDur
+private:: setDurAtSched
+private:: stopPatternAndFreeSynths
+private:: storeCurrentGenericParams
+

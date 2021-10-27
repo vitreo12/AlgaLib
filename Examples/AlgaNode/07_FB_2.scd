@@ -1,7 +1,7 @@
 (
 Alga.boot({
-    a = AlgaNode({ SinOsc.ar(\freq.kr(220) + \fm.ar(0)) }, connectionTime:5, playTime:2);
-    b = AlgaNode({ SinOsc.ar(\freq.kr(134) + \fm.ar(0)) }, connectionTime:3);
+    a = AlgaNode({ SinOsc.ar(\freq.kr(220) + \fm.ar(0)) }, interpTime: 5, playTime:2);
+    b = AlgaNode({ SinOsc.ar(\freq.kr(134) + \fm.ar(0)) }, interpTime: 3);
     a.from(b, \fm, scale:[-100, 100]);
     b.from(a, \fm, scale:[-50, 50]); //Feedback connection!
     a.play(chans:2); //play stereo

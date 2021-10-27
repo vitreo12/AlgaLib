@@ -2,7 +2,7 @@
 Alga.boot;
 
 //Sine
-a = AlgaNode({ SinOsc.ar(\freq.kr(440)) }, connectionTime:3).play(chans:2)
+a = AlgaNode({ SinOsc.ar(\freq.kr(440)) }, interpTime:3).play(chans:2)
 
 //LFO
 b = AlgaNode({ SinOsc.kr(2) })
@@ -15,7 +15,7 @@ a.from(b, \freq, scale:[330, 550])
 b.replace({ LFNoise1.kr(5) })
 
 //Now replace it with a Phasor. Again, it will interpolate from the noise generator to the
-//new Phasor over 3 seconds, which is a's connectionTime. Same scaling is applied
+//new Phasor over 3 seconds, which is a's interpTime. Same scaling is applied
 b.replace({ LFSaw.kr(5) })
 
 //Let's change scaling
