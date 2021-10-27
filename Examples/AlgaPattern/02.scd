@@ -17,7 +17,7 @@ Alga.boot({
 	a = AlgaPattern((
 		def: \sine,
 		dur: 0.5
-	)).play;
+	)).play(chans: 2);
 });
 )
 
@@ -61,6 +61,21 @@ a.from(
 		AlgaTemp({ LFNoise0.kr(20) }, scale: [440, 880]),
 		AlgaTemp({ SinOsc.kr(2) }, scale: [330, 660])
 	], inf),
+	\freq,
+	time: 3
+)
+)
+
+//AlgaTemps support other AlgaTemps!
+(
+a.from(
+	AlgaTemp((
+		def: { LFNoise1.kr(\freq.kr(1)) },
+		freq: AlgaTemp((
+			def: { LFNoise0.kr(\freq.kr(1)) },
+			freq: Pseq([10, 100], inf)
+		), scale: [5, 50])
+	), scale: Pseq([[440, 880], [330, 660]], inf)),
 	\freq,
 	time: 3
 )

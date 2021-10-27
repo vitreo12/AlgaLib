@@ -17,7 +17,7 @@ Alga.boot({
 	a = AlgaPattern((
 		def: \sine,
 		dur: 0.5
-	)).play;
+	)).play(chans: 2);
 });
 )
 

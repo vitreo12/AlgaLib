@@ -18,13 +18,14 @@ Alga.boot({
 	a = AP((
 		def: { SinOsc.ar(\freq.kr(440)) * \amp.kr(1) * EnvGen.kr(Env.perc, doneAction:2) },
 		fx: [
-			{ [(\in.ar * 3).tanh, Silent.ar] },
-			{ [Silent.ar, (\in.ar * 3).clip] }
+			{ (\in.ar * 3).tanh },
+			{ (\in.ar * 3).clip }
 		],
 		dur: 1
 	)).play
 })
 )
+
 
 //out
 (

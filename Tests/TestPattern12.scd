@@ -44,7 +44,7 @@ a.from(
 		freq: AlgaTemp((
 			def: \noise0,
 			freq: Pwhite([10, 100])
-		), scale: [5, 50])
+		), scale: [5, 5])
 	), scale: Pseq([[250, 500], [330, 1331]], inf)),
 	\freq,
 	time: 5
