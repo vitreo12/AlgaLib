@@ -5,7 +5,6 @@ related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaArg,
 
 
 DESCRIPTION::
-
 note::
 For emphasis::SuperCollider:: < 3.13, it is highly suggested to download the
 custom emphasis::AlgaAudioControl:: link::Classes/UGen:: from
@@ -36,6 +35,10 @@ ARGUMENT:: sched
 Just like any other link::Classes/AlgaPattern:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 ARGUMENT:: server
 Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaPattern:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
+
+
+private:: addAlgaNoteEventType
+
 
 INSTANCEMETHODS::
 
@@ -196,4 +199,3 @@ private:: setDur
 private:: setDurAtSched
 private:: stopPatternAndFreeSynths
 private:: storeCurrentGenericParams
-
