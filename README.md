@@ -16,7 +16,7 @@ For usage and examples, check the *Help files* and the *Examples* folder.
 
 To install *AlgaLib*, you can either:
 
-1. Use the `Quarks` system: `Quarks.install("AlgaLib")`
+1. Use the `Quarks` system: `Quarks.install("https://github.com/vitreo12/AlgaLib")`
 
 2. `git clone` this repository to your `Platform.userExtensionDir`.
 

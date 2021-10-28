@@ -625,7 +625,7 @@ AlgaNode {
 		this.createSynthBus;
 	}
 
-	freeSynthBus { | now = false, time |
+	freeSynthBus { | now = false, time, isClear = false|
 		if(now, {
 			if(synthBus != nil, {
 				synthBus.free;
@@ -634,7 +634,10 @@ AlgaNode {
 		}, {
 			//if forking, this.synthBus could change, that's why this is needed
 			var prevSynthBus = synthBus.copy;
-			synthBus = nil;  //Necessary for correct .play behaviour!
+
+			if(isClear.not, {
+				synthBus = nil;  //Necessary for correct .play behaviour!
+			});
 
 			if(time == nil, { time = longestWaitTime });
 
@@ -644,6 +647,9 @@ AlgaNode {
 				//node will take to interpolate to the previous receivers) and then free all the previous stuff
 				(time + 1.0).wait;
 				if(prevSynthBus != nil, { prevSynthBus.free });
+				if(isClear, {
+					if(prevSynthBus == synthBus, { synthBus == nil });
+				});
 			}
 		});
 	}
@@ -695,8 +701,8 @@ AlgaNode {
 		});
 	}
 
-	freeAllBusses { | now = false, time |
-		this.freeSynthBus(now, time);
+	freeAllBusses { | now = false, time, isClear = false |
+		this.freeSynthBus(now, time, isClear);
 		this.freeInterpNormBusses(now, time);
 	}
 
@@ -3792,7 +3798,7 @@ AlgaNode {
 
 		//Just remove groups, they contain the synths
 		this.freeAllGroups(false, time);
-		this.freeAllBusses(false, time);
+		this.freeAllBusses(false, time, true);
 
 		fork {
 			//Wait time before clearing groups, synths and busses...

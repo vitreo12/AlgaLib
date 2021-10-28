@@ -1,7 +1,7 @@
 TITLE:: AlgaNode
 summary:: Alga module representing an instance of a sonic process
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaArg, Classes/AlgaTemp
+related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp
 
 
 DESCRIPTION::
@@ -245,14 +245,14 @@ a.mixFrom(c, \freq, scale:[-100, 100]);
 
 //Clear over 3 seconds. Note how the interpolation will bring us back
 //to just having b modulating a's frequency parameter
-c.clear(3);
+c.clear(time:3);
 
 //Clear over 5 seconds. No more connections:
 //now we'll interpolate back to a's \freq default value, 440
-b.clear(5);
+b.clear(time:5);
 
 //Bye bye
-a.clear(3);
+a.clear(time:3);
 ::
 
 subsection:: Simple feedback
@@ -298,8 +298,8 @@ b.replace({ Saw.ar(\freq.kr + \fm.ar) })
 
 //Bye bye
 (
-b.clear(2);
-a.clear(2);
+b.clear(time:2);
+a.clear(time:2);
 )
 
 //The errors on console are the routines (fork)
