@@ -1,0 +1,8 @@
+(
+	name:			"AlgaLib",
+	path:			"AlgaLib",
+	summary:		"Interpolating live coding language"
+	author:			"vitreo12",
+	helpdoc:		"HelpSources/Classes/Alga.schelp"
+	version:		1.0.0,
+)
