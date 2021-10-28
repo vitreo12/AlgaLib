@@ -1,0 +1,72 @@
+TITLE:: AlgaOut
+summary:: Represents a temporary output, an AlgaNode, of an AlgaPattern
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern
+
+
+DESCRIPTION::
+An link::Classes/AlgaOut:: can be used to programmatically specify the output of an link::Classes/AlgaPattern::. This must only be used in conjunction of the code::'out':: key of an link::Classes/AlgaPattern::.
+
+
+CLASSMETHODS::
+METHOD:: new
+Create a new link::Classes/AlgaOut::.
+ARGUMENT:: node
+Specify the link::Classes/AlgaNode:: to output to.
+ARGUMENT:: param
+Specify the parameter of the link::Classes/AlgaNode:: to output to.
+ARGUMENT:: chans
+A specific emphasis::channels:: mapping to take from the link::Classes/AlgaPattern::.
+ARGUMENT:: scale
+A specific emphasis::scaling:: to apply to the output of the link::Classes/AlgaPattern::.
+
+
+EXAMPLES::
+code::
+(
+Alga.boot({
+	//Simple sine
+	AlgaSynthDef(\sine, {
+		SinOsc.ar(\freq.kr(440)) * EnvPerc.ar(release: 0.5)
+	}, sampleAccurate: true).add;
+
+	//Simple saw
+	AlgaSynthDef(\saw, {
+		Saw.ar(\freq.kr(440)) * EnvPerc.ar(release: 0.5) * 0.5
+	}, sampleAccurate: true).add;
+
+	//Wait
+	s.sync;
+
+	//2 channels: tanh on the left and silence on the right
+	b = AN({ [(\in.ar * 10).tanh * 0.5, Silent.ar] }).play;
+
+	//2 channels: silence on the left and reverb on the right
+	c = AN({ [Silent.ar, FreeVerb.ar(\in.ar, 0.8) * 10] }).play;
+
+	//Declare the pattern using the 'out' parameter.
+	//'out' allows to route the output of the pattern to other AlgaNodes, using the AlgaOut Class.
+	a = AlgaPattern((
+		def: \sine,
+		dur: 0.5,
+		freq: Pwhite(220, 440),
+		out: Pseq([
+			AlgaOut(
+				node: b,
+				param: \in
+			),
+			AlgaOut(
+				node: c,
+				param: \in
+			)
+		], inf)
+	));
+});
+)
+::
+
+private:: chans
+private:: isAlgaOut
+private:: node
+private:: param
+private:: scale

@@ -16,15 +16,29 @@
 
 +Object {
 	isAlgaNode { ^false }
+	isAlgaPattern { ^false }
+	isAlgaArg { ^false }
+	isAlgaOut { ^false }
+	isAlgaTemp { ^false }
+	isBuffer { ^false }
+	isPattern { ^false }
+	isStream { ^false }
+	isSymbol { ^false }
+	isEvent { ^false }
+	isListPattern { ^false }
 	isTempoClock { ^false }
-	isNumberOrArray { ^((this.isNumber).or(this.isSequenceableCollection)) }
+	def { ^nil }
+	isNumberOrArray { ^((this.isNumber).or(this.isArray)) }
 
-	//AlgaNode support
+	//AlgaNode / AlgaPattern support
 	algaInstantiated { ^true }
 	algaInstantiatedAsSender { ^true }
 	algaInstantiatedAsReceiver { | param, sender, mix | ^true }
 	algaCleared { ^false }
 	algaToBeCleared { ^false }
+
+	//Like asStream, but also converts inner elements of an Array
+	algaAsStream { ^(this.asStream) }
 
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
 	addAction { | condition, func, sched = 0 |
@@ -39,10 +53,72 @@
 	}
 }
 
+//Essential for 'a16' busses not to be interpreted as an Array!
++String {
+	isNumberOrArray { ^false } //isArray would be true!!
+}
+
+//Fix lincurve with .ir arg
++UGen {
+	algaLinCurve { arg inMin = 0, inMax = 1, outMin = 0, outMax = 1, curve = -4, clip = \minmax;
+		var grow, a, b, scaled, curvedResult;
+		if (curve.isNumber and: { abs(curve) < 0.125 }) {
+			^this.linlin(inMin, inMax, outMin, outMax, clip)
+		};
+		grow = exp(curve);
+		a = outMax - outMin / (1.0 - grow);
+		b = outMin + a;
+		scaled = (this.prune(inMin, inMax, clip) - inMin) / (inMax - inMin);
+
+		curvedResult = b - (a * pow(grow, scaled));
+
+		^Select.perform(this.methodSelectorForRate, abs(curve) >= 0.125, [
+			this.linlin(inMin, inMax, outMin, outMax, clip),
+			curvedResult
+		])
+	}
+}
+
+//Better than checking .class == Symbol
++Symbol {
+	isSymbol { ^true }
+}
+
+//Bettern than checking .class == Event
++Event {
+	isEvent { ^true }
+}
+
+//For Array lincurve
++SequenceableCollection {
+	algaLinCurve { arg ... args; ^this.multiChannelPerform('algaLinCurve', *args) }
+
+	//Also converts each inner element to Streams recursively
+	algaAsStream {
+		this.do({ | entry, i |
+			this[i] = entry.algaAsStream
+		});
+	}
+}
+
+//PlayBuf bug with canFreeSynth
++PlayBuf {
+	canFreeSynth { ^inputs.at(6).isNumber.not or: { inputs.at(6) > 1 } }
+}
+
 +Nil {
     //Fundamental for bug-prone trying to index a nil 'nil[0]'
     //for example when dealing with nested IdentityDictionaries
     at { | index | ^nil }
+
+	//As before (.do is already implemented)
+	keysValuesDo { | key, value | ^nil }
+
+	//Needed for scaleCurve (reduce code boilerplate)
+	clip { | min, max | ^nil }
+
+	//This avoids many problems when .clearing a node used in connections
+	busArg { ^nil }
 }
 
 +SynthDef {
@@ -91,6 +167,26 @@
 	}
 }
 
++Pattern {
+	isPattern { ^true }
+
+	playAlgaRescheduling { | clock, protoEvent, quant |
+		clock = clock ? TempoClock.default;
+		^AlgaReschedulingEventStreamPlayer(
+			this.asStream,
+			protoEvent
+		).play(clock, false, quant)
+	}
+}
+
++Stream {
+	isStream { ^true }
+}
+
++ListPattern {
+	isListPattern { ^true }
+}
+
 //List extensions are used in AlgaScheduler to manage actions
 +List {
 	//object equality!
@@ -136,15 +232,7 @@
 
 //Add support for >> and >>+
 +Buffer {
-
-}
-
-+SystemClock {
-	//If using a SystemClock in AlgaScheduler, just schedule as if quant is time
-	*algaSchedAtQuantOnce { | quant, task |
-		var taskOnce = { task.value; nil };
-		this.sched(quant, taskOnce)
-	}
+	isBuffer { ^true }
 }
 
 +Clock {
@@ -212,6 +300,21 @@
 			"Clock is not a TempoClock. Can't schedule with top priority".warn;
 			this.algaSched(when, taskOnce)
 		});
+	}
+}
+
++SystemClock {
+	//If using the SystemClock in AlgaScheduler, just schedule as if quant is time
+	*algaSchedAtQuantOnce { | quant, task |
+		var taskOnce = { task.value; nil };
+		this.sched(quant, taskOnce)
+	}
+
+	//If using the SystemClock in AlgaScheduler, just schedule as if quant is time
+	*algaSchedAtQuantOnceWithTopPriority { | quant, task |
+		var taskOnce = { task.value; nil };
+		"SystemClock is not a TempoClock. Can't schedule with top priority".warn;
+		this.sched(quant, taskOnce)
 	}
 }
 

@@ -17,14 +17,20 @@
 Alga {
 	classvar <schedulers;
 	classvar <servers;
+	classvar <clocks;
+	classvar <oldSynthDefsDir;
 
 	*initSynthDefs {
 		AlgaStartup.initSynthDefs;
 	}
 
 	*initClass {
-		schedulers = IdentityDictionary(1);
 		servers = IdentityDictionary(1);
+		schedulers = IdentityDictionary(1);
+		clocks = IdentityDictionary(1);
+
+		//Make sure to reset it
+		"SC_SYNTHDEF_PATH".unsetenv;
 	}
 
 	*maxIO {
@@ -35,12 +41,18 @@ Alga {
 		AlgaStartup.algaMaxIO = value
 	}
 
-	*clearScheduler { | server |
-		var scheduler = schedulers[server];
-		if(scheduler != nil, {
-			scheduler.clear;
-			schedulers.removeAt(server);
-		});
+	*setAlgaSynthDefsDir {
+		oldSynthDefsDir = "SC_SYNTHDEF_PATH".getenv;
+		"SC_SYNTHDEF_PATH".setenv(AlgaStartup.algaSynthDefPath);
+	}
+
+	*restoreSynthDefsDir {
+		"SC_SYNTHDEF_PATH".setenv(oldSynthDefsDir);
+	}
+
+	*newServer { | server |
+		server = server ? Server.default;
+		servers[server] = server;
 	}
 
 	*clearServer { | server, prevServerQuit |
@@ -57,29 +69,53 @@ Alga {
 		});
 	}
 
-	*clearAllSchedulers {
-		if(schedulers != nil, {
-			schedulers.do({ | scheduler |
-				scheduler.clear;
-			});
-
-			schedulers.clear;
-		});
-	}
-
 	*newScheduler { | server, clock, cascadeMode = false |
 		schedulers[server] = AlgaScheduler(server, clock, cascadeMode);
-	}
-
-	*newServer { | server |
-		server = server ? Server.default;
-		servers[server] = server;
 	}
 
 	*getScheduler { | server |
 		var scheduler = schedulers[server];
 		if(scheduler.isNil, { ("No AlgaScheduler initialized for server " ++ server.asString).error });
 		^scheduler;
+	}
+
+	*clearScheduler { | server |
+		var scheduler = schedulers[server];
+		if(scheduler != nil, {
+			scheduler.clear;
+			schedulers.removeAt(server);
+		});
+	}
+
+	*clearAllSchedulers {
+		if(schedulers != nil, {
+			schedulers.do({ | scheduler |
+				scheduler.clear;
+			});
+			schedulers.clear;
+		});
+	}
+
+	*newClock { | server, clock |
+		clock = clock ? TempoClock(1, queueSize:16834).permanent_(true);
+		clocks[server] = clock;
+		^clock
+	}
+
+	*clock { | server |
+		if(server.isNil, { server = Server.default });
+		^clocks[server]
+	}
+
+	*checkAlgaAudioControl {
+		if(\AlgaAudioControl.asClass == nil, {
+			"\n************************************************\n".postln;
+			"AlgaAugioControl is not installed. Read the following instructions to install it:".warn;
+			"\n1) Download the AlgaAudioControl UGen from https://github.com/vitreo12/AlgaAudioControl/releases/tag/v0.0.1".postln;
+			"2) Unzip it to your 'Platform.userExtensionDir'".postln;
+			"\nThis UGen fixes some synchronization issues that may result in audio glitches for short enveloped sounds.\nAfter installing it, no further action is required: Alga will detect it and use it internally, and this message will not be shown again.\n".postln;
+			"************************************************\n".postln;
+		});
 	}
 
 	*boot { | onBoot, server, algaServerOptions, clock |
@@ -89,7 +125,7 @@ Alga {
 		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
 		if(algaServerOptions.class != AlgaServerOptions, {
-			"Use an AlgaServerOptions instance as the algaServerOptions argument".error;
+			"Alga: Use an AlgaServerOptions instance as the algaServerOptions argument".error;
 			^this;
 		});
 
@@ -108,14 +144,17 @@ Alga {
 		if(algaServerOptions.supernova, { Server.supernova }, { Server.scsynth });
 		server.options.threads = algaServerOptions.supernovaThreads;
 		server.options.useSystemClock = algaServerOptions.supernovaUseSystemClock;
-		server.options.protocol = algaServerOptions.protocol;
+		server.options.protocol = algaServerOptions.protocol ? \tcp;
 		server.latency = algaServerOptions.latency;
 
-		//Check AlgaSynthDef folder exists...
-		if(File.existsCaseSensitive(AlgaStartup.algaSynthDefIOPath) == false, {
-			("Could not retrieve the correct AlgaSyntDef/IO folder. Running 'Alga.initSynthDefs' now...").warn;
+		//Check AlgaSynthDef/IO folder exists...
+		if(File.exists(AlgaStartup.algaSynthDefIO_numberPath) == false, {
+			("Could not retrieve the correct 'AlgaSyntDefs/IO_...' folder. Running 'Alga.initSynthDefs' now...").warn;
 			this.initSynthDefs;
 		});
+
+		//Use AlgaSynthDefs as folder for SynthDefs
+		this.setAlgaSynthDefsDir;
 
 		//Add to SynthDescLib in order for SynthDef.add to work
 		SynthDescLib.global.addServer(server);
@@ -123,17 +162,20 @@ Alga {
 		//Run CmdPeriod
 		CmdPeriod.run;
 
-		//clear scheduler @server if present
+		//Clear scheduler @server if present
 		this.clearScheduler(server);
 
-		//clear server @server if present, also quit it
+		//Clear server @server if present, also quit it
 		this.clearServer(server, prevServerQuit);
-
-		//Create an AlgaScheduler @ the server (using TempoClock for now...)
-		this.newScheduler(server, clock);
 
 		//Add the server
 		this.newServer(server);
+
+		//Add the clock. Creates a new TempoClock if clock is nil
+		clock = this.newClock(server, clock);
+
+		//Create an AlgaScheduler @ the server
+		this.newScheduler(server, clock);
 
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
@@ -143,7 +185,21 @@ Alga {
 
 				//Execute onBoot function
 				onBoot.value;
+
+				//Check AlgaAudioControl so that it's printed after boot
+				this.checkAlgaAudioControl;
 			});
+		});
+	}
+
+	*quit { | onQuit, server |
+		var prevServerQuit = [false]; //pass by reference: use Array
+		server = server ? Server.default;
+		this.clearScheduler(server);
+		this.clearServer(server, prevServerQuit);
+		this.restoreSynthDefsDir;
+		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
+			onQuit.value;
 		});
 	}
 }

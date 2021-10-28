@@ -29,7 +29,7 @@ AlgaBlock {
 	var <runningIndex;
 
 	//bottom most and top most nodes in this block
-	var <bottomOutNodes, <topInNodes;
+	var <bottomOutNodes; //, <topInNodes;
 
 	//the index for this block in the AlgaBlocksDict global dict
 	var <blockIndex;
@@ -45,10 +45,16 @@ AlgaBlock {
 		nodesDict      = IdentityDictionary(20);
 		statesDict     = IdentityDictionary(20);
 		bottomOutNodes = IdentityDictionary();
-		topInNodes     = IdentityDictionary();
+		//topInNodes     = IdentityDictionary();
 	}
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
+		//Unpack AlgaArg
+		if(node.isAlgaArg, {
+			node = node.sender;
+			if(node.isAlgaNode.not, { ^nil });
+		});
+
 		//Add to dict
 		nodesDict.put(node, node);
 
@@ -81,14 +87,14 @@ AlgaBlock {
 
 		//Remove this block from AlgaBlocksDict if it's empty!
 		if(nodesDict.size == 0, {
-			("Deleting empty block: " ++ blockIndex).warn;
+			//("Deleting empty block: " ++ blockIndex).warn;
 			AlgaBlocksDict.blocksDict.removeAt(nodeBlockIndex);
 		});
 	}
 
 	rearrangeBlock {
 		//ordered collection
-		orderedArray = Array.newClear(nodesDict.size);
+		orderedArray = Array.new;
 
 		//Find the nodes with no outNodes (so, the last ones in the chain!), and init the statesDict
 		this.findBottomMostOutNodesAndInitStatesDict;
@@ -98,7 +104,7 @@ AlgaBlock {
 
 		//Store the rearranging results in this.orderedArray
 		bottomOutNodes.do({ | node |
-			this.rearrangeBlockLoop(node, node);
+			this.rearrangeBlockLoop(node);
 		});
 
 		this.sanitizeArray;
@@ -125,19 +131,30 @@ AlgaBlock {
 		this.sanitizeDict;
 	}
 
-	//Remove nil entries or ones that do not have any in our out connections
+	//Remove nil entries or ones that do not have any in or out connections
 	sanitizeArray {
 		orderedArray.removeAllSuchThat({ | item |
-			var removeCondition;
+			var removeCondition = false;
 
 			//If nil, remove entry anyway. Otherwise, look for the other cases.
 			if(item == nil, {
 				removeCondition = true;
 			}, {
 				removeCondition = (item.inNodes.size == 0).and(item.outNodes.size == 0);
-			});
 
-			//removeCondition.postln;
+				if(item.patternOutNodes != nil, {
+					removeCondition = removeCondition.and(item.patternOutNodes.size == 0);
+				});
+
+				//Check that the current item is not used for patternOut of other nodes
+				nodesDict.do({ | algaNode |
+					if(algaNode.isAlgaNode, {
+						removeCondition = removeCondition.and(
+							algaNode.isContainedInPatternOut(item).not
+						);
+					});
+				});
+			});
 
 			removeCondition;
 		});
@@ -162,7 +179,7 @@ AlgaBlock {
 
 				//Remove node from block
 				if(result.not, {
-					("Removing node at group " ++ node.group ++ " from block number " ++ blockIndex).warn;
+					//("Removing node at group " ++ node.group ++ " from block number " ++ blockIndex).warn;
 					this.removeNode(node);
 				});
 
@@ -180,7 +197,10 @@ AlgaBlock {
 
 	//Have something to automatically remove Nodes that haven't been touched from the dict
 	rearrangeBlockLoop { | node |
-		if(node != nil, {
+		//Unpack AlgaArg if needed
+		if(node.isAlgaArg, { node = node.sender });
+
+		if(node.isAlgaNode, {
 			var nodeState = statesDict[node];
 
 			//If for any reason the node wasn't already in the nodesDict, add it
@@ -195,16 +215,20 @@ AlgaBlock {
 				//it's also essential for this to be before the next loop
 				statesDict[node] = true;
 
+				//rearrange inputs to this, this will add the inNodes
 				node.inNodes.nodesLoop ({ | inNode |
-					//rearrangeInputs to this, this will add the inNodes
 					this.rearrangeBlockLoop(inNode);
 				});
 
-				//Add this
-				orderedArray[runningIndex] = node;
+				//rearrange inputs to this, this will add the patternOutNodes
+				if(node.patternOutNodes != nil, {
+					node.patternOutNodes.nodesLoop ({ | inNode |
+						this.rearrangeBlockLoop(inNode);
+					});
+				});
 
-				//Advance counter
-				runningIndex = runningIndex + 1;
+				//Add node to orderedArray
+				orderedArray = orderedArray.add(node);
 			});
 		});
 	}
@@ -221,8 +245,17 @@ AlgaBlock {
 			});
 		}, {
 			nodesDict.do({ | node |
-				//Find the ones with no outNodes but at least one inNode
-				if((node.outNodes.size == 0).and(node.inNodes.size > 0), {
+				var inNodesCondition = (node.inNodes.size > 0);
+				var condition;
+
+				if(node.patternOutNodes != nil, {
+					inNodesCondition = inNodesCondition.or(node.patternOutNodes.size > 0)
+				});
+
+				condition = (node.outNodes.size == 0).and(inNodesCondition);
+
+				//Find the ones with no outNodes but at least one inNode or patternOutNode
+				if(condition, {
 					bottomOutNodes.put(node, node);
 				});
 
@@ -242,14 +275,6 @@ AlgaBlocksDict {
 	}
 
 	*createNewBlockIfNeeded { | receiver, sender |
-		var newBlockIndex;
-		var newBlock;
-
-		var receiverBlockIndex;
-		var senderBlockIndex;
-		var receiverBlock;
-		var senderBlock;
-
 		//This happens when patching a simple number or array in to set a param
 		if((receiver.isAlgaNode.not).or(sender.isAlgaNode.not), { ^nil });
 
@@ -258,6 +283,28 @@ AlgaBlocksDict {
 			("AlgaBlocksDict: Trying to create a block between two AlgaNodes on different servers").error;
 			^receiver;
 		});
+
+		//Check if groups are instantiated, otherwise push action to scheduler
+		if((receiver.group != nil).and(sender.group != nil), {
+			this.createNewBlockIfNeeded_inner(receiver, sender)
+		}, {
+			receiver.scheduler.addAction(
+				condition: { (receiver.group != nil).and(sender.group != nil) },
+				func: {
+					this.createNewBlockIfNeeded_inner(receiver, sender)
+				}
+			)
+		});
+	}
+
+	*createNewBlockIfNeeded_inner { | receiver, sender |
+		var newBlockIndex;
+		var newBlock;
+
+		var receiverBlockIndex;
+		var senderBlockIndex;
+		var receiverBlock;
+		var senderBlock;
 
 		//Unpack things
 		receiverBlockIndex = receiver.blockIndex;

@@ -29,6 +29,9 @@ AlgaDynamicEnvGate {
 		//1 / fadeTime. Sanitize is for fadeTime = 0
 		var invFadeTime = Select.kr(realFadeTime > 0, [0, realFadeTime.reciprocal]);
 
+		//Ensure that t_release can only be triggered once
+		real_t_release = Select.kr(PulseCount.kr(real_t_release) <= 1, [0, real_t_release]);
+
 		//Trick: if fadeTime is 0 or less, the increment will be BlockSize
 		//(which will make Sweep jump to 1 instantly)
 		invFadeTime = Select.kr(realFadeTime > 0, [BlockSize.ir, invFadeTime]);
@@ -75,6 +78,9 @@ AlgaDynamicEnvGate {
 
 		//1 / fadeTime. Sanitize is for fadeTime = 0
 		var invFadeTime = Select.kr(realFadeTime > 0, [0, realFadeTime.reciprocal]);
+
+		//Ensure that t_release can only be triggered once
+		real_t_release = Select.kr(PulseCount.kr(real_t_release) <= 1, [0, real_t_release]);
 
 		//Trick: if fadeTime is 0 or less, the increment will be BlockSize
 		//(which will make Sweep jump to 1 instantly)
