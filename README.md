@@ -10,8 +10,6 @@ static audio patches. In *Alga*, the definition of a new connection between the 
 and the input of another does not happen instantaneously, but it triggers a process of *parameter
 interpolation* over a specified window of time.
 
-For usage and examples, check the *Help files* and the *Examples* folder.
-
 ## Installation
 
 To install *AlgaLib*, you can either:
@@ -32,8 +30,11 @@ internally. To install the `AlgaAudioControl` *UGen* follow these simple instruc
 
 ## Examples
 
+For usage and examples, check the *Help files* and the *Examples* folder. 
+
 ### AlgaNode
 
+```SuperCollider
     //Boot Alga and declare an AlgaSynthDef
     (
     Alga.boot({
@@ -73,6 +74,7 @@ internally. To install the `AlgaAudioControl` *UGen* follow these simple instruc
 
     //Bye bye
     a.clear(time:3);
+```
 
 ### AlgaPattern
 
