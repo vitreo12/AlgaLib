@@ -73,7 +73,7 @@ Alga.boot({
 	//Note that for it to be used in an AlgaPattern it must free itself.
 	//Also, note the 'sampleAccurate' argument. This allows the AlgaSynthDef to use OffsetOut instead of Out
 	//for sample accurate retriggering.
-	AlgaSynthDef(\sine, {
+	AlgaSynthDef(\sinePerc, {
 		SinOsc.ar(\freq.kr(440)) * EnvPerc.ar
 	}, sampleAccurate: true).add;
 
@@ -83,7 +83,7 @@ Alga.boot({
 	//Create an AlgaPattern and play it.
 	//Unlike Pbind, AlgaPatterns use an Event to describe the parameter -> value mapping.
 	a = AlgaPattern((
-		def: \sine,
+		def: \sinePerc,
 		dur: 0.5
 	)).play(chans: 2);
 });

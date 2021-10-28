@@ -217,14 +217,14 @@ code::
 //Boot Alga and declare an AlgaSynthDef
 (
 Alga.boot({
-	AlgaSynthDef(\mySineOsc, {
+	AlgaSynthDef(\sine, {
 		SinOsc.ar(\freq.ar(440))
 	}).add;
 });
 )
 
 //Declare a node and play to stereo output
-a = AlgaNode(\mySineOsc, interpTime:2).play(chans:2);
+a = AlgaNode(\sine, interpTime:2).play(chans:2);
 
 //Change \freq parameter. Note how it interpolates to new value over 2 seconds
 a <<.freq 220;
@@ -237,7 +237,7 @@ b = AlgaNode({ Pulse.ar(LFNoise1.kr(1).range(1, 100)) });
 a.from(b, \freq, scale: [100, 1000], time:5);
 
 //Declare a new Sine oscillator to use as LFO
-c = AlgaNode(\mySineOsc, [\freq, 2]);
+c = AlgaNode(\sine, [\freq, 2]);
 
 //Also connect c to a's \freq, mixing with what was already there.
 //This will use a's interpTime, 2

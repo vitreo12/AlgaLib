@@ -38,14 +38,14 @@ For usage and examples, check the *Help files* and the *Examples* folder.
 //Boot Alga and declare an AlgaSynthDef
 (
 Alga.boot({
-    AlgaSynthDef(\mySineOsc, {
+    AlgaSynthDef(\sine, {
         SinOsc.ar(\freq.ar(440))
     }).add;
 });
 )
 
 //Declare a node and play to stereo output
-a = AlgaNode(\mySineOsc, interpTime:2).play(chans:2);
+a = AlgaNode(\sine, interpTime:2).play(chans:2);
 
 //Change \freq parameter. Note how it interpolates to new value over 2 seconds
 a <<.freq 220;
@@ -58,7 +58,7 @@ b = AlgaNode({ Pulse.ar(LFNoise1.kr(1).range(1, 100)) });
 a.from(b, \freq, scale: [100, 1000], time:5);
 
 //Declare a new Sine oscillator to use as LFO
-c = AlgaNode(\mySineOsc, [\freq, 2]);
+c = AlgaNode(\sine, [\freq, 2]);
 
 //Also connect c to a's \freq, mixing with what was already there.
 //This will use a's interpTime, 2
@@ -86,7 +86,7 @@ Alga.boot({
     //Note that for it to be used in an AlgaPattern it must free itself.
     //Also, note the 'sampleAccurate' argument. This allows the AlgaSynthDef to use OffsetOut instead of Out
     //for sample accurate retriggering.
-    AlgaSynthDef(\sine, {
+    AlgaSynthDef(\sinePerc, {
         SinOsc.ar(\freq.kr(440)) * EnvPerc.ar
     }, sampleAccurate: true).add;
 
@@ -96,7 +96,7 @@ Alga.boot({
     //Create an AlgaPattern and play it.
     //Unlike Pbind, AlgaPatterns use an Event to describe the parameter -> value mapping.
     a = AlgaPattern((
-        def: \sine,
+        def: \sinePerc,
         dur: 0.5
     )).play(chans: 2);
 });
