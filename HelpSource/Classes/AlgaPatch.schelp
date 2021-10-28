@@ -1,0 +1,36 @@
+TITLE:: AlgaPatch
+summary:: Schedule Alga connections sequentially to create a reproducible patch
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern
+
+DESCRIPTION::
+An link::Classes/AlgaPatch:: allows the user to schedule specific actions to always be executed sequentially (top to bottom). This allows for reproducible environments to be created.
+
+CLASSMETHODS::
+METHOD:: new
+Create a new patch.
+ARGUMENT:: func
+Function to execute.
+ARGUMENT:: server
+The link::Classes/Server:: where the emphasis::patch:: should be executed on
+
+EXAMPLES::
+code::
+(
+Alga.boot({
+	AlgaPatch({
+		a = AlgaNode({ SinOsc.ar(\freq.kr(220) + \fm.ar(0)) }, interpTime:5, playTime:0.5).play(chans:2);
+		b = AlgaNode({ SinOsc.ar(\freq.kr(134) + \fm.ar(0)) }, interpTime:3);
+		a.from(b, \fm, scale:[-100, 100]);
+		b.from(a, \fm, scale:[-50, 50]); //feedback connection!
+
+		//Change root frequencies
+		b <<.freq 25;
+		a <<.freq 103;
+
+		//Change the oscillator implementation, using a Saw wave instead
+		b.replace({ Saw.ar(\freq.kr + \fm.ar) })
+	});
+});
+)
+::
