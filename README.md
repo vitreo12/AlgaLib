@@ -11,3 +11,13 @@ and the input of another does not happen instantaneously, but it triggers a proc
 interpolation* over a specified window of time.
 
 For usage and examples, check the *Help files* and the *Examples* folder.
+
+###AlgaAudioControl
+
+This *UGen* fixes some synchronization issues that may result in audio glitches for short enveloped
+sounds. After installing it, no further action is required: *Alga* will detect it and use it
+internally. To install the `AlgaAudioControl` *UGen* follow these simple instructions:
+
+1. Download from https://github.com/vitreo12/AlgaAudioControl/releases/tag/v0.0.1
+
+2. Unzip it to your *SuperCollider*'s `Platform.userExtensionDir`. 
