@@ -1,12 +1,14 @@
 TITLE:: Alga
-summary:: live-coding dialect focused on the interpolation between sonic nodes
+summary:: live coding language focused on the interpolation between sonic nodes
 categories:: Alga
 related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaServerOptions
 
 DESCRIPTION::
-emphasis::Alga:: is a new live coding language whose focus is not on pattern manipulation, but on describing dynamic connections between nodes. By linking link::Classes/AlgaNode::s together, it is possible to create a fluid, complex network of sonic interactions. What makes emphasis::Alga:: different from other environments is its interpolation capabilities. In fact, the nature of the connections between link::Classes/AlgaNode::s arises from continuous processes of interpolation between the current states of the system and future ones, over specified windows of time.
+emphasis::Alga:: is a new live coding language whose focus is on describing dynamic connections between nodes. By linking link::Classes/AlgaNode::s together, it is possible to create a fluid, complex network of sonic interactions. What makes emphasis::Alga:: different from other environments is its interpolation capabilities. In fact, the nature of the connections between link::Classes/AlgaNode::s arises from continuous processes of interpolation between the current states of the system and future ones, over specified windows of time.
+link::Classes/AlgaNode::'s sister class, link::Classes/AlgaPattern::, represents
+the polyphonic counterpart to this paradigm.
 
-Check the link::Classes/AlgaNode:: help file for examples on usage.
+Check out the link::Classes/AlgaNode:: and link::Classes/AlgaPattern:: help files for examples on usage.
 
 CLASSMETHODS::
 
@@ -50,3 +52,4 @@ private:: newClock
 private:: oldSynthDefsDir
 private:: restoreSynthDefsDir
 private:: setAlgaSynthDefsDir
+private:: checkAlgaAudioControl
