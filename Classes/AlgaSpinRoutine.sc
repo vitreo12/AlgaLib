@@ -28,10 +28,12 @@ AlgaSpinRoutine {
 				while( { condition.value.not }, {
 					interval.wait;
 					accumTime = accumTime + interval;
-					if(accumTime >= maxTime, {
-						"AlgaSpinRoutine: exceeded maximum wait time".error;
-						exceededMaxTime = true;
-						condition = { true };
+					if(maxTime != nil, {
+						if(accumTime >= maxTime, {
+							"AlgaSpinRoutine: exceeded maximum wait time".error;
+							exceededMaxTime = true;
+							condition = { true };
+						});
 					});
 				});
 

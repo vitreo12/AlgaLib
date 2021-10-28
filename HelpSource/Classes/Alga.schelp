@@ -1,7 +1,7 @@
 TITLE:: Alga
 summary:: live-coding dialect focused on the interpolation between sonic nodes
 categories:: Alga
-related:: Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaServerOptions
+related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaServerOptions
 
 DESCRIPTION::
 emphasis::Alga:: is a new live coding language whose focus is not on pattern manipulation, but on describing dynamic connections between nodes. By linking link::Classes/AlgaNode::s together, it is possible to create a fluid, complex network of sonic interactions. What makes emphasis::Alga:: different from other environments is its interpolation capabilities. In fact, the nature of the connections between link::Classes/AlgaNode::s arises from continuous processes of interpolation between the current states of the system and future ones, over specified windows of time.
@@ -21,6 +21,13 @@ An instance of link::Classes/AlgaServerOptions:: to boot the server with. If not
 ARGUMENT:: clock
 The emphasis::Clock:: for the internal link::Classes/AlgaScheduler::. If not specified, a default link::Classes/TempoClock:: will be created.
 
+METHOD:: quit
+Quit emphasis::Alga::.
+ARGUMENT:: onQuit
+Execute a link::Classes/Function:: on quit.
+ARGUMENT:: server
+The link::Classes/Server:: to quit emphasis::Alga:: from.
+
 METHOD:: maxIO
 Change the maximum number of IO connections between link::Classes/AlgaNode::s. This requires the emphasis::initSynthDefs:: method to re-compile all the necessary link::Classes/AlgaSynthDef::s. The default value is 8.
 ARGUMENT:: value
@@ -37,3 +44,9 @@ private:: newScheduler
 private:: newServer
 private:: schedulers
 private:: servers
+private:: clock
+private:: clocks
+private:: newClock
+private:: oldSynthDefsDir
+private:: restoreSynthDefsDir
+private:: setAlgaSynthDefsDir

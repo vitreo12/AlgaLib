@@ -1,0 +1,98 @@
+TITLE:: AlgaTemp
+summary:: Represents a temporary AlgaNode to be used for on-the-fly definitions of AlgaNodes' and AlgaPatterns' parameters
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern
+
+DESCRIPTION::
+An link::Classes/AlgaTemp:: represents a temporary link::Classes/AlgaNode::. This emphasis::node:: will be created ad-hoc when requested, and patched to the according parameter of the parent link::Classes/AlgaNode:: or link::Classes/AlgaPattern::.
+
+CLASSMETHODS::
+METHOD:: new
+Create a new link::Classes/AlgaTemp::.
+ARGUMENT:: def
+A definition: a link::Classes/Function:: or emphasis::Symbol:: pointing to a valid link::Classes/AlgaSynthDef::.
+ARGUMENT:: chans
+A specific emphasis::channels:: mapping to take from the emphasis::def::.
+ARGUMENT:: scale
+A specific emphasis::scaling:: to apply to the output of the emphasis::def::.
+
+
+INSTANCEMETHODS::
+
+
+EXAMPLES::
+subsection:: AlgaNode
+code::
+//AlgaTemp can also be used as an 'arg'
+(
+Alga.boot({
+	a = AlgaNode(
+		{ SinOsc.ar(\freq.kr(220) + \fm.ar) },
+		[\fm, AlgaTemp({ LFNoise2.ar(1000) }, scale: [-200, 880])]
+	).play(chans: 2);
+});
+)
+
+//Using a new AlgaTemp
+a.from(AlgaTemp({ LFNoise0.ar(1) }, scale: [-330, 660]), \fm, time: 2)
+
+//Using a Function will wrap it in an AlgaTemp
+a.from({ LFNoise1.ar(100) }, \fm, scale: [-100, 500], time: 2)
+
+//AlgaTemps can be complex (AlgaTemps modifying AlgaTemps...)
+(
+a.from(
+	AlgaTemp((
+		def: { LFNoise1.ar(\freq.kr(10)) },
+		freq: AlgaTemp({ LFNoise0.kr(10) }, scale: [250, 1000])
+	),
+	scale: [-100, 200]),
+	\fm, time: 2)
+)
+
+//Resetting will go back to 'args': the original AlgaTemp
+a.resetParam(\fm, time: 2)
+
+//Bye Bye
+a.clear(time: 2);
+::
+
+subsection:: AlgaPattern
+code::
+(
+Alga.boot({
+	a = AlgaPattern((
+		def: { SinOsc.ar(\freq.kr(220) + \fm.ar) * EnvPerc.ar(release: 0.5) },
+		dur: 0.5,
+		fm: Pseq([
+			AlgaTemp({ SinOsc.ar(200) }, scale: [-100, 100]),
+			AlgaTemp({ Saw.ar(40) }, scale: [-200, 200])
+		], inf)
+	)).play(chans: 2);
+});
+)
+
+//Connect a new Prand using AlgaTemps
+(
+a.from( Prand([
+	AlgaTemp({ LFNoise0.ar(10) }, scale: [-200, 600]),
+	AlgaTemp({ SinOsc.ar(100) }, scale: [-100, 1000]),
+	AlgaTemp({ Pulse.ar(5) }, scale: [40, 500])
+], inf),
+\fm, time: 3)
+)
+
+//Bye bye
+a.clear(time: 2);
+::
+
+private:: checkValidSynthDef
+private:: controlNames
+private:: def
+private:: isAlgaTemp
+private:: numChannels
+private:: rate
+private:: scale
+private:: setDef
+private:: valid
+private:: chans

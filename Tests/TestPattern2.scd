@@ -8,14 +8,13 @@ Alga.boot({
 	s.sync;
 
 	b = AlgaNode({SinOsc.kr([1, 2]).range(10, 1000)});
-
 	a = AlgaPattern((
 		def: \test,
 		dur: 1,
 		freq: Pwhite(400, 1000)
 	)).play;
 
-	//s.plotTree
+	s.plotTree
 });
 )
 

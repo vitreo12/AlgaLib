@@ -1,7 +1,7 @@
 TITLE:: AlgaServerOptions
 summary:: ServerOptions for Alga
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaNode
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern
 
 DESCRIPTION::
 Convenience wrapper around link::Classes/ServerOptions:: to work nicely when using link::Classes/Alga::.
@@ -29,7 +29,7 @@ ARGUMENT:: maxNodes
 Set the maximum number of concurrent nodes on the server. Default value is 32768.
 ARGUMENT:: maxSynthDefs
 Set the maximum number of link::Classes/AlgaSynthDef::s. Default value is 32768.
-ARGUMENT:: numWireBus
+ARGUMENT:: numWireBufs
 Set the maximum number of internal connections for an link::Classes/AlgaSynthDef::s. Default value is 32768.
 ARGUMENT:: supernova
 Boot a supernova server insead of scsynth. Default is false
@@ -37,11 +37,6 @@ ARGUMENT:: supernovaThreads
 Set number of threads to boot supernova with. Default is code::Server.default.options.threads::.
 ARGUMENT:: supernovaUseSystemClock
 Set supernova to use system clock for more accuracy in syncinc with sclang. Default is true.
-ARGUMENT:: protocol
-Set the OSC protocol to boot the server with. Default is code::\tcp::.
-note::
-The code::\udp:: protocol does not work nicely with link::Classes/Alga:: as it might drop OSC packages which are essential in the language to server communication.
-::
 ARGUMENT:: latency
 Set the latency in scheduling OSC messages. Default is code::Server.default.latency::.
 note::
