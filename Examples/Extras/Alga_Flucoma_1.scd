@@ -1,3 +1,6 @@
+//This example requires the FluCoMa tools to be installed from::
+//https://www.flucoma.org/download/
+
 (
 Alga.boot({
 	//Sine oscillator with frequency modulation
@@ -27,4 +30,9 @@ a.from(b, \fm, scale:[-1432, 679], time:3);
 a.from(100, \freq, time:2);
 
 //Bye bye
-a.clear(time:3);
+(
+a.clear({
+	b.clear;
+	c.clear;
+}, time:3)
+);
