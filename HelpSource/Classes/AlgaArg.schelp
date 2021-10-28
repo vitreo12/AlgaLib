@@ -5,12 +5,60 @@ related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaTemp
 
 
 DESCRIPTION::
+An link::Classes/AlgaArg:: represents a direct reference to a running link::Classes/AlgaNode::. This can be then used as a parameter for other running link::Classes/AlgaNode::s and link::Classes/AlgaPattern::s.
 
 
 CLASSMETHODS::
 
-
-INSTANCEMETHODS::
-
+METHOD:: new
+Create a new link::Classes/AlgaArg::.
+ARGUMENT:: node
+The running link::Classes/AlgaNode::.
+ARGUMENT:: chans
+A specific emphasis::channels:: mapping to take from the emphasis::node::.
+ARGUMENT:: scale
+A specific emphasis::scaling:: to apply to the output of the emphasis::node::.
 
 EXAMPLES::
+subsection:: AlgaNode
+code::
+//In the case of AlgaNodes, AlgaArg can be used to patch a running node as one of the 'args'.
+(
+Alga.boot({
+	b = AlgaNode({ SinOsc.ar(100) });
+	a = AlgaNode(
+		{ SinOsc.ar(\freq.kr(220) + \fm.ar) },
+		[\fm, AlgaArg(b, scale: [-100, 100])]
+	).play(chans: 2);
+});
+)
+::
+
+subsection:: AlgaPattern
+code::
+//In the case of AlgaPatterns, AlgaArg can be used at any time to patch a specific node to a parameter.
+(
+Alga.boot({
+	b = AlgaNode({ SinOsc.ar(100) });
+	c = AlgaNode({ Pulse.ar(100) });
+	s.sync;
+	a = AlgaPattern((
+		def: { SinOsc.ar(\freq.kr(220) + \fm.ar) * EnvPerc.ar(release: 0.5) },
+		dur: 0.5,
+		fm: Pseq([
+			AlgaArg(b, scale: [-100, 100]),
+			AlgaArg(c, scale: [-200, 200])
+		], inf)
+	)).play(chans: 2);
+});
+)
+::
+
+private:: algaInstantiatedAsSender
+private:: blockIndex
+private:: chans
+private:: inNodes
+private:: isAlgaArg
+private:: outNodes
+private:: scale
+private:: sender
