@@ -12,6 +12,14 @@ interpolation* over a specified window of time.
 
 For usage and examples, check the *Help files* and the *Examples* folder.
 
+## Installation
+
+To install *AlgaLib*, you can either:
+
+1. Use the `Quarks` system: `Quarks.install("AlgaLib")`
+
+2. `git clone` this repository to your `Platform.userExtensionDir`.
+
 ### AlgaAudioControl
 
 This *UGen* fixes some synchronization issues that may result in audio glitches for short enveloped
