@@ -8,7 +8,7 @@ DESCRIPTION::
 note::
 For emphasis::SuperCollider:: < 3.13, it is highly suggested to download the
 custom emphasis::AlgaAudioControl:: link::Classes/UGen:: from
-https://github.com/vitreo12/AlgaAudioControl/releases/tag/v0.0.1 and install it
+https://github.com/vitreo12/AlgaAudioControl/releases/tag/v1.0.0 and install it
 in your code::Platform.userExtensionDir::. This
 link::Classes/UGen:: fixes some synchronization issues that may result in audio
 glitches for short enveloped sounds. After installing it, no further action is
