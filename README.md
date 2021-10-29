@@ -35,17 +35,21 @@ For usage and examples, check the *Help files* and the *Examples* folder.
 ### AlgaNode
 
 ```SuperCollider
-//Boot Alga and declare an AlgaSynthDef
+//Boot Alga
 (
 Alga.boot({
+	//Declare an AlgaSynthDef
     AlgaSynthDef(\sine, {
         SinOsc.ar(\freq.ar(440))
     }).add;
+	
+    //Wait for definition to be sent to server
+	s.sync;
+	
+	//Declare a node and play to stereo output
+	a = AlgaNode(\sine, interpTime:2).play(chans:2);
 });
 )
-
-//Declare a node and play to stereo output
-a = AlgaNode(\sine, interpTime:2).play(chans:2);
 
 //Change \freq parameter. Note how it interpolates to new value over 2 seconds
 a <<.freq 220;
