@@ -34,6 +34,8 @@ For usage and examples, check the *Help files* and the *Examples* folder.
 
 ### AlgaNode
 
+https://user-images.githubusercontent.com/32070555/139412547-f727eed9-aa9e-4efd-a17d-ea41a5476bbc.mp4
+
 ```SuperCollider
 //Boot Alga
 (
@@ -81,6 +83,8 @@ a.clear(time:3);
 ```
 
 ### AlgaPattern
+
+https://user-images.githubusercontent.com/32070555/139412596-2e8ebe1b-ce53-4667-941e-d95e722763d5.mp4
 
 ```SuperCollider
 (
