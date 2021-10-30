@@ -1,9 +1,9 @@
 AlgaLib 
 =======
 
-This is the *SuperCollider* implementation of *Alga*, an interpolating live coding language.
+This is the *SuperCollider* implementation of *Alga*, an interpolating live coding environment.
 
-*Alga* is a new language for live coding that focuses on the creation and connection of sonic
+*Alga* is a new environment for live coding that focuses on the creation and connection of sonic
 modules. Unlike other audio software environments, the act of connecting *Alga* modules together is
 viewed as an essential component of music composing and improvising, and not just as a mean towards
 static audio patches. In *Alga*, the definition of a new connection between the output of a module
