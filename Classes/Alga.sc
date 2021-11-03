@@ -55,7 +55,11 @@ Alga {
 		servers[server] = server;
 	}
 
-	*clearServer { | server, prevServerQuit |
+	*clearServer { | server |
+		if(server != nil, { servers.removeAt(server) });
+	}
+
+	*quitServerAndClear { | server, prevServerQuit |
 		var tempServer = servers[server];
 		if(tempServer != nil, {
 			if(tempServer.serverRunning, {
@@ -63,7 +67,7 @@ Alga {
 			}, {
 				prevServerQuit[0] = true;
 			});
-			servers.removeAt(tempServer);
+			this.clearServer(tempServer);
 		}, {
 			prevServerQuit[0] = true;
 		});
@@ -153,9 +157,6 @@ Alga {
 			this.initSynthDefs;
 		});
 
-		//Use AlgaSynthDefs as folder for SynthDefs
-		this.setAlgaSynthDefsDir;
-
 		//Add to SynthDescLib in order for SynthDef.add to work
 		SynthDescLib.global.addServer(server);
 
@@ -166,7 +167,7 @@ Alga {
 		this.clearScheduler(server);
 
 		//Clear server @server if present, also quit it
-		this.clearServer(server, prevServerQuit);
+		this.quitServerAndClear(server, prevServerQuit);
 
 		//Add the server
 		this.newServer(server);
@@ -177,11 +178,17 @@ Alga {
 		//Create an AlgaScheduler @ the server
 		this.newScheduler(server, clock);
 
+		//Use AlgaSynthDefs as SC_SYNTHDEF_PATH
+		this.setAlgaSynthDefsDir;
+
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
 				//Make sure to init groups
 				server.initTree;
+
+				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
+				this.restoreSynthDefsDir;
 
 				//Execute onBoot function
 				onBoot.value;
@@ -193,13 +200,13 @@ Alga {
 	}
 
 	*quit { | onQuit, server |
-		var prevServerQuit = [false]; //pass by reference: use Array
 		server = server ? Server.default;
-		this.clearScheduler(server);
-		this.clearServer(server, prevServerQuit);
-		this.restoreSynthDefsDir;
-		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
-			onQuit.value;
+		if(servers[server] != nil, {
+			server.quit(onComplete: {
+				this.clearServer(server);
+				this.clearScheduler(server);
+				onQuit.value;
+			});
 		});
 	}
 }
