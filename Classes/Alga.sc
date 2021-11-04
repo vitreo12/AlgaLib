@@ -18,6 +18,7 @@ Alga {
 	classvar <schedulers;
 	classvar <servers;
 	classvar <clocks;
+	classvar <parGroups;
 	classvar <oldSynthDefsDir;
 
 	*initSynthDefs {
@@ -28,6 +29,7 @@ Alga {
 		servers = IdentityDictionary(1);
 		schedulers = IdentityDictionary(1);
 		clocks = IdentityDictionary(1);
+		parGroups = IdentityDictionary(1);
 
 		//Make sure to reset it
 		"SC_SYNTHDEF_PATH".unsetenv;
@@ -106,8 +108,29 @@ Alga {
 	}
 
 	*clock { | server |
-		if(server.isNil, { server = Server.default });
+		server = server ? Server.default;
 		^clocks[server]
+	}
+
+	*addParGroupOnServerTree {
+		//ServerActions pass the server as first arg
+		var serverTreeParGroupFunc = { | server |
+			//If it's an Alga booted server, create a ParGroup at head
+			if(servers[server] != nil, {
+				parGroups[server] = ParGroup(server.defaultGroup)
+			});
+		};
+
+		//Add the function to the init of ServerTree
+		ServerTree.add(serverTreeParGroupFunc);
+
+		//On Server quit, remove the func
+		ServerQuit.add({ ServerTree.remove(serverTreeParGroupFunc) });
+	}
+
+	*parGroup { | server |
+		server = server ? Server.default;
+		^parGroups[server]
 	}
 
 	*checkAlgaAudioControl {
@@ -177,15 +200,15 @@ Alga {
 		//Create an AlgaScheduler @ the server
 		this.newScheduler(server, clock);
 
+		//Create ParGroup when the server boots and keep it persistent
+		this.addParGroupOnServerTree;
+
 		//Use AlgaSynthDefs as SC_SYNTHDEF_PATH
 		this.setAlgaSynthDefsDir;
 
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
-				//Make sure to init groups
-				server.initTree;
-
 				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
 				this.restoreSynthDefsDir;
 

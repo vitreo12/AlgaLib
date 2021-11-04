@@ -567,7 +567,8 @@ AlgaNode {
 	}
 
 	createAllGroups {
-		group = AlgaGroup(server);
+		var parGroup = Alga.parGroup(server);
+		group = AlgaGroup(parGroup);
 		playGroup = AlgaGroup(group);
 		synthGroup = AlgaGroup(group);
 		normGroup = AlgaGroup(group);
@@ -3838,6 +3839,16 @@ AlgaNode {
 	//Move this node's group after another node's one
 	moveAfter { | node |
 		group.moveAfter(node.group);
+	}
+
+	//Move inside another group (head)
+	moveToHead { | argGroup |
+		group.moveToHead(argGroup);
+	}
+
+	//Move inside another group (tail)
+	moveToTail { | argGroup |
+		group.moveToTail(argGroup);
 	}
 
 	//Number plays those number of channels sequentially

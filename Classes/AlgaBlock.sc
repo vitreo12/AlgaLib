@@ -28,24 +28,25 @@ AlgaBlock {
 	//Counter for correct ordering of entries in orderedArray
 	var <runningIndex;
 
-	//bottom most and top most nodes in this block
-	var <bottomOutNodes; //, <topInNodes;
+	//bottom most nodes in this block
+	var <bottomOutNodes;
 
 	//the index for this block in the AlgaBlocksDict global dict
 	var <blockIndex;
 
-	*new { | inBlockIndex |
-		^super.new.init(inBlockIndex);
+	//the Group
+	var <group;
+
+	*new { | parGroup |
+		^super.new.init(parGroup)
 	}
 
-	init { | inBlockIndex |
-
-		blockIndex = inBlockIndex;
-
+	init { | parGroup |
 		nodesDict      = IdentityDictionary(20);
 		statesDict     = IdentityDictionary(20);
 		bottomOutNodes = IdentityDictionary();
-		//topInNodes     = IdentityDictionary();
+		group          = Group(parGroup);
+		blockIndex     = group.nodeID;
 	}
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
@@ -57,6 +58,9 @@ AlgaBlock {
 
 		//Add to dict
 		nodesDict.put(node, node);
+
+		//Add to group
+		node.moveToHead(group);
 
 		//Check mismatch
 		if(node.blockIndex != blockIndex, {
@@ -72,9 +76,7 @@ AlgaBlock {
 	}
 
 	removeNode { | node |
-		var nodeBlockIndex = node.blockIndex;
-
-		if(nodeBlockIndex != blockIndex, {
+		if(node.blockIndex != blockIndex, {
 			"Trying to remove a node from a block that did not contain it!".warn;
 			^nil;
 		});
@@ -87,8 +89,9 @@ AlgaBlock {
 
 		//Remove this block from AlgaBlocksDict if it's empty!
 		if(nodesDict.size == 0, {
-			//("Deleting empty block: " ++ blockIndex).warn;
-			AlgaBlocksDict.blocksDict.removeAt(nodeBlockIndex);
+			("Deleting empty block: " ++ blockIndex).warn;
+			AlgaBlocksDict.blocksDict.removeAt(blockIndex);
+			group.free;
 		});
 	}
 
@@ -314,11 +317,12 @@ AlgaBlocksDict {
 
 		//Create new block if both connections didn't have any
 		if((receiverBlockIndex == -1).and(senderBlockIndex == -1), {
+			//"No block indices. Creating a new one".warn;
 
-			//"No block inidices. Create new".warn;
-
-			newBlockIndex = UniqueID.next;
-			newBlock = AlgaBlock.new(newBlockIndex);
+			newBlock = AlgaBlock(
+				Alga.parGroup(receiver.server)
+			);
+			newBlockIndex = newBlock.blockIndex;
 
 			receiver.blockIndex = newBlockIndex;
 			sender.blockIndex = newBlockIndex;
@@ -334,12 +338,11 @@ AlgaBlocksDict {
 			if(receiverBlockIndex != senderBlockIndex, {
 				//Merge receiver with sender if receiver is not in a block yet
 				if(receiverBlockIndex == -1, {
-
-					//"No receiver block index. Set to sender".warn;
+					//"No receiver block index. Set to sender's".warn;
 
 					//Check block validity
 					if(senderBlock == nil, {
-						("Invalid block with index " ++ senderBlockIndex).error;
+						//("Invalid block with index " ++ senderBlockIndex).error;
 						^nil;
 					});
 
@@ -356,7 +359,7 @@ AlgaBlocksDict {
 						//"No sender block index. Set to receiver".warn;
 
 						if(receiverBlock == nil, {
-							("Invalid block with index " ++ receiverBlockIndex).error;
+							//("Invalid block with index " ++ receiverBlockIndex).error;
 							^nil;
 						});
 
@@ -370,10 +373,12 @@ AlgaBlocksDict {
 						//Else, it means both nodes are already in blocks.
 						//Create a new one and merge them into a new one (including relative ins/outs)
 
-						//"Different block indices. Merge into new one.".warn;
+						//"Different block indices. Merge into a new one".warn;
 
-						newBlockIndex = UniqueID.next;
-						newBlock = AlgaBlock.new(newBlockIndex);
+						newBlock = AlgaBlock(
+							Alga.parGroup(receiver.server)
+						);
+						newBlockIndex = newBlock.blockIndex;
 
 						//Change group of all nodes in the receiver's previous block
 						if(receiverBlock != nil, {
@@ -409,7 +414,7 @@ AlgaBlocksDict {
 		});
 
 		//If the function passes through (no actions taken), pass receiver's block instead
-		if(newBlockIndex == nil, { newBlockIndex = receiver.blockIndex; });
+		if(newBlockIndex == nil, { newBlockIndex = receiver.blockIndex });
 
 		//Actually reorder the block's nodes
 		newBlock = blocksDict[newBlockIndex];
