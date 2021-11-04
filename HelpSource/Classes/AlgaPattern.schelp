@@ -1,14 +1,14 @@
 TITLE:: AlgaPattern
 summary:: Alga module representing multiple instances of sonic processes
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut
 
 
 DESCRIPTION::
 note::
 For emphasis::SuperCollider:: < 3.13, it is highly suggested to download the
 custom emphasis::AlgaAudioControl:: link::Classes/UGen:: from
-https://github.com/vitreo12/AlgaAudioControl/releases/tag/v0.0.1 and install it
+https://github.com/vitreo12/AlgaAudioControl/releases/tag/v1.0.0 and install it
 in your code::Platform.userExtensionDir::. This
 link::Classes/UGen:: fixes some synchronization issues that may result in audio
 glitches for short enveloped sounds. After installing it, no further action is
@@ -73,7 +73,7 @@ Alga.boot({
 	//Note that for it to be used in an AlgaPattern it must free itself.
 	//Also, note the 'sampleAccurate' argument. This allows the AlgaSynthDef to use OffsetOut instead of Out
 	//for sample accurate retriggering.
-	AlgaSynthDef(\sine, {
+	AlgaSynthDef(\sinePerc, {
 		SinOsc.ar(\freq.kr(440)) * EnvPerc.ar
 	}, sampleAccurate: true).add;
 
@@ -83,7 +83,7 @@ Alga.boot({
 	//Create an AlgaPattern and play it.
 	//Unlike Pbind, AlgaPatterns use an Event to describe the parameter -> value mapping.
 	a = AlgaPattern((
-		def: \sine,
+		def: \sinePerc,
 		dur: 0.5
 	)).play(chans: 2);
 });

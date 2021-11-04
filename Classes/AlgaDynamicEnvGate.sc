@@ -1,5 +1,5 @@
-// AlgaLib: SuperCollider implementation of the Alga live coding language
-// Copyright (C) 2020-2021 Francesco Cameli
+// AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
+// Copyright (C) 2020-2021 Francesco Cameli.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by

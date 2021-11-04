@@ -1,5 +1,5 @@
-// AlgaLib: SuperCollider implementation of the Alga live coding language
-// Copyright (C) 2020-2021 Francesco Cameli
+// AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
+// Copyright (C) 2020-2021 Francesco Cameli.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -55,15 +55,18 @@ Alga {
 		servers[server] = server;
 	}
 
-	*clearServer { | server, prevServerQuit |
-		var tempServer = servers[server];
-		if(tempServer != nil, {
-			if(tempServer.serverRunning, {
-				tempServer.quit(onComplete: { prevServerQuit[0] = true });
+	*clearServer { | server |
+		if(server != nil, { servers.removeAt(server) });
+	}
+
+	*quitServerAndClear { | server, prevServerQuit |
+		if(server != nil, {
+			if(server.serverRunning, {
+				server.quit(onComplete: { prevServerQuit[0] = true });
 			}, {
 				prevServerQuit[0] = true;
 			});
-			servers.removeAt(tempServer);
+			this.clearServer(server);
 		}, {
 			prevServerQuit[0] = true;
 		});
@@ -111,7 +114,7 @@ Alga {
 		if(\AlgaAudioControl.asClass == nil, {
 			"\n************************************************\n".postln;
 			"AlgaAugioControl is not installed. Read the following instructions to install it:".warn;
-			"\n1) Download the AlgaAudioControl UGen from https://github.com/vitreo12/AlgaAudioControl/releases/tag/v0.0.1".postln;
+			"\n1) Download the AlgaAudioControl UGen from https://github.com/vitreo12/AlgaAudioControl/releases/tag/v1.0.0".postln;
 			"2) Unzip it to your 'Platform.userExtensionDir'".postln;
 			"\nThis UGen fixes some synchronization issues that may result in audio glitches for short enveloped sounds.\nAfter installing it, no further action is required: Alga will detect it and use it internally, and this message will not be shown again.\n".postln;
 			"************************************************\n".postln;
@@ -153,9 +156,6 @@ Alga {
 			this.initSynthDefs;
 		});
 
-		//Use AlgaSynthDefs as folder for SynthDefs
-		this.setAlgaSynthDefsDir;
-
 		//Add to SynthDescLib in order for SynthDef.add to work
 		SynthDescLib.global.addServer(server);
 
@@ -166,7 +166,7 @@ Alga {
 		this.clearScheduler(server);
 
 		//Clear server @server if present, also quit it
-		this.clearServer(server, prevServerQuit);
+		this.quitServerAndClear(server, prevServerQuit);
 
 		//Add the server
 		this.newServer(server);
@@ -177,11 +177,17 @@ Alga {
 		//Create an AlgaScheduler @ the server
 		this.newScheduler(server, clock);
 
+		//Use AlgaSynthDefs as SC_SYNTHDEF_PATH
+		this.setAlgaSynthDefsDir;
+
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
 				//Make sure to init groups
 				server.initTree;
+
+				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
+				this.restoreSynthDefsDir;
 
 				//Execute onBoot function
 				onBoot.value;
@@ -193,13 +199,13 @@ Alga {
 	}
 
 	*quit { | onQuit, server |
-		var prevServerQuit = [false]; //pass by reference: use Array
 		server = server ? Server.default;
-		this.clearScheduler(server);
-		this.clearServer(server, prevServerQuit);
-		this.restoreSynthDefsDir;
-		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
-			onQuit.value;
+		if(servers[server] != nil, {
+			server.quit(onComplete: {
+				this.clearServer(server);
+				this.clearScheduler(server);
+				onQuit.value;
+			});
 		});
 	}
 }
