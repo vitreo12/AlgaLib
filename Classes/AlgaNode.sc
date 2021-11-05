@@ -567,12 +567,32 @@ AlgaNode {
 	}
 
 	createAllGroups {
+		//THIS IS ESSENTIAL FOR PROPER WORKING!!
 		var parGroup = Alga.parGroup(server);
+
+		//THIS ONE MUST BE GROUP AND NOT PARGROUP FOR ORDERING TO WORK CORRECTLY!!
 		group = AlgaGroup(parGroup);
+
+		//Keep playGroup as Group: no need to multithread it here
 		playGroup = AlgaGroup(group);
-		synthGroup = AlgaGroup(group);
-		normGroup = AlgaGroup(group);
-		interpGroup = AlgaGroup(group);
+
+		//if(this.isAlgaPattern, { this.fxConvGroup = AlgaGroup(group) });
+		if(this.isAlgaPattern, { this.fxConvGroup = AlgaParGroup(group) });
+
+		if(this.isAlgaPattern, { this.fxGroup = AlgaParGroup(group) });
+
+		//if(this.isAlgaPattern, { this.synthConvGroup = AlgaGroup(group) });
+		if(this.isAlgaPattern, { this.synthConvGroup = AlgaParGroup(group) });
+
+		synthGroup = AlgaParGroup(group);
+
+		//normGroup = AlgaGroup(group);
+		normGroup = AlgaParGroup(group);
+
+		if(this.isAlgaPattern, { this.tempGroup = AlgaParGroup(group) });
+
+		//interpGroup = AlgaGroup(group);
+		interpGroup = AlgaParGroup(group);
 	}
 
 	resetGroups {
@@ -582,6 +602,12 @@ AlgaNode {
 			synthGroup = nil;
 			normGroup = nil;
 			interpGroup = nil;
+			if(this.isAlgaPattern, {
+				this.fxGroup = nil;
+				this.fxConvGroup = nil;
+				this.synthConvGroup = nil;
+				this.tempGroup = nil;
+			});
 		});
 	}
 
