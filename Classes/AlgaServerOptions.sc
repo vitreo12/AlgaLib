@@ -21,8 +21,8 @@ AlgaServerOptions {
 	var <>supernova, <>supernovaThreads, <>supernovaUseSystemClock, <protocol = \tcp, <>latency;
 
 	*new { | sampleRate, blockSize, numInputBusChannels, numOutputBusChannels,
-		memSize=524288, numAudioBusChannels=24576, numControlBusChannels=24576,
-		numBuffers=24576, maxNodes=32768, maxSynthDefs=32768, numWireBufs=32768,
+		memSize=524288, numAudioBusChannels=32768, numControlBusChannels=32768,
+		numBuffers=32768, maxNodes=32768, maxSynthDefs=32768, numWireBufs=32768,
 		supernova=false, supernovaThreads, supernovaUseSystemClock=true, latency |
 
 		^super.new.init(
@@ -34,8 +34,8 @@ AlgaServerOptions {
 	}
 
 	init { | argSampleRate, argBlockSize, argNumInputBusChannels, argNumOutputBusChannels,
-		argMemSize=524288, argNumAudioBusChannels=24576, argNumControlBusChannels=24576,
-		argNumBuffers=24576, argMaxNodes=32768, argMaxSynthDefs=32768, argNumWireBufs=32768,
+		argMemSize=524288, argNumAudioBusChannels=32768, argNumControlBusChannels=32768,
+		argNumBuffers=32768, argMaxNodes=32768, argMaxSynthDefs=32768, argNumWireBufs=32768,
 		argSupernova=false, argSupernovaThreads, argSupernovaUseSystemClock=true, argLatency |
 
 		sampleRate = argSampleRate ? Server.default.options.sampleRate;

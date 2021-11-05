@@ -148,6 +148,7 @@ Alga {
 		var prevServerQuit = [false]; //pass by reference: use Array
 
 		server = server ? Server.default;
+		algaServerOptions = topEnvironment[\algaServerOptions];
 		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
 		if(algaServerOptions.class != AlgaServerOptions, {
