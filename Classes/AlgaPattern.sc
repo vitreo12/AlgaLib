@@ -23,6 +23,12 @@ AlgaPattern : AlgaNode {
 	2) \dur interpolation
 	*/
 
+	//Special groups used in AlgaPattern
+	var <>fxGroup;
+	var <>fxConvGroup;
+	var <>synthConvGroup;
+	var <>tempGroup;
+
 	//The actual Patterns to be manipulated
 	var <pattern;
 
@@ -297,7 +303,7 @@ AlgaPattern : AlgaNode {
 		tempSynth = AlgaSynth(
 			def,
 			tempSynthArgs,
-			interpGroup,
+			tempGroup,
 			\addToTail,
 			false
 		);
@@ -752,7 +758,7 @@ AlgaPattern : AlgaNode {
 			var patternInterpInSynth = AlgaSynth(
 				patternInterpInSynthSymbol,
 				patternInterpInSynthArgs,
-				synthGroup,
+				synthConvGroup,
 				\addToTail,
 				false
 			);
@@ -809,7 +815,7 @@ AlgaPattern : AlgaNode {
 			fxSynth = AlgaSynth(
 				fxSynthSymbol,
 				fxSynthArgs,
-				synthGroup,
+				fxGroup,
 				\addToTail,
 				false
 			);
@@ -827,7 +833,7 @@ AlgaPattern : AlgaNode {
 				fxInterpSynth = AlgaSynth(
 					fxInterpSynthSymbol,
 					fxInterpSynthArgs,
-					synthGroup,
+					fxConvGroup,
 					\addToTail,
 					false
 				);
@@ -1136,7 +1142,7 @@ AlgaPattern : AlgaNode {
 				var patternSynthConverter = AlgaSynth(
 					patternSynthConverterSymbol,
 					[ \in, converterBus.busArg, \out, algaSynthBus.index ],
-					synthGroup,
+					synthConvGroup,
 					\addToTail,
 					false
 				);

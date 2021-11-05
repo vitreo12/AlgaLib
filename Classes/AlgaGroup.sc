@@ -63,3 +63,7 @@ AlgaGroup : Group {
 		});
 	}
 }
+
+AlgaParGroup : AbstractGroup {
+	*creationCmd { ^ParGroup.creationCmd }
+}
