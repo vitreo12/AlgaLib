@@ -146,9 +146,10 @@ Alga {
 
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
+		var envAlgaServerOptions = topEnvironment[\algaServerOptions];
 
 		server = server ? Server.default;
-		algaServerOptions = topEnvironment[\algaServerOptions];
+		algaServerOptions = algaServerOptions ? envAlgaServerOptions;
 		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
 		if(algaServerOptions.class != AlgaServerOptions, {
