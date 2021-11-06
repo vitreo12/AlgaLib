@@ -15,3 +15,11 @@ Alga.boot({
 algaServerOptions: AlgaServerOptions(supernova: true)
 )
 )
+
+/*
+scsynth: 27
+
+supernova: 7.7
+
+gain: 3.5
+*/

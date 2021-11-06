@@ -34,7 +34,7 @@ Alga.boot({
 	//'fx' allows to specify an effect node to be applied at the trigger of each pattern instance.
 	a = AlgaPattern((
 		def: \sine,
-		dur: 0.0125,
+		dur: 0.00625,
 		freq: Pwhite(220, 880),
 		fx: (
 			def: \tanh,
@@ -54,6 +54,13 @@ algaServerOptions: AlgaServerOptions(supernova: true)
 );
 )
 
+/*
+scsynth: 44.4
+
+supernova: 15.3
+
+gain: 2.9
+*/
 
 (
 a.from((
@@ -82,5 +89,14 @@ a.from((
 \fx, time: 2, sched: 1
 )
 )
+
+/*
+scsynth: GLITCHES
+
+supernova: 24
+
+gain: inf :)
+
+*/
 
 a.stopPattern

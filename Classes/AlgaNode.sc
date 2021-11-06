@@ -573,7 +573,7 @@ AlgaNode {
 		//THIS ONE MUST BE GROUP AND NOT PARGROUP FOR ORDERING TO WORK CORRECTLY!!
 		group = AlgaGroup(parGroup);
 
-		//Keep playGroup as Group: no need to multithread it here
+		//Keep playGroup as Group: no need to multithread here
 		playGroup = AlgaGroup(group);
 
 		//if(this.isAlgaPattern, { this.fxConvGroup = AlgaGroup(group) });
