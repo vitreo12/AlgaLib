@@ -11,8 +11,8 @@ Alga.boot({
 		}
 	}
 },
-//Comment this line for scsynth
-algaServerOptions: AlgaServerOptions(supernova: true)
+algaServerOptions: AlgaServerOptions(blockSize: 64, supernova: true)
+//algaServerOptions: AlgaServerOptions(blockSize: 64)
 )
 )
 

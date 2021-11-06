@@ -112,12 +112,16 @@ Alga {
 		^clocks[server]
 	}
 
-	*addParGroupOnServerTree {
+	*addParGroupOnServerTree { | supernova |
 		//ServerActions pass the server as first arg
 		var serverTreeParGroupFunc = { | server |
 			//If it's an Alga booted server, create a ParGroup at head
 			if(servers[server] != nil, {
-				parGroups[server] = ParGroup(server.defaultGroup)
+				if(supernova, {
+					parGroups[server] = ParGroup(server.defaultGroup)
+				}, {
+					parGroups[server] = Group(server.defaultGroup)
+				});
 			});
 		};
 
@@ -203,7 +207,7 @@ Alga {
 		this.newScheduler(server, clock);
 
 		//Create ParGroup when the server boots and keep it persistent
-		this.addParGroupOnServerTree;
+		this.addParGroupOnServerTree(algaServerOptions.supernova);
 
 		//Use AlgaSynthDefs as SC_SYNTHDEF_PATH
 		this.setAlgaSynthDefsDir;
