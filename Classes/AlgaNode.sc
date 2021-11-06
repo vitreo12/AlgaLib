@@ -582,6 +582,7 @@ AlgaNode {
 		ParGroup performs *slightly* better with higher number of synths.
 
 		As of now, I stick with Group as it's more generally working better.
+		Also, it's faster in all cases for smaller vector sizes ( <= 128 ).
 		*/
 
 		if(this.isAlgaPattern, { this.fxConvGroup = AlgaGroup(group) });
