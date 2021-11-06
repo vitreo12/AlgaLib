@@ -27,7 +27,6 @@ AlgaPattern : AlgaNode {
 	var <>fxGroup;
 	var <>fxConvGroup;
 	var <>synthConvGroup;
-	var <>tempGroup;
 
 	//The actual Patterns to be manipulated
 	var <pattern;

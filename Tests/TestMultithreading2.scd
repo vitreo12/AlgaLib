@@ -49,17 +49,17 @@ Alga.boot({
 		}
 	};
 },
-//Comment this line for scsynth
-algaServerOptions: AlgaServerOptions(supernova: true)
+algaServerOptions: AlgaServerOptions(blockSize:256, supernova: true)
+//algaServerOptions: AlgaServerOptions(blockSize:256)
 );
 )
 
 /*
-scsynth: 44.4
+scsynth: 44.4 / 15
 
-supernova: 15.3
+supernova: 15
 
-gain: 2.9
+gain: 3
 */
 
 (

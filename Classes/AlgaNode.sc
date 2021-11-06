@@ -75,7 +75,7 @@ AlgaNode {
 	var <outsMapping;
 
 	//All Groups / Synths / Busses
-	var <group, <playGroup, <synthGroup, <normGroup, <interpGroup;
+	var <group, <playGroup, <synthGroup, <normGroup, <interpGroup, <tempGroup;
 	var <playSynth, <synth, <normSynths, <interpSynths;
 	var <synthBus, <normBusses, <interpBusses;
 
@@ -576,23 +576,49 @@ AlgaNode {
 		//Keep playGroup as Group: no need to multithread here
 		playGroup = AlgaGroup(group);
 
-		//if(this.isAlgaPattern, { this.fxConvGroup = AlgaGroup(group) });
-		if(this.isAlgaPattern, { this.fxConvGroup = AlgaParGroup(group) });
+		/*
+		Notes on Group vs ParGroup for all conversion / interpolation / norm groups.
+		Generally, Group performs *slightly* better with lesser number of synths.
+		ParGroup performs *slightly* better with higher number of synths.
 
+		As of now, I stick with Group as it's more generally working better.
+		*/
+
+		if(this.isAlgaPattern, { this.fxConvGroup = AlgaGroup(group) });
+		//if(this.isAlgaPattern, { this.fxConvGroup = AlgaParGroup(group) });
+
+		//Keep it ParGroup
 		if(this.isAlgaPattern, { this.fxGroup = AlgaParGroup(group) });
 
-		//if(this.isAlgaPattern, { this.synthConvGroup = AlgaGroup(group) });
-		if(this.isAlgaPattern, { this.synthConvGroup = AlgaParGroup(group) });
+		if(this.isAlgaPattern, { this.synthConvGroup = AlgaGroup(group) });
+		//if(this.isAlgaPattern, { this.synthConvGroup = AlgaParGroup(group) });
 
-		synthGroup = AlgaParGroup(group);
+		//For AlgaPattern, use a ParGroup to parallelize
+		if(this.isAlgaPattern, {
+			synthGroup = AlgaParGroup(group);
+		}, {
+			//For AlgaNode, use a Group (no need to parallelize)
+			synthGroup = AlgaGroup(group);
+		});
 
-		//normGroup = AlgaGroup(group);
-		normGroup = AlgaParGroup(group);
+		normGroup = AlgaGroup(group);
+		//normGroup = AlgaParGroup(group);
 
-		if(this.isAlgaPattern, { this.tempGroup = AlgaParGroup(group) });
+		//For AlgaPattern, use a ParGroup to parallelize
+		if(this.isAlgaPattern, {
+			tempGroup = AlgaParGroup(group);
+		}, {
+			//For AlgaNode, use a Group (no need to parallelize)
+			/*
+			NOTE that if you intend to change tempGroup to AlgaParGroup for AlgaNodes,
+			it is also used for the converters. Those need to be changed aswell!
+			Look for createTempSynth and converterSynth variables.
+			*/
+			tempGroup = AlgaGroup(group);
+		});
 
-		//interpGroup = AlgaGroup(group);
-		interpGroup = AlgaParGroup(group);
+		interpGroup = AlgaGroup(group);
+		//interpGroup = AlgaParGroup(group);
 	}
 
 	resetGroups {
@@ -2049,7 +2075,7 @@ AlgaNode {
 							converterSynth = AlgaSynth(
 								converterSymbol,
 								converterSynthArgs,
-								interpGroup,
+								tempGroup, //Use tempGroup as it's Group for AlgaNode
 								\addToTail,
 								false
 							);
@@ -2091,7 +2117,7 @@ AlgaNode {
 								var converterSynth = AlgaSynth(
 									converterSymbol,
 									[ \in, entry, \out, paramBus.index ],
-									interpGroup,
+									tempGroup, //Use tempGroup as it's Group for AlgaNode
 									\addToTail,
 									false
 								);
@@ -2118,7 +2144,7 @@ AlgaNode {
 		tempSynth = AlgaSynth(
 			def,
 			tempSynthArgs,
-			interpGroup,
+			tempGroup,
 			\addToTail,
 			false
 		);
