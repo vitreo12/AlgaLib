@@ -79,6 +79,19 @@
 	}
 }
 
+//Needed for AlgaIEnvGen / IEnvGen to work
++Env {
+	//Used in the AlgaSynthDef
+	algaAsArray {
+		^this.asArrayForInterpolation.unbubble;
+	}
+
+	//Used on .set to change Env
+	algaConvertEnv {
+		^this.asArrayForInterpolation.collect(_.reference).unbubble;
+	}
+}
+
 //Better than checking .class == Symbol
 +Symbol {
 	isSymbol { ^true }
