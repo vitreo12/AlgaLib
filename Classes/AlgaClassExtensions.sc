@@ -43,7 +43,7 @@
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
 	addAction { | condition, func, sched = 0 |
 		if(sched != 0, {
-			"AlgaSpinRoutine: sched is not a valid argument".error;
+			"AlgaSpinRoutine: 'sched' will be ignored".error;
 		});
 
 		AlgaSpinRoutine.waitFor(
@@ -53,7 +53,7 @@
 	}
 }
 
-//Essential for 'a16' busses not to be interpreted as an Array!
+//Essential for 'c5' / 'a16' busses not to be interpreted as an Array!
 +String {
 	isNumberOrArray { ^false } //isArray would be true!!
 }
