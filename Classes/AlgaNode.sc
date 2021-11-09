@@ -600,6 +600,7 @@ AlgaNode {
 		}, {
 			//For AlgaNode, use a Group (no need to parallelize)
 			synthGroup = AlgaGroup(group);
+			//synthGroup = AlgaParGroup(group);
 		});
 
 		normGroup = AlgaGroup(group);
@@ -616,6 +617,7 @@ AlgaNode {
 			Look for createTempSynth and converterSynth variables.
 			*/
 			tempGroup = AlgaGroup(group);
+			//tempGroup = AlgaParGroup(group);
 		});
 
 		interpGroup = AlgaGroup(group);

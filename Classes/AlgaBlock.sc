@@ -37,16 +37,29 @@ AlgaBlock {
 	//the Group
 	var <group;
 
-	*new { | parGroup |
-		^super.new.init(parGroup)
+	//To determine which
+	var isAlgaNode = false;
+	var isAlgaEffect = false;
+	var isAlgaMod = false;
+
+	*new { | parGroup, isAlgaNode = false, isAlgaEffect = false, isAlgaMod = false |
+		^super.new.init(parGroup, isAlgaNode, isAlgaEffect, isAlgaMod)
 	}
 
-	init { | parGroup |
+	init { | parGroup, argIsAlgaNode = false, argIsAlgaEffect = false, argIsAlgaMod = false |
 		nodesDict      = IdentityDictionary(20);
 		statesDict     = IdentityDictionary(20);
 		bottomOutNodes = IdentityDictionary();
 		group          = Group(parGroup);
 		blockIndex     = group.nodeID;
+		isAlgaNode     = argIsAlgaNode;
+		isAlgaEffect   = argIsAlgaEffect;
+		isAlgaMod      = argIsAlgaMod;
+
+		case
+		{ isAlgaNode } { "AlgaNode -> AlgaNode".warn }
+		{ isAlgaEffect } { "AlgaEffect -> AlgaEffect".warn }
+		{ isAlgaMod } { "AlgaMod -> AlgaMod".warn };
 	}
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
@@ -102,6 +115,8 @@ AlgaBlock {
 		//Find the nodes with no outNodes (so, the last ones in the chain!), and init the statesDict
 		this.findBottomMostOutNodesAndInitStatesDict;
 
+		bottomOutNodes.asString.warn;
+
 		//init runningIndex
 		runningIndex = 0;
 
@@ -120,12 +135,9 @@ AlgaBlock {
 
 			//Must loop reverse to correct order stuff
 			sizeMinusOne.reverseDo({ | index |
-
 				var count = index + 1;
-
 				var thisEntry = orderedArray[count];
 				var prevEntry = orderedArray[count - 1];
-
 				prevEntry.moveBefore(thisEntry);
 			});
 		});
@@ -182,7 +194,7 @@ AlgaBlock {
 
 				//Remove node from block
 				if(result.not, {
-					//("Removing node at group " ++ node.group ++ " from block number " ++ blockIndex).warn;
+					("Removing node at group " ++ node.group ++ " from block number " ++ blockIndex).warn;
 					this.removeNode(node);
 				});
 
@@ -205,33 +217,45 @@ AlgaBlock {
 
 		if(node.isAlgaNode, {
 			var nodeState = statesDict[node];
+			var valid = false;
 
-			//If for any reason the node wasn't already in the nodesDict, add it
-			this.addNode(node, true);
+			//Check for type correctness (do not mix AlgaMods / Effects with AlgaNodes)
+			if((
+				(node.isAlgaMod).and(isAlgaMod)).or(
+				(node.isAlgaEffect).and(isAlgaEffect)).or(
+				(node.isAlgaNode).and(isAlgaNode)), {
+				valid = true;
+			});
 
-			//("adding group " ++ node.group ++ " to block " ++ blockIndex).postln;
+			//If correct type-wise, go through
+			if(valid, {
+				//Add if needed: this is fundamental!
+				this.addNode(node, true);
 
-			//If this node has never been touched, avoid repetitions
-			if(nodeState == false, {
-				//put it to true so it's not added again
-				//This is essential to make feedback work!
-				//it's also essential for this to be before the next loop
-				statesDict[node] = true;
+				//("adding group " ++ node.group ++ " to block " ++ blockIndex).postln;
 
-				//rearrange inputs to this, this will add the inNodes
-				node.inNodes.nodesLoop ({ | inNode |
-					this.rearrangeBlockLoop(inNode);
-				});
+				//If this node has never been touched, avoid repetitions
+				if(nodeState == false, {
+					//put it to true so it's not added again
+					//This is essential to make feedback work!
+					//it's also essential for this to be before the next loop
+					statesDict[node] = true;
 
-				//rearrange inputs to this, this will add the patternOutNodes
-				if(node.patternOutNodes != nil, {
-					node.patternOutNodes.nodesLoop ({ | inNode |
+					//rearrange inputs to this, this will add the inNodes
+					node.inNodes.nodesLoop ({ | inNode |
 						this.rearrangeBlockLoop(inNode);
 					});
-				});
 
-				//Add node to orderedArray
-				orderedArray = orderedArray.add(node);
+					//rearrange inputs to this, this will add the patternOutNodes
+					if(node.patternOutNodes != nil, {
+						node.patternOutNodes.nodesLoop ({ | inNode |
+							this.rearrangeBlockLoop(inNode);
+						});
+					});
+
+					//Add node to orderedArray
+					orderedArray = orderedArray.add(node);
+				});
 			});
 		});
 	}
@@ -248,6 +272,7 @@ AlgaBlock {
 			});
 		}, {
 			nodesDict.do({ | node |
+				var outNodesCondition = true;
 				var inNodesCondition = (node.inNodes.size > 0);
 				var condition;
 
@@ -255,7 +280,28 @@ AlgaBlock {
 					inNodesCondition = inNodesCondition.or(node.patternOutNodes.size > 0)
 				});
 
-				condition = (node.outNodes.size == 0).and(inNodesCondition);
+				//Make sure to not consider outNodes of different kinds
+				if(node.outNodes.size > 0, {
+					node.outNodes.keysValuesDo({ | outNode, params |
+						node.asString.postln;
+						outNode.asString.postln;
+						//If at least one mismatch, consider it false
+						case
+						{ (node.isAlgaMod).and(outNode.isAlgaMod) } { outNodesCondition = false }
+						{ (node.isAlgaEffect).and(outNode.isAlgaEffect) } { outNodesCondition = false }
+						{
+							(((node.isAlgaMod).or(node.isAlgaEffect)).not).and(
+								((outNode.isAlgaMod).or(outNode.isAlgaEffect)).not) } {
+							outNodesCondition = false
+						};
+					});
+				}, {
+					//No out nodes
+					outNodesCondition = node.outNodes.size == 0;
+				});
+
+				//Merge conditions
+				condition = (outNodesCondition).and(inNodesCondition);
 
 				//Find the ones with no outNodes but at least one inNode or patternOutNode
 				if(condition, {
@@ -300,6 +346,48 @@ AlgaBlocksDict {
 		});
 	}
 
+	*newBlock { | receiver, sender |
+		var newBlock;
+
+		case
+
+		//AlgaEffect -> AlgaEffect
+		{ sender.isAlgaEffect.and(receiver.isAlgaEffect) } {
+			newBlock = AlgaBlock(
+				Alga.effectParGroup(receiver.server),
+				isAlgaEffect: true
+			)
+		}
+
+		//AlgaMod -> AlgaMod
+		{ sender.isAlgaMod.and(receiver.isAlgaMod) } {
+			newBlock = AlgaBlock(
+				Alga.modParGroup(receiver.server),
+				isAlgaMod: true
+			)
+		}
+
+		//Mismatch: don't create a Block
+		{ sender.isAlgaNode.and(receiver.isAlgaEffect.or(receiver.isAlgaMod)) } {
+			^nil
+		}
+
+		//Mismatch: don't create a Block
+		{ receiver.isAlgaNode.and(sender.isAlgaEffect.or(sender.isAlgaMod)) } {
+			^nil
+		}
+
+		//AlgaNode -> AlgaNode
+		{ sender.isAlgaNode.and(receiver.isAlgaNode) } {
+			newBlock = AlgaBlock(
+				Alga.parGroup(receiver.server),
+				isAlgaNode: true
+			);
+		};
+
+		^newBlock;
+	}
+
 	*createNewBlockIfNeeded_inner { | receiver, sender |
 		var newBlockIndex;
 		var newBlock;
@@ -319,9 +407,9 @@ AlgaBlocksDict {
 		if((receiverBlockIndex == -1).and(senderBlockIndex == -1), {
 			//"No block indices. Creating a new one".warn;
 
-			newBlock = AlgaBlock(
-				Alga.parGroup(receiver.server)
-			);
+			newBlock = this.newBlock(receiver, sender);
+			if(newBlock == nil, { ^nil });
+
 			newBlockIndex = newBlock.blockIndex;
 
 			receiver.blockIndex = newBlockIndex;
@@ -375,9 +463,9 @@ AlgaBlocksDict {
 
 						//"Different block indices. Merge into a new one".warn;
 
-						newBlock = AlgaBlock(
-							Alga.parGroup(receiver.server)
-						);
+						newBlock = this.newBlock(receiver, sender);
+						if(newBlock == nil, { ^nil });
+
 						newBlockIndex = newBlock.blockIndex;
 
 						//Change group of all nodes in the receiver's previous block

@@ -1,7 +1,21 @@
 (
 Alga.boot({
+	AlgaSynthDef(\test, {
+		Mix(Array.fill(100, { | i | SinOsc.ar(\freq.kr(100) * i) })) * DC.ar(0)
+	}).add;
+
+	s.sync;
+
+	a = AN({ \in.ar });
 	50.do({
-		AlgaNode({ Mix(Array.fill(100, { | i | SinOsc.ar(\freq.kr(100) * i) })) * 0.01 });
+		b = AlgaNode(\test);
+		a << b;
+	});
+
+	c = AN({ \in.ar });
+	50.do({
+		d = AlgaNode(\test);
+		c << d;
 	});
 
 	fork {
@@ -11,15 +25,13 @@ Alga.boot({
 		}
 	}
 },
-algaServerOptions: AlgaServerOptions(blockSize: 64, supernova: true)
+algaServerOptions: AlgaServerOptions(blockSize: 64, supernova: true, supernovaThreads: 6)
 //algaServerOptions: AlgaServerOptions(blockSize: 64)
 )
 )
 
 /*
-scsynth: 27
+scsynth: 90
 
-supernova: 7.7
-
-gain: 3.5
+supernova: 50
 */

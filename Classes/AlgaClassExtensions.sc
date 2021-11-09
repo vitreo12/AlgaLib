@@ -17,6 +17,8 @@
 +Object {
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
+	isAlgaEffect { ^false }
+	isAlgaMod { ^false }
 	isAlgaArg { ^false }
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
