@@ -19,6 +19,7 @@
 	isAlgaPattern { ^false }
 	isAlgaEffect { ^false }
 	isAlgaMod { ^false }
+	isAlgaNode_AlgaBlock { ^false }
 	isAlgaArg { ^false }
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }

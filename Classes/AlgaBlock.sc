@@ -15,7 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 AlgaBlock {
-
 	//all the nodes for this block
 	var <nodesDict;
 
@@ -24,9 +23,6 @@ AlgaBlock {
 
 	//A dict storing node -> (true or false) to state if all inputs have been checked or not
 	var <statesDict;
-
-	//Counter for correct ordering of entries in orderedArray
-	var <runningIndex;
 
 	//bottom most nodes in this block
 	var <bottomOutNodes;
@@ -55,11 +51,6 @@ AlgaBlock {
 		isAlgaNode     = argIsAlgaNode;
 		isAlgaEffect   = argIsAlgaEffect;
 		isAlgaMod      = argIsAlgaMod;
-
-		case
-		{ isAlgaNode } { "AlgaNode -> AlgaNode".warn }
-		{ isAlgaEffect } { "AlgaEffect -> AlgaEffect".warn }
-		{ isAlgaMod } { "AlgaMod -> AlgaMod".warn };
 	}
 
 	addNode { | node, addingInRearrangeBlockLoop = false |
@@ -102,7 +93,7 @@ AlgaBlock {
 
 		//Remove this block from AlgaBlocksDict if it's empty!
 		if(nodesDict.size == 0, {
-			("Deleting empty block: " ++ blockIndex).warn;
+			//("Deleting empty block: " ++ blockIndex).warn;
 			AlgaBlocksDict.blocksDict.removeAt(blockIndex);
 			group.free;
 		});
@@ -114,11 +105,6 @@ AlgaBlock {
 
 		//Find the nodes with no outNodes (so, the last ones in the chain!), and init the statesDict
 		this.findBottomMostOutNodesAndInitStatesDict;
-
-		bottomOutNodes.asString.warn;
-
-		//init runningIndex
-		runningIndex = 0;
 
 		//Store the rearranging results in this.orderedArray
 		bottomOutNodes.do({ | node |
@@ -194,14 +180,14 @@ AlgaBlock {
 
 				//Remove node from block
 				if(result.not, {
-					("Removing node at group " ++ node.group ++ " from block number " ++ blockIndex).warn;
+					//("Removing node " ++ node.group.nodeID ++ " from block number " ++ blockIndex).warn;
 					this.removeNode(node);
 				});
 
 				result;
 			});
 		}, {
-			//Ordered array has size 0. Free all
+			//Ordered array has size 0. Reset all
 			nodesDict.do({ | node |
 				node.blockIndex = -1;
 			});
@@ -221,9 +207,9 @@ AlgaBlock {
 
 			//Check for type correctness (do not mix AlgaMods / Effects with AlgaNodes)
 			if((
-				(node.isAlgaMod).and(isAlgaMod)).or(
-				(node.isAlgaEffect).and(isAlgaEffect)).or(
-				(node.isAlgaNode).and(isAlgaNode)), {
+				(node.isAlgaMod).and(isAlgaMod)).or( //isAlgaMod refers to AlgaBlock
+				(node.isAlgaEffect).and(isAlgaEffect)).or( //isAlgaEffect refers to AlgaBlock
+				(node.isAlgaNode_AlgaBlock).and(isAlgaNode)), { //isAlgaNode refers to AlgaBlock
 				valid = true;
 			});
 
@@ -283,17 +269,11 @@ AlgaBlock {
 				//Make sure to not consider outNodes of different kinds
 				if(node.outNodes.size > 0, {
 					node.outNodes.keysValuesDo({ | outNode, params |
-						node.asString.postln;
-						outNode.asString.postln;
-						//If at least one mismatch, consider it false
+						//If at least one correct connection, consider it false (outNodes are being used in the same AlgaBlock)
 						case
 						{ (node.isAlgaMod).and(outNode.isAlgaMod) } { outNodesCondition = false }
 						{ (node.isAlgaEffect).and(outNode.isAlgaEffect) } { outNodesCondition = false }
-						{
-							(((node.isAlgaMod).or(node.isAlgaEffect)).not).and(
-								((outNode.isAlgaMod).or(outNode.isAlgaEffect)).not) } {
-							outNodesCondition = false
-						};
+						{ (node.isAlgaNode_AlgaBlock).and(outNode.isAlgaNode_AlgaBlock) } { outNodesCondition = false };
 					});
 				}, {
 					//No out nodes

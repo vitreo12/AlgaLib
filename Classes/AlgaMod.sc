@@ -15,8 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 //Like AlgaNode, but in a custom group at the top.
-AlgaMod : AlgaNode {
+AlgaModulator : AlgaNode {
 	isAlgaMod { ^true }
+
+	isAlgaNode_AlgaBlock { ^false }
 
 	createAllGroups {
 		//THIS IS ESSENTIAL FOR PROPER WORKING!!
@@ -28,8 +30,12 @@ AlgaMod : AlgaNode {
 		//Keep playGroup as Group: no need to multithread here
 		playGroup = AlgaGroup(group);
 
+		//The only time there will be more than one synth is on .replace
 		synthGroup = AlgaGroup(group);
 		//synthGroup = AlgaParGroup(group);
+
+		//Don't use ParGroups as AlgaEffect, as it's less likely that there will be
+		//multiple (in the order of > 10) connections to an AlgaModulator.
 
 		normGroup = AlgaGroup(group);
 		//normGroup = AlgaParGroup(group);
@@ -43,4 +49,7 @@ AlgaMod : AlgaNode {
 }
 
 //Alias
-AM : AlgaMod { }
+AlgaMod : AlgaModulator { }
+
+//Alias
+AM : AlgaModulator { }

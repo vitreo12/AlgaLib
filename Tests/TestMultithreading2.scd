@@ -49,13 +49,13 @@ Alga.boot({
 		}
 	};
 },
-//algaServerOptions: AlgaServerOptions(blockSize:256, supernova: true)
-algaServerOptions: AlgaServerOptions(blockSize:256)
+algaServerOptions: AlgaServerOptions(blockSize:256, supernova: true)
+//algaServerOptions: AlgaServerOptions(blockSize:256)
 );
 )
 
 /*
-scsynth: 44.4
+scsynth: 45
 
 supernova: 15
 

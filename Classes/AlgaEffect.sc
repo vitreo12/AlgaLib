@@ -18,6 +18,8 @@
 AlgaEffect : AlgaNode {
 	isAlgaEffect { ^true }
 
+	isAlgaNode_AlgaBlock { ^false }
+
 	createAllGroups {
 		//THIS IS ESSENTIAL FOR PROPER WORKING!!
 		var parGroup = Alga.effectParGroup(server);
@@ -28,19 +30,28 @@ AlgaEffect : AlgaNode {
 		//Keep playGroup as Group: no need to multithread here
 		playGroup = AlgaGroup(group);
 
+		//The only time there will be more than one synth is on .replace
 		synthGroup = AlgaGroup(group);
 		//synthGroup = AlgaParGroup(group);
 
-		normGroup = AlgaGroup(group);
-		//normGroup = AlgaParGroup(group);
+		//Use ParGroups as multiple parameter inputs will be parallelized!
 
-		tempGroup = AlgaGroup(group);
-		//tempGroup = AlgaParGroup(group);
+		//normGroup = AlgaGroup(group);
+		normGroup = AlgaParGroup(group);
 
-		interpGroup = AlgaGroup(group);
-		//interpGroup = AlgaParGroup(group);
+		//tempGroup = AlgaGroup(group);
+		tempGroup = AlgaParGroup(group);
+
+		//interpGroup = AlgaGroup(group);
+		interpGroup = AlgaParGroup(group);
 	}
 }
 
 //Alias
 AE : AlgaEffect { }
+
+//Alias
+AlgaFX : AlgaEffect { }
+
+//Alias
+AFX : AlgaEffect { }

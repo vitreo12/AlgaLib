@@ -576,52 +576,33 @@ AlgaNode {
 		//Keep playGroup as Group: no need to multithread here
 		playGroup = AlgaGroup(group);
 
-		/*
-		Notes on Group vs ParGroup for all conversion / interpolation / norm groups.
-		Generally, Group performs *slightly* better with lesser number of synths.
-		ParGroup performs *slightly* better with higher number of synths.
-
-		As of now, I stick with Group as it's more generally working better.
-		Also, it's faster in all cases for smaller vector sizes ( <= 128 ).
-		*/
-
-		if(this.isAlgaPattern, { this.fxConvGroup = AlgaGroup(group) });
-		//if(this.isAlgaPattern, { this.fxConvGroup = AlgaParGroup(group) });
-
-		//Keep it ParGroup
+		//Keep these ParGroups
+		if(this.isAlgaPattern, { this.fxConvGroup = AlgaParGroup(group) });
 		if(this.isAlgaPattern, { this.fxGroup = AlgaParGroup(group) });
-
-		if(this.isAlgaPattern, { this.synthConvGroup = AlgaGroup(group) });
-		//if(this.isAlgaPattern, { this.synthConvGroup = AlgaParGroup(group) });
+		if(this.isAlgaPattern, { this.synthConvGroup = AlgaParGroup(group) });
 
 		//For AlgaPattern, use a ParGroup to parallelize
 		if(this.isAlgaPattern, {
 			synthGroup = AlgaParGroup(group);
+			normGroup = AlgaParGroup(group);
+			tempGroup = AlgaParGroup(group);
+			interpGroup = AlgaParGroup(group);
 		}, {
-			//For AlgaNode, use a Group (no need to parallelize)
+			//These will all use Group and not ParGroup because it generally
+			//performs better. Parallelization is only achieved with the Alga.parGroup and AlgaBlock's group.
+
 			synthGroup = AlgaGroup(group);
 			//synthGroup = AlgaParGroup(group);
-		});
 
-		normGroup = AlgaGroup(group);
-		//normGroup = AlgaParGroup(group);
+			normGroup = AlgaGroup(group);
+			//normGroup = AlgaParGroup(group);
 
-		//For AlgaPattern, use a ParGroup to parallelize
-		if(this.isAlgaPattern, {
-			tempGroup = AlgaParGroup(group);
-		}, {
-			//For AlgaNode, use a Group (no need to parallelize)
-			/*
-			NOTE that if you intend to change tempGroup to AlgaParGroup for AlgaNodes,
-			it is also used for the converters. Those need to be changed aswell!
-			Look for createTempSynth and converterSynth variables.
-			*/
 			tempGroup = AlgaGroup(group);
-			//tempGroup = AlgaParGroup(group);
-		});
+			//tempGroup = AlgaGroup(group);
 
-		interpGroup = AlgaGroup(group);
-		//interpGroup = AlgaParGroup(group);
+			interpGroup = AlgaGroup(group);
+			//interpGroup = AlgaGroup(group);
+		});
 	}
 
 	resetGroups {
@@ -4097,6 +4078,9 @@ AlgaNode {
 	}
 
 	isAlgaNode { ^true }
+
+	//Used in AlgaBlock
+	isAlgaNode_AlgaBlock { ^true }
 
 	clock { ^(scheduler.clock) }
 }

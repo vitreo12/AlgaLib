@@ -6,16 +6,19 @@ Alga.boot({
 
 	s.sync;
 
-	a = AN({ \in.ar });
-	50.do({
+	a = AlgaEffect({ \in.ar });
+
+	//Note the CPU diff!
+	//a = AlgaNode({ \in.ar });
+
+	25.do({
 		b = AlgaNode(\test);
-		a << b;
+		a <<+ b;
 	});
 
-	c = AN({ \in.ar });
-	50.do({
+	25.do({
 		d = AlgaNode(\test);
-		c << d;
+		a <<+ d;
 	});
 
 	fork {
@@ -31,7 +34,7 @@ algaServerOptions: AlgaServerOptions(blockSize: 64, supernova: true, supernovaTh
 )
 
 /*
-scsynth: 90
+scsynth: 39
 
-supernova: 50
+supernova: 13.6
 */
