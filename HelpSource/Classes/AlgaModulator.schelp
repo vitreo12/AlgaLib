@@ -1,0 +1,64 @@
+TITLE:: AlgaModulator
+summary:: An AlgaNode that gets processed in the modulators' ParGroup
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaEffect
+
+DESCRIPTION::
+An link::Classes/AlgaModulator:: has the same exact purpose as an link::Classes/AlgaNode::, with the difference of it being processed in a link::Classes/ParGroup:: that preceeds the one used for link::Classes/AlgaNode::s and link::Classes/AlgaPattern::s.
+
+When using the emphasis::supernova:: server, link::Classes/Alga:: attempts to parallelize as much processing as possible: when link::Classes/AlgaNode::s are connected together, they will be processed on the same emphasis::supernova:: thread. However, there are cases where one might actually only want to define a single node to send to multiple link::Classes/AlgaNode::s. This is the purpose of this class.
+
+note::
+When using the default emphasis::scsynth:: server, this class will behave exactly as an link::Classes/AlgaNode::.
+::
+
+INSTANCEMETHODS::
+private:: createAllGroups
+private:: isAlgaMod
+private:: isAlgaNode_AlgaBlock
+
+EXAMPLES::
+code::
+(
+Alga.boot({
+	//50 saws with random frequency
+	AlgaSynthDef(\expensiveSaws, {
+		Mix(Saw.ar(\freq.kr(1) * Array.rand(50, 10, 30))) * 0.005
+	}).add;
+
+	s.sync;
+
+	//Declare a single modulator
+	a = AlgaEffect({ SinOsc.kr(1) });
+
+	//Define 25 nodes to operate in parallel.
+	//Use the modulator for each of them with different scaling.
+	25.do({
+		b = AlgaNode(
+			\expensiveSaws,
+			[\freq, AlgaArg(a, scale: [rrand(10, 20), rrand(20, 50)])]
+		).play(chans:2);
+	});
+
+	//Print out cpu usage
+	fork {
+		loop {
+			s.avgCPU.postln;
+			1.wait;
+		}
+	}
+},
+
+//Compare the CPU usage of these two cases by commenting / uncommenting
+//the algaServerOptions to use: supernova or scsynth
+
+//supernova
+algaServerOptions: AlgaServerOptions(supernova: true, latency: 0.5)
+
+//scsynth
+//algaServerOptions: AlgaServerOptions(latency: 0.5)
+)
+)
+::
+
+s.scope
