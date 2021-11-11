@@ -4093,6 +4093,15 @@ AlgaNode {
 	isAlgaNode_AlgaBlock { ^true }
 
 	clock { ^(scheduler.clock) }
+
+	//asString: use name of group
+	asString {
+		var nameOrGroup;
+		var groupIndex;
+		if(group != nil, { groupIndex = group.nodeID.asString });
+		nameOrGroup = name.asString ? groupIndex;
+		^(this.class.asString ++ "(" ++ nameOrGroup ++ ")");
+	}
 }
 
 //Alias
