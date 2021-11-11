@@ -115,8 +115,15 @@ AlgaNode {
 	var <algaWasBeingCleared = false;
 	var <algaCleared = false;
 
+	//Debugging tool
+	var <name;
+
 	*new { | def, args, interpTime, playTime, sched, outsMapping, server |
 		^super.new.init(def, args, interpTime, playTime, sched, outsMapping, server)
+	}
+
+	*debug { | def, args, interpTime, playTime, sched, outsMapping, server, name |
+		^super.new.init(def, args, interpTime, playTime, sched, outsMapping, server, name)
 	}
 
 	initAllVariables { | argServer |
@@ -251,7 +258,7 @@ AlgaNode {
 	}
 
 	init { | argDef, argArgs, argConnectionTime = 0, argPlayTime = 0,
-		argSched = 0, argOutsMapping, argServer |
+		argSched = 0, argOutsMapping, argServer, argName |
 
 		//Check supported classes for argObj, so that things won't even init if wrong.
 		//Also check for AlgaPattern
@@ -275,6 +282,9 @@ AlgaNode {
 		if(this.initAllVariables(argServer).not, {
 			^this
 		});
+
+		//Init debug name
+		name = argName;
 
 		//starting connectionTime (using the setter so it also sets longestConnectionTime)
 		this.connectionTime_(argConnectionTime, all:true);

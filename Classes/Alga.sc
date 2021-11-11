@@ -19,8 +19,6 @@ Alga {
 	classvar <servers;
 	classvar <clocks;
 	classvar <parGroups;
-	classvar <effectParGroups;
-	classvar <modParGroups;
 	classvar <oldSynthDefsDir;
 
 	*initSynthDefs {
@@ -32,8 +30,6 @@ Alga {
 		schedulers = IdentityDictionary(1);
 		clocks = IdentityDictionary(1);
 		parGroups = IdentityDictionary(1);
-		effectParGroups = IdentityDictionary(1);
-		modParGroups = IdentityDictionary(1);
 
 		//Make sure to reset it
 		"SC_SYNTHDEF_PATH".unsetenv;
@@ -122,13 +118,9 @@ Alga {
 			//If it's an Alga booted server, create the ParGroups / Groups
 			if(servers[server] != nil, {
 				if(supernova, {
-					effectParGroups[server] = AlgaParGroup(server.defaultGroup);
 					parGroups[server] = AlgaParGroup(server.defaultGroup);
-					modParGroups[server] = AlgaParGroup(server.defaultGroup);
 				}, {
-					effectParGroups[server] = AlgaGroup(server.defaultGroup);
 					parGroups[server] = AlgaGroup(server.defaultGroup);
-					modParGroups[server] = AlgaGroup(server.defaultGroup);
 				});
 			});
 		};
@@ -143,16 +135,6 @@ Alga {
 	*parGroup { | server |
 		server = server ? Server.default;
 		^parGroups[server]
-	}
-
-	*effectParGroup { | server |
-		server = server ? Server.default;
-		^effectParGroups[server]
-	}
-
-	*modParGroup { | server |
-		server = server ? Server.default;
-		^modParGroups[server]
 	}
 
 	*checkAlgaAudioControl {
