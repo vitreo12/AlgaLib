@@ -16,7 +16,19 @@
 
 AlgaBlock {
 	//All the nodes in the block
-	var <nodesDict;
+	var <nodes;
+
+	//All the nodes that already have been visited
+	var <visitedNodes;
+
+	//All the nodes that have FB connections
+	var <feedbackNodes;
+
+	//Upper most nodes to start processing from
+	var <upperMostNodes;
+
+	//OrderedIdentitySet of IdentitySets of node dependencies
+	var <orderedNodes;
 
 	//the index for this block in the AlgaBlocksDict global dict
 	var <blockIndex;
@@ -24,12 +36,20 @@ AlgaBlock {
 	//the Group
 	var <group;
 
+	//the ParGroups / Groups within the Group
+	var <groups;
+
 	*new { | parGroup |
 		^super.new.init(parGroup)
 	}
 
 	init { | parGroup |
-		nodesDict      = IdentityDictionary(10);
+		nodes          = IdentityDictionary(10);
+		visitedNodes   = IdentitySet(10);
+		feedbackNodes  = IdentityDictionary(10);
+		orderedNodes   = OrderedIdentitySet(10);
+		groups         = IdentitySet(10);
+		upperMostNodes = IdentitySet(10);
 		group          = Group(parGroup);
 		blockIndex     = group.nodeID;
 	}
@@ -43,7 +63,7 @@ AlgaBlock {
 		});
 
 		//Add to dict
-		nodesDict.put(node, node);
+		nodes.put(node, node);
 
 		//Add to group
 		//node.moveToHead(group);
@@ -52,12 +72,6 @@ AlgaBlock {
 		if(node.blockIndex != blockIndex, {
 			//("blockIndex mismatch detected. Using " ++ blockIndex).warn;
 			node.blockIndex = blockIndex;
-
-			//Also update statesDict and add one more entry to ordered array
-			/* if(addingInRearrangeBlockLoop, {
-				statesDict.put(node, false);
-				orderedArray.add(nil);
-			}); */
 		});
 	}
 
@@ -69,13 +83,13 @@ AlgaBlock {
 		});
 
 		//Remove from dict
-		nodesDict.removeAt(node);
+		nodes.removeAt(node);
 
 		//Set node's index to -1
 		node.blockIndex = -1;
 
 		//Remove this block from AlgaBlocksDict if it's empty!
-		if(nodesDict.size == 0, {
+		if(nodes.size == 0, {
 			//("Deleting empty block: " ++ blockIndex).warn;
 			AlgaBlocksDict.blocksDict.removeAt(blockIndex);
 			group.free;
@@ -84,7 +98,186 @@ AlgaBlock {
 
 	//Re-arrange block starting from the sender
 	rearrangeBlock { | sender |
+		//Stage 1: detect feedback and find upper most nodes
+		this.stage1(sender);
 
+		//Debug
+		this.debugFeedback;
+
+		//Stage 2: order nodes and create ParGroups / Groups accordingly
+		this.stage2;
+
+		//Debug
+		this.debugOrderedNodes;
+
+		"".postln;
+	}
+
+	//Stage 1: detect feedback and find upper most nodes
+	stage1 { | sender |
+		//Reset all needed things for stage1
+		visitedNodes.clear;
+		feedbackNodes.clear;
+		upperMostNodes.clear;
+
+		//Detect FBs
+		this.detectFeedback(sender);
+
+		//Find upper most nodes
+		this.findUpperMostNodes;
+	}
+
+	//Debug the FB connections
+	debugFeedback {
+		feedbackNodes.keysValuesDo({ | sender, receiversSet |
+			receiversSet.do({ | receiver |
+				("FB: " ++ sender.asString ++ " >> " ++ receiver.asString).error;
+			});
+		});
+	}
+
+	//Add FB pair
+	addFeedback { | sender, receiver |
+		//Create IdentitySet if needed
+		if(feedbackNodes[sender] == nil, {
+			feedbackNodes[sender] = IdentitySet();
+		});
+
+		//Check if the receiver already had the same connection defined.
+		case
+		{ feedbackNodes[receiver] == nil } {
+			feedbackNodes[sender].add(receiver);
+		}
+		//Only add one pair
+		{ feedbackNodes[receiver].includes(sender).not } {
+			feedbackNodes[sender].add(receiver);
+		};
+	}
+
+	//Loop through each node and check for visited nodes
+	detectFeedback { | sender |
+		//If not in nodes, add it
+		if(sender.blockIndex != blockIndex, { this.addNode(sender) });
+
+		//Set visited
+		visitedNodes.add(sender);
+
+		//Check all outNodes for FB connections
+		sender.outNodes.keys.do({ | receiver |
+			if(visitedNodes.includes(receiver).not, {
+				this.detectFeedback(receiver);
+			}, {
+				this.addFeedback(sender, receiver);
+			});
+		});
+	}
+
+	//Find the nodes with no ins
+	findUpperMostNodes {
+		nodes.do({ | node |
+			//No inNodes: use node as one of the starting points
+			if(node.inNodes.size == 0, {
+				upperMostNodes.add(node)
+			});
+		});
+
+		//Look to add just one FB connection if no other were found
+		/* if(upperMostNodes.size == 0, {
+			var addFirst = false;
+			feedbackNodes.do({ | receiver |
+				if(addFirst.not, {
+					upperMostNodes.add(receiver);
+					addFirst = true;
+				});
+			});
+		}); */
+	}
+
+	//Loop through currentUpperMostNodes to find nodes to add to newUpperMostNodes
+	findNewUpperMostNodes { | currentUpperMostNodes |
+		var newUpperMostNodes = IdentitySet(10);
+		//Loop through currentUpperMostNodes to build the newNodes IdentitySet
+		currentUpperMostNodes.do({ | node |
+			//Add it to visitedNodes
+			visitedNodes.add(node);
+
+			//If receiver's inNodes have already been visited, it can be added
+			node.outNodes.keys.do({ | receiver |
+				//Check all of receiver's inNodes
+				receiver.inNodes.do({ | sendersSet |
+					var sendersVisited = true;
+					sendersSet.do({ | sender |
+						if(visitedNodes.includes(sender).not, {
+							sendersVisited = false;
+						});
+					});
+
+					//If all senders have been visited, add the receiver to newNodes
+					if(sendersVisited, {
+						newUpperMostNodes.add(receiver)
+					});
+				});
+			});
+		});
+
+		^newUpperMostNodes;
+	}
+
+	//Loop through nodes and order them in IdentitySets
+	orderNodes { | currentUpperMostNodes |
+		if(currentUpperMostNodes.size > 0, {
+			var newUpperMostNodes;
+
+			//Add currentUpperMostNodes to orderedNodes
+			orderedNodes.add(currentUpperMostNodes);
+
+			//Loop through currentUpperMostNodes to find nodes to add to newUpperMostNodes
+			newUpperMostNodes = this.findNewUpperMostNodes(currentUpperMostNodes);
+
+			currentUpperMostNodes.do({ | node |
+				node.name.asString.warn;
+			});
+
+			newUpperMostNodes.do({ | node |
+				node.name.asString.error;
+			});
+
+			//Move on to the next group of nodes
+			if(newUpperMostNodes.size > 0, {
+				this.orderNodes(newUpperMostNodes);
+			});
+		});
+	}
+
+	//Debug orderedNodes
+	debugOrderedNodes {
+		var counter = 1;
+		orderedNodes.do({ | nodesSet |
+			("Group " ++ counter).warn;
+			nodesSet.do({ | node |
+				node.name.asString.postln
+			});
+			counter = counter + 1;
+			"".postln;
+		});
+	}
+
+	//Stage 2: order nodes and create ParGroups / Groups accordingly
+	stage2 {
+		//Reset all needed things for stage2
+		orderedNodes.clear;
+		visitedNodes.clear;
+
+		/* upperMostNodes.do({ | node |
+			node.asString.warn;
+		}); */
+
+		//upperMostNodes.asString.warn;
+
+		//Fill the orderedNodes
+		//this.orderNodes(upperMostNodes);
+
+		//Build groups from orderedNodes
 	}
 }
 
@@ -201,7 +394,7 @@ AlgaBlocksDict {
 
 						//Change group of all nodes in the receiver's previous block
 						if(receiverBlock != nil, {
-							blocksDict[receiverBlockIndex].nodesDict.do({ | node |
+							blocksDict[receiverBlockIndex].nodes.do({ | node |
 								node.blockIndex = newBlockIndex;
 								newBlock.addNode(node);
 							});
@@ -209,7 +402,7 @@ AlgaBlocksDict {
 
 						//Change group of all nodes in the sender's previous block
 						if(senderBlock != nil,  {
-							blocksDict[senderBlockIndex].nodesDict.do({ | node |
+							blocksDict[senderBlockIndex].nodes.do({ | node |
 								node.blockIndex = newBlockIndex;
 								newBlock.addNode(node);
 							});

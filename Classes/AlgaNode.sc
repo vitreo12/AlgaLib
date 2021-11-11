@@ -4094,12 +4094,15 @@ AlgaNode {
 
 	clock { ^(scheduler.clock) }
 
-	//asString: use name of group
+	//asString: use name or group's ID
 	asString {
 		var nameOrGroup;
 		var groupIndex;
 		if(group != nil, { groupIndex = group.nodeID.asString });
 		nameOrGroup = name.asString ? groupIndex;
+		if(nameOrGroup == nil, {
+			^(this.class.asString);
+		});
 		^(this.class.asString ++ "(" ++ nameOrGroup ++ ")");
 	}
 }
