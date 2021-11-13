@@ -39,12 +39,16 @@ Alga.boot({
 	a = AN.debug({ DC.ar(\in.ar) }, name: \a);
 	b = AN.debug({ DC.ar(\in.ar) }, name: \b);
 	c = AN.debug({ DC.ar(\in.ar) }, name: \c);
+	d = AN.debug({ DC.ar(\in.ar) }, name: \d);
+	e = AN.debug({ DC.ar(\in.ar) }, name: \e);
 
 	a >>+ b;
 	b >>+ a;
+	/*b >>+ c;
 	c >>+ a;
 	c >>+ b;
-	b >>+ c;
-	a >>+ c;
+
+	d >>+ a;
+	e >>+ a;*/
 });
 )
