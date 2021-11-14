@@ -125,8 +125,15 @@ AlgaBlock {
 
 	//Stage 1: detect feedbacks
 	stage1 { | sender, receiver |
+		//Clear all needed stuff
 		visitedNodes.clear;
-		this.detectFeedback(sender, receiver);
+
+		//Start to detect feedback from the receiver
+		this.detectFeedback(
+			node: receiver,
+			blockSender: sender,
+			blockReceiver: receiver
+		);
 	}
 
 	//Debug the FB connections
@@ -140,7 +147,6 @@ AlgaBlock {
 
 	//Add FB pair (both ways)
 	addFeedback { | sender, receiver |
-		("FB: " ++ sender.asString ++ " >> " ++ receiver.asString).postln;
 		//Create IdentitySets if needed
 		if(feedbackNodes[sender] == nil, {
 			feedbackNodes[sender] = IdentitySet();
@@ -151,31 +157,35 @@ AlgaBlock {
 
 		//Add the FB connection
 		feedbackNodes[sender].add(receiver);
-		feedbackNodes[receiver].add(sender);
+		//feedbackNodes[receiver].add(sender);
 	}
 
-	//Detect feedback
-	detectFeedbackInner { | topSender, topReceiver, sender |
-		sender.outNodes.keys.do({ | receiver |
-			//Back to starting node == FB
-			var isFeedback = topSender == receiver;
-			var visited = visitedNodes.includes(receiver);
-
-			if(visited.not.and(isFeedback.not), {
-				(sender.asString ++ " >> " ++ receiver.asString).postln;
-				visitedNodes.add(receiver);
-				this.detectFeedbackInner(topSender, topReceiver, receiver)
-			}, {
-				if(isFeedback, {
-					this.addFeedback(topSender, topReceiver)
-				});
-			});
+	//Resolve feedback: check for the inNodes of the node.
+	resolveFeedback { | node, nodeSender, blockSender, blockReceiver |
+		//If there is a match between who sent the node (nodeSender)
+		//and the original sender, AND between the current node and
+		//the original receiver, it's feedback!
+		if((nodeSender == blockSender).and(node == blockReceiver), {
+			this.addFeedback(blockSender, blockReceiver);
 		});
 	}
 
 	//Detect feedback for a node
-	detectFeedback { | topSender, topReceiver |
-		this.detectFeedbackInner(topSender, topReceiver, topSender)
+	detectFeedback { | node, nodeSender, blockSender, blockReceiver |
+		//If node was already visited, its outNodes have already all been scanned.
+		//This means that it can either be a feedback loop to be resolved, or an
+		//already completed connection branch.
+		var visited = visitedNodes.includes(node);
+		if(visited, { ^this.resolveFeedback(node, nodeSender, blockSender, blockReceiver) });
+
+		//This node can be marked as visited
+		visitedNodes.add(node);
+
+		//Scan outNodes of this node
+		node.outNodes.keys.do({ | outNode |
+			//nodeSender == node: the node who sent this outNode
+			this.detectFeedback(outNode, node, blockSender, blockReceiver);
+		});
 	}
 
 	//Stage 2: order nodes

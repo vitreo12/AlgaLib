@@ -21,15 +21,17 @@ Alga.boot({
 	f >>+ g;
 	e >>+ i;
 	e >>+ k;
+	f >>+ h;
 	h >>+ l;
 	i >>+ l;
 	k >>+ l;
 	k >>+ d;
 	g >>+ a;
 	l >>+ b;
-	f >>+ h;
 });
 )
+
+f.inNodes
 
 //If feedback, its position should be determined by the OTHER inputs the node has.
 //If all inputs are feedback, it does not really matter if it's before or after the other node,
