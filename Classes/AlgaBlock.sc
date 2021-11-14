@@ -42,13 +42,27 @@ AlgaBlock {
 
 	init { | parGroup |
 		nodes          = IdentitySet(10);
-		visitedNodes   = IdentitySet(10);
 		feedbackNodes  = IdentityDictionary(10);
+
+		visitedNodes   = IdentitySet(10);
 		orderedNodes   = List(10);
 
 		groups         = IdentitySet(10);
 		group          = Group(parGroup);
 		blockIndex     = group.nodeID;
+	}
+
+	//Copy an AlgaBlock's nodes
+	copyBlock { | senderBlock |
+		if(senderBlock != nil, {
+			senderBlock.nodes.do({ | node |
+				this.addNode(node)
+			});
+
+			senderBlock.feedbackNodes.keysValuesDo({ | sender, receiver |
+				this.addFeedback(sender, receiver)
+			});
+		});
 	}
 
 	//Add node to the block
@@ -90,10 +104,12 @@ AlgaBlock {
 		});
 	}
 
-	//Re-arrange block starting from the receiver
-	rearrangeBlock {
-		//Stage 1: detect feedbacks
-		this.stage1;
+	//Re-arrange block
+	rearrangeBlock { | sender, receiver |
+		//Stage 1: detect feedbacks between sender and receiver
+		this.stage1(sender, receiver);
+
+		this.debugFeedback;
 
 		//Stage 2: order nodes accrding to I/O
 		this.stage2;
@@ -107,9 +123,10 @@ AlgaBlock {
 		"".postln;
 	}
 
-	//Stage 1: detect feedback
-	stage1 {
-
+	//Stage 1: detect feedbacks
+	stage1 { | sender, receiver |
+		visitedNodes.clear;
+		this.detectFeedback(sender, receiver);
 	}
 
 	//Debug the FB connections
@@ -122,7 +139,8 @@ AlgaBlock {
 	}
 
 	//Add FB pair (both ways)
-	resolveFeedback { | sender, receiver |
+	addFeedback { | sender, receiver |
+		("FB: " ++ sender.asString ++ " >> " ++ receiver.asString).postln;
 		//Create IdentitySets if needed
 		if(feedbackNodes[sender] == nil, {
 			feedbackNodes[sender] = IdentitySet();
@@ -134,6 +152,30 @@ AlgaBlock {
 		//Add the FB connection
 		feedbackNodes[sender].add(receiver);
 		feedbackNodes[receiver].add(sender);
+	}
+
+	//Detect feedback
+	detectFeedbackInner { | topSender, topReceiver, sender |
+		sender.outNodes.keys.do({ | receiver |
+			//Back to starting node == FB
+			var isFeedback = topSender == receiver;
+			var visited = visitedNodes.includes(receiver);
+
+			if(visited.not.and(isFeedback.not), {
+				(sender.asString ++ " >> " ++ receiver.asString).postln;
+				visitedNodes.add(receiver);
+				this.detectFeedbackInner(topSender, topReceiver, receiver)
+			}, {
+				if(isFeedback, {
+					this.addFeedback(topSender, topReceiver)
+				});
+			});
+		});
+	}
+
+	//Detect feedback for a node
+	detectFeedback { | topSender, topReceiver |
+		this.detectFeedbackInner(topSender, topReceiver, topSender)
 	}
 
 	//Stage 2: order nodes
@@ -261,29 +303,18 @@ AlgaBlocksDict {
 						newBlock = AlgaBlock(Alga.parGroup(receiver.server));
 						if(newBlock == nil, { ^nil });
 
+						//Merge the old blocks into the new one
+						newBlock.copyBlock(blocksDict[senderBlockIndex]);
+						newBlock.copyBlock(blocksDict[receiverBlockIndex]);
+
+						//Change index
 						newBlockIndex = newBlock.blockIndex;
 
-						//Change group of all nodes in the receiver's previous block
-						if(receiverBlock != nil, {
-							blocksDict[receiverBlockIndex].nodes.do({ | node |
-								node.blockIndex = newBlockIndex;
-								newBlock.addNode(node);
-							});
-						});
-
-						//Change group of all nodes in the sender's previous block
-						if(senderBlock != nil,  {
-							blocksDict[senderBlockIndex].nodes.do({ | node |
-								node.blockIndex = newBlockIndex;
-								newBlock.addNode(node);
-							});
-						});
-
-						//Remove previous groups
+						//Remove previous blocks
 						blocksDict.removeAt(receiverBlockIndex);
 						blocksDict.removeAt(senderBlockIndex);
 
-						//Add the two nodes to this new group
+						//Add the two nodes to this new block
 						receiver.blockIndex = newBlockIndex;
 						sender.blockIndex = newBlockIndex;
 						newBlock.addNode(receiver);
@@ -302,7 +333,7 @@ AlgaBlocksDict {
 		//Actually reorder the block's nodes starting from the receiver
 		newBlock = blocksDict[newBlockIndex];
 		if(newBlock != nil, {
-			newBlock.rearrangeBlock(sender);
+			newBlock.rearrangeBlock(sender, receiver);
 		});
 	}
 }
