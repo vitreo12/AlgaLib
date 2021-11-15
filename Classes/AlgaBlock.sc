@@ -245,10 +245,13 @@ AlgaBlock {
 
 	//Stage 2: order nodes
 	stage2 {
-
+		//Find the upper most nodes
 	}
 
-	//
+	//Order the nodes ignoring FB
+	orderNodes {
+
+	}
 
 	//Stage 3: optimize the ordered nodes (make groups)
 	stage3 {
