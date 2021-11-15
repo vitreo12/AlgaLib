@@ -138,8 +138,10 @@ AlgaBlock {
 
 		this.debugFeedbacks;
 
-		//Stage 2: find unused nodes and order nodes according to I/O
+		//Stage 2: order nodes according to I/O
 		this.stage2;
+
+		this.debugOrderedNodes;
 
 		//Stage 3: optimize the ordered nodes (make groups)
 		this.stage3;
@@ -161,6 +163,9 @@ AlgaBlock {
 			blockSender: sender,
 			blockReceiver: receiver
 		);
+
+		//Find unused feedback loops (from previous disconnections)
+		this.findAllUnusedFeedbacks;
 	}
 
 	//Debug the FB connections
@@ -169,6 +174,15 @@ AlgaBlock {
 			receiversSet.do({ | receiver |
 				("FB: " ++ sender.asString ++ " >> " ++ receiver.asString).error;
 			});
+		});
+	}
+
+	//Debug orderedNodes
+	debugOrderedNodes {
+		"".postln;
+		"OrderedNodes:".warn;
+		orderedNodes.do({ | node |
+			node.asString.warn;
 		});
 	}
 
@@ -184,7 +198,7 @@ AlgaBlock {
 
 		//Add the FB connection
 		feedbackNodes[sender].add(receiver);
-		//feedbackNodes[receiver].add(sender);
+		feedbackNodes[receiver].add(sender);
 	}
 
 	//Remove FB pair
@@ -234,6 +248,8 @@ AlgaBlock {
 
 	}
 
+	//
+
 	//Stage 3: optimize the ordered nodes (make groups)
 	stage3 {
 
@@ -282,6 +298,8 @@ AlgaBlock {
 					blockReceiver: receiver
 				);
 
+				//atLeastOneFeedback.asString.error;
+
 				//If no feedbacks, the pair can be removed.
 				//Effectively, this means that the disconnection of the node in
 				//rearrangeBlock_disconnect freed this particular feedback loop
@@ -294,6 +312,14 @@ AlgaBlock {
 			if(visited.not, {
 				this.findUnusedFeedbacks(receiver);
 			});
+		});
+	}
+
+	//Running this on new connections?
+	findAllUnusedFeedbacks {
+		nodes.do({ | node |
+			disconnectVisitedNodes.clear;
+			this.findUnusedFeedbacks(node)
 		});
 	}
 }

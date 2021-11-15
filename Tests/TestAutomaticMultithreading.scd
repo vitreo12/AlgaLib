@@ -29,7 +29,9 @@ Alga.boot({
 	g >>+ a;
 	l >>+ b;
 
+	//This is to test freeUnusedFeedbacks
 	//h <| \in;
+	//l >>+ b;
 });
 )
 
