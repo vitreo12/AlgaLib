@@ -3487,7 +3487,10 @@ AlgaNode {
 			})
 		}, {
 			this.removeInterpConnectionAtParam(nil, param, time:time);
-		})
+		});
+
+		//Re-order block using the _disconnect version
+		AlgaBlocksDict.rearrangeBlock_disconnect(this);
 	}
 
 	resetParam { | param = \in, oldSender = nil, time, sched |

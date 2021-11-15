@@ -21,8 +21,14 @@ AlgaBlock {
 	//All the nodes that already have been visited
 	var <visitedNodes;
 
+	//Used for disconnect
+	var <disconnectVisitedNodes;
+
 	//All the nodes that have FB connections
 	var <feedbackNodes;
+
+	//Used for disconnect
+	var <atLeastOneFeedback = false;
 
 	//OrderedIdentitySet of IdentitySets of node dependencies
 	var <orderedNodes;
@@ -45,6 +51,7 @@ AlgaBlock {
 		feedbackNodes  = IdentityDictionary(10);
 
 		visitedNodes   = IdentitySet(10);
+		disconnectVisitedNodes = IdentitySet(10);
 		orderedNodes   = List(10);
 
 		groups         = IdentitySet(10);
@@ -83,6 +90,23 @@ AlgaBlock {
 		});
 	}
 
+	//Remove all FB related to the node
+	removeFeedbacks { | node |
+		feedbackNodes.removeAt(node);
+		feedbackNodes.keysValuesDo({ | sender, receiverSet |
+			receiverSet.remove(node);
+			if(receiverSet.size == 0, { feedbackNodes.removeAt(sender) })
+		});
+	}
+
+	//Is connection a feedback one?
+	isFeedback { | sender, receiver |
+		if(feedbackNodes[sender] != nil, {
+			^feedbackNodes[sender].includes(receiver)
+		})
+		^false
+	}
+
 	//Remove a node from the block. If the block is empty, free its group
 	removeNode { | node |
 		if(node.blockIndex != blockIndex, {
@@ -92,6 +116,9 @@ AlgaBlock {
 
 		//Remove from dict
 		nodes.remove(node);
+
+		//Remove from FB connections
+		this.removeFeedbacks(node);
 
 		//Set node's index to -1
 		node.blockIndex = -1;
@@ -104,14 +131,14 @@ AlgaBlock {
 		});
 	}
 
-	//Re-arrange block
+	//Re-arrange block on connection
 	rearrangeBlock { | sender, receiver |
 		//Stage 1: detect feedbacks between sender and receiver
 		this.stage1(sender, receiver);
 
-		this.debugFeedback;
+		this.debugFeedbacks;
 
-		//Stage 2: order nodes accrding to I/O
+		//Stage 2: find unused nodes and order nodes according to I/O
 		this.stage2;
 
 		//Stage 3: optimize the ordered nodes (make groups)
@@ -137,7 +164,7 @@ AlgaBlock {
 	}
 
 	//Debug the FB connections
-	debugFeedback {
+	debugFeedbacks {
 		feedbackNodes.keysValuesDo({ | sender, receiversSet |
 			receiversSet.do({ | receiver |
 				("FB: " ++ sender.asString ++ " >> " ++ receiver.asString).error;
@@ -160,6 +187,19 @@ AlgaBlock {
 		//feedbackNodes[receiver].add(sender);
 	}
 
+	//Remove FB pair
+	removeFeedback { | sender, receiver |
+		if(feedbackNodes[sender] != nil, {
+			feedbackNodes[sender].remove(receiver);
+			if(feedbackNodes[sender].size == 0, { feedbackNodes.removeAt(sender) });
+		});
+
+		if(feedbackNodes[receiver] != nil, {
+			feedbackNodes[receiver].remove(sender);
+			if(feedbackNodes[receiver].size == 0, { feedbackNodes.removeAt(receiver) });
+		});
+	}
+
 	//Resolve feedback: check for the inNodes of the node.
 	resolveFeedback { | node, nodeSender, blockSender, blockReceiver |
 		//If there is a match between who sent the node (nodeSender)
@@ -167,6 +207,7 @@ AlgaBlock {
 		//the original receiver, it's feedback!
 		if((nodeSender == blockSender).and(node == blockReceiver), {
 			this.addFeedback(blockSender, blockReceiver);
+			atLeastOneFeedback = true;
 		});
 	}
 
@@ -201,6 +242,59 @@ AlgaBlock {
 	//Stage 4: build ParGroups / Groups out of the optimized ordered nodes
 	stage4 {
 
+	}
+
+	//Re-arrange block on disconnect (needs WIP)
+	rearrangeBlock_disconnect { | node |
+		//Stage 1: free unused FB connections
+		this.stage1_disconnect(node);
+
+		this.debugFeedbacks;
+	}
+
+	//Free unused FB connections
+	stage1_disconnect { | node |
+		//Clear needed things
+		disconnectVisitedNodes.clear;
+
+		//Find unused FB connections from this node
+		this.findUnusedFeedbacks(node);
+	}
+
+	//Find unused feedback loops related to node
+	findUnusedFeedbacks { | node |
+		disconnectVisitedNodes.add(node);
+		node.outNodes.keys.do({ | receiver |
+			var visited = disconnectVisitedNodes.includes(receiver);
+
+			//(node.asString ++ " >> " ++ receiver.asString).postln;
+
+			//Found a FB connection
+			if(this.isFeedback(node, receiver), {
+				//detectFeedback uses Class's visitedNodes and atLeastOneFeedback
+				visitedNodes.clear;
+				atLeastOneFeedback = false;
+
+				//Run FB detection to see if at least one feedback is generated
+				this.detectFeedback(
+					node: receiver,
+					blockSender: node,
+					blockReceiver: receiver
+				);
+
+				//If no feedbacks, the pair can be removed.
+				//Effectively, this means that the disconnection of the node in
+				//rearrangeBlock_disconnect freed this particular feedback loop
+				if(atLeastOneFeedback.not, {
+					this.removeFeedback(node, receiver);
+				});
+			});
+
+			//Not visited, look through
+			if(visited.not, {
+				this.findUnusedFeedbacks(receiver);
+			});
+		});
 	}
 }
 
@@ -341,9 +435,21 @@ AlgaBlocksDict {
 		if(newBlockIndex == nil, { newBlockIndex = receiver.blockIndex });
 
 		//Actually reorder the block's nodes starting from the receiver
-		newBlock = blocksDict[newBlockIndex];
-		if(newBlock != nil, {
-			newBlock.rearrangeBlock(sender, receiver);
+		this.rearrangeBlock(newBlockIndex, sender, receiver);
+	}
+
+	*rearrangeBlock { | index, sender, receiver |
+		var block = blocksDict[index];
+		if(block != nil, {
+			block.rearrangeBlock(sender, receiver);
+		});
+	}
+
+	*rearrangeBlock_disconnect { | node |
+		var index = node.blockIndex;
+		var block = blocksDict[index];
+		if(block != nil, {
+			block.rearrangeBlock_disconnect(node);
 		});
 	}
 }

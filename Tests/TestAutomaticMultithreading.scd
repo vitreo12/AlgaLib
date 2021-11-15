@@ -28,9 +28,12 @@ Alga.boot({
 	k >>+ d;
 	g >>+ a;
 	l >>+ b;
+
+	//h <| \in;
 });
 )
 
+h.inNodes
 f.inNodes
 
 //If feedback, its position should be determined by the OTHER inputs the node has.
@@ -42,17 +45,17 @@ f.inNodes
 Alga.boot({
 	a = AN.debug({ DC.ar(\in.ar) }, name: \a);
 	b = AN.debug({ DC.ar(\in.ar) }, name: \b);
-	/*c = AN.debug({ DC.ar(\in.ar) }, name: \c);
+	c = AN.debug({ DC.ar(\in.ar) }, name: \c);
 	d = AN.debug({ DC.ar(\in.ar) }, name: \d);
-	e = AN.debug({ DC.ar(\in.ar) }, name: \e);*/
+	e = AN.debug({ DC.ar(\in.ar) }, name: \e);
 
 	a >>+ b;
 	b >>+ a;
-	/*b >>+ c;
+	b >>+ c;
 	c >>+ a;
 	c >>+ b;
 
 	d >>+ a;
-	e >>+ a;*/
+	e >>+ a;
 });
 )
