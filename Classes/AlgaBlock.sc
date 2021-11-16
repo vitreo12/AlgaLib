@@ -46,6 +46,10 @@ AlgaBlock {
 	//the ParGroups / Groups within the Group
 	var <groups;
 
+	//These are the top groups that belonged to merging AlgaBlocks
+	var <isMergedGroup = false;
+	var <mergedGroups;
+
 	//Nodes at the top of the block
 	var <upperMostNodes;
 
@@ -83,6 +87,19 @@ AlgaBlock {
 			senderBlock.feedbackNodes.keysValuesDo({ | sender, receiver |
 				this.addFeedback(sender, receiver)
 			});
+
+			//When merging blocks, the old one's core group must be freed!
+			this.addMergedGroup(senderBlock);
+			isMergedGroup = true;
+		});
+	}
+
+	//Add group to mergedGroups for deletion. Also add the mergedGroups that that one had.
+	addMergedGroup { | senderBlock |
+		mergedGroups = mergedGroups ? IdentitySet();
+		mergedGroups.add(senderBlock.group);
+		senderBlock.mergedGroups.do({ | oldMergedGroup |
+			mergedGroups.add(oldMergedGroup)
 		});
 	}
 
@@ -268,7 +285,9 @@ AlgaBlock {
 		//This means that it can either be a feedback loop to be resolved, or an
 		//already completed connection branch.
 		var visited = visitedNodes.includes(node);
-		if(visited, { ^this.resolveFeedback(node, nodeSender, blockSender, blockReceiver) });
+		if(visited, {
+			^this.resolveFeedback(node, nodeSender, blockSender, blockReceiver);
+		});
 
 		//This node can be marked as visited
 		visitedNodes.add(node);
@@ -379,10 +398,7 @@ AlgaBlock {
 	groupSetIncludesASender { | groupSet, node |
 		node.inNodes.do({ | sendersSet |
 			sendersSet.do({ | sender |
-				var isFeedback = this.isFeedback(sender, node);
-				if(isFeedback.not, {
-					if(groupSet.includes(sender), { ^true });
-				});
+				if(groupSet.includes(sender), { ^true });
 			})
 		})
 		^false;
@@ -432,12 +448,19 @@ AlgaBlock {
 		});
 	}
 
-	//Delete old groups
+	//Delete old groups and merged groups
 	deleteOldGroups { | oldGroups |
-		fork {
-			1.wait;
-			oldGroups.do({ | oldGroup | oldGroup.nodeID.asString.error; oldGroup.free });
-		}
+		//If a group has just been merged, free those groups too
+		if(isMergedGroup, {
+			mergedGroups.do({ | mergedGroup | mergedGroup.free });
+			mergedGroups.clear;
+			isMergedGroup = false;
+		});
+
+		//fork {
+		//	1.wait;
+		oldGroups.do({ | oldGroup | oldGroup.free });
+		//}
 	}
 
 	//Stage 4: build ParGroups / Groups out of the optimized ordered nodes
@@ -451,7 +474,7 @@ AlgaBlock {
 		//Build new grups
 		this.buildGroups;
 
-		//Delete old groups
+		//Delete old groups (need to be locked due to fork)
 		this.deleteOldGroups(oldGroups);
 	}
 

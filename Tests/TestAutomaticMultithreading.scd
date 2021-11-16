@@ -32,6 +32,8 @@ Alga.boot({
 	//This is to test freeUnusedFeedbacks
 	//h <| \in;
 	//l >>+ b;
+
+	//s.plotTree;
 });
 )
 
