@@ -6,18 +6,18 @@ Alga.boot({
 
 	s.sync;
 
-	a = AlgaEffect({ \in.ar });
+	//a = AlgaEffect({ \in.ar });
 
 	//Note the CPU diff!
-	//a = AlgaNode({ \in.ar });
+	a = AlgaNode.debug({ \in.ar }, name:\a);
 
 	25.do({
-		b = AlgaNode(\test);
+		b = AlgaNode.debug(\test, name:\b);
 		a <<+ b;
 	});
 
 	25.do({
-		d = AlgaNode(\test);
+		d = AlgaNode.debug(\test, name:\d);
 		a <<+ d;
 	});
 

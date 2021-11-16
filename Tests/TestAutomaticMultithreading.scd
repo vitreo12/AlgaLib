@@ -35,6 +35,8 @@ Alga.boot({
 });
 )
 
+s.plotTree
+
 h.inNodes
 f.inNodes
 

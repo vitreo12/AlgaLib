@@ -180,13 +180,13 @@ AlgaNode {
 		activeInterpSynths = IdentityDictionary(10);
 
 		//Per-argument connections to this AlgaNode. These are in the form:
-		//(param -> IdentitySet[AlgaNode, AlgaNode...]). Multiple AlgaNodes are used when
+		//(param -> OrderedIdentitySet[AlgaNode, AlgaNode...]). Multiple AlgaNodes are used when
 		//using the mixing <<+ / >>+
 		inNodes = IdentityDictionary(10);
 
 		//outNodes are not indexed by param name, as they could be attached to multiple nodes with same param name.
-		//they are indexed by identity of the connected node, and then it contains a IdentitySet of all parameters
-		//that it controls in that node (AlgaNode -> IdentitySet[\freq, \amp ...])
+		//they are indexed by identity of the connected node, and then it contains a OrderedIdentitySet of all parameters
+		//that it controls in that node (AlgaNode -> OrderedIdentitySet[\freq, \amp ...])
 		outNodes = IdentityDictionary(10);
 
 		//Chans mapping from inNodes... How to support <<+ / >>+ ???
@@ -598,20 +598,21 @@ AlgaNode {
 			tempGroup = AlgaParGroup(group);
 			interpGroup = AlgaParGroup(group);
 		}, {
-			//These will all use Group and not ParGroup because it generally
-			//performs better. Parallelization is only achieved with the Alga.parGroup and AlgaBlock's group.
+			//With mixing and everything, it's nice to parallelize interpGroup, normGroup and tempGroup.
+			//Of course, with fewer parameters and / or mix inputs, the gains will not be huge.
+			//synthGroup is better as standard Group, as it's mostly one (unless .replace happening)
 
 			synthGroup = AlgaGroup(group);
 			//synthGroup = AlgaParGroup(group);
 
-			normGroup = AlgaGroup(group);
-			//normGroup = AlgaParGroup(group);
+			//normGroup = AlgaGroup(group);
+			normGroup = AlgaParGroup(group);
 
-			tempGroup = AlgaGroup(group);
 			//tempGroup = AlgaGroup(group);
+			tempGroup = AlgaParGroup(group);
 
-			interpGroup = AlgaGroup(group);
 			//interpGroup = AlgaGroup(group);
+			interpGroup = AlgaParGroup(group);
 		});
 	}
 
@@ -2699,7 +2700,7 @@ AlgaNode {
 		});
 	}
 
-	//param -> IdentitySet[AlgaNode, AlgaNode, ...]
+	//param -> OrderedIdentitySet[AlgaNode, AlgaNode, ...]
 	addInNode { | sender, param = \in, mix = false |
 		//First of all, remove the outNodes that the previous sender had with the
 		//param of this node, if there was any. Only apply if mix==false (no <<+ / >>+)
@@ -2713,9 +2714,9 @@ AlgaNode {
 		});
 
 		if((sender.isAlgaNode).or(sender.isAlgaArg), {
-			//Empty entry OR not doing mixing, create new IdentitySet. Otherwise, add to existing
+			//Empty entry OR not doing mixing, create new OrderedIdentitySet. Otherwise, add to existing
 			if((inNodes[param] == nil).or(mix.not), {
-				inNodes[param] = IdentitySet[sender];
+				inNodes[param] = OrderedIdentitySet[sender];
 			}, {
 				inNodes[param].add(sender);
 			})
@@ -2728,11 +2729,11 @@ AlgaNode {
 		});
 	}
 
-	//AlgaNode -> IdentitySet[param, param, ...]
+	//AlgaNode -> OrderedIdentitySet[param, param, ...]
 	addOutNode { | receiver, param = \in |
-		//Empty entry, create IdentitySet. Otherwise, add to existing
+		//Empty entry, create OrderedIdentitySet. Otherwise, add to existing
 		if(outNodes[receiver] == nil, {
-			outNodes[receiver] = IdentitySet[param];
+			outNodes[receiver] = OrderedIdentitySet[param];
 		}, {
 			outNodes[receiver].add(param);
 		});
@@ -2746,7 +2747,7 @@ AlgaNode {
 		//Unpack AlgaArg
 		if(sender.isAlgaArg, { sender = sender.sender });
 
-		//This will add the entries to the existing IdentitySet, or create a new one
+		//This will add the entries to the existing OrderedIdentitySet, or create a new one
 		if(sender.isAlgaNode, {
 			sender.addOutNode(this, param);
 
@@ -2768,7 +2769,7 @@ AlgaNode {
 			//Just remove one param from sender's set at this entry
 			senderOutNodesAtThis.remove(param);
 
-			//If IdentitySet is now empty, remove it entirely
+			//If OrderedIdentitySet is now empty, remove it entirely
 			if(senderOutNodesAtThis.size == 0, {
 				sender.outNodes.removeAt(this);
 			});
@@ -2778,7 +2779,7 @@ AlgaNode {
 			//Remove the specific param / sender combination from inNodes
 			inNodesAtParam.remove(sender);
 
-			//If IdentitySet is now empty, remove it entirely
+			//If OrderedIdentitySet is now empty, remove it entirely
 			if(inNodesAtParam.size == 0, {
 				inNodes.removeAt(param);
 			});

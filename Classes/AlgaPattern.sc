@@ -2776,9 +2776,9 @@ AlgaPattern : AlgaNode {
 	//Add entry to inNodes. Unlike AlgaNodes, inNodes can here contain AlgaArgs, as the .replace
 	//mechanism is difference. For AlgaNodes, AlgaArgs can only be used in the args initialization
 	addInNodeAlgaNode { | sender, param = \in, mix = false |
-		//Empty entry OR not doing mixing, create new IdentitySet. Otherwise, add to existing
+		//Empty entry OR not doing mixing, create new OrderedIdentitySet. Otherwise, add to existing
 		if((inNodes[param] == nil).or(mix.not), {
-			inNodes[param] = IdentitySet[sender];
+			inNodes[param] = OrderedIdentitySet[sender];
 		}, {
 			inNodes[param].add(sender);
 		});
@@ -2887,7 +2887,7 @@ AMP : AlgaMonoPattern {}
 	//Add a node to patternOutNodes
 	addPatternOutNode { | algaPattern, param = \in |
 		if(patternOutNodes == nil, { patternOutNodes = IdentityDictionary() });
-		if(patternOutNodes[param] == nil, { patternOutNodes[param] = IdentitySet() });
+		if(patternOutNodes[param] == nil, { patternOutNodes[param] = OrderedIdentitySet() });
 		patternOutNodes[param].add(algaPattern);
 	}
 
@@ -2991,10 +2991,10 @@ AMP : AlgaMonoPattern {}
 
 		//Set of uniqueIDs at specific [param, algaPattern, algaSynthBus]
 		if(patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus] == nil, {
-			patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus] = IdentitySet()
+			patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus] = OrderedIdentitySet()
 		});
 
-		//Add uniqueID to IdentitySet
+		//Add uniqueID to OrderedIdentitySet
 		(patternOutUniqueIDs[paramAlgaPatternAlgaSynthBus]).add(uniqueID);
 
 		//Check if patternOutEnvBusses needs to be init.
