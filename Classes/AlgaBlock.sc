@@ -42,6 +42,12 @@ AlgaBlock {
 	//the ParGroups / Groups within the Group
 	var <groups;
 
+	//Nodes at the top of the block
+	var <upperMostNodes;
+
+	//Used when all connections are FB
+	var <lastSender;
+
 	*new { | parGroup |
 		^super.new.init(parGroup)
 	}
@@ -52,7 +58,9 @@ AlgaBlock {
 
 		visitedNodes   = IdentitySet(10);
 		disconnectVisitedNodes = IdentitySet(10);
-		orderedNodes   = List(10);
+
+		upperMostNodes = IdentitySet(10);
+		orderedNodes   = OrderedIdentitySet(10);
 
 		groups         = IdentitySet(10);
 		group          = Group(parGroup);
@@ -139,7 +147,7 @@ AlgaBlock {
 		this.debugFeedbacks;
 
 		//Stage 2: order nodes according to I/O
-		this.stage2;
+		this.stage2(sender);
 
 		this.debugOrderedNodes;
 
@@ -244,13 +252,77 @@ AlgaBlock {
 	}
 
 	//Stage 2: order nodes
-	stage2 {
-		//Find the upper most nodes
+	stage2 { | sender |
+		//Clear all needed stuff
+		visitedNodes.clear;
+		orderedNodes.clear;
+
+		//Assign lastSender
+		lastSender = sender;
+
+		//Find the upper most nodes. Use lastSender if none found
+		this.findUpperMostNodes;
+
+		//Order the nodes starting from upperMostNodes
+		this.orderNodes;
+	}
+
+	//Find the upper most nodes
+	findUpperMostNodes {
+		upperMostNodes.clear;
+
+		//Nodes with no inputs
+		nodes.do({ | node |
+			if(node.inNodes.size == 0, {
+				upperMostNodes.add(node)
+			});
+		});
+
+		//All FB connections. Use lastSender as upper most node
+		if(upperMostNodes.size == 0, {
+			upperMostNodes.add(lastSender)
+		});
+	}
+
+	//
+	orderNodeInNodes { | node |
+		//Add to visited
+		visitedNodes.add(node);
+
+		//Check inNodes
+		node.inNodes.do({ | sendersSet |
+			sendersSet.do({ | sender |
+				//If not visited and not FB connection, check its inNodes too
+				var visited = visitedNodes.includes(sender);
+				var isFeedback = this.isFeedback(sender, node);
+				if(visited.not.and(isFeedback.not), {
+					this.orderNodeInNodes(sender);
+				});
+			});
+		});
+
+		//All its inNodes have been added: we can now add the node to orderedNodes
+		orderedNodes.add(node);
+	}
+
+	//Order a node
+	orderNode { | node |
+		//Check output
+		node.outNodes.keys.do({ | receiver |
+			var visited = visitedNodes.includes(receiver);
+			//If not visited yet, visit inputs and then start ordering it too
+			if(visited.not, {
+				this.orderNodeInNodes(receiver);
+				this.orderNode(receiver);
+			});
+		});
 	}
 
 	//Order the nodes ignoring FB
 	orderNodes {
-
+		upperMostNodes.do({ | node |
+			this.orderNode(node);
+		});
 	}
 
 	//Stage 3: optimize the ordered nodes (make groups)
