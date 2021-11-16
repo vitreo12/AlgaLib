@@ -30,8 +30,12 @@ AlgaBlock {
 	//Used for disconnect
 	var <atLeastOneFeedback = false;
 
-	//OrderedIdentitySet of IdentitySets of node dependencies
+	//OrderedIdentitySet of ordered nodes
 	var <orderedNodes;
+
+	//Array of IdentitySets of node dependencies
+	var <groupedOrderedNodes;
+	var <currentGroupSet;
 
 	//the index for this block in the AlgaBlocksDict global dict
 	var <blockIndex;
@@ -53,16 +57,18 @@ AlgaBlock {
 	}
 
 	init { | parGroup |
-		nodes          = IdentitySet(10);
+		nodes          = OrderedIdentitySet(10);
 		feedbackNodes  = IdentityDictionary(10);
 
 		visitedNodes   = IdentitySet(10);
 		disconnectVisitedNodes = IdentitySet(10);
 
-		upperMostNodes = IdentitySet(10);
+		upperMostNodes = OrderedIdentitySet(10);
 		orderedNodes   = OrderedIdentitySet(10);
 
-		groups         = IdentitySet(10);
+		groupedOrderedNodes = Array.newClear;
+
+		groups         = OrderedIdentitySet(10);
 		group          = Group(parGroup);
 		blockIndex     = group.nodeID;
 	}
@@ -139,43 +145,6 @@ AlgaBlock {
 		});
 	}
 
-	//Re-arrange block on connection
-	rearrangeBlock { | sender, receiver |
-		//Stage 1: detect feedbacks between sender and receiver
-		this.stage1(sender, receiver);
-
-		this.debugFeedbacks;
-
-		//Stage 2: order nodes according to I/O
-		this.stage2(sender);
-
-		this.debugOrderedNodes;
-
-		//Stage 3: optimize the ordered nodes (make groups)
-		this.stage3;
-
-		//Stage 4: build ParGroups / Groups out of the optimized ordered nodes
-		this.stage4;
-
-		"".postln;
-	}
-
-	//Stage 1: detect feedbacks
-	stage1 { | sender, receiver |
-		//Clear all needed stuff
-		visitedNodes.clear;
-
-		//Start to detect feedback from the receiver
-		this.detectFeedback(
-			node: receiver,
-			blockSender: sender,
-			blockReceiver: receiver
-		);
-
-		//Find unused feedback loops (from previous disconnections)
-		this.findAllUnusedFeedbacks;
-	}
-
 	//Debug the FB connections
 	debugFeedbacks {
 		feedbackNodes.keysValuesDo({ | sender, receiversSet |
@@ -192,6 +161,66 @@ AlgaBlock {
 		orderedNodes.do({ | node |
 			node.asString.warn;
 		});
+	}
+
+	//Debug groupedOrderedNodes
+	debugGroupedOrderedNodes {
+		"".postln;
+		"GroupedOrderedNodes:".warn;
+		groupedOrderedNodes.do({ | set, i |
+			("Group " ++ (i+1).asString ++ ":").warn;
+			set.do({ | node |
+				node.asString.warn;
+			});
+			"".postln;
+		});
+	}
+
+	/***********/
+	/* CONNECT */
+	/***********/
+
+	//Re-arrange block on connection
+	rearrangeBlock { | sender, receiver |
+		//Stage 1: detect feedbacks between sender and receiver
+		this.stage1(sender, receiver);
+
+		this.debugFeedbacks;
+
+		//Stage 2: order nodes according to I/O
+		this.stage2(sender);
+
+		this.debugOrderedNodes;
+
+		//Stage 3: optimize the ordered nodes (make groups)
+		this.stage3;
+
+		this.debugGroupedOrderedNodes;
+
+		//Stage 4: build ParGroups / Groups out of the optimized ordered nodes
+		this.stage4;
+
+		"".postln;
+	}
+
+	/***********/
+	/* STAGE 1 */
+	/***********/
+
+	//Stage 1: detect feedbacks
+	stage1 { | sender, receiver |
+		//Clear all needed stuff
+		visitedNodes.clear;
+
+		//Start to detect feedback from the receiver
+		this.detectFeedback(
+			node: receiver,
+			blockSender: sender,
+			blockReceiver: receiver
+		);
+
+		//Find unused feedback loops (from previous disconnections)
+		this.findAllUnusedFeedbacks;
 	}
 
 	//Add FB pair (both ways)
@@ -251,6 +280,10 @@ AlgaBlock {
 		});
 	}
 
+	/***********/
+	/* STAGE 2 */
+	/***********/
+
 	//Stage 2: order nodes
 	stage2 { | sender |
 		//Clear all needed stuff
@@ -269,6 +302,7 @@ AlgaBlock {
 
 	//Find the upper most nodes
 	findUpperMostNodes {
+		//Reset
 		upperMostNodes.clear;
 
 		//Nodes with no inputs
@@ -284,7 +318,7 @@ AlgaBlock {
 		});
 	}
 
-	//
+	//Order the inNodes of a node
 	orderNodeInNodes { | node |
 		//Add to visited
 		visitedNodes.add(node);
@@ -325,15 +359,105 @@ AlgaBlock {
 		});
 	}
 
+	/***********/
+	/* STAGE 3 */
+	/***********/
+
 	//Stage 3: optimize the ordered nodes (make groups)
 	stage3 {
+		//Clear all needed stuff
+		visitedNodes.clear;
+		groupedOrderedNodes = Array.newClear;
+		currentGroupSet = IdentitySet();
+		groupedOrderedNodes = groupedOrderedNodes.add(currentGroupSet);
 
+		//Run optimizer
+		this.optimizeOrderedNodes;
+	}
+
+	//Check if groupSet includes a sender of node
+	groupSetIncludesASender { | groupSet, node |
+		node.inNodes.do({ | sendersSet |
+			sendersSet.do({ | sender |
+				var isFeedback = this.isFeedback(sender, node);
+				if(isFeedback.not, {
+					if(groupSet.includes(sender), { ^true });
+				});
+			})
+		})
+		^false;
+	}
+
+	//Optimize a node
+	optimizeNode { | node |
+		var currentGroupSetIncludesASender = this.groupSetIncludesASender(currentGroupSet, node);
+
+		//New group to create
+		if(currentGroupSetIncludesASender, {
+			var newGroupSet = IdentitySet();
+			newGroupSet.add(node);
+			groupedOrderedNodes = groupedOrderedNodes.add(newGroupSet);
+			currentGroupSet = newGroupSet;
+		}, {
+			//Add to currentGroupSet
+			currentGroupSet.add(node);
+		});
+	}
+
+	//Optimize orderedNodes
+	optimizeOrderedNodes {
+		orderedNodes.do({ | node |
+			this.optimizeNode(node);
+		});
+	}
+
+	/***********/
+	/* STAGE 4 */
+	/***********/
+
+	//Build Groups / ParGroups
+	buildGroups {
+		groupedOrderedNodes.do({ | groupSet |
+			var newGroup;
+			if(groupSet.size > 1, {
+				newGroup = ParGroup(group, \addToTail);
+			}, {
+				newGroup = Group(group, \addToTail);
+			});
+			groupSet.do({ | node |
+				node.moveToHead(newGroup)
+			});
+			("new " ++ newGroup.nodeID.asString).warn;
+			groups.add(newGroup);
+		});
+	}
+
+	//Delete old groups
+	deleteOldGroups { | oldGroups |
+		fork {
+			1.wait;
+			oldGroups.do({ | oldGroup | oldGroup.nodeID.asString.error; oldGroup.free });
+		}
 	}
 
 	//Stage 4: build ParGroups / Groups out of the optimized ordered nodes
 	stage4 {
+		//Copy old groups
+		var oldGroups = groups.copy;
 
+		//Clear all needed stuff
+		groups.clear;
+
+		//Build new grups
+		this.buildGroups;
+
+		//Delete old groups
+		this.deleteOldGroups(oldGroups);
 	}
+
+	/**************/
+	/* DISCONNECT */
+	/**************/
 
 	//Re-arrange block on disconnect (needs WIP)
 	rearrangeBlock_disconnect { | node |
@@ -342,6 +466,10 @@ AlgaBlock {
 
 		this.debugFeedbacks;
 	}
+
+	/***********/
+	/* STAGE 1 */
+	/***********/
 
 	//Free unused FB connections
 	stage1_disconnect { | node |
