@@ -21,6 +21,9 @@ Alga {
 	classvar <parGroups;
 	classvar <oldSynthDefsDir;
 
+	//Store if server is supernova or not
+	classvar <supernovas;
+
 	*initSynthDefs {
 		AlgaStartup.initSynthDefs;
 	}
@@ -30,6 +33,8 @@ Alga {
 		schedulers = IdentityDictionary(1);
 		clocks = IdentityDictionary(1);
 		parGroups = IdentityDictionary(1);
+
+		supernovas = IdentityDictionary(1);
 
 		//Make sure to reset it
 		"SC_SYNTHDEF_PATH".unsetenv;
@@ -137,6 +142,16 @@ Alga {
 		^parGroups[server]
 	}
 
+	*setSupernova { | server, supernova |
+		server = server ? Server.default;
+		supernovas[server] = supernova;
+	}
+
+	*supernova { | server |
+		server = server ? Server.default;
+		^(supernovas[server] ? false);
+	}
+
 	*checkAlgaAudioControl {
 		if(\AlgaAudioControl.asClass == nil, {
 			"\n************************************************\n".postln;
@@ -208,6 +223,9 @@ Alga {
 
 		//Create ParGroup when the server boots and keep it persistent
 		this.addParGroupOnServerTree(algaServerOptions.supernova);
+
+		//Set if server is supernva or not
+		this.setSupernova(server, algaServerOptions.supernova);
 
 		//Use AlgaSynthDefs as SC_SYNTHDEF_PATH
 		this.setAlgaSynthDefsDir;

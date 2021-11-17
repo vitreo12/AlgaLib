@@ -199,6 +199,9 @@ AlgaBlock {
 
 	//Re-arrange block on connection
 	rearrangeBlock { | sender, receiver |
+		//Check if it's supernova
+		var supernova = Alga.supernova(sender.server);
+
 		//Stage 1: detect feedbacks between sender and receiver
 		this.stage1(sender, receiver);
 
@@ -209,13 +212,19 @@ AlgaBlock {
 
 		this.debugOrderedNodes;
 
-		//Stage 3: optimize the ordered nodes (make groups)
-		this.stage3;
+		//Stage 4
+		if(supernova, {
+			//Stage 3: optimize the ordered nodes (make groups)
+			this.stage3;
 
-		this.debugGroupedOrderedNodes;
+			this.debugGroupedOrderedNodes;
 
-		//Stage 4: build ParGroups / Groups out of the optimized ordered nodes
-		this.stage4;
+			//Build ParGroups / Groups out of the optimized ordered nodes
+			this.stage4_supernova;
+		}, {
+			//Simply add orderedNods to group. No stage3.
+			this.stage4_scsynth;
+		});
 
 		"".postln;
 	}
@@ -459,7 +468,9 @@ AlgaBlock {
 
 		//fork {
 		//	1.wait;
-		oldGroups.do({ | oldGroup | oldGroup.free });
+		if(oldGroups != nil, {
+			oldGroups.do({ | oldGroup | oldGroup.free })
+		});
 		//}
 	}
 
@@ -476,6 +487,23 @@ AlgaBlock {
 
 		//Delete old groups (need to be locked due to fork)
 		this.deleteOldGroups(oldGroups);
+	}
+
+	//Simply add orderedNodes to group
+	addOrderedNodesToGroup {
+		orderedNodes.do({ | node |
+			node.group.nodeID.postln;
+			node.moveToTail(group);
+		});
+	}
+
+	//Stage 4 scsynth: simply add orderedNodes to group
+	stage4_scsynth {
+		//Simply add orderedNodes to group
+		this.addOrderedNodesToGroup;
+
+		//In scsynth case, this is only needed to delete merged groups
+		this.deleteOldGroups;
 	}
 
 	/**************/

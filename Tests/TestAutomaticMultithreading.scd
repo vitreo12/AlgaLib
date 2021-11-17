@@ -34,7 +34,9 @@ Alga.boot({
 	//l >>+ b;
 
 	//s.plotTree;
-});
+},
+algaServerOptions: AlgaServerOptions(supernova: true)
+);
 )
 
 s.plotTree
