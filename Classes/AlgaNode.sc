@@ -88,6 +88,10 @@ AlgaNode {
 	//Connected nodes
 	var <inNodes, <outNodes;
 
+	//Connected ACTIVE nodes (interpolation going on)
+	var <activeInNodes, <activeOutNodes;
+	var <activeInNodesCounter;
+
 	//Keep track of current \default nodes (this is used for mix parameters)
 	var <currentDefaultNodes;
 
@@ -188,6 +192,15 @@ AlgaNode {
 		//they are indexed by identity of the connected node, and then it contains a OrderedIdentitySet of all parameters
 		//that it controls in that node (AlgaNode -> OrderedIdentitySet[\freq, \amp ...])
 		outNodes = IdentityDictionary(10);
+
+		//Like inNodes
+		activeInNodes = IdentityDictionary(10);
+
+		//Like outNodes
+		activeOutNodes = IdentityDictionary(10);
+
+		//Used to counter same Nodes
+		activeInNodesCounter = IdentityDictionary(10);
 
 		//Chans mapping from inNodes... How to support <<+ / >>+ ???
 		//IdentityDictionary of IdentityDictionaries:
@@ -346,7 +359,7 @@ AlgaNode {
 						//If previous entry was symbol, use that to map inNodes
 						if(param.isSymbol, {
 							this.addInOutNodesDict(entry, param); //Add entry to inNodes. entry MUST be the AlgaArg!
-							AlgaBlocksDict.createNewBlockIfNeeded(this, sender); //Use sender
+							AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 						});
 					});
 				};
@@ -1452,30 +1465,43 @@ AlgaNode {
 	}
 
 	//The actual empty function
-	removeActiveInterpSynthOnFree { | param, sender, interpSynth, action |
+	removeActiveInterpSynthOnFree { | param, sender, senderSym, interpSynth, action |
 		interpSynth.onFree({
-			activeInterpSynths[param][sender].remove(interpSynth);
+			//Remove activeInterpSynth
+			activeInterpSynths[param][senderSym].remove(interpSynth);
+
+			//These have been added earlier
+			if(sender.isAlgaArg, { sender = sender.sender });
+			if(sender.isAlgaNode, {
+				(this.asString ++ ": ended interpSynth at : " ++ sender.asString).warn;
+				this.removeActiveInNode(sender, param);
+				sender.removeActiveOutNode(this, param);
+				if(activeInNodesCounter[sender] != nil, {
+					activeInNodesCounter[sender].postln;
+					if(activeInNodesCounter[sender] < 1, {
+						AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+					})
+				});
+			});
 
 			//This is used in AlgaPattern
-			if(action != nil, {
-				action.value;
-			});
+			if(action != nil, { action.value });
 		});
 	}
 
 	//Use the .onFree node function to dynamically fill and empty the activeInterpSynths for
 	//each param / sender combination!
-	addActiveInterpSynthOnFree { | param, sender, interpSynth, action |
+	addActiveInterpSynthOnFree { | param, sender, senderSym, interpSynth, action |
 		//Each sender has IdentitySet with all the active ones
-		if(activeInterpSynths[param][sender].class == IdentitySet, {
-			activeInterpSynths[param][sender].add(interpSynth)
+		if(activeInterpSynths[param][senderSym].class == IdentitySet, {
+			activeInterpSynths[param][senderSym].add(interpSynth)
 		}, {
-			activeInterpSynths[param][sender] = IdentitySet();
-			activeInterpSynths[param][sender].add(interpSynth)
+			activeInterpSynths[param][senderSym] = IdentitySet();
+			activeInterpSynths[param][senderSym].add(interpSynth)
 		});
 
 		//The actual function that empties
-		this.removeActiveInterpSynthOnFree(param, sender, interpSynth, action);
+		this.removeActiveInterpSynthOnFree(param, sender, senderSym, interpSynth, action);
 	}
 
 	//Set proper fadeTime for all active interpSynths on param / sender combination
@@ -1631,14 +1657,14 @@ AlgaNode {
 									normSynths[paramName][\default] = normSynth;
 
 									//Add interpSynth to the current active ones for specific param / sender combination
-									this.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
+									this.addActiveInterpSynthOnFree(paramName, prevSender, \default, interpSynth);
 								}, {
 									//mix param
 									interpSynths[paramName][prevSender] = interpSynth;
 									normSynths[paramName][prevSender] = normSynth;
 
 									//Add interpSynth to the current active ones for specific param / sender combination
-									this.addActiveInterpSynthOnFree(paramName, prevSender, interpSynth);
+									this.addActiveInterpSynthOnFree(paramName, prevSender, prevSender, interpSynth);
 
 									//And update the ones in \default if this sender is the currentDefaultNode!!!
 									//This is essential, because otherwise interpBusses[paramName][\default]
@@ -1851,7 +1877,7 @@ AlgaNode {
 				normSynths[paramName][\default] = normSynth;
 
 				//Add interpSynth to the current active ones for specific param / sender combination
-				this.addActiveInterpSynthOnFree(paramName, \default, interpSynth);
+				this.addActiveInterpSynthOnFree(paramName, nil, \default, interpSynth);
 
 				//When interpSynth is freed, free the synths / busses for AlgaTemps
 				if(tempSynthsAndBusses != nil, {
@@ -2461,7 +2487,7 @@ AlgaNode {
 		interpSynths[param][senderSym] = interpSynth;
 
 		//Add interpSynth to the current active ones for specific param / sender combination
-		this.addActiveInterpSynthOnFree(param, senderSym, interpSynth);
+		this.addActiveInterpSynthOnFree(param, sender, senderSym, interpSynth);
 
 		//Store current \default (needed when going from mix == true to mix == false)...
 		//basically, restoring proper connections after going from <<+ to << or <|
@@ -2754,6 +2780,10 @@ AlgaNode {
 			//Add to connectionTimeOutNodes and recalculate longestConnectionTime
 			sender.connectionTimeOutNodes[this] = this.connectionTime;
 			sender.calculateLongestConnectionTime(this.connectionTime);
+
+			//Like inNodes / outNodes. They get freed on the accoding interpSynth
+			this.addActiveInNode(sender, param);
+			sender.addActiveOutNode(this, param);
 		});
 	}
 
@@ -2820,11 +2850,63 @@ AlgaNode {
 		replaceArgs.removeAt(param);
 	}
 
+	//Like addInNode
+	addActiveInNode { | sender, param = \in |
+		if(activeInNodes[param] == nil, {
+			activeInNodes[param] = OrderedIdentitySet[sender];
+		}, {
+			activeInNodes[param].add(sender);
+		});
+
+		if(activeInNodesCounter[sender] == nil, {
+			activeInNodesCounter[sender] = 1
+		}, {
+			activeInNodesCounter[sender] = activeInNodesCounter[sender] + 1
+		});
+	}
+
+	//Like inNodes'
+	removeActiveInNode { | sender, param = \in |
+		if(activeInNodesCounter[sender] != nil, {
+			var activeInNodesAtParam = activeInNodes[param];
+			if(activeInNodesAtParam != nil, {
+				activeInNodesAtParam.remove(sender);
+				if(activeInNodesAtParam.size == 0, {
+					activeInNodes.removeAt(param)
+				});
+			});
+			activeInNodesCounter[sender] = activeInNodesCounter[sender] - 1
+		});
+	}
+
+	//Like addOutNode
+	addActiveOutNode { | receiver, param = \in |
+		//Empty entry, create OrderedIdentitySet. Otherwise, add to existing
+		if(activeOutNodes[receiver] == nil, {
+			activeOutNodes[receiver] = OrderedIdentitySet[param];
+		}, {
+			activeOutNodes[receiver].add(param);
+		});
+	}
+
+	//Like outNodes'
+	removeActiveOutNode { | receiver, param = \in |
+		var activeOutNodesAtReceiver = activeOutNodes[receiver];
+		if(activeOutNodesAtReceiver != nil, {
+			activeOutNodesAtReceiver.remove(param);
+			if(activeOutNodesAtReceiver.size == 0, {
+				activeOutNodes.removeAt(receiver)
+			});
+		});
+	}
+
 	//Clear the dicts
 	resetInOutNodesDicts {
 		if(algaToBeCleared, {
 			inNodes.clear;
 			outNodes.clear;
+			activeInNodes.clear;
+			activeOutNodes.clear;
 		});
 	}
 
@@ -2844,14 +2926,6 @@ AlgaNode {
 		//Add proper inNodes / outNodes / connectionTimeOutNodes
 		this.addInOutNodesDict(sender, param, mix:false);
 
-		//Re-order groups
-		//Actually reorder the block's nodes ONLY if not running .replace
-		//(no need there, they are already ordered, and it also avoids a lot of problems
-		//with feedback connections)
-		if(replace.not, {
-			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
-		});
-
 		//Free previous interp synth(s) (fades out)
 		this.freeInterpSynthAtParam(sender, param, time:time);
 
@@ -2859,6 +2933,14 @@ AlgaNode {
 		this.createInterpSynthAtParam(sender, param,
 			senderChansMapping:senderChansMapping, scale:scale, time:time
 		);
+
+		//Re-order groups
+		//Actually reorder the block's nodes ONLY if not running .replace
+		//(no need there, they are already ordered, and it also avoids a lot of problems
+		//with feedback connections)
+		if(replace.not, {
+			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+		});
 	}
 
 	//New mix connection at specific parameter
@@ -2877,14 +2959,6 @@ AlgaNode {
 		//Add proper inNodes / outNodes / connectionTimeOutNodes
 		this.addInOutNodesDict(sender, param, mix:true);
 
-		//Re-order groups
-		//Actually reorder the block's nodes ONLY if not running .replace
-		//(no need there, they are already ordered, and it also avoids a lot of problems
-		//with feedback connections)
-		if((replace.not).and(replaceMix).not, {
-			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
-		});
-
 		//Needed for .replace. .replaceMix is already handled by .disconnectInner
 		if(replace, {
 			this.freeInterpSynthAtParam(sender, param, mix:true, replace:true, time:time);
@@ -2896,6 +2970,14 @@ AlgaNode {
 			replaceMix:replaceMix, replace:replace,
 			senderChansMapping:senderChansMapping, scale:scale, time:time
 		);
+
+		//Re-order groups
+		//Actually reorder the block's nodes ONLY if not running .replace
+		//(no need there, they are already ordered, and it also avoids a lot of problems
+		//with feedback connections)
+		if((replace.not).and(replaceMix).not, {
+			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+		});
 	}
 
 	//Used in <| and replaceMix
@@ -4092,9 +4174,6 @@ AlgaNode {
 	}
 
 	isAlgaNode { ^true }
-
-	//Used in AlgaBlock
-	isAlgaNode_AlgaBlock { ^true }
 
 	clock { ^(scheduler.clock) }
 

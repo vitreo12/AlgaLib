@@ -1,8 +1,8 @@
 (
 Alga.boot({
 	a = AN.debug({ DC.ar(\in.ar) }, name: \a);
-	b = AN.debug({ DC.ar(\in.ar) }, interpTime: 3, name: \b);
-	c = AN.debug({ DC.ar(\in.ar) }, interpTime: 5, name: \c);
+	b = AN.debug({ DC.ar(\in.ar) }, interpTime: 1, name: \b);
+	c = AN.debug({ DC.ar(\in.ar) }, interpTime: 2, name: \c);
 
 	a >> b;
 	b >> c;
@@ -17,6 +17,10 @@ Alga.boot({
 b.disconnect;
 a >> c;
 )
+
+//Bug if ran again
+a >> c;
+
 
 //This can also be applied when 2 different blocks are involved
 (

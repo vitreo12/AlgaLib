@@ -161,6 +161,8 @@ AlgaBlock {
 			^nil;
 		});
 
+		("Removing node: " ++ node.asString ++ " from block: " ++ blockIndex).error;
+
 		//Remove from dict
 		nodes.remove(node);
 
@@ -224,7 +226,7 @@ AlgaBlock {
 		this.debugFeedbacks;
 
 		//Stage 2: order nodes according to I/O
-		this.stage2(sender);
+		this.stage2;
 
 		this.debugOrderedNodes;
 
@@ -253,6 +255,9 @@ AlgaBlock {
 	stage1 { | sender, receiver |
 		//Clear all needed stuff
 		visitedNodes.clear;
+
+		//Assign lastSender
+		lastSender = sender;
 
 		//Start to detect feedback from the receiver
 		this.detectFeedback(
@@ -318,7 +323,7 @@ AlgaBlock {
 		visitedNodes.add(node);
 
 		//Scan outNodes of this node
-		node.outNodes.keys.do({ | outNode |
+		node.activeOutNodes.keys.do({ | outNode |
 			//nodeSender == node: the node who sent this outNode
 			this.detectFeedback(outNode, node, blockSender, blockReceiver);
 		});
@@ -329,13 +334,10 @@ AlgaBlock {
 	/***********/
 
 	//Stage 2: order nodes
-	stage2 { | sender |
+	stage2 {
 		//Clear all needed stuff
 		visitedNodes.clear;
 		orderedNodes.clear;
-
-		//Assign lastSender
-		lastSender = sender;
 
 		//Find the upper most nodes. Use lastSender if none found
 		this.findUpperMostNodes;
@@ -351,7 +353,7 @@ AlgaBlock {
 
 		//Nodes with no inputs
 		nodes.do({ | node |
-			if(node.inNodes.size == 0, {
+			if(node.activeInNodes.size == 0, {
 				upperMostNodes.add(node)
 			});
 		});
@@ -368,7 +370,7 @@ AlgaBlock {
 		visitedNodes.add(node);
 
 		//Check inNodes
-		node.inNodes.do({ | sendersSet |
+		node.activeInNodes.do({ | sendersSet |
 			sendersSet.do({ | sender |
 				//If not visited and not FB connection, check its inNodes too
 				var visited = visitedNodes.includes(sender);
@@ -386,7 +388,7 @@ AlgaBlock {
 	//Order a node
 	orderNode { | node |
 		//Check output
-		node.outNodes.keys.do({ | receiver |
+		node.activeOutNodes.keys.do({ | receiver |
 			var visited = visitedNodes.includes(receiver);
 			//If not visited yet, visit inputs and then start ordering it too
 			if(visited.not, {
@@ -421,7 +423,7 @@ AlgaBlock {
 
 	//Check if groupSet includes a sender of node
 	groupSetIncludesASender { | groupSet, node |
-		node.inNodes.do({ | sendersSet |
+		node.activeInNodes.do({ | sendersSet |
 			sendersSet.do({ | sender |
 				if(groupSet.includes(sender), { ^true });
 			})
@@ -569,7 +571,7 @@ AlgaBlock {
 	//Find unused feedback loops related to node
 	findUnusedFeedbacks { | node |
 		disconnectVisitedNodes.add(node);
-		node.outNodes.keys.do({ | receiver |
+		node.activeOutNodes.keys.do({ | receiver |
 			var visited = disconnectVisitedNodes.includes(receiver);
 
 			//(node.asString ++ " >> " ++ receiver.asString).postln;
