@@ -14,6 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+/*
+TODOS:
+
+1. Fix feedback ordering (shouldn't be reverted if already connected once)
+
+2. Support patternOut
+
+3. Fix disconnected modules: they can still be re-arranged into wrong positions
+IF they get patched to something else while the interpolation is happening.
+This means that the fading out interpolation might cause read-write mismatches.
+How to fix it though? One idea would be to move the AlgaBlock's group to the top
+everytime it's used, but this won't take into consideration if the nodes were used
+as outputs.
+
+*/
+
 AlgaBlock {
 	//All the nodes in the block
 	var <nodes;
@@ -73,7 +89,7 @@ AlgaBlock {
 		groupedOrderedNodes = Array.newClear;
 
 		groups         = OrderedIdentitySet(10);
-		group          = Group(parGroup);
+		group          = Group(parGroup, \addToHead);
 		blockIndex     = group.nodeID;
 	}
 
@@ -475,7 +491,7 @@ AlgaBlock {
 	}
 
 	//Stage 4: build ParGroups / Groups out of the optimized ordered nodes
-	stage4 {
+	stage4_supernova {
 		//Copy old groups
 		var oldGroups = groups.copy;
 
