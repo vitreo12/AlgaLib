@@ -1477,7 +1477,7 @@ AlgaNode {
 				this.removeActiveInNode(sender, param);
 				sender.removeActiveOutNode(this, param);
 				if(activeInNodesCounter[sender] != nil, {
-					activeInNodesCounter[sender].postln;
+					//Only re-order if all references to sender have been consumed
 					if(activeInNodesCounter[sender] < 1, {
 						AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 					})
@@ -2926,14 +2926,6 @@ AlgaNode {
 		//Add proper inNodes / outNodes / connectionTimeOutNodes
 		this.addInOutNodesDict(sender, param, mix:false);
 
-		//Free previous interp synth(s) (fades out)
-		this.freeInterpSynthAtParam(sender, param, time:time);
-
-		//Spawn new interp synth (fades in)
-		this.createInterpSynthAtParam(sender, param,
-			senderChansMapping:senderChansMapping, scale:scale, time:time
-		);
-
 		//Re-order groups
 		//Actually reorder the block's nodes ONLY if not running .replace
 		//(no need there, they are already ordered, and it also avoids a lot of problems
@@ -2941,6 +2933,14 @@ AlgaNode {
 		if(replace.not, {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 		});
+
+		//Free previous interp synth(s) (fades out)
+		this.freeInterpSynthAtParam(sender, param, time:time);
+
+		//Spawn new interp synth (fades in)
+		this.createInterpSynthAtParam(sender, param,
+			senderChansMapping:senderChansMapping, scale:scale, time:time
+		);
 	}
 
 	//New mix connection at specific parameter
@@ -2959,6 +2959,14 @@ AlgaNode {
 		//Add proper inNodes / outNodes / connectionTimeOutNodes
 		this.addInOutNodesDict(sender, param, mix:true);
 
+		//Re-order groups
+		//Actually reorder the block's nodes ONLY if not running .replace
+		//(no need there, they are already ordered, and it also avoids a lot of problems
+		//with feedback connections)
+		if((replace.not).and(replaceMix).not, {
+			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+		});
+
 		//Needed for .replace. .replaceMix is already handled by .disconnectInner
 		if(replace, {
 			this.freeInterpSynthAtParam(sender, param, mix:true, replace:true, time:time);
@@ -2970,14 +2978,6 @@ AlgaNode {
 			replaceMix:replaceMix, replace:replace,
 			senderChansMapping:senderChansMapping, scale:scale, time:time
 		);
-
-		//Re-order groups
-		//Actually reorder the block's nodes ONLY if not running .replace
-		//(no need there, they are already ordered, and it also avoids a lot of problems
-		//with feedback connections)
-		if((replace.not).and(replaceMix).not, {
-			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
-		});
 	}
 
 	//Used in <| and replaceMix
