@@ -466,9 +466,9 @@ AlgaBlock {
 				newGroup = Group(group, \addToTail);
 			});
 			groupSet.do({ | node |
-				node.moveToHead(newGroup)
+				node.moveToHead(newGroup);
+				visitedNodes.add(node);
 			});
-			("new " ++ newGroup.nodeID.asString).warn;
 			groups.add(newGroup);
 		});
 	}
@@ -490,6 +490,15 @@ AlgaBlock {
 		//}
 	}
 
+	//Remove all nodes that have not been visited
+	removeUnvisitedNodes {
+		nodes.do({ | node |
+			if(visitedNodes.includes(node).not, {
+				this.removeNode(node)
+			});
+		});
+	}
+
 	//Stage 4: build ParGroups / Groups out of the optimized ordered nodes
 	stage4_supernova {
 		//Copy old groups
@@ -497,29 +506,39 @@ AlgaBlock {
 
 		//Clear all needed stuff
 		groups.clear;
+		visitedNodes.clear;
 
 		//Build new grups
 		this.buildGroups;
 
 		//Delete old groups (need to be locked due to fork)
 		this.deleteOldGroups(oldGroups);
+
+		//Remove unvisited nodes
+		this.removeUnvisitedNodes;
 	}
 
 	//Simply add orderedNodes to group
 	addOrderedNodesToGroup {
 		orderedNodes.do({ | node |
-			node.group.nodeID.postln;
 			node.moveToTail(group);
+			visitedNodes.add(node);
 		});
 	}
 
 	//Stage 4 scsynth: simply add orderedNodes to group
 	stage4_scsynth {
+		//Clear all needed stuff
+		visitedNodes.clear;
+
 		//Simply add orderedNodes to group
 		this.addOrderedNodesToGroup;
 
 		//In scsynth case, this is only needed to delete merged groups
 		this.deleteOldGroups;
+
+		//Remove unvisited nodes
+		this.removeUnvisitedNodes;
 	}
 
 	/**************/
