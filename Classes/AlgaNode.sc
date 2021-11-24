@@ -90,7 +90,7 @@ AlgaNode {
 
 	//Connected ACTIVE nodes (interpolation going on)
 	var <activeInNodes, <activeOutNodes;
-	var <activeInNodesCounter;
+	var <activeInNodesCounter, <activeOutNodesCounter;
 
 	//Keep track of current \default nodes (this is used for mix parameters)
 	var <currentDefaultNodes;
@@ -200,7 +200,8 @@ AlgaNode {
 		activeOutNodes = IdentityDictionary(10);
 
 		//Used to counter same Nodes
-		activeInNodesCounter = IdentityDictionary(10);
+		activeInNodesCounter  = IdentityDictionary(10);
+		activeOutNodesCounter = IdentityDictionary(10);
 
 		//Chans mapping from inNodes... How to support <<+ / >>+ ???
 		//IdentityDictionary of IdentityDictionaries:
@@ -1464,25 +1465,40 @@ AlgaNode {
 		});
 	}
 
+	//Remove activeInNodes / outNodes and reorder block
+	removeActiveNodesAndBlockReorder { | param, sender |
+		if(sender.isAlgaArg, { sender = sender.sender });
+		if(sender.isAlgaNode, {
+			this.removeActiveInNode(sender, param);
+			sender.removeActiveOutNode(this, param);
+			if(activeInNodesCounter[sender] != nil, {
+				//Only re-order if all references to sender have been consumed
+				if(activeInNodesCounter[sender] < 1, {
+					var thisBlock   = AlgaBlocksDict.blocksDict[blockIndex];
+					var senderBlock = AlgaBlocksDict.blocksDict[sender.blockIndex];
+					if((thisBlock == senderBlock).and(thisBlock != nil), {
+						thisBlock.rearrangeBlock;
+					}, {
+						if(thisBlock != nil, {
+							thisBlock.rearrangeBlock;
+						});
+						if(senderBlock != nil, {
+							senderBlock.rearrangeBlock;
+						});
+					});
+				})
+			});
+		});
+	}
+
 	//The actual empty function
 	removeActiveInterpSynthOnFree { | param, sender, senderSym, interpSynth, action |
 		interpSynth.onFree({
 			//Remove activeInterpSynth
 			activeInterpSynths[param][senderSym].remove(interpSynth);
 
-			//These have been added earlier
-			if(sender.isAlgaArg, { sender = sender.sender });
-			if(sender.isAlgaNode, {
-				(this.asString ++ ": ended interpSynth at : " ++ sender.asString).warn;
-				this.removeActiveInNode(sender, param);
-				sender.removeActiveOutNode(this, param);
-				if(activeInNodesCounter[sender] != nil, {
-					//Only re-order if all references to sender have been consumed
-					if(activeInNodesCounter[sender] < 1, {
-						AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
-					})
-				});
-			});
+			//Remove activeInNodes / activeOutNodes and reorder blocks accordingly
+			this.removeActiveNodesAndBlockReorder(param, sender);
 
 			//This is used in AlgaPattern
 			if(action != nil, { action.value });
@@ -2740,7 +2756,8 @@ AlgaNode {
 		});
 
 		if((sender.isAlgaNode).or(sender.isAlgaArg), {
-			//Empty entry OR not doing mixing, create new OrderedIdentitySet. Otherwise, add to existing
+			//Empty entry OR not doing mixing, create new OrderedIdentitySet.
+			//Otherwise, add to existing
 			if((inNodes[param] == nil).or(mix.not), {
 				inNodes[param] = OrderedIdentitySet[sender];
 			}, {
@@ -2869,33 +2886,41 @@ AlgaNode {
 	removeActiveInNode { | sender, param = \in |
 		if(activeInNodesCounter[sender] != nil, {
 			var activeInNodesAtParam = activeInNodes[param];
-			if(activeInNodesAtParam != nil, {
+			activeInNodesCounter[sender] = activeInNodesCounter[sender] - 1;
+			if((activeInNodesAtParam != nil).and(activeInNodesCounter[sender] < 1), {
 				activeInNodesAtParam.remove(sender);
 				if(activeInNodesAtParam.size == 0, {
-					activeInNodes.removeAt(param)
+					activeInNodes.removeAt(param);
 				});
 			});
-			activeInNodesCounter[sender] = activeInNodesCounter[sender] - 1
 		});
 	}
 
 	//Like addOutNode
 	addActiveOutNode { | receiver, param = \in |
-		//Empty entry, create OrderedIdentitySet. Otherwise, add to existing
 		if(activeOutNodes[receiver] == nil, {
 			activeOutNodes[receiver] = OrderedIdentitySet[param];
 		}, {
 			activeOutNodes[receiver].add(param);
 		});
+
+		if(activeOutNodesCounter[receiver] == nil, {
+			activeOutNodesCounter[receiver] = 1
+		}, {
+			activeOutNodesCounter[receiver] = activeOutNodesCounter[receiver] + 1
+		});
 	}
 
 	//Like outNodes'
 	removeActiveOutNode { | receiver, param = \in |
-		var activeOutNodesAtReceiver = activeOutNodes[receiver];
-		if(activeOutNodesAtReceiver != nil, {
-			activeOutNodesAtReceiver.remove(param);
-			if(activeOutNodesAtReceiver.size == 0, {
-				activeOutNodes.removeAt(receiver)
+		if(activeOutNodesCounter[receiver] != nil, {
+			var activeOutNodesAtReceiver = activeOutNodes[receiver];
+			activeOutNodesCounter[receiver] = activeOutNodesCounter[receiver] - 1;
+			if((activeOutNodesAtReceiver != nil).and(activeOutNodesCounter[receiver] < 1), {
+				activeOutNodesAtReceiver.remove(param);
+				if(activeOutNodesAtReceiver.size == 0, {
+					activeOutNodes.removeAt(receiver)
+				});
 			});
 		});
 	}
@@ -2907,6 +2932,8 @@ AlgaNode {
 			outNodes.clear;
 			activeInNodes.clear;
 			activeOutNodes.clear;
+			activeInNodesCounter.clear;
+			activeOutNodesCounter.clear;
 		});
 	}
 
