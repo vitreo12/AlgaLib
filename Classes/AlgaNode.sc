@@ -1466,7 +1466,7 @@ AlgaNode {
 	}
 
 	//Remove activeInNodes / outNodes and reorder block
-	removeActiveNodesAndBlockReorder { | param, sender |
+	removeActiveNodeAndReorderBlock { | param, sender |
 		if(sender.isAlgaArg, { sender = sender.sender });
 		if(sender.isAlgaNode, {
 			this.removeActiveInNode(sender, param);
@@ -1487,7 +1487,18 @@ AlgaNode {
 						});
 					});
 				})
+			})
+		});
+	}
+
+	//Remove activeInNodes / outNodes and reorder block
+	removeActiveNodesAndReorderBlocks { | param, sender |
+		if(sender.isListPattern, {
+			sender.list.do({ | entry |
+				this.removeActiveNodeAndReorderBlock(param, entry)
 			});
+		}, {
+			this.removeActiveNodeAndReorderBlock(param, sender)
 		});
 	}
 
@@ -1498,7 +1509,9 @@ AlgaNode {
 			activeInterpSynths[param][senderSym].remove(interpSynth);
 
 			//Remove activeInNodes / activeOutNodes and reorder blocks accordingly
-			this.removeActiveNodesAndBlockReorder(param, sender);
+			if(sender != nil, {
+				this.removeActiveNodesAndReorderBlocks(param, sender);
+			});
 
 			//This is used in AlgaPattern
 			if(action != nil, { action.value });

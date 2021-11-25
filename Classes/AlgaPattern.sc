@@ -83,6 +83,7 @@ AlgaPattern : AlgaNode {
 
 	//Current nodes of used in currentOut
 	var <currentPatternOutNodes;
+	var <prevPatternOutNodes;
 
 	//Current time used for \out replacement
 	var <currentPatternOutTime;
@@ -1663,7 +1664,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create out: receivers
-	createPatternOutReceivers { | prevPatternOutNodes |
+	createPatternOutReceivers {
 		var time = currentPatternOutTime ? 0;
 
 		//Fade out (also old synths)
@@ -1720,19 +1721,6 @@ AlgaPattern : AlgaNode {
 		^nil
 	}
 
-	/*
-	//Check if param is a \freq type
-	isFreqParam { | param = \in |
-		^(
-			(param == \midinote).or(param == \ctranspose).or(
-				param == \harmonic).or(param == \detune).or(param == \note).or(
-				param == \root).or(param == \octave).or(param == \gtranspose).or(
-				param == \stepsPerOctave).or(param == \octaveRatio).or(
-				param == \degree).or(param == \scale).or(param == \mtranspose)
-		)
-	}
-	*/
-
 	//Store generic params for replaces
 	storeCurrentGenericParams { | key, value |
 		currentGenericParams = currentGenericParams ? IdentityDictionary();
@@ -1746,7 +1734,6 @@ AlgaPattern : AlgaNode {
 		var foundFX = false;
 		var parsedFX;
 		var parsedOut;
-		var prevPatternOutNodes = currentPatternOutNodes.copy;
 		var foundOut = false;
 		var foundGenericParams = IdentitySet();
 		var patternPairs = Array.newClear;
@@ -1875,7 +1862,8 @@ AlgaPattern : AlgaNode {
 
 					//reset \out
 					if((foundOut.not).and(resetSet.findMatch(\out) != nil), {
-						parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil
+						parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil;
+						prevPatternOutNodes = nil;
 					});
 
 					//reset \dur
@@ -1888,7 +1876,7 @@ AlgaPattern : AlgaNode {
 				}
 				{ resetSet == true } {
 					parsedFX = nil; currentFX = nil; //reset \fx
-					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil; //reset \out
+					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil; prevPatternOutNodes = nil; //reset \out
 					interpStreams = nil; //reset \dur
 
 					//reset all generic params
@@ -1965,7 +1953,7 @@ AlgaPattern : AlgaNode {
 		patternAsStream = pattern.algaAsStream; //Needed for things like dur: \none
 
 		//Determine if \out interpolation is required
-		this.createPatternOutReceivers(prevPatternOutNodes);
+		this.createPatternOutReceivers;
 
 		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
 		//createPattern function is non scheduled as it it better to create it right away.
@@ -2163,9 +2151,6 @@ AlgaPattern : AlgaNode {
 
 	//Parse the \out key
 	parseOut { | value, alreadyParsed |
-		//Reset currentPatternOutNodes
-		currentPatternOutNodes = currentPatternOutNodes ? IdentitySet();
-
 		alreadyParsed = alreadyParsed ? IdentityDictionary();
 
 		case
@@ -2316,8 +2301,12 @@ AlgaPattern : AlgaNode {
 		//Parse \fx
 		if(defFX != nil, { def[\fx] = this.parseFX(defFX, functionSynthDefDict) });
 
-		//Parse \out
-		if(defOut != nil, { def[\out] = this.parseOut(defOut) });
+		//Parse \out (reset currentPatternOutNodes too)
+		if(defOut != nil, {
+			prevPatternOutNodes = currentPatternOutNodes.copy;
+			currentPatternOutNodes = IdentitySet();
+			def[\out] = this.parseOut(defOut)
+		});
 
 		//Parse all the other entries looking for AlgaTemps / ListPatterns
 		def.keysValuesDo({ | key, value |
@@ -2783,6 +2772,10 @@ AlgaPattern : AlgaNode {
 			inNodes[param].add(sender);
 		});
 
+		//Also add to activeInNodes / activeOutNodes
+		this.addActiveInNode(sender, param);
+		sender.addActiveOutNode(this, param);
+
 		//Update blocks too
 		AlgaBlocksDict.createNewBlockIfNeeded(this, sender)
 	}
@@ -3062,8 +3055,15 @@ AMP : AlgaMonoPattern {}
 		//Add to patternOutEnvSynths
 		patternOutEnvSynthsAtParamAlgaPattern[uniqueIDAlgaSynthBus] = envSynth;
 
-		//Update patternOutNodes
+		//Add patternOutNode
 		this.addPatternOutNode(algaPattern, param);
+
+		//Update activeInNodes / activeOutNodes
+		//These are manually cleared in removePatternOutsAtParam...
+		//Unlike other connections, this doesn't actually wait for end, as there's no interpSynth involved,
+		//but it should be mostly fine...
+		this.addActiveInNode(algaPattern, param);
+		algaPattern.addActiveOutNode(this, param);
 
 		//Update blocks
 		AlgaBlocksDict.createNewBlockIfNeeded(this, algaPattern)
@@ -3118,9 +3118,13 @@ AMP : AlgaMonoPattern {}
 			});
 		});
 
-		//Update patternOutNodes only if needed. On .replace,this will be false.
+		//Update activeInNodes / activeOutNodes / patternOutNode only if needed.
+		//On .replace, this will be false.
 		if(removePatternOutNodeFromDict, {
 			this.removePatternOutNode(algaPattern, param);
+			this.removeActiveInNode(algaPattern, param);
+			algaPattern.removeActiveOutNode(this, param);
+
 		});
 	}
 
@@ -3209,8 +3213,9 @@ AMP : AlgaMonoPattern {}
 						waitForInst:false
 					);
 
-					//Add Synth to activeInterpSynthsAtParam
-					this.addActiveInterpSynthOnFree(param, algaPattern, tempSynth);
+					//Add tempSynth to activeInterpSynthsAtParam...
+					//Make sure "sender" is nil as the activeInNodes mechanism should not be handled here!
+					this.addActiveInterpSynthOnFree(param, nil, algaPattern, tempSynth);
 
 					//Add Synth to patternBussesAndSynths
 					patternBussesAndSynths.add(tempSynth);

@@ -198,7 +198,7 @@ AlgaPatternInterpStreams {
 	//as they are not embedded with the interpolation behaviour itself, but they are external.
 	//This allows to separate the per-tick pattern triggering from the interpolation process.
 	createPatternInterpSynthAndBusAtParam { | paramName, paramRate, paramNumChannels,
-		entry, uniqueID, time = 0 |
+		entry, entryOriginal, uniqueID, time = 0 |
 
 		var interpGroup = algaPattern.interpGroup;
 		var interpBus, interpSynth;
@@ -250,7 +250,7 @@ AlgaPatternInterpStreams {
 		//Also add a "onFree" routine that deletes unused entries from Dictionaries. This function
 		//is called on freeing the interpSynth.
 		//Note: no mixing yet
-		algaPattern.addActiveInterpSynthOnFree(paramName, \default, interpSynth, {
+		algaPattern.addActiveInterpSynthOnFree(paramName, entryOriginal, \default, interpSynth, {
 			var entriesAtParam              = entries[paramName];
 			var interpSynthsAtParam         = interpSynths[paramName];
 			var interpBussesAtParam         = interpBusses[paramName];
@@ -399,6 +399,7 @@ AlgaPatternInterpStreams {
 			paramRate: paramRate,
 			paramNumChannels: paramNumChannels,
 			entry: entry,
+			entryOriginal: entryOriginal,
 			uniqueID: uniqueID,
 			time: time
 		);
