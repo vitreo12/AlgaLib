@@ -36,6 +36,7 @@
 	algaInstantiatedAsReceiver { | param, sender, mix | ^true }
 	algaCleared { ^false }
 	algaToBeCleared { ^false }
+	algaCanFreeSynth { ^false }
 
 	//Like asStream, but also converts inner elements of an Array
 	algaAsStream { ^(this.asStream) }
@@ -99,11 +100,18 @@
 			this[i] = entry.algaAsStream
 		});
 	}
+
+	//Also consider algaCanFreeSynth
+	algaCanFreeSynth {
+		^this.any({ | item |
+			(item.canFreeSynth).or(item.algaCanFreeSynth)
+		})
+	}
 }
 
 //PlayBuf bug with canFreeSynth
 +PlayBuf {
-	canFreeSynth { ^inputs.at(6).isNumber.not or: { inputs.at(6) > 1 } }
+	algaCanFreeSynth { ^inputs.at(6).isNumber.not or: { inputs.at(6) > 1 } }
 }
 
 +Nil {
