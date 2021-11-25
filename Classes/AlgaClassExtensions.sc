@@ -30,6 +30,7 @@
 	isEvent { ^false }
 	isListPattern { ^false }
 	isTempoClock { ^false }
+	isSet { ^false }
 	def { ^nil }
 	isNumberOrArray { ^((this.isNumber).or(this.isArray)) }
 
@@ -153,13 +154,17 @@
 	}
 }
 
++Set {
+	isSet { ^true }
+}
+
 +Dictionary {
 	//Loop over a Dict, unpacking IdentitySet.
 	//It's used in AlgaBlock to unpack inNodes of an AlgaNode
 	nodesLoop { | function |
 		this.keysValuesDo({
 			arg key, value, i;
-			if(value.class == IdentitySet, {
+			if(value.isSet, {
 				value.do({ | entry |
 					function.value(entry, i);
 				});
