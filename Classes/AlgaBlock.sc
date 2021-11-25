@@ -19,8 +19,6 @@ TODOS:
 
 1. Fix feedback ordering (shouldn't be reverted if already connected once)
 
-2. AlgaPattern and AlgaPattern's 'out' support
-
 */
 
 AlgaBlock {

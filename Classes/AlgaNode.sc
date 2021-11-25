@@ -1466,7 +1466,7 @@ AlgaNode {
 	}
 
 	//Remove activeInNodes / outNodes and reorder block
-	removeActiveNodeAndReorderBlock { | param, sender |
+	removeActiveNodeAndRearrangeBlock { | param, sender |
 		if(sender.isAlgaArg, { sender = sender.sender });
 		if(sender.isAlgaNode, {
 			this.removeActiveInNode(sender, param);
@@ -1492,13 +1492,13 @@ AlgaNode {
 	}
 
 	//Remove activeInNodes / outNodes and reorder block
-	removeActiveNodesAndReorderBlocks { | param, sender |
+	removeActiveNodesAndRearrangeBlocks { | param, sender |
 		if(sender.isListPattern, {
 			sender.list.do({ | entry |
-				this.removeActiveNodeAndReorderBlock(param, entry)
+				this.removeActiveNodeAndRearrangeBlock(param, entry)
 			});
 		}, {
-			this.removeActiveNodeAndReorderBlock(param, sender)
+			this.removeActiveNodeAndRearrangeBlock(param, sender)
 		});
 	}
 
@@ -1510,7 +1510,7 @@ AlgaNode {
 
 			//Remove activeInNodes / activeOutNodes and reorder blocks accordingly
 			if(sender != nil, {
-				this.removeActiveNodesAndReorderBlocks(param, sender);
+				this.removeActiveNodesAndRearrangeBlocks(param, sender);
 			});
 
 			//This is used in AlgaPattern
