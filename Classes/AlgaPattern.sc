@@ -2832,6 +2832,9 @@ AlgaPattern : AlgaNode {
 		//AlgaNode only uses this for number parameters, but AlgaPattern uses it for any
 		//kind of parameter, including AlgaNodes and AlgaArgs.
 		replaceArgs[param] = sender;
+
+		//Reset connectionAlreadyInPlace
+		connectionAlreadyInPlace = false;
 	}
 
 	//Called from clearInner

@@ -3012,6 +3012,9 @@ AlgaNode {
 		this.createInterpSynthAtParam(sender, param,
 			senderChansMapping:senderChansMapping, scale:scale, time:time
 		);
+
+		//Reset connectionAlreadyInPlace
+		connectionAlreadyInPlace = false;
 	}
 
 	//New mix connection at specific parameter
@@ -3055,6 +3058,9 @@ AlgaNode {
 			replaceMix:replaceMix, replace:replace,
 			senderChansMapping:senderChansMapping, scale:scale, time:time
 		);
+
+		//Reset connectionAlreadyInPlace
+		connectionAlreadyInPlace = false;
 	}
 
 	//Used in <| and replaceMix
