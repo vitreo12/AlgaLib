@@ -299,12 +299,14 @@ AlgaPatternInterpStreams {
 	//Wrapper around AlgaNode's addInOutNodesDict.
 	//If entry is a ListPattern, loop around it and add each entry that is an AlgaNode.
 	addInOutNodesDictAtParam { | sender, param, mix = false |
-		algaPattern.addInOutNodesDict(sender, param, mix)
+		algaPattern.addInOutNodesDict(sender, param, mix);
 	}
 
 	//Wrapper around AlgaNode's removeInOutNodesDict.
 	//If entry is a ListPattern, loop around it and remove each entry that is an AlgaNode.
-	removeAllInOutNodesDictAtParam { | paramName |
+	removeAllInOutNodesDictAtParam { | sender, paramName |
+		//This is then picked up in addInNode in AlgaPattern. This must come before removeInOutNodesDict
+		algaPattern.connectionAlreadyInPlace = algaPattern.checkConnectionAlreadyInPlace(sender);
 		algaPattern.removeInOutNodesDict(nil, paramName) //nil removes them all
 	}
 
@@ -380,7 +382,7 @@ AlgaPatternInterpStreams {
 		this.addSampleAndHold(paramName, sampleAndHold);
 
 		//Remove all older inNodes / outNodes... Doesn't work with mix yet
-		this.removeAllInOutNodesDictAtParam(paramName);
+		this.removeAllInOutNodesDictAtParam(entryOriginal, paramName);
 
 		//Add proper inNodes / outNodes / connectionTimeOutNodes. Use entryOriginal in order
 		//to retrieve if it is a ListPattern.

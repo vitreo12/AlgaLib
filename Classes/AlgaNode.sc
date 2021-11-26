@@ -104,6 +104,10 @@ AlgaNode {
 	//Keep track of the "chans" arg for play so it's kept across .replaces
 	var <playChans;
 
+	//This is used to trigger the creation of AlgaBlocks, if needed.
+	//It needs a setter cause it's also used in AlgaPatternInterpStreams
+	var <>connectionAlreadyInPlace = false;
+
 	//Needed to receive out: from an AlgaPattern.
 	var <patternOutNodes;
 	var <patternOutEnvSynths;
@@ -2812,8 +2816,11 @@ AlgaNode {
 			sender.calculateLongestConnectionTime(this.connectionTime);
 
 			//Like inNodes / outNodes. They get freed on the accoding interpSynth
-			this.addActiveInNode(sender, param);
-			sender.addActiveOutNode(this, param);
+			//AlgaPattern handles it in its own addInNode, this would double it!
+			if(this.isAlgaPattern.not, {
+				this.addActiveInNode(sender, param);
+				sender.addActiveOutNode(this, param);
+			});
 		});
 	}
 
@@ -2889,9 +2896,9 @@ AlgaNode {
 		});
 
 		if(activeInNodesCounter[sender] == nil, {
-			activeInNodesCounter[sender] = 1
+			activeInNodesCounter[sender] = 1;
 		}, {
-			activeInNodesCounter[sender] = activeInNodesCounter[sender] + 1
+			activeInNodesCounter[sender] = activeInNodesCounter[sender] + 1;
 		});
 	}
 
@@ -2950,15 +2957,39 @@ AlgaNode {
 		});
 	}
 
+	//Check if connection was already in place at any param
+	checkConnectionAlreadyInPlace { | sender |
+		if(sender.isAlgaTemp, { sender = sender.sender });
+
+		inNodes.do({ | sendersSet |
+			if(sender.isListPattern, {
+				sender.do({ | entry |
+					if(entry.isAlgaTemp, { entry = entry.sender });
+					if(sendersSet.includes(entry), { ^true })
+				})
+			});
+
+			if(sender.isAlgaNode, {
+				if(sendersSet.includes(sender), { ^true })
+			});
+		});
+
+		^false;
+	}
+
 	//New interp connection at specific parameter
 	newInterpConnectionAtParam { | sender, param = \in, replace = false,
 		senderChansMapping, scale, time |
 
+		//Check valid param
 		var controlName = controlNames[param];
 		if(controlName == nil, {
 			("AlgaNode: invalid param to create a new interp synth for: '" ++ param ++ "'").error;
 			^this;
 		});
+
+		//Check if connection was already there (must come before removeInOutNodesDict)
+		connectionAlreadyInPlace = this.checkConnectionAlreadyInPlace(sender);
 
 		//Remove ALL previous inNodes / outNodes at param
 		this.removeInOutNodesDict(nil, param);
@@ -2970,7 +3001,7 @@ AlgaNode {
 		//Actually reorder the block's nodes ONLY if not running .replace
 		//(no need there, they are already ordered, and it also avoids a lot of problems
 		//with feedback connections)
-		if(replace.not, {
+		if((replace.not).and(connectionAlreadyInPlace.not), {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 		});
 
@@ -2987,14 +3018,20 @@ AlgaNode {
 	newMixConnectionAtParam { | sender, param = \in, replace = false,
 		replaceMix = false, senderChansMapping, scale, time |
 
+		//Check valid param
 		var controlName = controlNames[param];
 		if(controlName == nil, {
 			("AlgaNode: invalid param to create a new interp synth for: '" ++ param ++ "'").error;
 			^this;
 		});
 
-		//Note: there's no removeInOutNodesDict here. Since it's a mix connection,
-		//no previous connections should be removed!
+		//Check if connection was already there
+		connectionAlreadyInPlace = this.checkConnectionAlreadyInPlace(sender);
+
+		/*
+		Note: there's no removeInOutNodesDict here. Since it's a mix connection,
+		no previous connections should be removed!!!!
+		*/
 
 		//Add proper inNodes / outNodes / connectionTimeOutNodes
 		this.addInOutNodesDict(sender, param, mix:true);
@@ -3003,7 +3040,7 @@ AlgaNode {
 		//Actually reorder the block's nodes ONLY if not running .replace
 		//(no need there, they are already ordered, and it also avoids a lot of problems
 		//with feedback connections)
-		if((replace.not).and(replaceMix).not, {
+		if((replace.not).and(connectionAlreadyInPlace.not).and(replaceMix).not, {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 		});
 

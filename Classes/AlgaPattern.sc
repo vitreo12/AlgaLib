@@ -2776,8 +2776,10 @@ AlgaPattern : AlgaNode {
 		this.addActiveInNode(sender, param);
 		sender.addActiveOutNode(this, param);
 
-		//Update blocks too
-		AlgaBlocksDict.createNewBlockIfNeeded(this, sender)
+		//Update blocks too (connectionWasAlreadyThere is set in AlgaPatternInterpStreams)
+		if(connectionAlreadyInPlace.not, {
+			AlgaBlocksDict.createNewBlockIfNeeded(this, sender)
+		});
 	}
 
 	//Add entries to inNodes
@@ -3124,7 +3126,6 @@ AMP : AlgaMonoPattern {}
 			this.removePatternOutNode(algaPattern, param);
 			this.removeActiveInNode(algaPattern, param);
 			algaPattern.removeActiveOutNode(this, param);
-
 		});
 	}
 

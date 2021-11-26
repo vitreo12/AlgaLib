@@ -5,10 +5,15 @@ Alga.boot({
 	c = AN.debug({ DC.ar }, name: \c);
 
 	d = AP.debug((
-		def: { DC.ar(\in.ar) },
+		def: { DC.ar(\in.ar) * EnvPerc.ar },
 		in: Pseq([a, b], inf)
-	), interpTime: 3, name: \d);
+	), interpTime: 1, name: \d);
 })
 )
 
 d.from(c)
+
+d.blockIndex
+c.blockIndex
+b.blockIndex
+a.blockIndex
