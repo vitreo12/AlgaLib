@@ -660,11 +660,13 @@ AlgaBlock {
 		//Build new grups
 		this.buildGroups;
 
+		//Remove unvisited nodes.
+		//This must come before deleteOldGroups, as nodes will be moved
+		//back to top's ParGroup here.
+		this.removeUnvisitedNodes;
+
 		//Delete old groups (need to be locked due to fork)
 		this.deleteOldGroups(oldGroups);
-
-		//Remove unvisited nodes
-		this.removeUnvisitedNodes;
 	}
 
 	//Simply add orderedNodes to group
