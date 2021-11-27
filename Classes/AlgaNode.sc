@@ -2965,11 +2965,13 @@ AlgaNode {
 			if(sender.isListPattern, {
 				sender.do({ | entry |
 					if(entry.isAlgaTemp, { entry = entry.sender });
+					if(blockIndex != entry.blockIndex, { ^false });
 					if(sendersSet.includes(entry), { ^true })
 				})
 			});
 
 			if(sender.isAlgaNode, {
+				if(blockIndex != sender.blockIndex, { ^false });
 				if(sendersSet.includes(sender), { ^true })
 			});
 		});

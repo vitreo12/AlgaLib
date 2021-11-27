@@ -234,6 +234,8 @@ AlgaBlock {
 	rearrangeBlock { | sender, receiver |
 		var server, supernova;
 
+		(sender.asString ++ " >> " ++ receiver.asString).postln;
+
 		//Update lastSender
 		lastSender = sender ? lastSender;
 
@@ -242,7 +244,7 @@ AlgaBlock {
 			this.stage1(sender, receiver);
 		});
 
-		this.debugFeedbacks;
+		//this.debugFeedbacks;
 
 		//Stage 2: order nodes according to I/O
 		this.stage2;
@@ -256,7 +258,7 @@ AlgaBlock {
 		supernova = Alga.supernova(server);
 
 		//Stages 3-4
-		if(supernova, {
+		//if(supernova, {
 			//Stage 3: optimize the ordered nodes (make groups)
 			this.stage3;
 
@@ -264,10 +266,10 @@ AlgaBlock {
 
 			//Build ParGroups / Groups out of the optimized ordered nodes
 			this.stage4_supernova;
-		}, {
+		/*}, {
 			//Simply add orderedNods to group. No stage3 (no need to parallelize order)
 			this.stage4_scsynth;
-		});
+		});*/
 
 		"".postln;
 	}
@@ -325,10 +327,6 @@ AlgaBlock {
 		//If there is a match between who sent the node (nodeSender)
 		//and the original sender, AND between the current node and
 		//the original receiver, it's feedback!
-		nodeSender.asString.warn;
-		blockSender.asString.warn;
-		node.asString.warn;
-		blockReceiver.asString.warn;
 		if((nodeSender == blockSender).and(node == blockReceiver), {
 			this.addFeedback(blockSender, blockReceiver);
 			atLeastOneFeedback = true;
@@ -457,6 +455,9 @@ AlgaBlock {
 		//Detect FB connections that might need to be added here (check comment later)
 		var fbConnectionsToAdd = OrderedIdentitySet();
 
+		//
+		("orderNodeInNodes: " ++ node.asString).postln;
+
 		//Add to visited
 		visitedNodes.add(node);
 		visitedNodesThisUpperMostNode.add(node);
@@ -479,6 +480,7 @@ AlgaBlock {
 		});
 
 		//All its inNodes have been added: we can now add the node to orderedNodes
+		("adding :" ++ node.asString).error;
 		orderedNodes.add(node);
 
 		//This is to cover a very specific situation in which, at the end of a chain,
@@ -516,14 +518,16 @@ AlgaBlock {
 	}
 
 	//Order a node
-	orderNode { | node, visitedNodesThisUpperMostNode |
+	orderNodeOutNodes { | node, visitedNodesThisUpperMostNode |
+		("orderNodeOutNodes: " ++ node.asString).postln;
+
 		//Check output
 		node.activeOutNodes.keys.do({ | receiver |
-			var visited = visitedNodes.includes(receiver);
 			//If not visited yet, visit inputs and then start ordering it too
+			var visited = visitedNodes.includes(receiver);
 			if(visited.not, {
 				this.orderNodeInNodes(receiver, visitedNodesThisUpperMostNode);
-				this.orderNode(receiver, visitedNodesThisUpperMostNode);
+				this.orderNodeOutNodes(receiver, visitedNodesThisUpperMostNode);
 			});
 
 			//Add node to visitedNodesThisUpperMostNode
@@ -538,7 +542,8 @@ AlgaBlock {
 	orderNodes { | visitedUpperMostNodes |
 		upperMostNodes.do({ | node, i |
 			var visitedNodesThisUpperMostNode = OrderedIdentitySet(10);
-			this.orderNode(node, visitedNodesThisUpperMostNode);
+			(">> upperMostNode: " ++ node.asString).postln;
+			this.orderNodeOutNodes(node, visitedNodesThisUpperMostNode);
 			visitedUpperMostNodes[i] = visitedNodesThisUpperMostNode;
 		});
 	}
