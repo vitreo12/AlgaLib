@@ -24,10 +24,10 @@ Alga.boot({
 	f >>+ h;
 	h >>+ l;
 	i >>+ l;
-	/* k >>+ l;
+	k >>+ l;
 	k >>+ d;
 	g >>+ a;
-	l >>+ b; */
+	l >>+ b;
 
 	//This is to test freeUnusedFeedbacks
 	//h <| \in;

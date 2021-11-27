@@ -14,13 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-/*
-TODOS:
-
-1. Fix feedback ordering (shouldn't be reverted if already connected once)
-
-*/
-
 AlgaBlock {
 	//All the nodes in the block
 	var <nodes;
@@ -68,7 +61,7 @@ AlgaBlock {
 	}
 
 	init { | parGroup |
-		nodes          = OrderedIdentitySet(10);
+		nodes          = OrderedIdentitySet(10); //Essential to be ordered to maintain when things were added to block!
 		feedbackNodes  = IdentityDictionary(10);
 
 		visitedNodes   = OrderedIdentitySet(10);
@@ -374,6 +367,9 @@ AlgaBlock {
 		//Order the nodes starting from upperMostNodes
 		this.orderNodes(visitedUpperMostNodes);
 
+		//If any nodes haven't been reached, but are connected
+		this.orderUnvisitedConnectedNodes(visitedUpperMostNodes);
+
 		//Find blocks to separate
 		this.findBlocksToSplit(visitedUpperMostNodes);
 	}
@@ -450,101 +446,56 @@ AlgaBlock {
 		});
 	}
 
-	//Order the inNodes of a node
-	orderNodeInNodes { | node, visitedNodesThisUpperMostNode |
-		//Detect FB connections that might need to be added here (check comment later)
-		var fbConnectionsToAdd = OrderedIdentitySet();
+	//Order nodes according to their I/O
+	orderNodes {
+		//This doesn't take into account feedback nodes that actually need to be removed,
+		//the ones found with visitedNodesThisUpperMostNode
+		//in the previous algorithm
+		var counter = nodes.size;
 
-		//
-		("orderNodeInNodes: " ++ node.asString).postln;
+		//Keep going 'til all nodes are done... But it's not enough (read earlier)
+		while { counter > 0 } {
+			nodes.do({ | node |
+				if(visitedNodes.includes(node).not, {
+					var inNodesDone = true;
 
-		//Add to visited
-		visitedNodes.add(node);
-		visitedNodesThisUpperMostNode.add(node);
-
-		//Check inNodes
-		node.activeInNodes.do({ | sendersSet |
-			sendersSet.do({ | sender |
-				//If not visited and not FB connection, check its inNodes too
-				var visited = visitedNodes.includes(sender);
-				var isFeedback = this.isFeedback(sender, node);
-				if(visited.not.and(isFeedback.not), {
-					this.orderNodeInNodes(sender, visitedNodesThisUpperMostNode);
-				}, {
-					//These might be added (check comment later)
-					if(isFeedback, {
-						fbConnectionsToAdd.add(sender);
-					});
-				});
-			});
-		});
-
-		//All its inNodes have been added: we can now add the node to orderedNodes
-		("adding :" ++ node.asString).error;
-		orderedNodes.add(node);
-
-		//This is to cover a very specific situation in which, at the end of a chain,
-		//only a FB connection remains, with no other ins / outs. This must be added
-		//after the node with which FB is happening. Basically, this connection would
-		//not be reached otherwise, so it needs to be added here.
-		fbConnectionsToAdd.do({ | fbNode |
-			var areAllFbNodeOutsFb = true;
-			var areAllFbNodeInsFb  = true;
-
-			block { | break |
-				fbNode.activeOutNodes.keys.do({ | receiver |
-					if(this.isFeedback(fbNode, receiver).not, {
-						areAllFbNodeOutsFb = false;
-						break.value(nil);
-					});
-				});
-				fbNode.activeInNodes.do({ | senderSet |
-					senderSet.do({ | sender |
-						if(this.isFeedback(sender, fbNode).not, {
-							areAllFbNodeInsFb = false;
-							break.value(nil);
+					//If it has inNodes, check if all of them have
+					//already been added. Also, ignore FB connections (their position is irrelevant)
+					if(node.activeInNodes.size > 0, {
+						node.activeInNodes.do({ | sendersSet |
+							sendersSet.do({ | sender |
+								var visited = visitedNodes.includes(sender);
+								var isFeedback = this.isFeedback(sender, node);
+								if(visited.not.and(isFeedback.not), {
+									inNodesDone = false
+								})
+							})
 						});
 					});
+
+					//If so, this node can be added
+					if(inNodesDone, {
+						visitedNodes.add(node);
+						orderedNodes.add(node);
+						counter = counter - 1;
+					});
 				});
-			};
-
-			if(areAllFbNodeInsFb.and(
-				areAllFbNodeOutsFb).and(
-				orderedNodes.includes(fbNode).not), {
-				orderedNodes.add(fbNode);
-				visitedNodesThisUpperMostNode.add(fbNode);
 			})
-		});
+		}
 	}
 
-	//Order a node
-	orderNodeOutNodes { | node, visitedNodesThisUpperMostNode |
-		("orderNodeOutNodes: " ++ node.asString).postln;
+	//If any nodes haven't been reached, but are connected
+	orderUnvisitedConnectedNodes { | visitedUpperMostNodes |
+		visitedNodes.do({ | node |
+			node.outNodes.keys.do({ | receiver |
+				if(visitedNodes.includes(receiver).not, {
+					("UNVISITED: " ++ receiver.asString).error
 
-		//Check output
-		node.activeOutNodes.keys.do({ | receiver |
-			//If not visited yet, visit inputs and then start ordering it too
-			var visited = visitedNodes.includes(receiver);
-			if(visited.not, {
-				this.orderNodeInNodes(receiver, visitedNodesThisUpperMostNode);
-				this.orderNodeOutNodes(receiver, visitedNodesThisUpperMostNode);
+					//Add receiver orderedNodes after the node
+
+					//Add the nodes to visitedUpperMostNodes where the node is
+				});
 			});
-
-			//Add node to visitedNodesThisUpperMostNode
-			visitedNodesThisUpperMostNode.add(receiver);
-		});
-
-		//Add node to visitedNodesThisUpperMostNode
-		visitedNodesThisUpperMostNode.add(node);
-	}
-
-	//Order the nodes ignoring FB
-	orderNodes { | visitedUpperMostNodes |
-		upperMostNodes.do({ | node, i |
-			var visitedNodesThisUpperMostNode = OrderedIdentitySet(10);
-			(">> upperMostNode: " ++ node.asString).postln;
-			this.orderNodeOutNodes(node, visitedNodesThisUpperMostNode);
-			visitedUpperMostNodes[i] = visitedNodesThisUpperMostNode;
 		});
 	}
 
