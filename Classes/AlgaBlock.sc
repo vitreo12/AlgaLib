@@ -184,7 +184,9 @@ AlgaBlock {
 		if(nodes.size == 0, {
 			//("Deleting empty block: " ++ blockIndex).warn;
 			AlgaBlocksDict.blocksDict.removeAt(blockIndex);
-			group.free;
+
+			//Make sure all nodes were removed! This is essential
+			fork { 1.wait; group.free; };
 		});
 	}
 
@@ -357,39 +359,19 @@ AlgaBlock {
 		//Clear all needed stuff
 		visitedNodes.clear;
 		orderedNodes.clear;
+		upperMostNodes.clear;
 
-		//Find the upper most nodes. Use lastSender if none found
-		this.findUpperMostNodes;
+		//Order the nodes starting
+		this.orderNodes;
 
 		//Need to know upperMostNodes' size
 		visitedUpperMostNodes = Array.newClear(upperMostNodes.size);
 
-		//Order the nodes starting from upperMostNodes
-		this.orderNodes(visitedUpperMostNodes);
+		//Traverse branches from upperMostNodes
+		this.traverseBranches(visitedUpperMostNodes);
 
-		//If any nodes haven't been reached, but are connected
-		this.orderUnvisitedConnectedNodes(visitedUpperMostNodes);
-
-		//Find blocks to separate
+		//Find blocks that should be separated
 		this.findBlocksToSplit(visitedUpperMostNodes);
-	}
-
-	//Find the upper most nodes
-	findUpperMostNodes {
-		//Reset
-		upperMostNodes.clear;
-
-		//Nodes with no inputs
-		nodes.do({ | node |
-			if(node.activeInNodes.size == 0, {
-				upperMostNodes.add(node)
-			});
-		});
-
-		//All FB connections. Use lastSender as upper most node
-		if(upperMostNodes.size == 0, {
-			upperMostNodes.add(lastSender)
-		});
 	}
 
 	//Create a new block
@@ -446,7 +428,30 @@ AlgaBlock {
 		});
 	}
 
-	//Order nodes according to their I/O
+	//Check all nodes belonging to a branch
+	traverseBranch { | node, visitedUpperMostNodesEntry, tempVisitedNodes |
+		tempVisitedNodes.add(node);
+		node.activeOutNodes.keys.do({ | receiver |
+			var visited = tempVisitedNodes.includes(receiver);
+			var isFeedback = this.isFeedback(node, receiver);
+			if((visited.not).and(isFeedback.not), {
+				this.traverseBranch(receiver, visitedUpperMostNodesEntry, tempVisitedNodes);
+			});
+		});
+		visitedUpperMostNodesEntry.add(node);
+	}
+
+	//Check all nodes belonging to a branch
+	traverseBranches {  | visitedUpperMostNodes |
+		upperMostNodes.do({ | node, i |
+			var tempVisitedNodes = IdentitySet();
+			visitedUpperMostNodes[i] = IdentitySet();
+			this.traverseBranch(node, visitedUpperMostNodes[i], tempVisitedNodes);
+		});
+	}
+
+	//Order nodes according to their I/O..
+	//TEST WITH TestBugInterpDisconnections to fix findBlocksToSplit with this new algorithm
 	orderNodes {
 		//This doesn't take into account feedback nodes that actually need to be removed,
 		//the ones found with visitedNodesThisUpperMostNode
@@ -457,46 +462,46 @@ AlgaBlock {
 		while { counter > 0 } {
 			nodes.do({ | node |
 				if(visitedNodes.includes(node).not, {
-					var inNodesDone = true;
+					var activeInNodesDone = true;
+					var noIO = false;
 
 					//If it has inNodes, check if all of them have
+
+					//If it has activeInNodesDone, check if all of them have
 					//already been added. Also, ignore FB connections (their position is irrelevant)
+					//FB's will maintain the same order thanks to nodes being OrderedIdentitySet
 					if(node.activeInNodes.size > 0, {
-						node.activeInNodes.do({ | sendersSet |
-							sendersSet.do({ | sender |
-								var visited = visitedNodes.includes(sender);
-								var isFeedback = this.isFeedback(sender, node);
-								if(visited.not.and(isFeedback.not), {
-									inNodesDone = false
+						block { | break |
+							node.activeInNodes.do({ | sendersSet |
+								sendersSet.do({ | sender |
+									var visited = visitedNodes.includes(sender);
+									var isFeedback = this.isFeedback(sender, node);
+									if(visited.not.and(isFeedback.not), {
+										activeInNodesDone = false;
+										break.value(nil);
+									})
 								})
-							})
-						});
+							});
+						};
+					}, {
+						//If no ins, add to upperMostNodes
+						upperMostNodes.add(node);
+
+						//If also no outs, it's a node that has to be removed.
+						//It will be done later in stage4 for all nodes that
+						//haven't been added to orderedNodes
+						if(node.activeOutNodes.size == 0, { noIO = true });
 					});
 
 					//If so, this node can be added
-					if(inNodesDone, {
+					if(activeInNodesDone, {
 						visitedNodes.add(node);
-						orderedNodes.add(node);
+						if(noIO.not, { orderedNodes.add(node) });
 						counter = counter - 1;
 					});
 				});
 			})
 		}
-	}
-
-	//If any nodes haven't been reached, but are connected
-	orderUnvisitedConnectedNodes { | visitedUpperMostNodes |
-		visitedNodes.do({ | node |
-			node.outNodes.keys.do({ | receiver |
-				if(visitedNodes.includes(receiver).not, {
-					("UNVISITED: " ++ receiver.asString).error
-
-					//Add receiver orderedNodes after the node
-
-					//Add the nodes to visitedUpperMostNodes where the node is
-				});
-			});
-		});
 	}
 
 	/***********/
