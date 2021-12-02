@@ -2765,6 +2765,8 @@ AlgaPattern : AlgaNode {
 	//Add entry to inNodes. Unlike AlgaNodes, inNodes can here contain AlgaArgs, as the .replace
 	//mechanism is difference. For AlgaNodes, AlgaArgs can only be used in the args initialization
 	addInNodeAlgaNode { | sender, param = \in, mix = false |
+		var connectionToItself = (this == sender);
+
 		//Empty entry OR not doing mixing, create new OrderedIdentitySet. Otherwise, add to existing
 		if((inNodes[param] == nil).or(mix.not), {
 			inNodes[param] = OrderedIdentitySet[sender];
@@ -2772,13 +2774,16 @@ AlgaPattern : AlgaNode {
 			inNodes[param].add(sender);
 		});
 
-		//Also add to activeInNodes / activeOutNodes
-		this.addActiveInNode(sender, param);
-		sender.addActiveOutNode(this, param);
+		//Only go through if not connecting with itself
+		if(connectionToItself.not, {
+			//Add to activeInNodes / activeOutNodes
+			this.addActiveInNode(sender, param);
+			sender.addActiveOutNode(this, param);
 
-		//Update blocks too (connectionWasAlreadyThere is set in AlgaPatternInterpStreams)
-		if(connectionAlreadyInPlace.not, {
-			AlgaBlocksDict.createNewBlockIfNeeded(this, sender)
+			//Update blocks too (connectionWasAlreadyThere is set in AlgaPatternInterpStreams)
+			if(connectionAlreadyInPlace.not, {
+				AlgaBlocksDict.createNewBlockIfNeeded(this, sender)
+			});
 		});
 	}
 
