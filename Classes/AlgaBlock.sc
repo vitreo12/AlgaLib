@@ -14,13 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-/*
-TODOS:
-
-1. Fix feedback ordering (shouldn't be reverted if already connected once)
-
-*/
-
 AlgaBlock {
 	//All the nodes in the block
 	var <nodes;
@@ -68,7 +61,7 @@ AlgaBlock {
 	}
 
 	init { | parGroup |
-		nodes          = OrderedIdentitySet(10);
+		nodes          = OrderedIdentitySet(10); //Essential to be ordered to maintain when things were added to block!
 		feedbackNodes  = IdentityDictionary(10);
 
 		visitedNodes   = OrderedIdentitySet(10);
@@ -191,7 +184,9 @@ AlgaBlock {
 		if(nodes.size == 0, {
 			//("Deleting empty block: " ++ blockIndex).warn;
 			AlgaBlocksDict.blocksDict.removeAt(blockIndex);
-			group.free;
+
+			//Make sure all nodes were removed! This is essential
+			fork { 1.wait; group.free; };
 		});
 	}
 
@@ -364,36 +359,19 @@ AlgaBlock {
 		//Clear all needed stuff
 		visitedNodes.clear;
 		orderedNodes.clear;
+		upperMostNodes.clear;
 
-		//Find the upper most nodes. Use lastSender if none found
-		this.findUpperMostNodes;
+		//Order the nodes starting
+		this.orderNodes;
 
 		//Need to know upperMostNodes' size
 		visitedUpperMostNodes = Array.newClear(upperMostNodes.size);
 
-		//Order the nodes starting from upperMostNodes
-		this.orderNodes(visitedUpperMostNodes);
+		//Traverse branches from upperMostNodes
+		this.traverseBranches(visitedUpperMostNodes);
 
-		//Find blocks to separate
+		//Find blocks that should be separated
 		this.findBlocksToSplit(visitedUpperMostNodes);
-	}
-
-	//Find the upper most nodes
-	findUpperMostNodes {
-		//Reset
-		upperMostNodes.clear;
-
-		//Nodes with no inputs
-		nodes.do({ | node |
-			if(node.activeInNodes.size == 0, {
-				upperMostNodes.add(node)
-			});
-		});
-
-		//All FB connections. Use lastSender as upper most node
-		if(upperMostNodes.size == 0, {
-			upperMostNodes.add(lastSender)
-		});
 	}
 
 	//Create a new block
@@ -450,102 +428,80 @@ AlgaBlock {
 		});
 	}
 
-	//Order the inNodes of a node
-	orderNodeInNodes { | node, visitedNodesThisUpperMostNode |
-		//Detect FB connections that might need to be added here (check comment later)
-		var fbConnectionsToAdd = OrderedIdentitySet();
-
-		//
-		("orderNodeInNodes: " ++ node.asString).postln;
-
-		//Add to visited
-		visitedNodes.add(node);
-		visitedNodesThisUpperMostNode.add(node);
-
-		//Check inNodes
-		node.activeInNodes.do({ | sendersSet |
-			sendersSet.do({ | sender |
-				//If not visited and not FB connection, check its inNodes too
-				var visited = visitedNodes.includes(sender);
-				var isFeedback = this.isFeedback(sender, node);
-				if(visited.not.and(isFeedback.not), {
-					this.orderNodeInNodes(sender, visitedNodesThisUpperMostNode);
-				}, {
-					//These might be added (check comment later)
-					if(isFeedback, {
-						fbConnectionsToAdd.add(sender);
-					});
-				});
-			});
-		});
-
-		//All its inNodes have been added: we can now add the node to orderedNodes
-		("adding :" ++ node.asString).error;
-		orderedNodes.add(node);
-
-		//This is to cover a very specific situation in which, at the end of a chain,
-		//only a FB connection remains, with no other ins / outs. This must be added
-		//after the node with which FB is happening. Basically, this connection would
-		//not be reached otherwise, so it needs to be added here.
-		fbConnectionsToAdd.do({ | fbNode |
-			var areAllFbNodeOutsFb = true;
-			var areAllFbNodeInsFb  = true;
-
-			block { | break |
-				fbNode.activeOutNodes.keys.do({ | receiver |
-					if(this.isFeedback(fbNode, receiver).not, {
-						areAllFbNodeOutsFb = false;
-						break.value(nil);
-					});
-				});
-				fbNode.activeInNodes.do({ | senderSet |
-					senderSet.do({ | sender |
-						if(this.isFeedback(sender, fbNode).not, {
-							areAllFbNodeInsFb = false;
-							break.value(nil);
-						});
-					});
-				});
-			};
-
-			if(areAllFbNodeInsFb.and(
-				areAllFbNodeOutsFb).and(
-				orderedNodes.includes(fbNode).not), {
-				orderedNodes.add(fbNode);
-				visitedNodesThisUpperMostNode.add(fbNode);
-			})
-		});
-	}
-
-	//Order a node
-	orderNodeOutNodes { | node, visitedNodesThisUpperMostNode |
-		("orderNodeOutNodes: " ++ node.asString).postln;
-
-		//Check output
+	//Check all nodes belonging to a branch
+	traverseBranch { | node, visitedUpperMostNodesEntry, tempVisitedNodes |
+		tempVisitedNodes.add(node);
 		node.activeOutNodes.keys.do({ | receiver |
-			//If not visited yet, visit inputs and then start ordering it too
-			var visited = visitedNodes.includes(receiver);
-			if(visited.not, {
-				this.orderNodeInNodes(receiver, visitedNodesThisUpperMostNode);
-				this.orderNodeOutNodes(receiver, visitedNodesThisUpperMostNode);
+			var visited = tempVisitedNodes.includes(receiver);
+			var isFeedback = this.isFeedback(node, receiver);
+			if((visited.not).and(isFeedback.not), {
+				this.traverseBranch(receiver, visitedUpperMostNodesEntry, tempVisitedNodes);
 			});
-
-			//Add node to visitedNodesThisUpperMostNode
-			visitedNodesThisUpperMostNode.add(receiver);
 		});
-
-		//Add node to visitedNodesThisUpperMostNode
-		visitedNodesThisUpperMostNode.add(node);
+		visitedUpperMostNodesEntry.add(node);
 	}
 
-	//Order the nodes ignoring FB
-	orderNodes { | visitedUpperMostNodes |
+	//Check all nodes belonging to a branch
+	traverseBranches {  | visitedUpperMostNodes |
 		upperMostNodes.do({ | node, i |
-			var visitedNodesThisUpperMostNode = OrderedIdentitySet(10);
-			(">> upperMostNode: " ++ node.asString).postln;
-			this.orderNodeOutNodes(node, visitedNodesThisUpperMostNode);
-			visitedUpperMostNodes[i] = visitedNodesThisUpperMostNode;
+			var tempVisitedNodes = IdentitySet();
+			visitedUpperMostNodes[i] = IdentitySet();
+			this.traverseBranch(node, visitedUpperMostNodes[i], tempVisitedNodes);
 		});
+	}
+
+	//Order nodes according to their I/O..
+	//TEST WITH TestBugInterpDisconnections to fix findBlocksToSplit with this new algorithm
+	orderNodes {
+		//This doesn't take into account feedback nodes that actually need to be removed,
+		//the ones found with visitedNodesThisUpperMostNode
+		//in the previous algorithm
+		var counter = nodes.size;
+
+		//Keep going 'til all nodes are done... But it's not enough (read earlier)
+		while { counter > 0 } {
+			nodes.do({ | node |
+				if(visitedNodes.includes(node).not, {
+					var activeInNodesDone = true;
+					var noIO = false;
+
+					//If it has inNodes, check if all of them have
+
+					//If it has activeInNodesDone, check if all of them have
+					//already been added. Also, ignore FB connections (their position is irrelevant)
+					//FB's will maintain the same order thanks to nodes being OrderedIdentitySet
+					if(node.activeInNodes.size > 0, {
+						block { | break |
+							node.activeInNodes.do({ | sendersSet |
+								sendersSet.do({ | sender |
+									var visited = visitedNodes.includes(sender);
+									var isFeedback = this.isFeedback(sender, node);
+									if(visited.not.and(isFeedback.not), {
+										activeInNodesDone = false;
+										break.value(nil);
+									})
+								})
+							});
+						};
+					}, {
+						//If no ins, add to upperMostNodes
+						upperMostNodes.add(node);
+
+						//If also no outs, it's a node that has to be removed.
+						//It will be done later in stage4 for all nodes that
+						//haven't been added to orderedNodes
+						if(node.activeOutNodes.size == 0, { noIO = true });
+					});
+
+					//If so, this node can be added
+					if(activeInNodesDone, {
+						visitedNodes.add(node);
+						if(noIO.not, { orderedNodes.add(node) });
+						counter = counter - 1;
+					});
+				});
+			})
+		}
 	}
 
 	/***********/

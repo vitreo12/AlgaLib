@@ -1473,10 +1473,16 @@ AlgaNode {
 	removeActiveNodeAndRearrangeBlock { | param, sender |
 		if(sender.isAlgaArg, { sender = sender.sender });
 		if(sender.isAlgaNode, {
+			//If this == sender, no need to go through with this
+			var connectionToItself = (this == sender);
+			if(connectionToItself, { ^this });
+
+			//Remove active nodes
 			this.removeActiveInNode(sender, param);
 			sender.removeActiveOutNode(this, param);
+
+			//Only re-order if all references to sender have been consumed
 			if(activeInNodesCounter[sender] != nil, {
-				//Only re-order if all references to sender have been consumed
 				if(activeInNodesCounter[sender] < 1, {
 					var thisBlock   = AlgaBlocksDict.blocksDict[blockIndex];
 					var senderBlock = AlgaBlocksDict.blocksDict[sender.blockIndex];
@@ -2818,8 +2824,12 @@ AlgaNode {
 			//Like inNodes / outNodes. They get freed on the accoding interpSynth
 			//AlgaPattern handles it in its own addInNode, this would double it!
 			if(this.isAlgaPattern.not, {
-				this.addActiveInNode(sender, param);
-				sender.addActiveOutNode(this, param);
+				//Don't add to active if sender == this
+				var connectionToItself = (this == sender);
+				if(connectionToItself.not, {
+					this.addActiveInNode(sender, param);
+					sender.addActiveOutNode(this, param);
+				});
 			});
 		});
 	}
@@ -2983,6 +2993,9 @@ AlgaNode {
 	newInterpConnectionAtParam { | sender, param = \in, replace = false,
 		senderChansMapping, scale, time |
 
+		//Check sender == this
+		var connectionToItself = (this == sender);
+
 		//Check valid param
 		var controlName = controlNames[param];
 		if(controlName == nil, {
@@ -3003,7 +3016,7 @@ AlgaNode {
 		//Actually reorder the block's nodes ONLY if not running .replace
 		//(no need there, they are already ordered, and it also avoids a lot of problems
 		//with feedback connections)
-		if((replace.not).and(connectionAlreadyInPlace.not), {
+		if((replace.not).and(connectionAlreadyInPlace.not).and(connectionToItself.not), {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 		});
 
@@ -3022,6 +3035,9 @@ AlgaNode {
 	//New mix connection at specific parameter
 	newMixConnectionAtParam { | sender, param = \in, replace = false,
 		replaceMix = false, senderChansMapping, scale, time |
+
+		//Don't reorder block if connecting to itself
+		var connectionToItself = (this == sender);
 
 		//Check valid param
 		var controlName = controlNames[param];
@@ -3045,7 +3061,7 @@ AlgaNode {
 		//Actually reorder the block's nodes ONLY if not running .replace
 		//(no need there, they are already ordered, and it also avoids a lot of problems
 		//with feedback connections)
-		if((replace.not).and(connectionAlreadyInPlace.not).and(replaceMix).not, {
+		if((replace.not).and(connectionAlreadyInPlace.not).and(connectionToItself.not).and(replaceMix.not), {
 			AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
 		});
 
