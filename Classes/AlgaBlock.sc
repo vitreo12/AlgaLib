@@ -61,7 +61,8 @@ AlgaBlock {
 	}
 
 	init { | parGroup |
-		nodes          = OrderedIdentitySet(10); //Essential to be ordered to maintain when things were added to block!
+		//Essential to be ordered to maintain when things were added to block!
+		nodes          = OrderedIdentitySet(10);
 		feedbackNodes  = IdentityDictionary(10);
 
 		visitedNodes   = OrderedIdentitySet(10);
@@ -361,7 +362,7 @@ AlgaBlock {
 		orderedNodes.clear;
 		upperMostNodes.clear;
 
-		//Order the nodes starting
+		//Order the nodes
 		this.orderNodes;
 
 		//Need to know upperMostNodes' size
@@ -450,22 +451,41 @@ AlgaBlock {
 		});
 	}
 
-	//Order nodes according to their I/O..
-	//TEST WITH TestBugInterpDisconnections to fix findBlocksToSplit with this new algorithm
-	orderNodes {
-		//This doesn't take into account feedback nodes that actually need to be removed,
-		//the ones found with visitedNodesThisUpperMostNode
-		//in the previous algorithm
-		var counter = nodes.size;
+	//Find upper most nodes
+	findUpperMostNodes {
+		nodes.do({ | node |
+			if(node.activeInNodes.size == 0, {
+				upperMostNodes.add(node);
+			});
+		});
+	}
 
-		//Keep going 'til all nodes are done... But it's not enough (read earlier)
-		while { counter > 0 } {
+	//Order nodes according to their I/O
+	orderNodes {
+		//Bail after 50k tries
+		var bailLimit = 50000;
+		var bailCounter = 0;
+
+		//Count all nodes down
+		var nodeCounter = nodes.size;
+
+		//Find upper most nodes
+		this.findUpperMostNodes;
+
+		//If upperMostNodes.size == 0, it means the whole block is FB only.
+		//Don't go through or it will loop forever. Since everything is ordered,
+		//the FB will be preserved in the order it was declared.
+		if(upperMostNodes.size == 0, {
+			nodes.do({ | node | orderedNodes.add(node) });
+			^this;
+		});
+
+		//Keep going 'til all nodes are done
+		while { nodeCounter > 0 } {
 			nodes.do({ | node |
 				if(visitedNodes.includes(node).not, {
 					var activeInNodesDone = true;
 					var noIO = false;
-
-					//If it has inNodes, check if all of them have
 
 					//If it has activeInNodesDone, check if all of them have
 					//already been added. Also, ignore FB connections (their position is irrelevant)
@@ -474,19 +494,20 @@ AlgaBlock {
 						block { | break |
 							node.activeInNodes.do({ | sendersSet |
 								sendersSet.do({ | sender |
-									var visited = visitedNodes.includes(sender);
-									var isFeedback = this.isFeedback(sender, node);
-									if(visited.not.and(isFeedback.not), {
-										activeInNodesDone = false;
-										break.value(nil);
-									})
-								})
+									//This can happen on CmdPeriod.
+									//Make sure sender is in nodes or it will loop forever.
+									if(nodes.includes(sender), {
+										var visited = visitedNodes.includes(sender);
+										var isFeedback = this.isFeedback(sender, node);
+										if(visited.not.and(isFeedback.not), {
+											activeInNodesDone = false;
+											break.value(nil);
+										});
+									});
+								});
 							});
 						};
 					}, {
-						//If no ins, add to upperMostNodes
-						upperMostNodes.add(node);
-
 						//If also no outs, it's a node that has to be removed.
 						//It will be done later in stage4 for all nodes that
 						//haven't been added to orderedNodes
@@ -496,11 +517,14 @@ AlgaBlock {
 					//If so, this node can be added
 					if(activeInNodesDone, {
 						visitedNodes.add(node);
+						nodeCounter = nodeCounter - 1;
 						if(noIO.not, { orderedNodes.add(node) });
-						counter = counter - 1;
 					});
 				});
-			})
+			});
+
+			bailCounter = bailCounter + 1;
+			if(bailCounter == bailLimit, { nodeCounter = 0 });
 		}
 	}
 
