@@ -765,7 +765,7 @@ AlgaBlocksDict {
 
 		//Can't connect nodes from two different servers together
 		if(receiver.server != sender.server, {
-			("AlgaBlocksDict: Trying to create a block between two AlgaNodes on different servers").error;
+			//("AlgaBlocksDict: Trying to create a block between two AlgaNodes on different servers").error;
 			^receiver;
 		});
 
