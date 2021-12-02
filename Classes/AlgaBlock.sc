@@ -229,6 +229,7 @@ AlgaBlock {
 	//Re-arrange block on connection
 	rearrangeBlock { | sender, receiver |
 		var server, supernova;
+		var ignoreStages;
 
 		(sender.asString ++ " >> " ++ receiver.asString).postln;
 
@@ -242,19 +243,22 @@ AlgaBlock {
 
 		//this.debugFeedbacks;
 
-		//Stage 2: order nodes according to I/O
-		this.stage2;
+		//If upperMostNodes is 0, it's a full FB block. No need to run anything else.
+		ignoreStages = upperMostNodes.size == 0;
+		if(ignoreStages.not, {
+			//Stage 2: order nodes according to I/O
+			this.stage2;
 
-		this.debugOrderedNodes;
+			this.debugOrderedNodes;
 
-		//Check lastSender's server (it's been updated if sender != nil in stage1)
-		server = if(lastSender != nil, { lastSender.server }, { Server.default });
+			//Check lastSender's server (it's been updated if sender != nil in stage1)
+			server = if(lastSender != nil, { lastSender.server }, { Server.default });
 
-		//Check if it's supernova
-		supernova = Alga.supernova(server);
+			//Check if it's supernova
+			supernova = Alga.supernova(server);
 
-		//Stages 3-4
-		//if(supernova, {
+			//Stages 3-4
+			//if(supernova, {
 			//Stage 3: optimize the ordered nodes (make groups)
 			this.stage3;
 
@@ -262,10 +266,11 @@ AlgaBlock {
 
 			//Build ParGroups / Groups out of the optimized ordered nodes
 			this.stage4_supernova;
-		/*}, {
+			/*}, {
 			//Simply add orderedNods to group. No stage3 (no need to parallelize order)
 			this.stage4_scsynth;
-		});*/
+			});*/
+		});
 
 		"".postln;
 	}
@@ -278,6 +283,7 @@ AlgaBlock {
 	stage1 { | sender, receiver |
 		//Clear all needed stuff
 		visitedNodes.clear;
+		upperMostNodes.clear;
 
 		//Start to detect feedback from the receiver
 		this.detectFeedback(
@@ -288,21 +294,25 @@ AlgaBlock {
 
 		//Find unused feedback loops (from previous disconnections)
 		this.findAllUnusedFeedbacks;
+
+		//Find upper most nodes
+		this.findUpperMostNodes;
 	}
 
-	//Add FB pair (both ways)
+	//Add FB pair
 	addFeedback { | sender, receiver |
 		//Create IdentitySets if needed
 		if(feedbackNodes[sender] == nil, {
 			feedbackNodes[sender] = IdentitySet();
 		});
-		if(feedbackNodes[receiver] == nil, {
+
+		/* if(feedbackNodes[receiver] == nil, {
 			feedbackNodes[receiver] = IdentitySet();
-		});
+		}); */
 
 		//Add the FB connection
 		feedbackNodes[sender].add(receiver);
-		feedbackNodes[receiver].add(sender);
+		//feedbackNodes[receiver].add(sender);
 	}
 
 	//Remove FB pair
@@ -312,10 +322,10 @@ AlgaBlock {
 			if(feedbackNodes[sender].size == 0, { feedbackNodes.removeAt(sender) });
 		});
 
-		if(feedbackNodes[receiver] != nil, {
+		/* if(feedbackNodes[receiver] != nil, {
 			feedbackNodes[receiver].remove(sender);
 			if(feedbackNodes[receiver].size == 0, { feedbackNodes.removeAt(receiver) });
-		});
+		}); */
 	}
 
 	//Resolve feedback: check for the inNodes of the node.
@@ -360,7 +370,6 @@ AlgaBlock {
 		//Clear all needed stuff
 		visitedNodes.clear;
 		orderedNodes.clear;
-		upperMostNodes.clear;
 
 		//Order the nodes
 		this.orderNodes;
@@ -468,17 +477,6 @@ AlgaBlock {
 
 		//Count all nodes down
 		var nodeCounter = nodes.size;
-
-		//Find upper most nodes
-		this.findUpperMostNodes;
-
-		//If upperMostNodes.size == 0, it means the whole block is FB only.
-		//Don't go through or it will loop forever. Since everything is ordered,
-		//the FB will be preserved in the order it was declared.
-		if(upperMostNodes.size == 0, {
-			nodes.do({ | node | orderedNodes.add(node) });
-			^this;
-		});
 
 		//Keep going 'til all nodes are done
 		while { nodeCounter > 0 } {
