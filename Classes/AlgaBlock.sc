@@ -14,22 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-/*
-TODOS:
-
-1. Fix feedback ordering (shouldn't be reverted if already connected once)
-
-2. Support patternOut
-
-3. Fix disconnected modules: they can still be re-arranged into wrong positions
-IF they get patched to something else while the interpolation is happening.
-This means that the fading out interpolation might cause read-write mismatches.
-How to fix it though? One idea would be to move the AlgaBlock's group to the top
-everytime it's used, but this won't take into consideration if the nodes were used
-as outputs.
-
-*/
-
 AlgaBlock {
 	//All the nodes in the block
 	var <nodes;
@@ -77,10 +61,10 @@ AlgaBlock {
 	}
 
 	init { | parGroup |
-		nodes          = OrderedIdentitySet(10);
+		nodes          = OrderedIdentitySet(10); //Essential to be ordered to maintain when things were added to block!
 		feedbackNodes  = IdentityDictionary(10);
 
-		visitedNodes   = IdentitySet(10);
+		visitedNodes   = OrderedIdentitySet(10);
 		disconnectVisitedNodes = IdentitySet(10);
 
 		upperMostNodes = OrderedIdentitySet(10);
@@ -91,6 +75,11 @@ AlgaBlock {
 		groups         = OrderedIdentitySet(10);
 		group          = Group(parGroup, \addToHead);
 		blockIndex     = group.nodeID;
+
+		//Remove from blocks dict when group gets freed, eventually
+		group.onFree({
+			AlgaBlocksDict.blocksDict.removeAt(blockIndex)
+		});
 	}
 
 	//Copy an AlgaBlock's nodes
@@ -107,6 +96,22 @@ AlgaBlock {
 			//When merging blocks, the old one's core group must be freed!
 			this.addMergedGroup(senderBlock);
 			isMergedGroup = true;
+		});
+	}
+
+	//Copy a node from a block to another and reset
+	copyNodeAndReset { | node, senderBlock |
+		if((senderBlock != nil).and(node != nil), {
+			senderBlock.orderedNodes.remove(node);
+			senderBlock.upperMostNodes.remove(node);
+			senderBlock.removeNode(node); //this sets blockIndex to -1
+			this.addNode(node); //this sets blockIndex to the new one
+			senderBlock.feedbackNodes.keysValuesDo({ | sender, receiver |
+				if(sender == node, {
+					this.addFeedback(sender, receiver);
+					senderBlock.removeFeedback(sender, receiver);
+				});
+			});
 		});
 	}
 
@@ -161,6 +166,8 @@ AlgaBlock {
 			^nil;
 		});
 
+		("Removing node: " ++ node.asString ++ " from block: " ++ blockIndex).error;
+
 		//Remove from dict
 		nodes.remove(node);
 
@@ -170,11 +177,16 @@ AlgaBlock {
 		//Set node's index to -1
 		node.blockIndex = -1;
 
+		//Put node back to top parGroup
+		node.moveToHead(Alga.parGroup(node.server));
+
 		//Remove this block from AlgaBlocksDict if it's empty!
 		if(nodes.size == 0, {
 			//("Deleting empty block: " ++ blockIndex).warn;
 			AlgaBlocksDict.blocksDict.removeAt(blockIndex);
-			group.free;
+
+			//Make sure all nodes were removed! This is essential
+			fork { 1.wait; group.free; };
 		});
 	}
 
@@ -215,21 +227,33 @@ AlgaBlock {
 
 	//Re-arrange block on connection
 	rearrangeBlock { | sender, receiver |
-		//Check if it's supernova
-		var supernova = Alga.supernova(sender.server);
+		var server, supernova;
 
-		//Stage 1: detect feedbacks between sender and receiver
-		this.stage1(sender, receiver);
+		(sender.asString ++ " >> " ++ receiver.asString).postln;
 
-		this.debugFeedbacks;
+		//Update lastSender
+		lastSender = sender ? lastSender;
+
+		//Stage 1: detect feedbacks between sender and receiver (if they're valid)
+		if((sender != nil).and(receiver != nil), {
+			this.stage1(sender, receiver);
+		});
+
+		//this.debugFeedbacks;
 
 		//Stage 2: order nodes according to I/O
-		this.stage2(sender);
+		this.stage2;
 
 		this.debugOrderedNodes;
 
-		//Stage 4
-		if(supernova, {
+		//Check lastSender's server (it's been updated if sender != nil in stage1)
+		server = if(lastSender != nil, { lastSender.server }, { Server.default });
+
+		//Check if it's supernova
+		supernova = Alga.supernova(server);
+
+		//Stages 3-4
+		//if(supernova, {
 			//Stage 3: optimize the ordered nodes (make groups)
 			this.stage3;
 
@@ -237,10 +261,10 @@ AlgaBlock {
 
 			//Build ParGroups / Groups out of the optimized ordered nodes
 			this.stage4_supernova;
-		}, {
-			//Simply add orderedNods to group. No stage3.
+		/*}, {
+			//Simply add orderedNods to group. No stage3 (no need to parallelize order)
 			this.stage4_scsynth;
-		});
+		});*/
 
 		"".postln;
 	}
@@ -318,7 +342,7 @@ AlgaBlock {
 		visitedNodes.add(node);
 
 		//Scan outNodes of this node
-		node.outNodes.keys.do({ | outNode |
+		node.activeOutNodes.keys.do({ | outNode |
 			//nodeSender == node: the node who sent this outNode
 			this.detectFeedback(outNode, node, blockSender, blockReceiver);
 		});
@@ -329,78 +353,155 @@ AlgaBlock {
 	/***********/
 
 	//Stage 2: order nodes
-	stage2 { | sender |
+	stage2 {
+		var visitedUpperMostNodes;
+
 		//Clear all needed stuff
 		visitedNodes.clear;
 		orderedNodes.clear;
-
-		//Assign lastSender
-		lastSender = sender;
-
-		//Find the upper most nodes. Use lastSender if none found
-		this.findUpperMostNodes;
-
-		//Order the nodes starting from upperMostNodes
-		this.orderNodes;
-	}
-
-	//Find the upper most nodes
-	findUpperMostNodes {
-		//Reset
 		upperMostNodes.clear;
 
-		//Nodes with no inputs
-		nodes.do({ | node |
-			if(node.inNodes.size == 0, {
-				upperMostNodes.add(node)
-			});
-		});
+		//Order the nodes starting
+		this.orderNodes;
 
-		//All FB connections. Use lastSender as upper most node
-		if(upperMostNodes.size == 0, {
-			upperMostNodes.add(lastSender)
-		});
+		//Need to know upperMostNodes' size
+		visitedUpperMostNodes = Array.newClear(upperMostNodes.size);
+
+		//Traverse branches from upperMostNodes
+		this.traverseBranches(visitedUpperMostNodes);
+
+		//Find blocks that should be separated
+		this.findBlocksToSplit(visitedUpperMostNodes);
 	}
 
-	//Order the inNodes of a node
-	orderNodeInNodes { | node |
-		//Add to visited
-		visitedNodes.add(node);
+	//Create a new block
+	createNewBlock { | server |
+		var newBlock = AlgaBlock(Alga.parGroup(server));
+		newBlock.blockIndex.postln;
+		AlgaBlocksDict.blocksDict[newBlock.blockIndex] = newBlock;
+		^newBlock;
+	}
 
-		//Check inNodes
-		node.inNodes.do({ | sendersSet |
-			sendersSet.do({ | sender |
-				//If not visited and not FB connection, check its inNodes too
-				var visited = visitedNodes.includes(sender);
-				var isFeedback = this.isFeedback(sender, node);
-				if(visited.not.and(isFeedback.not), {
-					this.orderNodeInNodes(sender);
+	//Create new block and order it
+	createNewBlockAndOrderIt { | nodesSet |
+		var firstNode, server, newBlock;
+		block { | break |
+			nodesSet.do({ | node |
+				firstNode = node;
+				server = node.server;
+				break.value(nil)
+			})
+		};
+		newBlock = this.createNewBlock(server);
+		nodesSet.do({ | node | newBlock.copyNodeAndReset(node, this) });
+		newBlock.rearrangeBlock(firstNode); //Have at least a sender for lastSender
+	}
+
+	//Find blocks that should be separated. Basically, this checks that
+	//everytime a branch is computed from an upperMostNode, at least one of its visited nodes
+	//must be in another branch, meaning they're linked. If a branch does not
+	//have any node in common, it means it can be split into another block entirely.
+	findBlocksToSplit { | visitedUpperMostNodes |
+		if(visitedUpperMostNodes.size > 1, {
+			visitedUpperMostNodes.do({ | entry1, i |
+				//Only consider branches with more than one node
+				if(entry1.size > 1, {
+					var containsAnyOtherNode = false;
+
+					block { | break |
+						visitedUpperMostNodes.do({ | entry2 |
+							if(entry1 != entry2, {
+								if(entry1.sect(entry2).size > 0, {
+									containsAnyOtherNode = true;
+									break.value(nil);
+								});
+							});
+						});
+					};
+
+					//Create new block and order it
+					if(containsAnyOtherNode.not, {
+						this.createNewBlockAndOrderIt(entry1);
+					});
 				});
 			});
 		});
-
-		//All its inNodes have been added: we can now add the node to orderedNodes
-		orderedNodes.add(node);
 	}
 
-	//Order a node
-	orderNode { | node |
-		//Check output
-		node.outNodes.keys.do({ | receiver |
-			var visited = visitedNodes.includes(receiver);
-			//If not visited yet, visit inputs and then start ordering it too
-			if(visited.not, {
-				this.orderNodeInNodes(receiver);
-				this.orderNode(receiver);
+	//Check all nodes belonging to a branch
+	traverseBranch { | node, visitedUpperMostNodesEntry, tempVisitedNodes |
+		tempVisitedNodes.add(node);
+		node.activeOutNodes.keys.do({ | receiver |
+			var visited = tempVisitedNodes.includes(receiver);
+			var isFeedback = this.isFeedback(node, receiver);
+			if((visited.not).and(isFeedback.not), {
+				this.traverseBranch(receiver, visitedUpperMostNodesEntry, tempVisitedNodes);
 			});
 		});
+		visitedUpperMostNodesEntry.add(node);
 	}
 
-	//Order the nodes ignoring FB
-	orderNodes {
-		upperMostNodes.do({ | node |
-			this.orderNode(node);
+	//Check all nodes belonging to a branch
+	traverseBranches {  | visitedUpperMostNodes |
+		upperMostNodes.do({ | node, i |
+			var tempVisitedNodes = IdentitySet();
+			visitedUpperMostNodes[i] = IdentitySet();
+			this.traverseBranch(node, visitedUpperMostNodes[i], tempVisitedNodes);
 		});
+	}
+
+	//Order nodes according to their I/O..
+	//TEST WITH TestBugInterpDisconnections to fix findBlocksToSplit with this new algorithm
+	orderNodes {
+		//This doesn't take into account feedback nodes that actually need to be removed,
+		//the ones found with visitedNodesThisUpperMostNode
+		//in the previous algorithm
+		var counter = nodes.size;
+
+		//Keep going 'til all nodes are done... But it's not enough (read earlier)
+		while { counter > 0 } {
+			nodes.do({ | node |
+				if(visitedNodes.includes(node).not, {
+					var activeInNodesDone = true;
+					var noIO = false;
+
+					//If it has inNodes, check if all of them have
+
+					//If it has activeInNodesDone, check if all of them have
+					//already been added. Also, ignore FB connections (their position is irrelevant)
+					//FB's will maintain the same order thanks to nodes being OrderedIdentitySet
+					if(node.activeInNodes.size > 0, {
+						block { | break |
+							node.activeInNodes.do({ | sendersSet |
+								sendersSet.do({ | sender |
+									var visited = visitedNodes.includes(sender);
+									var isFeedback = this.isFeedback(sender, node);
+									if(visited.not.and(isFeedback.not), {
+										activeInNodesDone = false;
+										break.value(nil);
+									})
+								})
+							});
+						};
+					}, {
+						//If no ins, add to upperMostNodes
+						upperMostNodes.add(node);
+
+						//If also no outs, it's a node that has to be removed.
+						//It will be done later in stage4 for all nodes that
+						//haven't been added to orderedNodes
+						if(node.activeOutNodes.size == 0, { noIO = true });
+					});
+
+					//If so, this node can be added
+					if(activeInNodesDone, {
+						visitedNodes.add(node);
+						if(noIO.not, { orderedNodes.add(node) });
+						counter = counter - 1;
+					});
+				});
+			})
+		}
 	}
 
 	/***********/
@@ -421,7 +522,7 @@ AlgaBlock {
 
 	//Check if groupSet includes a sender of node
 	groupSetIncludesASender { | groupSet, node |
-		node.inNodes.do({ | sendersSet |
+		node.activeInNodes.do({ | sendersSet |
 			sendersSet.do({ | sender |
 				if(groupSet.includes(sender), { ^true });
 			})
@@ -482,18 +583,27 @@ AlgaBlock {
 			isMergedGroup = false;
 		});
 
-		//fork {
-		//	1.wait;
 		if(oldGroups != nil, {
 			oldGroups.do({ | oldGroup | oldGroup.free })
 		});
-		//}
 	}
 
-	//Remove all nodes that have not been visited
+	//Make a block with all the nodes that should be removed.
 	removeUnvisitedNodes {
+		var nodesToBeRemoved = OrderedIdentitySet();
+
 		nodes.do({ | node |
 			if(visitedNodes.includes(node).not, {
+				nodesToBeRemoved.add(node);
+			});
+		});
+
+		//At least 2 nodes, or it will loop forever!
+		if((nodes.size != nodesToBeRemoved.size).and(
+			nodesToBeRemoved.size > 1), {
+			this.createNewBlockAndOrderIt(nodesToBeRemoved)
+		}, {
+			nodesToBeRemoved.do({ | node |
 				this.removeNode(node)
 			});
 		});
@@ -511,11 +621,13 @@ AlgaBlock {
 		//Build new grups
 		this.buildGroups;
 
+		//Remove unvisited nodes.
+		//This must come before deleteOldGroups, as nodes will be moved
+		//back to top's ParGroup here.
+		this.removeUnvisitedNodes;
+
 		//Delete old groups (need to be locked due to fork)
 		this.deleteOldGroups(oldGroups);
-
-		//Remove unvisited nodes
-		this.removeUnvisitedNodes;
 	}
 
 	//Simply add orderedNodes to group
@@ -569,7 +681,7 @@ AlgaBlock {
 	//Find unused feedback loops related to node
 	findUnusedFeedbacks { | node |
 		disconnectVisitedNodes.add(node);
-		node.outNodes.keys.do({ | receiver |
+		node.activeOutNodes.keys.do({ | receiver |
 			var visited = disconnectVisitedNodes.includes(receiver);
 
 			//(node.asString ++ " >> " ++ receiver.asString).postln;
@@ -618,7 +730,9 @@ AlgaBlocksDict {
 	classvar <blocksDict;
 
 	*initClass {
+		var clearFunc = { AlgaBlocksDict.blocksDict.clear };
 		blocksDict = IdentityDictionary(20);
+		CmdPeriod.add(clearFunc);
 	}
 
 	*createNewBlockIfNeeded { | receiver, sender |

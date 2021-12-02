@@ -1,8 +1,8 @@
 (
 Alga.boot({
 	a = AN.debug({ DC.ar(\in.ar) }, name: \a);
-	b = AN.debug({ DC.ar(\in.ar) }, interpTime: 3, name: \b);
-	c = AN.debug({ DC.ar(\in.ar) }, interpTime: 5, name: \c);
+	b = AN.debug({ DC.ar(\in.ar) }, interpTime: 1, name: \b);
+	c = AN.debug({ DC.ar(\in.ar) }, interpTime: 2, name: \c);
 
 	a >> b;
 	b >> c;
@@ -18,13 +18,17 @@ b.disconnect;
 a >> c;
 )
 
+//Bug if ran again
+a >> c;
+
 //This can also be applied when 2 different blocks are involved
 (
 Alga.boot({
 	a = AN.debug({ DC.ar(\in.ar) }, name: \a);
-	b = AN.debug({ DC.ar(\in.ar) }, interpTime: 3, name: \b);
+	b = AN.debug({ DC.ar(\in.ar) }, interpTime: 1, name: \b);
 	c = AN.debug({ DC.ar(\in.ar) }, name: \c);
-	d = AN.debug({ DC.ar(\in.ar) }, interpTime: 5, name: \d);
+	d = AN.debug({ DC.ar(\in.ar) }, interpTime: 2, name: \d);
+	e = AN.debug({ DC.ar(\in.ar) }, name: \e);
 
 	//block 1
 	a >> b;
@@ -40,5 +44,31 @@ Alga.boot({
 // \b is actually still reading from \a being its input for 3 more seconds
 (
 b.disconnect;
+
 b >>+ d;
+
+//block 3 (try with fb too)
+a >> e;
+e >> a;
 )
+
+
+//BUG with activeInNodes
+(
+Alga.boot({
+	a = AN.debug({ DC.ar(\in.ar) }, name: \a);
+	e = AN.debug({ DC.ar(\in.ar) }, name: \e);
+
+	a >> e;
+	e >> a;
+})
+)
+
+a >> e;
+e >> a;
+
+a.disconnect
+
+//Inf loop
+e.disconnect
+
