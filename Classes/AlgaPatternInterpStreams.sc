@@ -198,7 +198,7 @@ AlgaPatternInterpStreams {
 	//as they are not embedded with the interpolation behaviour itself, but they are external.
 	//This allows to separate the per-tick pattern triggering from the interpolation process.
 	createPatternInterpSynthAndBusAtParam { | paramName, paramRate, paramNumChannels,
-		entry, uniqueID, time = 0 |
+		entry, entryOriginal, uniqueID, time = 0 |
 
 		var interpGroup = algaPattern.interpGroup;
 		var interpBus, interpSynth;
@@ -250,7 +250,7 @@ AlgaPatternInterpStreams {
 		//Also add a "onFree" routine that deletes unused entries from Dictionaries. This function
 		//is called on freeing the interpSynth.
 		//Note: no mixing yet
-		algaPattern.addActiveInterpSynthOnFree(paramName, \default, interpSynth, {
+		algaPattern.addActiveInterpSynthOnFree(paramName, entryOriginal, \default, interpSynth, {
 			var entriesAtParam              = entries[paramName];
 			var interpSynthsAtParam         = interpSynths[paramName];
 			var interpBussesAtParam         = interpBusses[paramName];
@@ -299,12 +299,14 @@ AlgaPatternInterpStreams {
 	//Wrapper around AlgaNode's addInOutNodesDict.
 	//If entry is a ListPattern, loop around it and add each entry that is an AlgaNode.
 	addInOutNodesDictAtParam { | sender, param, mix = false |
-		algaPattern.addInOutNodesDict(sender, param, mix)
+		algaPattern.addInOutNodesDict(sender, param, mix);
 	}
 
 	//Wrapper around AlgaNode's removeInOutNodesDict.
 	//If entry is a ListPattern, loop around it and remove each entry that is an AlgaNode.
-	removeAllInOutNodesDictAtParam { | paramName |
+	removeAllInOutNodesDictAtParam { | sender, paramName |
+		//This is then picked up in addInNode in AlgaPattern. This must come before removeInOutNodesDict
+		algaPattern.connectionAlreadyInPlace = algaPattern.checkConnectionAlreadyInPlace(sender);
 		algaPattern.removeInOutNodesDict(nil, paramName) //nil removes them all
 	}
 
@@ -380,7 +382,7 @@ AlgaPatternInterpStreams {
 		this.addSampleAndHold(paramName, sampleAndHold);
 
 		//Remove all older inNodes / outNodes... Doesn't work with mix yet
-		this.removeAllInOutNodesDictAtParam(paramName);
+		this.removeAllInOutNodesDictAtParam(entryOriginal, paramName);
 
 		//Add proper inNodes / outNodes / connectionTimeOutNodes. Use entryOriginal in order
 		//to retrieve if it is a ListPattern.
@@ -399,6 +401,7 @@ AlgaPatternInterpStreams {
 			paramRate: paramRate,
 			paramNumChannels: paramNumChannels,
 			entry: entry,
+			entryOriginal: entryOriginal,
 			uniqueID: uniqueID,
 			time: time
 		);
