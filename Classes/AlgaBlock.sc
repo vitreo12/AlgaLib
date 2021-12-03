@@ -243,6 +243,11 @@ AlgaBlock {
 
 		//this.debugFeedbacks;
 
+		//Find upper most nodes. This is done out of stage1 as it must always be executed,
+		//while stage1 might not be (sender == nil and receiver == nil). At the same time,
+		//this needs to happen before the other stages.
+		this.findUpperMostNodes;
+
 		//If upperMostNodes is 0, it's a full FB block. No need to run anything else.
 		ignoreStages = upperMostNodes.size == 0;
 		if(ignoreStages.not, {
@@ -283,7 +288,6 @@ AlgaBlock {
 	stage1 { | sender, receiver |
 		//Clear all needed stuff
 		visitedNodes.clear;
-		upperMostNodes.clear;
 
 		//Start to detect feedback from the receiver
 		this.detectFeedback(
@@ -294,9 +298,6 @@ AlgaBlock {
 
 		//Find unused feedback loops (from previous disconnections)
 		this.findAllUnusedFeedbacks;
-
-		//Find upper most nodes
-		this.findUpperMostNodes;
 	}
 
 	//Add FB pair
@@ -387,7 +388,6 @@ AlgaBlock {
 	//Create a new block
 	createNewBlock { | server |
 		var newBlock = AlgaBlock(Alga.parGroup(server));
-		newBlock.blockIndex.postln;
 		AlgaBlocksDict.blocksDict[newBlock.blockIndex] = newBlock;
 		^newBlock;
 	}
@@ -411,17 +411,21 @@ AlgaBlock {
 	//everytime a branch is computed from an upperMostNode, at least one of its visited nodes
 	//must be in another branch, meaning they're linked. If a branch does not
 	//have any node in common, it means it can be split into another block entirely.
+	/*
+	NOTE: this algorithm intentionally doesn't consider branches that are FB only, they're kept
+	in this AlgaBlock until FB is removed so their order is ALWAYS guaranteed!
+	*/
 	findBlocksToSplit { | visitedUpperMostNodes |
 		if(visitedUpperMostNodes.size > 1, {
-			visitedUpperMostNodes.do({ | entry1, i |
+			visitedUpperMostNodes.do({ | branch1, i |
 				//Only consider branches with more than one node
-				if(entry1.size > 1, {
+				if(branch1.size > 1, {
 					var containsAnyOtherNode = false;
 
 					block { | break |
-						visitedUpperMostNodes.do({ | entry2 |
-							if(entry1 != entry2, {
-								if(entry1.sect(entry2).size > 0, {
+						visitedUpperMostNodes.do({ | branch2 |
+							if(branch1 != branch2, {
+								if(branch1.sect(branch2).size > 0, {
 									containsAnyOtherNode = true;
 									break.value(nil);
 								});
@@ -431,7 +435,7 @@ AlgaBlock {
 
 					//Create new block and order it
 					if(containsAnyOtherNode.not, {
-						this.createNewBlockAndOrderIt(entry1);
+						this.createNewBlockAndOrderIt(branch1);
 					});
 				});
 			});
@@ -462,6 +466,7 @@ AlgaBlock {
 
 	//Find upper most nodes
 	findUpperMostNodes {
+		upperMostNodes.clear;
 		nodes.do({ | node |
 			if(node.activeInNodes.size == 0, {
 				upperMostNodes.add(node);
