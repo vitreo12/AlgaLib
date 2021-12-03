@@ -414,6 +414,8 @@ AlgaBlock {
 	/*
 	NOTE: this algorithm intentionally doesn't consider branches that are FB only, they're kept
 	in this AlgaBlock until FB is removed so their order is ALWAYS guaranteed!
+	In the future, these FB only branches could be detected and removed, but their new order
+	must also be guaranteed.
 	*/
 	findBlocksToSplit { | visitedUpperMostNodes |
 		if(visitedUpperMostNodes.size > 1, {
