@@ -17,17 +17,20 @@
 //Like AlgaDynamicEnvGate but with reset.
 AlgaDynamicEnvGateReset {
 	*ar { | t_reset, fadeTime, doneAction = 2 |
-		var selectReset;
+		var selectReset, real_t_reset;
 		var riseEnv, riseEndPoint, resetEnv, resetEnvCount, env;
 
 		//This retrieves \fadeTime from upper AlgaSynthDef
 		var realFadeTime = fadeTime ?? { NamedControl.kr(\fadeTime, 0) };
 
-		//This retrieves \t_reset from upper AlgaSynthDef
-		var real_t_reset = t_reset ?? { NamedControl.tr(\t_reset, 0) };
-
 		//1 / fadeTime. Sanitize is for fadeTime = 0
 		var invFadeTime = Select.kr(realFadeTime > 0, [0, realFadeTime.reciprocal]);
+
+		//This retrieves \t_reset from upper AlgaSynthDef
+		t_reset = t_reset ?? { NamedControl.tr(\t_reset, 0) };
+
+		//Ensure that t_release can only be triggered once
+		real_t_reset = Select.kr(PulseCount.kr(t_reset) <= 1, [0, t_reset]);
 
 		//Trick: if fadeTime is 0 or less, the increment will be BlockSize
 		//(which will make Sweep jump to 1 instantly)

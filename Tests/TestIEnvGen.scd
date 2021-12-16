@@ -1,14 +1,14 @@
 (
 s.waitForBoot({
 	SynthDef(\test, {
-		var dynamicEnvGateReset = AlgaDynamicEnvGateReset.ar(\t_release.tr(0), \ft.kr(1));
+		var dynamicEnvGateReset = AlgaDynamicEnvGateReset.ar(\t_release.tr, \ft.kr(1));
 		var phasor = dynamicEnvGateReset[0], endPoint = dynamicEnvGateReset[1];
 
 		var env = \env.kr(Env.newClear(128).algaAsArray);
-		var envGen = AlgaIEnvGen.ar(env, phasor * \envSum.kr(1), \t_release.tr);
+		var envGen = AlgaIEnvGen.ar(env, phasor * \envSum.kr(1), one_t_release);
 		var invEnvGen = (1 - envGen) * endPoint;
 
-		var finalEnv = Select.ar(ToggleFF.kr(\t_release.tr), [envGen, invEnvGen]);
+		var finalEnv = Select.ar(ToggleFF.kr(one_t_release), [envGen, invEnvGen]);
 
 		Out.ar(0, finalEnv)
 	}).add;
