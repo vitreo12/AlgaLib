@@ -1608,7 +1608,8 @@ AlgaNode {
 									\in, prevSender.synthBus.busArg,
 									\out, interpBus.index,
 									\indices, channelsMapping,
-									\fadeTime, 0
+									\fadeTime, 0,
+									\envShape, Env([0, 1], 1).algaConvertEnv
 								];
 
 								//Add scale array to args
@@ -1827,8 +1828,9 @@ AlgaNode {
 				interpSynthArgs = [
 					\in, paramDefault,
 					\out, interpBus.index,
+					\indices, channelsMapping,
 					\fadeTime, 0,
-					\indices, channelsMapping
+					\envShape, Env([0, 1], 1).algaConvertEnv
 				];
 
 				//add scaleArray to args
@@ -2281,7 +2283,8 @@ AlgaNode {
 				\in, sender.synthBus.busArg,
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
-				\fadeTime, time
+				\fadeTime, time,
+				\envShape, Env([0, 1], 1).algaConvertEnv
 			];
 
 			//calculate scale array (use sender)
@@ -2424,7 +2427,8 @@ AlgaNode {
 				\in, paramVal,
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
-				\fadeTime, time
+				\fadeTime, time,
+				\envShape, Env([0, 1], 1).algaConvertEnv
 			];
 
 			//calculate scale array
