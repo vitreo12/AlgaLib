@@ -46,6 +46,12 @@ AlgaNode {
 	//per-parameter connectionTime
 	var <paramsConnectionTime;
 
+	//The Env shape
+	var <interpShape;
+
+	//per-parameter interpShape
+	var <paramsInterpShapes;
+
 	//The max between longestConnectionTime and playTime
 	var <longestWaitTime = 0;
 
@@ -115,8 +121,8 @@ AlgaNode {
 	var <algaWasBeingCleared = false;
 	var <algaCleared = false;
 
-	*new { | def, args, interpTime, playTime, sched, outsMapping, server |
-		^super.new.init(def, args, interpTime, playTime, sched, outsMapping, server)
+	*new { | def, args, interpTime, interpShape, playTime, sched, outsMapping, server |
+		^super.new.init(def, args, interpTime, interpShape, playTime, sched, outsMapping, server)
 	}
 
 	initAllVariables { | argServer |
@@ -148,6 +154,9 @@ AlgaNode {
 
 		//param -> connectionTime
 		paramsConnectionTime = IdentityDictionary(10);
+
+		//param -> interpShape
+		paramsInterpShapes = IdentityDictionary(10);
 
 		//These are only one per param. All the mixing normalizers will be summed at the bus anyway.
 		//\param -> normBus
@@ -250,8 +259,8 @@ AlgaNode {
 		^func.value;
 	}
 
-	init { | argDef, argArgs, argConnectionTime = 0, argPlayTime = 0,
-		argSched = 0, argOutsMapping, argServer |
+	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
+		argPlayTime = 0, argSched = 0, argOutsMapping, argServer |
 
 		//Check supported classes for argObj, so that things won't even init if wrong.
 		//Also check for AlgaPattern
@@ -279,6 +288,10 @@ AlgaNode {
 		//starting connectionTime (using the setter so it also sets longestConnectionTime)
 		this.connectionTime_(argConnectionTime, all:true);
 		this.playTime_(argPlayTime);
+
+		//Set env shape
+		interpShape = Env([0, 1], 1); //default
+		this.interpShape_(argInterpShape, all:true);
 
 		//If AlgaPattern, parse the def and then dispatch accordingly (waiting for server if needed)
 		if(this.isAlgaPattern, {
@@ -409,6 +422,68 @@ AlgaNode {
 				});
 			});
 		});
+	}
+
+	//Set interp shape
+	interpShape_ { | value, param, all = false |
+		var validEnv = this.checkValidEnv(value);
+		if(validEnv, {
+			if(all, {
+				paramsInterpShapes.keysValuesChange({ value });
+			}, {
+				if(param != nil, {
+					var paramInterpShape = paramsInterpShapes[param];
+					if(paramInterpShape != nil, {
+						paramsInterpShapes[param] = value;
+					}, {
+						("AlgaNode: invalid param to set interpShape for: '" ++ param ++ "'").error;
+					});
+				}, {
+					paramsInterpShapes.keysValuesChange({ | param, paramInterpShape |
+						if(paramInterpShape == interpShape, { value }, { paramInterpShape });
+					});
+				});
+			});
+		});
+	}
+
+	//Check env
+	checkValidEnv { | value |
+		var levels;
+
+		if(value == nil, { ^false });
+
+		if(value.isKindOf(Env).not, {
+			("AlgaNode: invalid interpShape: " ++ value.class).error;
+			^false
+		});
+
+		levels = value.levels;
+		if(levels.size > AlgaStartup.maxEnvPoints, {
+			("AlgaNode: interpShape's Env can only have up to " ++ AlgaStartup.maxEnvPoints ++ " points.").error;
+			^false
+		});
+		if(levels.first != 0, {
+			("AlgaNode: interpShape's Env must always start from 0").error;
+			^false
+		});
+		if(levels.last != 1, {
+			("AlgaNode: interpShape's Env must always end at 1").error;
+			^false
+		});
+		levels.do({ | level |
+			if(((level >= 0.0).and(level <= 1.0)).not, {
+				("AlgaNode: interpShape's Env can only contain values between 0 and 1").error;
+				^false
+			});
+		});
+	}
+
+	//get interp shape at param
+	getInterpShape { | param |
+		var interpShapeAtParam = paramsInterpShapes[param];
+		if(interpShapeAtParam != nil, { ^interpShapeAtParam });
+		^(interpShape ? Env([0, 1], 1));
 	}
 
 	//connectionTime / ct / interpolationTime / it
@@ -1484,10 +1559,13 @@ AlgaNode {
 		this.removeActiveInterpSynthOnFree(param, sender, interpSynth, action);
 	}
 
-	//Set proper fadeTime for all active interpSynths on param / sender combination
-	setFadeTimeForAllActiveInterpSynths { | param, sender, time |
+	//Set proper fadeTime / shape for all active interpSynths on param / sender combination
+	setFadeTimeForAllActiveInterpSynths { | param, sender, time, shape |
 		activeInterpSynths[param][sender].do({ | activeInterpSynth |
-			activeInterpSynth.set(\fadeTime, time);
+			activeInterpSynth.set(
+				\fadeTime, time,
+				\shape, shape
+			);
 		});
 	}
 
@@ -1609,7 +1687,7 @@ AlgaNode {
 									\out, interpBus.index,
 									\indices, channelsMapping,
 									\fadeTime, 0,
-									\envShape, Env([0, 1], 1).algaConvertEnv
+									\envShape, interpShape.algaConvertEnv
 								];
 
 								//Add scale array to args
@@ -1830,7 +1908,7 @@ AlgaNode {
 					\out, interpBus.index,
 					\indices, channelsMapping,
 					\fadeTime, 0,
-					\envShape, Env([0, 1], 1).algaConvertEnv
+					\envShape, interpShape.algaConvertEnv
 				];
 
 				//add scaleArray to args
@@ -2284,7 +2362,7 @@ AlgaNode {
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
 				\fadeTime, time,
-				\envShape, Env([0, 1], 1).algaConvertEnv
+				\envShape, interpShape.algaConvertEnv
 			];
 
 			//calculate scale array (use sender)
@@ -2428,7 +2506,7 @@ AlgaNode {
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
 				\fadeTime, time,
-				\envShape, Env([0, 1], 1).algaConvertEnv
+				\envShape, interpShape.algaConvertEnv
 			];
 
 			//calculate scale array
@@ -2691,13 +2769,20 @@ AlgaNode {
 				//calculate temporary time
 				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
+				//get shape
+				shape = shape ? this.getInterpShape(param);
+
 				//Start the free on the previous individual interp synth (size is ALWAYS 1 here)
 				interpSynthsAtParam.do({ | interpSynthAtParam |
-					interpSynthAtParam.set(\t_release, 1, \fadeTime, time);
+					interpSynthAtParam.set(
+						\t_release, 1,
+						\fadeTime, time,
+						\shape, shape
+					);
 				});
 
 				//Set correct fadeTime for all active interp synths at param / sender combination
-				this.setFadeTimeForAllActiveInterpSynths(param, \default, time);
+				this.setFadeTimeForAllActiveInterpSynths(param, \default, time, shape:shape);
 			});
 		}, {
 			//mix == true
@@ -2840,7 +2925,7 @@ AlgaNode {
 
 	//New interp connection at specific parameter
 	newInterpConnectionAtParam { | sender, param = \in, replace = false,
-		senderChansMapping, scale, time |
+		senderChansMapping, scale, time, shape |
 
 		var controlName = controlNames[param];
 		if(controlName == nil, {
@@ -2863,11 +2948,11 @@ AlgaNode {
 		});
 
 		//Free previous interp synth(s) (fades out)
-		this.freeInterpSynthAtParam(sender, param, time:time);
+		this.freeInterpSynthAtParam(sender, param, time:time, shape:shape);
 
 		//Spawn new interp synth (fades in)
 		this.createInterpSynthAtParam(sender, param,
-			senderChansMapping:senderChansMapping, scale:scale, time:time
+			senderChansMapping:senderChansMapping, scale:scale, time:time, shape:shape
 		);
 	}
 
@@ -2976,7 +3061,7 @@ AlgaNode {
 
 	//implements receiver <<.param sender
 	makeConnectionInner { | sender, param = \in, replace = false, mix = false,
-		replaceMix = false, senderChansMapping, scale, time |
+		replaceMix = false, senderChansMapping, scale, time, shape |
 
 		if((sender.isAlgaNode.not).and(sender.isNumberOrArray.not).and(sender.isAlgaTemp.not).and(sender.isAlgaArg.not), {
 			"AlgaNode: can't connect to something that's not an AlgaNode, a Symbol, an AlgaTemp, an AlgaArg, a Function, a Number or an Array".error;
@@ -3030,7 +3115,7 @@ AlgaNode {
 				sender: sender, param: param,
 				replace:replace, replaceMix:replaceMix,
 				senderChansMapping:senderChansMapping,
-				scale:scale, time:time
+				scale:scale, time:time, shape:shape
 			)
 		}, {
 			//mix == false, clean everything up
@@ -3039,7 +3124,7 @@ AlgaNode {
 			this.newInterpConnectionAtParam(
 				sender: sender, param: param,
 				replace:replace, senderChansMapping:senderChansMapping,
-				scale:scale, time:time
+				scale:scale, time:time, shape:shape
 			);
 
 			//Cleanup interpBusses / interpSynths / normSynths from previous mix, leaving \default only
@@ -3049,7 +3134,7 @@ AlgaNode {
 
 	//<<.param sender
 	makeConnection { | sender, param = \in, replace = false, mix = false,
-		replaceMix = false, senderChansMapping, scale, time, sched = 0 |
+		replaceMix = false, senderChansMapping, scale, time, shape, sched = 0 |
 
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			scheduler.addAction(
@@ -3058,7 +3143,7 @@ AlgaNode {
 				},
 				func: {
 					this.makeConnectionInner(sender, param, replace, mix,
-						replaceMix, senderChansMapping, scale, time:time
+						replaceMix, senderChansMapping, scale, time:time, shape:shape
 					)
 				},
 				sched: sched
@@ -3069,7 +3154,7 @@ AlgaNode {
 
 	//<<.param { }
 	makeConnectionFunction { | sender, param = \in, replace = false,
-		senderChansMapping, scale, time, sched = 0 |
+		senderChansMapping, scale, time, shape, sched = 0 |
 
 		var defName = ("alga_" ++ UniqueID.next).asSymbol;
 		var algaTemp = AlgaTemp(defName);
@@ -3091,6 +3176,7 @@ AlgaNode {
 						senderChansMapping: senderChansMapping,
 						scale: scale,
 						time: time,
+						shape:shape,
 						sched: sched
 					)
 				}, {
@@ -3103,7 +3189,7 @@ AlgaNode {
 
 	//<<.param \someDef
 	makeConnectionSymbol { | sender, param = \in, replace = false,
-		senderChansMapping, scale, time, sched = 0 |
+		senderChansMapping, scale, time, shape, sched = 0 |
 
 		var algaTemp = AlgaTemp(sender);
 		algaTemp.checkValidSynthDef(sender);
@@ -3120,6 +3206,7 @@ AlgaNode {
 			senderChansMapping: senderChansMapping,
 			scale: scale,
 			time: time,
+			shape:shape,
 			sched: sched
 		)
 	}
@@ -3245,7 +3332,7 @@ AlgaNode {
 
 	//<<.param AlgaTemp
 	makeConnectionAlgaTemp { | sender, param = \in, replace = false,
-		senderChansMapping, scale, time, sched = 0 |
+		senderChansMapping, scale, time, shape, sched = 0 |
 
 		var functionSynthDefDict = IdentityDictionary();
 		var algaTemp = this.parseAlgaTempParam(sender, functionSynthDefDict);
@@ -3262,6 +3349,7 @@ AlgaNode {
 						senderChansMapping: senderChansMapping,
 						scale: scale,
 						time: time,
+						shape:shape,
 						sched: sched
 					)
 				}, {
@@ -3273,7 +3361,7 @@ AlgaNode {
 	}
 
 	//Receive a connection
-	from { | sender, param = \in, chans, scale, time, sched |
+	from { | sender, param = \in, chans, scale, time, shape, sched |
 		case
 		{ sender.isAlgaNode } {
 			if(this.server != sender.server, {
@@ -3281,7 +3369,7 @@ AlgaNode {
 				^this;
 			});
 			^this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
+				scale:scale, time:time, shape:shape, sched:sched
 			);
 		}
 		{ sender.isAlgaArg } {
@@ -3290,22 +3378,22 @@ AlgaNode {
 		}
 		{ sender.isNumberOrArray } {
 			^this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
+				scale:scale, time:time, shape:shape, sched:sched
 			);
 		}
 		{ sender.isFunction } {
 			^this.makeConnectionFunction(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
+				scale:scale, time:time, shape:shape, sched:sched
 			);
 		}
 		{ sender.isSymbol } {
 			^this.makeConnectionSymbol(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
+				scale:scale, time:time, shape:shape, sched:sched
 			);
 		}
 		{ sender.isAlgaTemp } {
 			^this.makeConnectionAlgaTemp(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, sched:sched
+				scale:scale, time:time, shape:shape, sched:sched
 			);
 		}
 		{ sender.isBuffer } {

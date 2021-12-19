@@ -25,6 +25,7 @@ beginning of the audio block!
 */
 AlgaStartup {
 	classvar <algaMaxIO = 8;
+	classvar <maxEnvPoints = 128;
 
 	classvar <algaSynthDefPath;
 	classvar <algaSynthDefIOPath;
@@ -279,7 +280,7 @@ Limiter.ar(input) * AlgaEnvGate.kr
 							in = "\\in.ar(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicIEnvGen.ar(\\envShape.kr(Env.newClear(128).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));";
+							env = "AlgaDynamicIEnvGen.ar(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));";
 							env_pattern = env_pattern_ar;
 							sampleAndHold = sampleAndHold_ar;
 						});
@@ -290,7 +291,7 @@ Limiter.ar(input) * AlgaEnvGate.kr
 							in = "\\in.kr(" ++ arrayOfZeros_in ++ ");";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicIEnvGen.kr(\\envShape.kr(Env.newClear(128).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));";
+							env = "AlgaDynamicIEnvGen.kr(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));";
 							env_pattern = env_pattern_kr;
 							sampleAndHold = sampleAndHold_kr;
 						});
@@ -301,7 +302,7 @@ Limiter.ar(input) * AlgaEnvGate.kr
 							in = "A2K.kr(\\in.ar(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_kr;
 							scaling = "Select.kr(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicIEnvGen.kr(\\envShape.kr(Env.newClear(128).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));";
+							env = "AlgaDynamicIEnvGen.kr(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));";
 							env_pattern = env_pattern_kr;
 							sampleAndHold = sampleAndHold_kr;
 						});
@@ -312,7 +313,7 @@ Limiter.ar(input) * AlgaEnvGate.kr
 							in = "K2A.ar(\\in.kr(" ++ arrayOfZeros_in ++ "));";
 							indices = indices_ar;
 							scaling = "Select.ar(\\useScaling.ir(0), [out, outScale]);";
-							env = "AlgaDynamicIEnvGen.ar(\\envShape.kr(Env.newClear(128).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));";
+							env = "AlgaDynamicIEnvGen.ar(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));";
 							env_pattern = env_pattern_ar;
 							sampleAndHold = sampleAndHold_ar;
 						});
@@ -543,7 +544,7 @@ val;
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);";
 
 			fade_patternOutEnv_kr = "AlgaSynthDef.new_inner_inner(\\alga_patternOutEnv_control" ++ i.asString ++ ", {
-var env = AlgaDynamicIEnvGen.kr(\\envShape.kr(Env.newClear(128).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));
+var env = AlgaDynamicIEnvGen.kr(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));
 var val = Array.newClear(" ++ (i + 1) ++ ");
 Out.kr(\\env_out.ir(0), env);
 " ++ i ++ ".do({ | i |
@@ -554,7 +555,7 @@ val;
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false, ignoreOutWarning:true).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);";
 
 			fade_patternOutEnv_ar = "AlgaSynthDef.new_inner_inner(\\alga_patternOutEnv_audio" ++ i.asString ++ ", {
-var env = AlgaDynamicIEnvGen.ar(\\envShape.kr(Env.newClear(128).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));
+var env = AlgaDynamicIEnvGen.ar(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));
 var val = Array.newClear(" ++ (i + 1) ++ ");
 var zero = DC.ar(0);
 Out.ar(\\env_out.ir(0), env);
@@ -582,11 +583,11 @@ val[" ++ i ++ "] = env;
 
 		result = "
 AlgaSynthDef.new_inner(\\alga_pattern_interp_env_audio, {
-AlgaDynamicIEnvGen.ar(\\envShape.kr(Env.newClear(128).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));
+AlgaDynamicIEnvGen.ar(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);
 
 AlgaSynthDef.new_inner(\\alga_pattern_interp_env_control, {
-AlgaDynamicIEnvGen.kr(\\envShape.kr(Env.newClear(128).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));
+AlgaDynamicIEnvGen.kr(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0));
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);
 ";
 		result.interpret;
