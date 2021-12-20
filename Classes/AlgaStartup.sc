@@ -505,41 +505,41 @@ out;
 
 			i = i + 1;
 
-			fadein_kr = "AlgaSynthDef.new_inner(\\alga_fadeIn_control" ++ i.asString ++ ", { | curve = \\lin |
+			fadein_kr = "AlgaSynthDef.new_inner(\\alga_fadeIn_control" ++ i.asString ++ ", {
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = 0;
 });
-val[" ++ i ++ "] = EnvGen.kr(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
+val[" ++ i ++ "] = AlgaDynamicIEnvGen.kr(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0), isFadeIn:1);
 val;
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);";
 
-			fadein_ar = "AlgaSynthDef.new_inner(\\alga_fadeIn_audio" ++ i.asString ++ ", { | curve = \\sin |
+			fadein_ar = "AlgaSynthDef.new_inner(\\alga_fadeIn_audio" ++ i.asString ++ ", {
 var val = Array.newClear(" ++ (i + 1) ++ ");
 var zero = DC.ar(0);
 " ++ i ++ ".do({ | i |
 val[i] = zero;
 });
-val[" ++ i ++ "] = EnvGen.ar(Env([1, 0], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
+val[" ++ i ++ "] = AlgaDynamicIEnvGen.ar(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0), isFadeIn:1);
 val;
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);";
 
-			fadeout_kr = "AlgaSynthDef.new_inner(\\alga_fadeOut_control" ++ i.asString ++ ", { | curve = \\lin |
+			fadeout_kr = "AlgaSynthDef.new_inner(\\alga_fadeOut_control" ++ i.asString ++ ", {
 var val = Array.newClear(" ++ (i + 1) ++ ");
 " ++ i ++ ".do({ | i |
 val[i] = 0;
 });
-val[" ++ i ++ "] = EnvGen.kr(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
+val[" ++ i ++ "] = AlgaDynamicIEnvGen.kr(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0), isFadeOut:1);
 val;
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);";
 
-			fadeout_ar = "AlgaSynthDef.new_inner(\\alga_fadeOut_audio" ++ i.asString ++ ", { | curve = \\sin |
+			fadeout_ar = "AlgaSynthDef.new_inner(\\alga_fadeOut_audio" ++ i.asString ++ ", {
 var val = Array.newClear(" ++ (i + 1) ++ ");
 var zero = DC.ar(0);
 " ++ i ++ ".do({ | i |
 val[i] = zero;
 });
-val[" ++ i ++ "] = EnvGen.ar(Env([0, 1], #[1], curve), \\gate.kr(1), 1.0, 0.0, \\fadeTime.kr(0), Done.freeSelf);
+val[" ++ i ++ "] = AlgaDynamicIEnvGen.ar(\\envShape.kr(Env.newClear(AlgaStartup.maxEnvPoints).algaAsArray), \\fadeTime.kr(0), \\t_release.tr(0), isFadeOut:1);
 val;
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);";
 

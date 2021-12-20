@@ -19,7 +19,7 @@ s.waitForBoot({
 //AR
 (
 ~env1 = Env([0, 1, 0, 1, 0, 1], [1, 2, 0.5, 1, 0.25]);
-a = Synth(\test_ar, [\env, ~env1.algaConvertEnv, \ft, 0])
+a = Synth(\test_ar, [\env, ~env1.algaConvertEnv, \ft, 1])
 )
 
 (

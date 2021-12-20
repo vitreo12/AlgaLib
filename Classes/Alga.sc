@@ -176,7 +176,7 @@ Alga {
 		if(algaServerOptions.supernova, { Server.supernova }, { Server.scsynth });
 		server.options.threads = algaServerOptions.supernovaThreads;
 		server.options.useSystemClock = algaServerOptions.supernovaUseSystemClock;
-		server.options.protocol = algaServerOptions.protocol ? \tcp;
+		server.options.protocol = \tcp; //Always \tcp!
 		server.latency = algaServerOptions.latency;
 
 		//Check AlgaSynthDef/IO folder exists...
