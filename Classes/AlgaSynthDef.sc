@@ -217,7 +217,7 @@ AlgaSynthDef : SynthDef {
 			};
 
 			//Only makeFadeEnv if the Synth can't free itself
-			canFree = UGen.buildSynthDef.children.canFreeSynth;
+			canFree = UGen.buildSynthDef.children.algaCanFreeSynth;
 			makeFadeEnv = makeFadeEnv and: { (isScalar || canFree).not };
 
 			//the AlgaEnvGate will take care of freeing the synth, even if not used to multiply
