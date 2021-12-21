@@ -3930,8 +3930,8 @@ AlgaNode {
 	}
 
 	//alias for disconnect: remove a mix entry
-	removeMix { | param = \in, oldSender, time, sched |
-		this.disconnect(param, oldSender, time, sched);
+	removeMix { | param = \in, oldSender, time, shape, sched |
+		this.disconnect(param, oldSender, time, shape, sched);
 	}
 
 	//Find out if specific param / sender combination is in the mix
