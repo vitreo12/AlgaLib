@@ -95,7 +95,7 @@ AlgaPatternInterpStreams {
 
 	//Free all active interpSynths. This triggers the onFree action that's executed in
 	//addActiveInterpSynthOnFree
-	freeActiveInterpSynthsAtParam { | paramName, time = 0 |
+	freeActiveInterpSynthsAtParam { | paramName, time = 0, shape |
 		var interpSynthsAtParam = interpSynths[paramName];
 		if(interpSynthsAtParam != nil, {
 			interpSynthsAtParam.keysValuesDo({ | uniqueID, interpSynth |
@@ -107,6 +107,7 @@ AlgaPatternInterpStreams {
 				interpSynth.set(
 					\t_release, 1,
 					\fadeTime, time,
+					\envShape, shape.algaConvertEnv
 				);
 			});
 		});
@@ -182,7 +183,10 @@ AlgaPatternInterpStreams {
 									algaPattern.currentActivePatternParamSynths[patternInterpBusAtParam];
 									if(currentActivePatternSynthsAtInterpBus != nil, {
 										currentActivePatternSynthsAtInterpBus.do({ | patternParamSynth |
-											patternParamSynth.set(\sampleAndHold, 1, \t_sah, 1);
+											patternParamSynth.set(
+												\sampleAndHold, 1,
+												\t_sah, 1
+											);
 										});
 									});
 								});
@@ -198,7 +202,7 @@ AlgaPatternInterpStreams {
 	//as they are not embedded with the interpolation behaviour itself, but they are external.
 	//This allows to separate the per-tick pattern triggering from the interpolation process.
 	createPatternInterpSynthAndBusAtParam { | paramName, paramRate, paramNumChannels,
-		entry, uniqueID, time = 0 |
+		entry, uniqueID, time = 0, shape |
 
 		var interpGroup = algaPattern.interpGroup;
 		var interpBus, interpSynth;
@@ -221,20 +225,28 @@ AlgaPatternInterpStreams {
 		//However, pattern synths are created on the fly, so the interpSynths need to be kept alive until
 		//interpolation has finished. In a nutshell, patternSynths and interpSynths are decoupled.
 		if(interpSynthsAtParam == nil, {
-			//If it's the first synth, fadeTime is 0.
+			//If it's the first synth, fadeTime is 0 and envShape is default
 			//This only happens when first creating the AlgaPattern!
 			interpSynth = AlgaSynth(
 				interpSymbol,
-				[\out, interpBus.index, \fadeTime, 0],
+				[
+					\out, interpBus.index,
+					\fadeTime, 0,
+					\envShape, Env([0, 1], 1)
+				],
 				interpGroup
 			);
 			interpSynths[paramName] = IdentityDictionary().put(uniqueID, interpSynth);
 			interpBusses[paramName] = IdentityDictionary().put(uniqueID, interpBus);
 		}, {
-			//If it's not the first synth, fadeTime is time
+			//If it's not the first synth, fadeTime is time and envShape is shape
 			interpSynth = AlgaSynth(
 				interpSymbol,
-				[\out, interpBus.index, \fadeTime, time],
+				[
+					\out, interpBus.index,
+					\fadeTime, time,
+					\envShape, shape.algaConvertEnv
+				],
 				interpGroup
 			);
 			interpSynths[paramName].put(uniqueID, interpSynth);
@@ -343,7 +355,7 @@ AlgaPatternInterpStreams {
 	}
 
 	//Add a new sender interpolation to the current param
-	add { | entry, controlName, chans, scale, sampleAndHold, time = 0 |
+	add { | entry, controlName, chans, scale, sampleAndHold, time = 0, shape |
 		var paramName, paramRate, paramNumChannels, paramDefault;
 		var uniqueID;
 
@@ -386,11 +398,15 @@ AlgaPatternInterpStreams {
 		//to retrieve if it is a ListPattern.
 		this.addInOutNodesDictAtParam(entryOriginal, paramName, false);
 
+		//Get shape
+		shape = algaPattern.checkValidEnv(shape) ? algaPattern.getInterpShape(paramName);
+
 		//Trigger the interpolation process on all the other active interpSynths.
 		//This must always be before createPatternInterpSynthAndBusAtParam
 		this.freeActiveInterpSynthsAtParam(
-			paramName,
-			time
+			paramName: paramName,
+			time: time,
+			shape: shape
 		);
 
 		//Create the interpSynth and interpBus for the new sender
@@ -400,7 +416,8 @@ AlgaPatternInterpStreams {
 			paramNumChannels: paramNumChannels,
 			entry: entry,
 			uniqueID: uniqueID,
-			time: time
+			time: time,
+			shape: shape
 		);
 
 		//Create a temporary pattern param synth to start the interpolation process with.
