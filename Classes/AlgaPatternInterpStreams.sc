@@ -232,7 +232,7 @@ AlgaPatternInterpStreams {
 				[
 					\out, interpBus.index,
 					\fadeTime, 0,
-					\envShape, Env([0, 1], 1)
+					\envShape, Env([0, 1], 1).algaConvertEnv
 				],
 				interpGroup
 			);

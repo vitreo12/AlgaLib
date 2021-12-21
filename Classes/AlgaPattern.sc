@@ -2492,7 +2492,8 @@ AlgaPattern : AlgaNode {
 						senderChansMapping: senderChansMapping,
 						scale: scale,
 						sampleAndHold: sampleAndHold,
-						time: time
+						time: time,
+						shape: shape
 					)
 				},
 				sched: sched,
@@ -2540,7 +2541,7 @@ AlgaPattern : AlgaNode {
 		if((sender.isPattern).or(sender.isAlgaArg).or(sender.isAlgaTemp), {
 			^this.makeConnection(
 				sender: sender, param: param, senderChansMapping: chans,
-				scale: scale, sampleAndHold: sampleAndHold, time: time, sched: sched
+				scale: scale, sampleAndHold: sampleAndHold, time: time, shape:shape, sched: sched
 			);
 		});
 
@@ -2552,7 +2553,7 @@ AlgaPattern : AlgaNode {
 			});
 			this.makeConnection(
 				sender: sender, param: param, senderChansMapping: chans,
-				scale: scale, time: time, shape:shape,sampleAndHold: sampleAndHold, sched: sched
+				scale: scale, time: time, shape:shape, sampleAndHold: sampleAndHold, sched: sched
 			);
 		}, {
 			//sender == symbol is used for \def
