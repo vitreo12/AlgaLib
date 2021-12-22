@@ -18,15 +18,15 @@ To install *AlgaLib*, you can either:
 
 2. `git clone` this repository to your `Platform.userExtensionDir`.
 
-### AlgaAudioControl
+### AlgaUGens
 
-This *UGen* fixes some synchronization issues that may result in audio glitches for short enveloped
-sounds. After installing it, no further action is required: *Alga* will detect it and use it
-internally. To install the `AlgaAudioControl` *UGen* follow these simple instructions:
+For *AlgaLib* to work correctly, a set of specific `UGens` must be installed. To install them, 
+follow these simple instructions:
 
-1. Download it from https://github.com/vitreo12/AlgaAudioControl/releases/tag/v1.0.0
+1. Download the correct version for your OS from 
+https://github.com/vitreo12/AlgaUGens/releases/tag/v1.0.0
 
-2. Unzip it to your *SuperCollider*'s `Platform.userExtensionDir`. 
+2. Unzip the file to your *SuperCollider*'s `Platform.userExtensionDir`. 
 
 ## Examples
 
