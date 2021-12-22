@@ -137,20 +137,25 @@ Alga {
 		^parGroups[server]
 	}
 
-	*checkAlgaAudioControl {
-		if(\AlgaAudioControl.asClass == nil, {
+	*checkAlgaUGens {
+		if((\AlgaDynamicIEnvGen.asClass == nil).or(\AlgaAudioControl.asClass == nil), {
 			"\n************************************************\n".postln;
-			"AlgaAugioControl is not installed. Read the following instructions to install it:".warn;
-			"\n1) Download the AlgaAudioControl UGen from https://github.com/vitreo12/AlgaAudioControl/releases/tag/v1.0.0".postln;
-			"2) Unzip it to your 'Platform.userExtensionDir'".postln;
-			"\nThis UGen fixes some synchronization issues that may result in audio glitches for short enveloped sounds.\nAfter installing it, no further action is required: Alga will detect it and use it internally, and this message will not be shown again.\n".postln;
+			"The AlgaUGens plugin extension is not installed. Read the following instructions to install it:".warn;
+			"\n1) Download the AlgaUGens plugin extension from https://github.com/vitreo12/AlgaUGens/releases/tag/v1.0.0".postln;
+			"2) Unzip the file to your 'Platform.userExtensionDir'".postln;
+			"\nAfter the installation, no further action is required: Alga will detect the UGens, use them internally and this message will not be shown again.\n".postln;
 			"************************************************\n".postln;
+			^false;
 		});
+		^true;
 	}
 
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
 		var envAlgaServerOptions = topEnvironment[\algaServerOptions];
+
+		//Check AlgaUGens
+		if(this.checkAlgaUGens.not, { ^this });
 
 		server = server ? Server.default;
 		algaServerOptions = algaServerOptions ? envAlgaServerOptions;
@@ -220,9 +225,6 @@ Alga {
 
 				//Execute onBoot function
 				onBoot.value;
-
-				//Check AlgaAudioControl so that it's printed after boot
-				this.checkAlgaAudioControl;
 			});
 		});
 	}
