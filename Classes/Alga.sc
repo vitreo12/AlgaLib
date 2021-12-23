@@ -15,6 +15,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 Alga {
+	classvar <debug = false;
+
 	classvar <schedulers;
 	classvar <servers;
 	classvar <clocks;
@@ -38,6 +40,12 @@ Alga {
 
 		//Make sure to reset it
 		"SC_SYNTHDEF_PATH".unsetenv;
+	}
+
+	*debug_ { | value |
+		if(value.isKindOf(Boolean), {
+			debug = value
+		});
 	}
 
 	*maxIO {

@@ -231,8 +231,6 @@ AlgaBlock {
 		var server, supernova;
 		var ignoreStages;
 
-		(sender.asString ++ " >> " ++ receiver.asString).postln;
-
 		//Update lastSender
 		lastSender = sender ? lastSender;
 
@@ -240,8 +238,6 @@ AlgaBlock {
 		if((sender != nil).and(receiver != nil), {
 			this.stage1(sender, receiver);
 		});
-
-		//this.debugFeedbacks;
 
 		//Find upper most nodes. This is done out of stage1 as it must always be executed,
 		//while stage1 might not be (sender == nil and receiver == nil). At the same time,
@@ -254,8 +250,6 @@ AlgaBlock {
 			//Stage 2: order nodes according to I/O
 			this.stage2;
 
-			this.debugOrderedNodes;
-
 			//Check lastSender's server (it's been updated if sender != nil in stage1)
 			server = if(lastSender != nil, { lastSender.server }, { Server.default });
 
@@ -263,21 +257,18 @@ AlgaBlock {
 			supernova = Alga.supernova(server);
 
 			//Stages 3-4
-			//if(supernova, {
-			//Stage 3: optimize the ordered nodes (make groups)
-			this.stage3;
+			if(supernova, {
+				//Stage 3: optimize the ordered nodes (make groups)
+				this.stage3;
 
-			this.debugGroupedOrderedNodes;
-
-			//Build ParGroups / Groups out of the optimized ordered nodes
-			this.stage4_supernova;
-			/*}, {
-			//Simply add orderedNods to group. No stage3 (no need to parallelize order)
-			this.stage4_scsynth;
-			});*/
+				//Build ParGroups / Groups out of the optimized ordered nodes
+				this.stage4_supernova;
+			}, {
+				//No stage3 (no need to parallelize order):
+				//simply add orderedNods to group
+				this.stage4_scsynth;
+			});
 		});
-
-		"".postln;
 	}
 
 	/***********/
@@ -298,6 +289,9 @@ AlgaBlock {
 
 		//Find unused feedback loops (from previous disconnections)
 		this.findAllUnusedFeedbacks;
+
+		//Debug
+		if(Alga.debug, { this.debugFeedbacks });
 	}
 
 	//Add FB pair
@@ -383,6 +377,9 @@ AlgaBlock {
 
 		//Find blocks that should be separated
 		this.findBlocksToSplit(visitedUpperMostNodes);
+
+		//Debug
+		if(Alga.debug, { this.debugOrderedNodes });
 	}
 
 	//Create a new block
@@ -547,6 +544,9 @@ AlgaBlock {
 
 		//Run optimizer
 		this.optimizeOrderedNodes;
+
+		//Debug
+		if(Alga.debug, { this.debugGroupedOrderedNodes });
 	}
 
 	//Check if groupSet includes a sender of node
