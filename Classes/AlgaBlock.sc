@@ -167,7 +167,10 @@ AlgaBlock {
 			^nil;
 		});
 
-		("Removing node: " ++ node.asString ++ " from block: " ++ blockIndex).error;
+		//Debug
+		if(Alga.debug, {
+			("Removing node: " ++ node.asString ++ " from block: " ++ blockIndex).warn
+		});
 
 		//Remove from dict
 		nodes.remove(node);
@@ -691,7 +694,8 @@ AlgaBlock {
 		//Stage 1: free unused FB connections
 		this.stage1_disconnect(node);
 
-		this.debugFeedbacks;
+		//Debug
+		if(Alga.debug, { this.debugFeedbacks });
 	}
 
 	/***********/
@@ -712,8 +716,6 @@ AlgaBlock {
 		disconnectVisitedNodes.add(node);
 		node.activeOutNodes.keys.do({ | receiver |
 			var visited = disconnectVisitedNodes.includes(receiver);
-
-			//(node.asString ++ " >> " ++ receiver.asString).postln;
 
 			//Found a FB connection
 			if(this.isFeedback(node, receiver), {
@@ -770,7 +772,7 @@ AlgaBlocksDict {
 
 		//Can't connect nodes from two different servers together
 		if(receiver.server != sender.server, {
-			//("AlgaBlocksDict: Trying to create a block between two AlgaNodes on different servers").error;
+			("AlgaBlocksDict: Trying to create a block between two AlgaNodes on different servers").error;
 			^receiver;
 		});
 

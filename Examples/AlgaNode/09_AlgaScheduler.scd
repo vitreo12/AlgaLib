@@ -11,4 +11,3 @@ Alga.boot({
 a = AlgaNode(\bypass).play(chans:2);
 100.do { |i| b = AlgaNode(\sine_const); a.mixFrom(b, time:1); };
 )
-

@@ -640,12 +640,12 @@ AlgaNode {
 			group = nil;
 			synthGroup = nil;
 			normGroup = nil;
+			tempGroup = nil;
 			interpGroup = nil;
 			if(this.isAlgaPattern, {
 				this.fxGroup = nil;
 				this.fxConvGroup = nil;
 				this.synthConvGroup = nil;
-				this.tempGroup = nil;
 			});
 		});
 	}
@@ -4280,14 +4280,8 @@ AlgaNode {
 
 	//asString: use name or group's ID
 	asString {
-		var nameOrGroup;
-		var groupIndex;
-		if(group != nil, { groupIndex = group.nodeID.asString });
-		nameOrGroup = name.asString ? groupIndex;
-		if(nameOrGroup == nil, {
-			^(this.class.asString);
-		});
-		^(this.class.asString ++ "(" ++ nameOrGroup ++ ")");
+		if(name == nil, { ^(this.class.asString) });
+		^(this.class.asString ++ "(" ++ name.asString ++ ")");
 	}
 }
 
