@@ -272,6 +272,9 @@ AlgaBlock {
 				this.stage4_scsynth;
 			});
 		});
+
+		//Debug space
+		if(Alga.debug, { "".postln });
 	}
 
 	/***********/
