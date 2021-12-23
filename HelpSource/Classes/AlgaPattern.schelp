@@ -4,17 +4,6 @@ categories:: Alga
 related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut
 
 
-DESCRIPTION::
-note::
-For emphasis::SuperCollider:: < 3.13, it is highly suggested to download the
-custom emphasis::AlgaAudioControl:: link::Classes/UGen:: from
-https://github.com/vitreo12/AlgaAudioControl/releases/tag/v1.0.0 and install it
-in your code::Platform.userExtensionDir::. This
-link::Classes/UGen:: fixes some synchronization issues that may result in audio
-glitches for short enveloped sounds. After installing it, no further action is
-required: emphasis::Alga:: will detect it and use it internally.
-::
-
 An link::Classes/AlgaPattern:: is the polyphonic counterpart of an link::Classes/AlgaNode::. All the basic concepts that define link::Classes/AlgaNode::s also apply to link::Classes/AlgaPattern::s. However, link::Classes/AlgaPattern::s also support link::Classes/Pattern::s as modifiers for their parameters.
 
 It is highly suggested to look into the Examples folder for more advanced usage of link::Classes/AlgaPattern::s.
@@ -29,6 +18,8 @@ ARGUMENT:: def
 Mandatory argument. It accepts either a emphasis::UGen function::, a symbol to lookup a defined link::Classes/AlgaSynthDef:: or an link::Classes/Event:: describing the pattern.
 ARGUMENT:: interpTime
 Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaPattern::.
+ARGUMENT:: interpShape
+Specify the interpolation shape that is to be used to perform new connections. This must be defined with an link::Classes/Env:: that always starts at 0 and ends at 1. If not specified, a single ramp code::Env([0, 1], 1):: is used by default.
 ARGUMENT:: playTime
 Specify the fading in / fading out time that it takes for this link::Classes/AlgaPattern:: to play through speakers. These values are applied when calling the emphasis::play:: or emphasis::stop:: functions.
 ARGUMENT:: sched
@@ -199,3 +190,8 @@ private:: setDur
 private:: setDurAtSched
 private:: stopPatternAndFreeSynths
 private:: storeCurrentGenericParams
+
+private:: currentPatternOutShape
+private:: fxConvGroup
+private:: fxGroup
+private:: synthConvGroup

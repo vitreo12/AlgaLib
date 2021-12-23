@@ -447,9 +447,17 @@ AlgaNode {
 		});
 	}
 
+	paramInterpShape_ { | param, value |
+		this.interpShape(value, param);
+	}
+
+	paramInterpShape { | param | ^paramsInterpShapes[param] }
+
+	pis { | param | ^paramsInterpShapes[param] }
+
 	//Check env
 	checkValidEnv { | value |
-		var levels;
+		var levels, times;
 
 		if(value == nil, { ^nil });
 
@@ -476,6 +484,12 @@ AlgaNode {
 				("AlgaNode: interpShape's Env can only contain values between 0 and 1").error;
 				^nil
 			});
+		});
+
+		times = value.times;
+		if(times.sum == 0, {
+			("AlgaNode: interpShape's Env cannot have its times sum up to 0").error;
+			^nil
 		});
 
 		^value

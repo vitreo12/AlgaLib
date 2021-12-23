@@ -3,7 +3,14 @@ summary:: live coding environment language focused on the interpolation between 
 categories:: Alga
 related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaServerOptions
 
+
 DESCRIPTION::
+note::
+For link::Classes/Alga:: to work correctly, it is required to install the emphasis::AlgaUGens:: plugin extensions. To do so, download the emphasis::AlgaUGens:: zip file from
+https://github.com/vitreo12/AlgaUGens/releases/tag/v1.0.0 and extract it
+to your code::Platform.userExtensionDir::
+::
+
 emphasis::Alga:: is a new live coding environment whose focus is on describing dynamic connections between nodes. By linking link::Classes/AlgaNode::s together, it is possible to create a fluid, complex network of sonic interactions. What makes emphasis::Alga:: different from other environments is its interpolation capabilities. In fact, the nature of the connections between link::Classes/AlgaNode::s arises from continuous processes of interpolation between the current states of the system and future ones, over specified windows of time.
 link::Classes/AlgaNode::'s sister class, link::Classes/AlgaPattern::, represents
 the polyphonic counterpart to this paradigm.

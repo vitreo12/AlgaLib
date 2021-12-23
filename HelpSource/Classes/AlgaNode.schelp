@@ -37,6 +37,8 @@ ARGUMENT:: args
 Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. These can be link::Classes/Number::s, link::Classes/Array::s, link::Classes/AlgaNode::s, link::Classes/AlgaTemp::s or link::Classes/AlgaArg::s.
 ARGUMENT:: interpTime
 Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaNode::.
+ARGUMENT:: interpShape
+Specify the interpolation shape that is to be used to perform new connections. This must be defined with an link::Classes/Env:: that always starts at 0 and ends at 1. If not specified, a single ramp code::Env([0, 1], 1):: is used by default.
 ARGUMENT:: playTime
 Specify the fading in / fading out time that it takes for this link::Classes/AlgaNode:: to play through speakers. These values are applied when calling the emphasis::play:: or emphasis::stop:: functions.
 ARGUMENT:: sched
@@ -89,12 +91,24 @@ METHOD:: it
 Shortcut for emphasis::interpTime::.
 
 
-method:: paramInterpTime
+METHOD:: paramInterpTime
 Specify a new time that the connections to the specific emphasis::param:: will use to perform interpolations.
 
 
-method:: pit
+METHOD:: pit
 Shortcut for emphasis::paramInterpTime::.
+
+
+METHOD:: interpShape
+Specify a new interpolation shape that the connections to any of the parameters will use to perform interpolations. This must be defined with an link::Classes/Env:: that always starts at 0 and ends at 1. If not specified, a single ramp code::Env([0, 1], 1):: is used by default.
+
+
+METHOD:: paramInterpShape
+Specify a new interpolation shape that the connections to the specific emphasis::param:: will use to perform interpolations.
+
+
+METHOD:: pis
+Shortcut for emphasis::paramInterpShape:.
 
 
 METHOD:: playTime
@@ -159,6 +173,8 @@ NUMBEREDLIST::
 Note that all the values can be specified as arrays, in which case they map for specific channels. For example, code::[-1, [1, 2], 0, [10, 20]]:: will scale the first channel to code::[-1, 1, 0, 10]::, and the second one to code::[-1, 2, 0, 20]::.
 ARGUMENT:: time
 Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
+ARGUMENT:: shape
+Define a temporary shape to be used in the interpolation process. This must be defined with an link::Classes/Env:: starting at 0 and ending at 1.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
@@ -477,3 +493,12 @@ private:: createMixInterpBusAndNormSynthAtParam
 private:: createMixInterpSynthAndInterpBusAndNormSynthAtParam
 private:: ct
 private:: replaceInterpBusAndNormSynth
+
+private:: checkValidEnv
+private:: getInterpShape
+private:: moveToHead
+private:: moveToTail
+private:: paramsInterpShapes
+private:: playTime
+private:: replacePlayTime
+private:: tempGroup
