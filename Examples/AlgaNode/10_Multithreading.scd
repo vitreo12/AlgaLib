@@ -4,7 +4,7 @@
 Alga.boot({
 	var reverb;
 
-	//A bank of 50 sines
+	//Definition of a bank of 50 sines
 	AlgaSynthDef(\sines, {
 		Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.005 }))
 	}).add;
@@ -37,7 +37,7 @@ Alga.boot({
 Alga.boot({
 	var reverb;
 
-	//A bank of 50 sines
+	//Definition of a bank of 50 sines
 	AlgaSynthDef(\sines, {
 		Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.005 }))
 	}).add;
