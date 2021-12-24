@@ -595,10 +595,11 @@ AlgaNode {
 	}
 
 	createAllGroups {
-		//THIS IS ESSENTIAL FOR PROPER WORKING!!
+		//Retrieve the global ParGroup
 		var parGroup = Alga.parGroup(server);
 
-		//THIS ONE MUST BE GROUP AND NOT PARGROUP FOR ORDERING TO WORK CORRECTLY!!
+		//This one must be Group for the simple fact that the ordering of the next groups
+		//needs to be maintained as it's declared here.
 		group = AlgaGroup(parGroup);
 
 		//Keep playGroup as Group: no need to multithread here
@@ -618,7 +619,8 @@ AlgaNode {
 		}, {
 			//With mixing and everything, it's nice to parallelize interpGroup, normGroup and tempGroup.
 			//Of course, with fewer parameters and / or mix inputs, the gains will not be huge.
-			//synthGroup is better as standard Group, as it's mostly one (unless .replace happening)
+			//synthGroup is better as standard Group, as it's mostly one, unless .repalce is happening,
+			//in which case, it's still fine to keep a low count as it's not happening all the time.
 
 			synthGroup = AlgaGroup(group);
 			//synthGroup = AlgaParGroup(group);
