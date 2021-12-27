@@ -160,7 +160,7 @@ Alga {
 		^(supernovas[server] ? false);
 	}
 
-	*checkAlgaAudioControl {
+	*checkAlgaUGens {
 		if(\AlgaAudioControl.asClass == nil, {
 			"\n************************************************\n".postln;
 			"The AlgaUGens plugin extension is not installed. Read the following instructions to install it:".warn;
