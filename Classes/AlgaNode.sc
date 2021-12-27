@@ -3284,7 +3284,8 @@ AlgaNode {
 	makeConnectionInner { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time, shape |
 
-		if((sender.isAlgaNode.not).and(sender.isNumberOrArray.not).and(sender.isAlgaTemp.not).and(sender.isAlgaArg.not), {
+		if((sender.isAlgaNode.not).and(sender.isNumberOrArray.not).and(
+			sender.isAlgaTemp.not).and(sender.isAlgaArg.not), {
 			"AlgaNode: can't connect to something that's not an AlgaNode, a Symbol, an AlgaTemp, an AlgaArg, a Function, a Number or an Array".error;
 			^this
 		});
@@ -4206,26 +4207,6 @@ AlgaNode {
 		);
 	}
 
-	//Move this node's group before another node's one
-	moveBefore { | node |
-		group.moveBefore(node.group);
-	}
-
-	//Move this node's group after another node's one
-	moveAfter { | node |
-		group.moveAfter(node.group);
-	}
-
-	//Move inside another group (head)
-	moveToHead { | argGroup |
-		group.moveToHead(argGroup);
-	}
-
-	//Move inside another group (tail)
-	moveToTail { | argGroup |
-		group.moveToTail(argGroup);
-	}
-
 	//Number plays those number of channels sequentially
 	//Array selects specific output
 	createPlaySynth { | time, channelsToPlay, replace = false |
@@ -4416,7 +4397,25 @@ AlgaNode {
 		^false;
 	}
 
-	isAlgaNode { ^true }
+	//Move this node's group before another node's one
+	moveBefore { | node |
+		group.moveBefore(node.group);
+	}
+
+	//Move this node's group after another node's one
+	moveAfter { | node |
+		group.moveAfter(node.group);
+	}
+
+	//Move inside another group (head)
+	moveToHead { | argGroup |
+		group.moveToHead(argGroup);
+	}
+
+	//Move inside another group (tail)
+	moveToTail { | argGroup |
+		group.moveToTail(argGroup);
+	}
 
 	clock { ^(scheduler.clock) }
 
