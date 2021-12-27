@@ -15,10 +15,16 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 Alga {
+	classvar <debug = false;
+
 	classvar <schedulers;
 	classvar <servers;
 	classvar <clocks;
+	classvar <parGroups;
 	classvar <oldSynthDefsDir;
+
+	//Store if server is supernova or not
+	classvar <supernovas;
 
 	*initSynthDefs {
 		AlgaStartup.initSynthDefs;
@@ -28,9 +34,18 @@ Alga {
 		servers = IdentityDictionary(1);
 		schedulers = IdentityDictionary(1);
 		clocks = IdentityDictionary(1);
+		parGroups = IdentityDictionary(1);
+
+		supernovas = IdentityDictionary(1);
 
 		//Make sure to reset it
 		"SC_SYNTHDEF_PATH".unsetenv;
+	}
+
+	*debug_ { | value |
+		if(value.isKindOf(Boolean), {
+			debug = value
+		});
 	}
 
 	*maxIO {
@@ -106,11 +121,46 @@ Alga {
 	}
 
 	*clock { | server |
-		if(server.isNil, { server = Server.default });
+		server = server ? Server.default;
 		^clocks[server]
 	}
 
-	*checkAlgaUGens {
+	*addParGroupOnServerTree { | supernova |
+		//ServerAction passes the server as first arg
+		var serverTreeParGroupFunc = { | server |
+			//If it's an Alga booted server, create the ParGroups / Groups
+			if(servers[server] != nil, {
+				if(supernova, {
+					parGroups[server] = AlgaParGroup(server.defaultGroup);
+				}, {
+					parGroups[server] = AlgaGroup(server.defaultGroup);
+				});
+			});
+		};
+
+		//Add the function to the init of ServerTree
+		ServerTree.add(serverTreeParGroupFunc);
+
+		//On Server quit, remove the func
+		ServerQuit.add({ ServerTree.remove(serverTreeParGroupFunc) });
+	}
+
+	*parGroup { | server |
+		server = server ? Server.default;
+		^parGroups[server]
+	}
+
+	*setSupernova { | server, supernova |
+		server = server ? Server.default;
+		supernovas[server] = supernova;
+	}
+
+	*supernova { | server |
+		server = server ? Server.default;
+		^(supernovas[server] ? false);
+	}
+
+	*checkAlgaAudioControl {
 		if(\AlgaAudioControl.asClass == nil, {
 			"\n************************************************\n".postln;
 			"The AlgaUGens plugin extension is not installed. Read the following instructions to install it:".warn;
@@ -123,8 +173,10 @@ Alga {
 
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
+		var envAlgaServerOptions = topEnvironment[\algaServerOptions];
 
 		server = server ? Server.default;
+		algaServerOptions = algaServerOptions ? envAlgaServerOptions;
 		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
 		if(algaServerOptions.class != AlgaServerOptions, {
@@ -177,15 +229,18 @@ Alga {
 		//Create an AlgaScheduler @ the server
 		this.newScheduler(server, clock);
 
+		//Create ParGroup when the server boots and keep it persistent
+		this.addParGroupOnServerTree(algaServerOptions.supernova);
+
+		//Set if server is supernva or not
+		this.setSupernova(server, algaServerOptions.supernova);
+
 		//Use AlgaSynthDefs as SC_SYNTHDEF_PATH
 		this.setAlgaSynthDefsDir;
 
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
-				//Make sure to init groups
-				server.initTree;
-
 				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
 				this.restoreSynthDefsDir;
 
