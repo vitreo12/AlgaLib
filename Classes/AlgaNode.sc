@@ -456,6 +456,10 @@ AlgaNode {
 	interpShape_ { | value, param, all = false |
 		value = this.checkValidEnv(value);
 		if(value != nil, {
+			//Set the global one if param is nil
+			if(param == nil, { interpShape = value });
+
+			//If all, set all paramConnectionTime regardless of their previous value
 			if(all, {
 				paramsInterpShapes.keysValuesChange({ value });
 			}, {
@@ -476,7 +480,7 @@ AlgaNode {
 	}
 
 	paramInterpShape_ { | param, value |
-		this.interpShape(value, param);
+		this.interpShape_(value, param);
 	}
 
 	paramInterpShape { | param | ^paramsInterpShapes[param] }
