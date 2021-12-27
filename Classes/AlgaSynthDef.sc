@@ -155,13 +155,25 @@ AlgaSynthDef : SynthDef {
 		def = super.new(name, {
 			var out, outCtl, buildSynthDef;
 
+			//invalid func
+			if(func.isFunction.not, {
+				Error("AlgaSynthDef: func is not a Function").algaThrow;
+			});
+
 			// build the controls from args
 			output = SynthDef.wrap(func, rates, prependArgs);
 			output = output.asUGenInput;
 
+			//Invalid return value
+			if(output == nil, {
+				if(output == nil, {
+					Error("AlgaSynthDef: could not retrieve the return value. Perhaps your function ends with a 'var' declaration?").algaThrow
+				});
+			});
+
 			// protect from user error
 			if(output.isKindOf(UGen) and: { output.synthDef != UGen.buildSynthDef }) {
-				Error("AlgaSynthdef: cannot share UGens between AlgaNodes:" + output).throw
+				Error("AlgaSynthdef: cannot share UGens between AlgaNodes:" + output).algaThrow
 			};
 
 			buildSynthDef = UGen.buildSynthDef;
@@ -177,7 +189,7 @@ AlgaSynthDef : SynthDef {
 				});
 
 				if(error, {
-					Error("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally.").throw;
+					Error("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally.").algaThrow;
 				});
 			});
 
@@ -185,7 +197,7 @@ AlgaSynthDef : SynthDef {
 			if(ignoreOutWarning.not, {
 				buildSynthDef.children.do({ | ugen |
 					if(ugen.isKindOf(AbstractOut), {
-						Error("AlgaSynthDef: Out / OffsetOut cannot be explicitly set. They are declared internally.").throw;
+						Error("AlgaSynthDef: Out / OffsetOut cannot be explicitly set. They are declared internally.").algaThrow;
 					});
 				});
 			});
@@ -201,6 +213,7 @@ AlgaSynthDef : SynthDef {
 				};
 			};
 
+			//Protect user
 			output = output ? 0.0;
 
 			// determine rate and numChannels of ugen func
@@ -223,11 +236,7 @@ AlgaSynthDef : SynthDef {
 			//the AlgaEnvGate will take care of freeing the synth, even if not used to multiply
 			//with output! This is fundamental for the \fadeTime mechanism in Alga to work,
 			//freeing synths at the right time.
-			envgen = if(makeFadeEnv, {
-				AlgaEnvGate.kr(i_level: 0, doneAction:2);
-			}, {
-				1.0;
-			});
+			envgen = if(makeFadeEnv, { AlgaEnvGate.kr(i_level: 0, doneAction:2) }, { 1.0 });
 
 			if(isScalar, {
 				output
@@ -280,14 +289,14 @@ AlgaSynthDef : SynthDef {
 								if(arrayEntry < numChannels, {
 									def.outsMapping[name] = val;
 								}, {
-									(name ++ " accesses out of bound channels: " ++ val).error;
+									("AlgaSynthDef: '" ++ name ++ " accesses out of bound channels: " ++ val).error;
 								});
 							});
 						}, {
 							if(val < numChannels, {
 								def.outsMapping[name] = val;
 							}, {
-								(name ++ " accesses an out of bound channel: " ++ val).error;
+								("AlgaSynthDef: '" ++ name ++ "' accesses an out of bound channel: " ++ val).error;
 							});
 						});
 					}, {
