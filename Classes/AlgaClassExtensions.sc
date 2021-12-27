@@ -52,6 +52,31 @@
 			func:func
 		);
 	}
+
+	//Like throw without stacktrace (used in AlgaSynthDef)
+	algaThrow {
+		if (Error.handling) {
+			error("throw during error handling!\n");
+			this.dump;
+			^this
+		};
+		thisThread.algaHandleError(this);
+	}
+}
+
+//Like handleError without stacktrace
++Thread {
+	algaHandleError { | error |
+		(exceptionHandler ? parent).algaHandleError(error)
+	}
+}
+
+//Like handleError without stacktrace
++Function {
+	algaHandleError { | error |
+		error.errorString.postln;
+		this.halt;
+	}
 }
 
 //Essential for 'a16' busses not to be interpreted as an Array!
@@ -127,6 +152,12 @@
 
 	//This avoids many problems when .clearing a node used in connections
 	busArg { ^nil }
+
+	//Like handleError without stacktrace
+	algaHandleError { | error |
+		error.errorString.postln;
+		this.halt;
+	}
 }
 
 +SynthDef {
