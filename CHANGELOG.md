@@ -1,4 +1,4 @@
-#1.2.0
+# 1.2.0
 
 - Added the `interpShape` option. This allows to specify an interpolation shape in the form of an
   `Env`. All connection methods have also been updated to receive a `shape` argument to set the `Env` 
