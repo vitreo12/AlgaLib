@@ -161,19 +161,24 @@ Alga {
 	}
 
 	*checkAlgaUGens {
-		if(\AlgaAudioControl.asClass == nil, {
+		if((\AlgaDynamicIEnvGen.asClass == nil).or(\AlgaAudioControl.asClass == nil), {
 			"\n************************************************\n".postln;
 			"The AlgaUGens plugin extension is not installed. Read the following instructions to install it:".warn;
 			"\n1) Download the AlgaUGens plugin extension from https://github.com/vitreo12/AlgaUGens/releases/tag/v1.0.0".postln;
 			"2) Unzip the file to your 'Platform.userExtensionDir'".postln;
 			"\nAfter the installation, no further action is required: Alga will detect the UGens, use them internally and this message will not be shown again.\n".postln;
 			"************************************************\n".postln;
+			^false;
 		});
+		^true;
 	}
 
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
 		var envAlgaServerOptions = topEnvironment[\algaServerOptions];
+
+		//Check AlgaUGens
+		if(this.checkAlgaUGens.not, { ^this });
 
 		server = server ? Server.default;
 		algaServerOptions = algaServerOptions ? envAlgaServerOptions;
@@ -199,7 +204,7 @@ Alga {
 		if(algaServerOptions.supernova, { Server.supernova }, { Server.scsynth });
 		server.options.threads = algaServerOptions.supernovaThreads;
 		server.options.useSystemClock = algaServerOptions.supernovaUseSystemClock;
-		server.options.protocol = algaServerOptions.protocol ? \tcp;
+		server.options.protocol = \tcp; //Always \tcp!
 		server.latency = algaServerOptions.latency;
 
 		//Check AlgaSynthDef/IO folder exists...
@@ -246,9 +251,6 @@ Alga {
 
 				//Execute onBoot function
 				onBoot.value;
-
-				//Check AlgaAudioControl so that it's printed after boot
-				this.checkAlgaUGens;
 			});
 		});
 	}

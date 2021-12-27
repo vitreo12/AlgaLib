@@ -88,6 +88,9 @@ AlgaPattern : AlgaNode {
 	//Current time used for \out replacement
 	var <currentPatternOutTime;
 
+	//Current shape used for \out replacement
+	var <currentPatternOutShape;
+
 	//Needed to store reset for various alga params (\out, \fx, etc...)
 	var <currentReset;
 
@@ -107,10 +110,11 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
-	*new { | def, interpTime, playTime, sched = 1, server |
+	*new { | def, interpTime, interpShape, playTime, sched = 1, server |
 		^super.new(
 			def: def,
 			interpTime: interpTime,
+			interpShape: interpShape,
 			playTime: playTime,
 			server: server,
 			sched: sched
@@ -1666,6 +1670,7 @@ AlgaPattern : AlgaNode {
 	//Create out: receivers
 	createPatternOutReceivers {
 		var time = currentPatternOutTime ? 0;
+		var shape = currentPatternOutShape ? Env([0, 1], 1);
 
 		//Fade out (also old synths)
 		if(prevPatternOutNodes != nil, {
@@ -1680,6 +1685,7 @@ AlgaPattern : AlgaNode {
 							param: param,
 							removePatternOutNodeFromDict: true,
 							time: time,
+							shape: shape
 						)
 					}
 				);
@@ -1697,7 +1703,8 @@ AlgaPattern : AlgaNode {
 						outNode.receivePatternOutsAtParam(
 							algaPattern: this,
 							param: param,
-							time: time
+							time: time,
+							shape: shape
 						)
 					}
 				)
@@ -1706,6 +1713,9 @@ AlgaPattern : AlgaNode {
 
 		//Reset currentPatternOutTime
 		currentPatternOutTime = 0;
+
+		//Reset currentPatternOutShape
+		currentPatternOutShape = Env([0, 1], 1);
 	}
 
 	//Reset specific algaParams (\out, \fx, etc...) and genericParams
@@ -2374,8 +2384,9 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Interpolate out == replace
-	interpolateOut { | value, time, sched |
+	interpolateOut { | value, time, shape, sched |
 		"AlgaPattern: changing the 'out' key. This will trigger 'replace'.".warn;
+		currentPatternOutShape = shape; //set shape!
 		^this.replace(
 			def: (def: this.getSynthDef, out: value),
 			time: time,
@@ -2406,7 +2417,9 @@ AlgaPattern : AlgaNode {
 	}
 
 	//<<, <<+ and <|
-	makeConnectionInner { | param = \in, sender, senderChansMapping, scale, sampleAndHold, time = 0 |
+	makeConnectionInner { | param = \in, sender, senderChansMapping, scale,
+		sampleAndHold, time = 0, shape |
+
 		var isDefault = false;
 		var paramConnectionTime = paramsConnectionTime[param];
 		var controlName;
@@ -2443,13 +2456,14 @@ AlgaPattern : AlgaNode {
 			chans: senderChansMapping,
 			scale: scale,
 			sampleAndHold: sampleAndHold,
-			time: time
+			time: time,
+			shape: shape
 		);
 	}
 
 	//<<, <<+ and <|
 	makeConnection { | sender, param = \in, replace = false, mix = false,
-		replaceMix = false, senderChansMapping, scale, sampleAndHold, time, sched |
+		replaceMix = false, senderChansMapping, scale, sampleAndHold, time, shape, sched |
 
 		//Default to false
 		sampleAndHold = sampleAndHold ? false;
@@ -2482,7 +2496,8 @@ AlgaPattern : AlgaNode {
 						senderChansMapping: senderChansMapping,
 						scale: scale,
 						sampleAndHold: sampleAndHold,
-						time: time
+						time: time,
+						shape: shape
 					)
 				},
 				sched: sched,
@@ -2492,7 +2507,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//from implementation
-	fromInner { | sender, param = \in, chans, scale, sampleAndHold, time, sched |
+	fromInner { | sender, param = \in, chans, scale, sampleAndHold, time, shape, sched |
 		//delta == dur
 		if(param == \delta, { param = \dur });
 
@@ -2511,9 +2526,9 @@ AlgaPattern : AlgaNode {
 			^this.interpolateFX(sender, time, sched);
 		});
 
-		//Special case, \out
+		//Special case, \out (the only one using shape)
 		if(param == \out, {
-			^this.interpolateOut(sender, time, sched);
+			^this.interpolateOut(sender, time, shape, sched);
 		});
 
 		//Entry is a Buffer == replace
@@ -2530,7 +2545,7 @@ AlgaPattern : AlgaNode {
 		if((sender.isPattern).or(sender.isAlgaArg).or(sender.isAlgaTemp), {
 			^this.makeConnection(
 				sender: sender, param: param, senderChansMapping: chans,
-				scale: scale, sampleAndHold: sampleAndHold, time: time, sched: sched
+				scale: scale, sampleAndHold: sampleAndHold, time: time, shape:shape, sched: sched
 			);
 		});
 
@@ -2542,14 +2557,14 @@ AlgaPattern : AlgaNode {
 			});
 			this.makeConnection(
 				sender: sender, param: param, senderChansMapping: chans,
-				scale: scale, time: time, sampleAndHold: sampleAndHold, sched: sched
+				scale: scale, time: time, shape:shape, sampleAndHold: sampleAndHold, sched: sched
 			);
 		}, {
 			//sender == symbol is used for \def
 			if(sender.isNumberOrArray, {
 				this.makeConnection(
 					sender: sender, param: param, senderChansMapping: chans,
-					scale: scale, time: time, sampleAndHold: sampleAndHold, sched: sched
+					scale: scale, time: time, shape:shape, sampleAndHold: sampleAndHold, sched: sched
 				);
 			}, {
 				("AlgaPattern: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
@@ -2558,7 +2573,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Only from is needed: to already calls into makeConnection
-	from { | sender, param = \in, chans, scale, sampleAndHold, time, sched |
+	from { | sender, param = \in, chans, scale, sampleAndHold, time, shape, sched |
 		//Parse the sender looking for AlgaTemps and ListPatterns
 		var senderAndFunctionSynthDefDict = this.parseAlgaTempListPatternParam(sender);
 		var functionSynthDefDict;
@@ -2581,6 +2596,7 @@ AlgaPattern : AlgaNode {
 					scale: scale,
 					sampleAndHold: sampleAndHold,
 					time: time,
+					shape: shape,
 					sched: sched
 				)
 			},
@@ -2589,25 +2605,26 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Don't support <<+ for now
-	mixFrom { | sender, param = \in, inChans, scale, time |
+	mixFrom { | sender, param = \in, inChans, scale, time, shape, sched |
 		"AlgaPattern: mixFrom is not supported yet".error;
 	}
 
 	// <<| \param (goes back to defaults)
 	//When sender is nil in makeConnection, the default value will be used
-	resetParam { | param = \in, sampleAndHold, time, sched |
+	resetParam { | param = \in, sampleAndHold, time, shape, sched |
 		this.makeConnection(
 			sender: nil,
 			param: param,
 			sampleAndHold: sampleAndHold,
 			time: time,
-			sched: sched
+			sched: sched,
+			shape: shape
 		)
 	}
 
 	//Alias for resetParam
-	reset { | param = \in, sampleAndHold, time, sched |
-		this.resetParam(param, sampleAndHold, time, sched)
+	reset { | param = \in, sampleAndHold, time, shape, sched |
+		this.resetParam(param, sampleAndHold, time, shape, sched)
 	}
 
 	//Replace: run parsing of def before running (so the SynthDefs of Functions are sent right away)
@@ -2956,7 +2973,7 @@ AMP : AlgaMonoPattern {}
 	}
 
 	//Triggered when the connection is made
-	receivePatternOutsAtParam { | algaPattern, param = \in, time = 0 |
+	receivePatternOutsAtParam { | algaPattern, param = \in, time = 0, shape |
 		var controlNamesAtParam, paramRate, paramNumChannels;
 		var patternOutEnvBussesAtParamAlgaPattern, patternOutEnvSynthsAtParamAlgaPattern;
 		var patternOutUniqueIDsAtParam;
@@ -3034,6 +3051,9 @@ AMP : AlgaMonoPattern {}
 		paramNumChannels = controlNamesAtParam.numChannels;
 		paramRate = controlNamesAtParam.rate;
 
+		//Get shape
+		shape = this.checkValidEnv(shape) ? this.getInterpShape(param);
+
 		//Lock interpBus with uniqueID
 		this.lockInterpBus(uniqueID, interpBus);
 
@@ -3057,7 +3077,12 @@ AMP : AlgaMonoPattern {}
 		//jittery across different triggering of synths (especially if overlapping)
 		envSynth = AlgaSynth(
 			envSymbol,
-			[ \out, interpBus.index, \env_out, envBus.index, \fadeTime, time ],
+			[
+				\out, interpBus.index,
+				\env_out, envBus.index,
+				\fadeTime, time,
+				\envShape, shape.algaConvertEnv
+			],
 			interpGroup,
 			waitForInst:false
 		);
@@ -3081,13 +3106,16 @@ AMP : AlgaMonoPattern {}
 
 	//Trigger the release of all active out: synths at specific param for a specific algaPattern.
 	//This is called everytime a connection is removed
-	removePatternOutsAtParam { | algaPattern, param = \in, removePatternOutNodeFromDict = true, time |
+	removePatternOutsAtParam { | algaPattern, param = \in, removePatternOutNodeFromDict = true, time, shape |
 		var paramAlgaPattern = [param, algaPattern];
 		var patternOutEnvSynthsAtParamAlgaPattern = patternOutEnvSynths[paramAlgaPattern];
 		var patternOutEnvBussesAtParamAlgaPattern = patternOutEnvBusses[paramAlgaPattern];
 
 		//Set time if needed
 		time = time ? 0;
+
+		//Get shape
+		shape = this.checkValidEnv(shape) ? this.getInterpShape(param);
 
 		if(patternOutEnvSynthsAtParamAlgaPattern != nil, {
 			patternOutEnvSynthsAtParamAlgaPattern.keysValuesDo({ | uniqueIDAlgaSynthBus, patternOutEnvSynth |
@@ -3100,7 +3128,13 @@ AMP : AlgaMonoPattern {}
 
 				//Free bus and entries when synth is done.
 				//It's still used while fade-out interpolation is happening
-				patternOutEnvSynth.set(\t_release, 1, \fadeTime, time);
+				patternOutEnvSynth.set(
+					\t_release, 1,
+					\fadeTime, time,
+					\envShape, shape.algaConvertEnv
+				);
+
+				//When freed
 				patternOutEnvSynth.onFree({
 					//Add the patternOutEnvBus to patternOutEnvBussesToBeFreed.
 					//It must be a Dictionary cause of the Array key: needs to be checked by value...
