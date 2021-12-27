@@ -625,6 +625,10 @@ AlgaNode {
 		replacePlayTime = value
 	}
 
+	rpt { ^replacePlayTime }
+
+	rpt_ { | value | this.replacePlayTime_(value) }
+
 	//maximum between longestConnectionTime and playTime...
 	//is this necessary? Yes it is, cause if running .clear on the receiver,
 	//I need to be sure that if .replace or .clear is set to a sender, they will be longer

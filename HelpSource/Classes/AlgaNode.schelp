@@ -83,42 +83,6 @@ METHOD:: clear
 Clear the link::Classes/AlgaNode::, dropping all connections in place (with appropriate interpolation) as well as the output to speakers.
 
 
-METHOD:: interpTime
-Specify a new time that the connections to any of the parameters will use to perform interpolations.
-
-
-METHOD:: it
-Shortcut for emphasis::interpTime::.
-
-
-METHOD:: paramInterpTime
-Specify a new time that the connections to the specific emphasis::param:: will use to perform interpolations.
-
-
-METHOD:: pit
-Shortcut for emphasis::paramInterpTime::.
-
-
-METHOD:: interpShape
-Specify a new interpolation shape that the connections to any of the parameters will use to perform interpolations. This must be defined with an link::Classes/Env:: that always starts at 0 and ends at 1. If not specified, a single ramp code::Env([0, 1], 1):: is used by default.
-
-
-METHOD:: paramInterpShape
-Specify a new interpolation shape that the connections to the specific emphasis::param:: will use to perform interpolations.
-
-
-METHOD:: pis
-Shortcut for emphasis::paramInterpShape:.
-
-
-METHOD:: playTime
-Specify fade in / fade out times when calling emphasis::play:: and emphasis::stop::.
-
-
-METHOD:: pt
-Shortcut for emphasis::playTime::.
-
-
 METHOD:: replace
 Replace the current content of the link::Classes/AlgaNode::. This method also takes care of restoring all running connections, applying the correct connection times and rate / channels conversions.
 ARGUMENT:: def
@@ -226,6 +190,50 @@ Same as emphasis::disconnect:: where no emphasis::oldSender:: is specified: rese
 
 METHOD:: <|
 Shortcut for emphasis::reset::.
+
+
+METHOD:: interpTime
+Specify a new time that the connections to any of the parameters will use to perform interpolations.
+
+
+METHOD:: it
+Shortcut for emphasis::interpTime::.
+
+
+METHOD:: paramInterpTime
+Specify a new time that the connections to the specific emphasis::param:: will use to perform interpolations.
+
+
+METHOD:: pit
+Shortcut for emphasis::paramInterpTime::.
+
+
+METHOD:: interpShape
+Specify a new interpolation shape that the connections to any of the parameters will use to perform interpolations. This must be defined with an link::Classes/Env:: that always starts at 0 and ends at 1. If not specified, a single ramp code::Env([0, 1], 1):: is used by default.
+
+
+METHOD:: paramInterpShape
+Specify a new interpolation shape that the connections to the specific emphasis::param:: will use to perform interpolations.
+
+
+METHOD:: pis
+Shortcut for emphasis::paramInterpShape::.
+
+
+METHOD:: playTime
+Specify fade in / fade out times when calling emphasis::play:: and emphasis::stop::.
+
+
+METHOD:: pt
+Shortcut for emphasis::playTime::.
+
+
+METHOD:: replacePlayTime
+Specify fade in / fade out times when calling emphasis::replace:: on a node that was playing.
+
+
+METHOD:: rpt
+Shortcut for emphasis::replacePlayTime::.
 
 
 EXAMPLES::
@@ -499,6 +507,19 @@ private:: getInterpShape
 private:: moveToHead
 private:: moveToTail
 private:: paramsInterpShapes
-private:: playTime
-private:: replacePlayTime
 private:: tempGroup
+
+private:: activeInNodes
+private:: activeInNodesCounter
+private:: activeOutNodes
+private:: activeOutNodesCounter
+private:: addActiveInNode
+private:: addActiveOutNode
+private:: asString
+private:: checkConnectionAlreadyInPlace
+private:: connectionAlreadyInPlace
+private:: name
+private:: removeActiveInNode
+private:: removeActiveNodeAndRearrangeBlock
+private:: removeActiveNodesAndRearrangeBlocks
+private:: removeActiveOutNode

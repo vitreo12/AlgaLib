@@ -196,3 +196,4 @@ private:: currentPatternOutShape
 private:: fxConvGroup
 private:: fxGroup
 private:: synthConvGroup
+private:: prevPatternOutNodes
