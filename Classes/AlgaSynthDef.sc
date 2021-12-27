@@ -166,9 +166,7 @@ AlgaSynthDef : SynthDef {
 
 			//Invalid return value
 			if(output == nil, {
-				if(output == nil, {
-					Error("AlgaSynthDef: could not retrieve the return value. Perhaps your function ends with a 'var' declaration?").algaThrow
-				});
+				Error("AlgaSynthDef: could not retrieve the return value. Perhaps your function ends with a 'var' declaration?").algaThrow
 			});
 
 			// protect from user error
