@@ -4432,6 +4432,8 @@ AlgaNode {
 		if(name == nil, { ^(this.class.asString) });
 		^(this.class.asString ++ "(" ++ name.asString ++ ")");
 	}
+
+	isAlgaNode { ^true }
 }
 
 //Alias
