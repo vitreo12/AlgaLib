@@ -425,14 +425,11 @@ AlgaScheduler : AlgaThread {
 			//All actions are completed: reset currentExecAction
 			currentExecAction = nil;
 
-			//If switchCascadeMode... This is used for AlgaPatch
+			//This is used in AlgaPatch
 			if(switchCascadeMode, {
 				if(verbose, { "AlgaPatch: switching mode".postcln; });
-				if(cascadeMode, {
-					cascadeMode = false;
-				}, {
-					cascadeMode = true;
-				});
+				if(cascadeMode, { cascadeMode = false }, { cascadeMode = true });
+				switchCascadeMode = false; //Reset or it will keep switching
 			});
 
 			//Done scheduling
@@ -500,10 +497,8 @@ AlgaScheduler : AlgaThread {
 	}
 }
 
-//Run things concurrently in the scheduler.
-//Each event waits for the previous one to be completed...
-//NOTE that this behaviour is broken when using an AlgaNode with a Function,
-//as the server.sync call screws up the ordering of its buildFromSynthDef call
+//Run things concurrently in the scheduler, where
+//each event waits for the previous one to be completed
 AlgaPatch {
 	*new { | func, server |
 		var scheduler;
@@ -511,13 +506,15 @@ AlgaPatch {
 		scheduler = Alga.schedulers[server];
 		if(scheduler != nil, {
 			if(scheduler.cascadeMode, {
-				//If already cascadeMode
-				scheduler.addAction(func: func);
+				//If already cascadeMode, just run the func.
+				//fork in case user has waits
+				fork { func.value };
 			}, {
 				//Make cascadeMode true and switch back to false when done
 				scheduler.cascadeMode = true;
 				scheduler.switchCascadeMode = true;
-				scheduler.addAction(func: func);
+				//fork in case user has waits
+				fork { func.value };
 			});
 		}, {
 			("Alga is not booted on server" + server.name).error;
