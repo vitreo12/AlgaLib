@@ -53,9 +53,9 @@ INSTANCEMETHODS::
 
 
 METHOD:: play
-Play the link::Classes/AlgaNode:: to SuperCollider's output.
+Play the link::Classes/AlgaNode:: to SuperCollider's output. Note that this method also ensures that no dangerous audio signals are forwarded to your speaker's output, with an implementation inspired by the SafetyNet quark ( https://github.com/adcxyz/SafetyNet ).
 ARGUMENT:: time
-Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
+Define a temporary connection time that the method takes to complete, applying the necessary interpolations. If not specified, emphasis::playTime:: will be used.
 ARGUMENT:: chans
 Specify an link::Classes/Array:: of output channels to play, which can contain emphasis::outsMapping:: symbols. It's also possible to just specify a number, in which case it determines how many channels will be played.
 code::
@@ -71,6 +71,8 @@ AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1]) //Play both channels,
 
 AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1, 1, 0]) //Quadraphonic
 ::
+ARGUMENT:: scale
+Define a multiplier to scale the output value by. This will be stored and maintained across different emphasis::play:: calls.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
@@ -234,6 +236,10 @@ Specify fade in / fade out times when calling emphasis::replace:: on a node that
 
 METHOD:: rpt
 Shortcut for emphasis::replacePlayTime::.
+
+
+METHOD:: playSafety
+Specify a different safety method to use to scale the outut of a node when using the emphasis::play:: method. Accepted values are: code::'clip', 'tanh', 'softclip', 'limiter'::.
 
 
 EXAMPLES::
@@ -523,3 +529,4 @@ private:: removeActiveInNode
 private:: removeActiveNodeAndRearrangeBlock
 private:: removeActiveNodesAndRearrangeBlocks
 private:: removeActiveOutNode
+private:: prevPlayScale

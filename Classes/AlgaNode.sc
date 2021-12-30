@@ -34,6 +34,12 @@ AlgaNode {
 	//On replace, use time if possible. Otherwise, playTime
 	var <replacePlayTime = true;
 
+	//Function to use in .play to clip
+	var <playSafety = \clip;
+
+	//On replace, use this scaling if possible.
+	var <prevPlayScale = 1.0;
+
 	//This is the longestConnectionTime between all the outNodes.
 	//It's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
@@ -628,6 +634,15 @@ AlgaNode {
 	rpt { ^replacePlayTime }
 
 	rpt_ { | value | this.replacePlayTime_(value) }
+
+	playSafety_ { | value |
+		var valueSymbol = value.asSymbol;
+		if((valueSymbol == \clip).or(valueSymbol == \tanh).or(valueSymbol == \softclip).or(valueSymbol == \limiter), {
+			playSafety = valueSymbol
+		}, {
+			"AlgaNode: 'playSafety' must be either 'clip', 'tanh', 'softclip' or 'limiter'.".error
+		})
+	}
 
 	//maximum between longestConnectionTime and playTime...
 	//is this necessary? Yes it is, cause if running .clear on the receiver,
@@ -3907,7 +3922,7 @@ AlgaNode {
 	replaceInner { | def, args, time, outsMapping, reset, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
-		var argTime = if(replacePlayTime, { time }, { nil });
+		var playTimeOnReplace = if(replacePlayTime, { time }, { nil });
 		var wasPlaying = false;
 
 		//Re-init groups if clear was used or toBeCleared
@@ -3941,7 +3956,10 @@ AlgaNode {
 
 		//If it was playing, free previous playSynth
 		if(isPlaying, {
-			this.stopInner(time: argTime, replace: true);
+			this.stopInner(
+				time: playTimeOnReplace,
+				replace: true
+			);
 			wasPlaying = true;
 		});
 
@@ -3981,7 +3999,11 @@ AlgaNode {
 
 		//If node was playing, or .replace has been called while .stop / .clear, play again
 		if(wasPlaying/*.or(beingStopped)*/, {
-			this.playInner(time: argTime, replace: true)
+			this.playInner(
+				time: playTimeOnReplace,
+				replace: true,
+				usePrevPlayScale: true
+			)
 		});
 
 		//Reset flag
@@ -4217,96 +4239,132 @@ AlgaNode {
 
 	//Number plays those number of channels sequentially
 	//Array selects specific output
-	createPlaySynth { | time, channelsToPlay, replace = false |
-		if((isPlaying.not).or(beingStopped), {
-			var actualNumChannels, playSynthSymbol;
+	createPlaySynth { | time, channelsToPlay, scale, replace = false, usePrevPlayScale = false |
+		var actualNumChannels, playSynthSymbol;
 
-			if(rate == \control, { "AlgaNode: cannot play a kr node".error; ^nil; });
+		//Can't play a kr node!
+		if(rate == \control, { "AlgaNode: cannot play a kr node".error; ^nil; });
 
-			if(channelsToPlay != nil, {
-				//store it so it's kept across replaces, unless a new one is specified
-				playChans = channelsToPlay
-			}, {
-				//If nil and replace, use the one stored
-				if(replace, {
-					channelsToPlay = playChans
-				});
-			});
+		//Scale for play can only be a num (prevPlayScale is used on .replace)
+		if(usePrevPlayScale, { scale = prevPlayScale }, { scale = scale ? 1.0 });
+		if(scale.isNumber.not, {
+			"AlgaNode: play: the 'scale' argument can only be a Number.".error;
+			^nil;
+		});
 
-			time = this.calculateTemporaryLongestWaitTime(time, playTime);
+		//Store prevPlayScale
+		prevPlayScale = scale;
 
-			if(channelsToPlay.isSequenceableCollection, {
-				//Array input. It can be channel numbers or outsMapping
+		//If not replace, if it was playing and not being stopped, free the previous one.
+		//This is used to dynamically change the scale of the output.
+		if((replace.not).and(isPlaying).and(beingStopped.not), {
+			this.freePlaySynth(time: time)
+		});
 
-				//Detect outsMapping and replace them with the actual channels value
-				channelsToPlay.do({ | entry, i |
-					var outMapping = synthDef.outsMapping[entry.asSymbol];
-					case
-					{ outMapping.isNumberOrArray } {
-						channelsToPlay = channelsToPlay.put(i, outMapping);
-					};
-				});
-
-				//Flatten so that outsMapping are not subarrays
-				channelsToPlay = channelsToPlay.flatten;
-
-				//Wrap around the indices entries around the actual
-				//number of outputs of the node... Should it ignore out of bounds?
-				channelsToPlay = channelsToPlay % numChannels;
-				actualNumChannels = channelsToPlay.size;
-
-				playSynthSymbol = (
-					"alga_play_" ++
-					numChannels ++ "_" ++
-					actualNumChannels
-				).asSymbol;
-
-				playSynth = AlgaSynth(
-					playSynthSymbol,
-					[\in, synthBus.busArg, \indices, channelsToPlay, \gate, 1, \fadeTime, time],
-					playGroup,
-					waitForInst:false
-				);
-			}, {
-				if(channelsToPlay.isNumber, {
-					//Tell it to play that specific number of channels, e.g. 2 for just stereo
-					actualNumChannels = channelsToPlay
-				}, {
-					actualNumChannels = numChannels
-				});
-
-				playSynthSymbol = ("alga_play_" ++ numChannels ++ "_" ++ actualNumChannels).asSymbol;
-
-				playSynth = AlgaSynth(
-					playSynthSymbol,
-					[\in, synthBus.busArg, \gate, 1, \fadeTime, time],
-					playGroup,
-					waitForInst:false
-				);
-			});
-
-			isPlaying = true;
-			beingStopped = false;
+		if(channelsToPlay != nil, {
+			//store it so it's kept across replaces, unless a new one is specified
+			playChans = channelsToPlay
 		}, {
-			"AlgaNode: node is already playing.".warn;
-		})
+			//If nil use the one stored
+			channelsToPlay = playChans
+		});
+
+		//Calc time
+		time = this.calculateTemporaryLongestWaitTime(time, playTime);
+
+		if(channelsToPlay.isSequenceableCollection, {
+			//Array input. It can be channel numbers or outsMapping
+			//Detect outsMapping and replace them with the actual channels value
+			channelsToPlay.do({ | entry, i |
+				var outMapping = synthDef.outsMapping[entry.asSymbol];
+				case
+				{ outMapping.isNumberOrArray } {
+					channelsToPlay = channelsToPlay.put(i, outMapping);
+				};
+			});
+
+			//Flatten so that outsMapping are not subarrays
+			channelsToPlay = channelsToPlay.flatten;
+
+			//Wrap around the indices entries around the actual
+			//number of outputs of the node... Should it ignore out of bounds?
+			channelsToPlay = channelsToPlay % numChannels;
+			actualNumChannels = channelsToPlay.size;
+
+			playSynthSymbol = (
+				"alga_play_" ++
+				playSafety ++ "_" ++
+				numChannels ++ "_" ++
+				actualNumChannels
+			).asSymbol;
+
+			playSynth = AlgaSynth(
+				playSynthSymbol,
+				[
+					\in, synthBus.busArg,
+					\indices, channelsToPlay,
+					\gate, 1,
+					\fadeTime, time,
+					\scale, scale
+				],
+				playGroup,
+				waitForInst:false
+			);
+		}, {
+			if(channelsToPlay.isNumber, {
+				//Tell it to play that specific number of channels, e.g. 2 for just stereo
+				actualNumChannels = channelsToPlay
+			}, {
+				actualNumChannels = numChannels
+			});
+
+			playSynthSymbol = (
+				"alga_play_" ++
+				playSafety ++ "_" ++
+				numChannels ++ "_" ++
+				actualNumChannels
+			).asSymbol;
+
+			playSynth = AlgaSynth(
+				playSynthSymbol,
+				[
+					\in, synthBus.busArg,
+					\gate, 1,
+					\fadeTime, time,
+					\scale, scale
+				],
+				playGroup,
+				waitForInst:false
+			);
+		});
+
+		isPlaying = true;
+		beingStopped = false;
 	}
 
-	playInner { | time, channelsToPlay, sched, replace = false |
+	playInner { | time, channelsToPlay, scale, sched, replace = false, usePrevPlayScale = false |
 		//Check only for synthBus, it makes more sense than also checking for synth.algaIstantiated,
 		//As it allows meanwhile to create the play synth while synth is getting instantiated
 		scheduler.addAction(
 			condition: { synthBus != nil },
-			func: { this.createPlaySynth(time, channelsToPlay, replace) },
+			func: {
+				this.createPlaySynth(
+					time: time,
+					channelsToPlay: channelsToPlay,
+					scale: scale,
+					replace: replace,
+					usePrevPlayScale: usePrevPlayScale
+				)
+			},
 			sched: sched
 		);
 	}
 
-	play { | time, chans, sched |
-		this.playInner(time, chans, sched);
+	play { | time, chans, scale, sched |
+		this.playInner(time, chans, scale, sched);
 	}
 
-	freePlaySynth { | time, isClear, action |
+	freePlaySynth { | time, isClear = false, action |
 		if(isPlaying, {
 			if(isClear.not, {
 				//time has already been calculated if isClear == true

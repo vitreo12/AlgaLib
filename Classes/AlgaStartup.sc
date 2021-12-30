@@ -161,15 +161,20 @@ AlgaStartup {
 					//Limiter to make sure not to blow up speakers.
 					//Note: Using AlgaEnvGate.ar here instead of AlgaDynamicIEnvGen.
 					//no need for dynamic fade times for play / stop, and AlgaEnvGate is cheaper!
-					sdef = "
-AlgaSynthDef.new_inner(\\alga_play_" ++ i ++ "_" ++ y ++ ", {
-var input = \\in.ar(" ++ arrayOfZeros_in ++ ");
+					["clip", "tanh", "softclip", "limiter"].do({ | funcName |
+						var func = funcName;
+						case
+						{ funcName == "clip" } { func = "clip2" }
+						{ funcName == "limiter" } { func = "Limiter.ar" };
+						sdef = "
+AlgaSynthDef.new_inner(\\alga_play_" ++ funcName ++ "_" ++ i ++ "_" ++ y ++ ", {
+var input = AlgaReplaceBadValues.ar(\\in.ar(" ++ arrayOfZeros_in ++ "));
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
-Limiter.ar(input) * AlgaEnvGate.kr
+input = " ++ func ++ "(input * \\scale.kr(1)) * AlgaEnvGate.kr;
 }, makeFadeEnv:false, sampleAccurate:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);
 ";
-
-					sdef.interpret;
+						sdef.interpret;
+					});
 				});
 			});
 		});
