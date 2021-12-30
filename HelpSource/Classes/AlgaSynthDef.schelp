@@ -60,3 +60,5 @@ private:: explicitFree
 private:: numChannels
 private:: outsMapping
 private:: rate
+private:: sampleAccurate
+private:: sendAndAddToGlobalDescLib

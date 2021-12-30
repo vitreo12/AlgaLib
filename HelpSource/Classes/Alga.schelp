@@ -60,3 +60,12 @@ private:: oldSynthDefsDir
 private:: restoreSynthDefsDir
 private:: setAlgaSynthDefsDir
 private:: checkAlgaAudioControl
+private:: addParGroupOnServerTree
+private:: checkAlgaUGens
+private:: debug
+private:: parGroup
+private:: parGroups
+private:: quitServerAndClear
+private:: setSupernova
+private:: supernova
+private:: supernovas
