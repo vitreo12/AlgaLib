@@ -3118,12 +3118,12 @@ AlgaNode {
 
 	//Check if connection was already in place at any param
 	checkConnectionAlreadyInPlace { | sender |
-		if(sender.isAlgaTemp, { sender = sender.sender });
+		if(sender.isAlgaTemp, { sender = sender.def });
 
 		inNodes.do({ | sendersSet |
 			if(sender.isListPattern, {
 				sender.do({ | entry |
-					if(entry.isAlgaTemp, { entry = entry.sender });
+					if(entry.isAlgaTemp, { entry = entry.def });
 					if(blockIndex != entry.blockIndex, { ^false });
 					if(sendersSet.includes(entry), { ^true })
 				})

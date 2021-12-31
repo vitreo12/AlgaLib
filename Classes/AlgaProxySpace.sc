@@ -6,7 +6,7 @@ AlgaProxySpace {
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var newSpace;
 		Alga.boot(onBoot, server, algaServerOptions, clock);
-		newSpace = this.new();
+		newSpace = this.new.init;
 		newSpace.push;
 		^newSpace;
 	}
@@ -18,9 +18,14 @@ AlgaProxySpace {
 
 	*addParamArgs { | param, value |
 		if(paramsArgs[currentNode] == nil, {
-			paramsArgs[currentNode] = OrderedIdentitySet()
+			paramsArgs[currentNode] = IdentityDictionary()
 		});
-		paramsArgs[currentNode].add(param).add(value);
+		paramsArgs[currentNode][param] = value;
+	}
+
+	init {
+		CmdPeriod.add(this);
+		^this
 	}
 
 	push {
@@ -44,24 +49,51 @@ AlgaProxySpace {
 		^AlgaNode(\alga_silent);
 	}
 
-	put { | key, def |
-		var currentArgs;
-		var node = this.at(key);
-
-		//Used to trigger Symbol's kr / ar
+	//This allows to retrieve Symbol.kr / Symbol.ar
+	//BEFORE they're sent to the server.
+	triggerDef { | node, def |
 		currentNode = node;
 		def.value;
+	}
 
-		currentArgs = paramsArgs[currentNode].asArray;
+	put { | key, def |
+		var currentArgsID, currentArgs;
+		var node = this.at(key);
 
-		if(currentArgs.size > 0, {
-			^node.replace(
-				def: def,
-				args: currentArgs
-			);
+		//If user explicitly sets an AlgaNode, use that
+		if(def.isAlgaNode, {
+			nodes[key] = def;
+			^def;
 		});
 
+		//Otherwise, go on with the replacing
+
+		//This allows to retrieve Symbol.kr / Symbol.ar using AlgaNodes
+		this.triggerDef(node, def);
+
+		//These are updated thanks to triggerDef
+		currentArgsID = paramsArgs[currentNode];
+		if(currentArgsID != nil, {
+			currentArgs = Array();
+			currentArgsID.keysValuesDo({ | param, val |
+				currentArgs = currentArgs.add(param).add(val);
+			});
+			if(currentArgs.size > 0, {
+				^node.replace(
+					def: def,
+					args: currentArgs
+				);
+			});
+		});
+
+		//Standard replace
 		^node.replace(def);
+	}
+
+	cmdPeriod {
+		currentNode = nil;
+		nodes.clear;
+		paramsArgs.clear;
 	}
 }
 
@@ -83,6 +115,7 @@ AlgaProxySpace {
 	}
 }
 
+//This fixes bug when doing def.value in AlgaProxySpace.put
 +Nil {
 	addAr { ^nil }
 }
