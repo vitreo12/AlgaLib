@@ -279,7 +279,8 @@ AlgaNode {
 
 				scheduler.addAction(
 					condition: { wait.test == true },
-					func: { func.value }
+					func: { func.value },
+					preCheck: true //execute right away if possible (most unlikely)
 				);
 
 				^this
@@ -288,6 +289,78 @@ AlgaNode {
 
 		//No Functions to consume
 		^func.value;
+	}
+
+	//Wait for all args to be instantiated before going forward
+	executeOnArgsInstantiation { | args, dispatchFunc |
+		if(args.isArray, {
+			var functionSynthDefDict;
+			var algaArgs;
+			args.do({ | entry, i |
+				case
+				{ entry.isAlgaTemp } {
+					if(i == 0, {
+						("AlgaNode: 'args' first element can't be an AlgaTemp").error;
+						^this
+					});
+
+					functionSynthDefDict = functionSynthDefDict ? IdentityDictionary();
+					entry = this.parseAlgaTempParam(entry, functionSynthDefDict);
+					args[i] = entry;
+				}
+				{ (entry.isAlgaArg).or(entry.isAlgaNode) } {
+					var sender = entry;
+
+					if(i == 0, {
+						("AlgaNode: 'args' first element can't be an AlgaArg").error;
+						^this
+					});
+
+					algaArgs = algaArgs ? IdentitySet();
+
+					if(entry.isAlgaArg, { sender = entry.sender });
+					if(sender.isAlgaNode, {
+						var param = args[i-1];
+						algaArgs.add(sender); //This is used later to check instantiation
+						//If previous entry was symbol, use that to map inNodes
+						if(param.isSymbol, {
+							this.addInOutNodesDict(entry, param); //Add entry to inNodes. entry MUST be the AlgaArg!
+							AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+						});
+					});
+				};
+			});
+
+			//Make sure to compile the AlgaTemps' Functions
+			this.compileFunctionSynthDefDictIfNeeded(
+				func: {
+					//Make sure that all AlgaArgs' nodes are instantiated
+					if(algaArgs != nil, {
+						scheduler.addAction(
+							condition: {
+								var instantiated = true;
+								algaArgs.do({ | algaArg |
+									if(algaArg.algaInstantiatedAsSender.not, {
+										instantiated = false
+									});
+								});
+								instantiated
+							},
+							func: dispatchFunc,
+							preCheck: true //execute right away if possible
+						);
+					}, {
+						dispatchFunc.value
+					});
+				},
+				functionSynthDefDict: functionSynthDefDict
+			);
+
+			^this;
+		});
+
+		//If no args, execute the function right away
+		dispatchFunc.value;
 	}
 
 	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
@@ -312,9 +385,7 @@ AlgaNode {
 
 		//initialize all IdentityDictionaries. Check if init went through correctly,
 		//otherwise, don't go through with anything
-		if(this.initAllVariables(argServer).not, {
-			^this
-		});
+		if(this.initAllVariables(argServer).not, { ^this });
 
 		//Init debug name
 		name = argName;
@@ -351,88 +422,19 @@ AlgaNode {
 		});
 
 		//Parse args looking for AlgaTemps / AlgaArgs / AlgaNodes
-		if(argArgs.isArray, {
-			var functionSynthDefDict;
-			var algaArgs;
-			argArgs.do({ | entry, i |
-				case
-				{ entry.isAlgaTemp } {
-					if(i == 0, {
-						("AlgaNode: 'args' first element can't be an AlgaTemp").error;
-						^this
-					});
-
-					functionSynthDefDict = functionSynthDefDict ? IdentityDictionary();
-					entry = this.parseAlgaTempParam(entry, functionSynthDefDict);
-					argArgs[i] = entry;
-				}
-				{ (entry.isAlgaArg).or(entry.isAlgaNode) } {
-					var sender = entry;
-
-					if(i == 0, {
-						("AlgaNode: 'args' first element can't be an AlgaArg").error;
-						^this
-					});
-
-					algaArgs = algaArgs ? IdentitySet();
-
-					if(entry.isAlgaArg, { sender = entry.sender });
-					if(sender.isAlgaNode, {
-						var param = argArgs[i-1];
-						algaArgs.add(sender); //This is used later to check instantiation
-						//If previous entry was symbol, use that to map inNodes
-						if(param.isSymbol, {
-							this.addInOutNodesDict(entry, param); //Add entry to inNodes. entry MUST be the AlgaArg!
-							AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
-						});
-					});
-				};
-			});
-
-			//Make sure to compile the AlgaTemps' Functions
-			this.compileFunctionSynthDefDictIfNeeded(
-				func: {
-					var dispatchFunc = {
-						this.dispatchNode(
-							argDef, argArgs,
-							initGroups: true,
-							outsMapping: argOutsMapping,
-							sched: argSched
-						);
-					};
-
-					//Make sure that all AlgaArgs' nodes are instantiated
-					if(algaArgs != nil, {
-						scheduler.addAction(
-							condition: {
-								var instantiated = true;
-								algaArgs.do({ | algaArg |
-									if(algaArg.algaInstantiatedAsSender.not, {
-										instantiated = false
-									});
-								});
-								instantiated
-							},
-							func: dispatchFunc
-						);
-					}, {
-						dispatchFunc.value
-					});
-				},
-				functionSynthDefDict: functionSynthDefDict
-			);
-
-			//Always return this
-			^this;
-		});
-
-		//AlgaNode dispatch
-		this.dispatchNode(
-			argDef, argArgs,
-			initGroups: true,
-			outsMapping: argOutsMapping,
-			sched: argSched
+		this.executeOnArgsInstantiation(
+			args: argArgs,
+			dispatchFunc: {
+				this.dispatchNode(
+					argDef, argArgs,
+					initGroups: true,
+					outsMapping: argOutsMapping,
+					sched: argSched
+				)
+			}
 		);
+
+		^this;
 	}
 
 	setParamsConnectionTime { | value, param, all = false |
@@ -3954,60 +3956,68 @@ AlgaNode {
 		//calc temporary time
 		time = this.calculateTemporaryLongestWaitTime(time, time);
 
-		//If it was playing, free previous playSynth
-		if(isPlaying, {
-			this.stopInner(
-				time: playTimeOnReplace,
-				replace: true
-			);
-			wasPlaying = true;
-		});
+		//Wait for instantiation of all args before going forward
+		this.executeOnArgsInstantiation(
+			args: args,
+			dispatchFunc: {
+				//If it was playing, free previous playSynth
+				if(isPlaying, {
+					this.stopInner(
+						time: playTimeOnReplace,
+						replace: true
+					);
+					wasPlaying = true;
+				});
 
-		//Free all previous out: connections from patterns
-		this.freeAllPatternOutConnections(time);
+				//Free all previous out: connections from patterns
+				this.freeAllPatternOutConnections(time);
 
-		//This doesn't work with feedbacks, as synths would be freed slightly before
-		//The new ones finish the rise, generating click. These should be freed
-		//When the new synths/busses are surely algaInstantiated on the server!
-		//The cheap solution that it's in place now is to wait 1.0 longer than longestConnectionTime.
-		//Work out a better solution now that AlgaScheduler is well tested!
-		this.freeAllSynths(false, false, time);
+				//This doesn't work with feedbacks, as synths would be freed slightly before
+				//The new ones finish the rise, generating click. These should be freed
+				//When the new synths/busses are surely algaInstantiated on the server!
+				//The cheap solution that it's in place now is to wait 1.0 longer than longestConnectionTime.
+				//Work out a better solution now that AlgaScheduler is well tested!
+				this.freeAllSynths(false, false, time);
 
-		//Free all previous busses
-		this.freeAllBusses;
+				//Free all previous busses
+				this.freeAllBusses;
 
-		//Reset interp / norm dictionaries
-		this.resetInterpNormDicts;
+				//Reset interp / norm dictionaries
+				this.resetInterpNormDicts;
 
-		//New node
-		this.dispatchNode(
-			def:def,
-			args:args,
-			initGroups:initGroups,
-			replace:true,
-			reset:reset,
-			keepChannelsMapping:keepOutsMappingIn, outsMapping:outsMapping,
-			keepScale:keepScalesIn
+				//New node
+				this.dispatchNode(
+					def:def,
+					args:args,
+					initGroups:initGroups,
+					replace:true,
+					reset:reset,
+					keepChannelsMapping:keepOutsMappingIn, outsMapping:outsMapping,
+					keepScale:keepScalesIn
+				);
+
+				//Re-enstablish connections that were already in place
+				this.replaceConnections(
+					keepChannelsMapping:keepOutsMappingOut,
+					keepScale:keepScalesOut,
+					time:time
+				);
+
+				//If node was playing, or .replace has been called while .stop / .clear, play again
+				if(wasPlaying/*.or(beingStopped)*/, {
+					this.playInner(
+						time: playTimeOnReplace,
+						replace: true,
+						usePrevPlayScale: true
+					)
+				});
+
+				//Reset flag
+				algaWasBeingCleared = false;
+			}
 		);
 
-		//Re-enstablish connections that were already in place
-		this.replaceConnections(
-			keepChannelsMapping:keepOutsMappingOut,
-			keepScale:keepScalesOut,
-			time:time
-		);
-
-		//If node was playing, or .replace has been called while .stop / .clear, play again
-		if(wasPlaying/*.or(beingStopped)*/, {
-			this.playInner(
-				time: playTimeOnReplace,
-				replace: true,
-				usePrevPlayScale: true
-			)
-		});
-
-		//Reset flag
-		algaWasBeingCleared = false;
+		^this;
 	}
 
 	//replace content of the node, re-making all the connections.
