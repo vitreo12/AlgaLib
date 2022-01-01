@@ -4017,6 +4017,13 @@ AlgaNode {
 
 				//If node was playing, or .replace has been called while .stop / .clear, play again
 				if(wasPlaying/*.or(beingStopped)*/, {
+					//In this case, no fadeIn must be provided
+					if(this.isAlgaPattern, {
+						if(this.stopPatternBeforeReplace, {
+							playTimeOnReplace = 0
+						})
+					});
+
 					this.playInner(
 						time: playTimeOnReplace,
 						replace: true,

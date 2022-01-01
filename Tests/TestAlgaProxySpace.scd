@@ -12,15 +12,16 @@ p = AlgaProxySpace.boot;
 ~b.from({ LFNoise1.ar(100) }, \freq, time:3)
 
 
-~c.playTime = 1;
+~c.playTime = 3;
 ~c.play
 ~c = (def: {SinOsc.ar * EnvPerc.ar(release: 3)}, dur:1)
 ~c = (def: {Saw.ar * EnvPerc.ar(release: 3) * 0.7}, dur:1)
 
-~c.stopPattern
-~c.resumePattern
+//Test difference!
+~c.stopPatternBeforeReplace = false
 
-s.scope
+~c = (def: {SinOsc.ar * EnvPerc.ar(release: 3)}, dur:1)
+~c = (def: {Saw.ar * EnvPerc.ar(release: 3) * 0.7}, dur:1)
 
 /*
 AP:
@@ -31,5 +32,3 @@ to the new AP and return that
 2) perform differential checks
 
 */
-
-//Replacing while playing the tail
