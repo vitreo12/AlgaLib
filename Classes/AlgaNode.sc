@@ -652,9 +652,9 @@ AlgaNode {
 			this.interpTime = nodeToCopy.connectionTime;
 			this.playTime = nodeToCopy.playTime;
 			this.replacePlayTime = nodeToCopy.replacePlayTime;
-			this.playSafety = nodeToCopy.playSafety;
-			this.paramsConnectionTime = nodeToCopy.paramsConnectionTime;
-			this.paramsInterpShapes = nodeToCopy.paramsInterpShapes;
+			playSafety = nodeToCopy.playSafety;
+			paramsConnectionTime = nodeToCopy.paramsConnectionTime;
+			paramsInterpShapes = nodeToCopy.paramsInterpShapes;
 		});
 	}
 

@@ -1970,7 +1970,10 @@ AlgaPattern : AlgaNode {
 		if(manualDur.not, {
 			scheduler.addAction(
 				func: {
-					newInterpStreams.playAlgaReschedulingEventStreamPlayer(pattern, this.clock);
+					newInterpStreams.playAlgaReschedulingEventStreamPlayer(
+						pattern: pattern,
+						clock: this.clock
+					);
 				},
 				sched: sched
 			);
@@ -2644,6 +2647,7 @@ AlgaPattern : AlgaNode {
 		//Otherwise, it will just execute func
 		^this.compileFunctionSynthDefDictIfNeeded(
 			func: {
+				//The actual replacement
 				super.replace(
 					def: def,
 					args: args,
@@ -2655,7 +2659,14 @@ AlgaPattern : AlgaNode {
 					keepOutsMappingOut: keepOutsMappingOut,
 					keepScalesIn: keepScalesIn,
 					keepScalesOut: keepScalesOut
-				)
+				);
+
+				//Stop the pattern at the same sched as the replace.
+				//This allows to catch Events that were supposed to be played at same sched and clear them.
+				//The call must happen AFTER replace as both are scheduled at top priority.
+				//stopPattern, then, must happen before replace, thus why it's here
+				//(top priority will put it on top)
+				this.stopPattern(sched);
 			},
 			functionSynthDefDict: functionSynthDefDict
 		)
@@ -2668,25 +2679,22 @@ AlgaPattern : AlgaNode {
 
 	//Called from replaceInner. freeInterpNormSynths is not used for AlgaPatterns
 	freeAllSynths { | useConnectionTime = true, now = true, time |
-		this.stopPatternAndFreeSynths(now, time);
+		this.freePatternInterpNormSynths(now, time);
 	}
 
-	//Used when replacing. Free synths and stop the current running pattern
-	stopPatternAndFreeSynths { | now = true, time |
+	//Used when replacing.
+	//Free synths after time. NOTE: this doesn't work with the new replace play mechanisms
+	freePatternInterpNormSynths { | now = true, time |
 		currentPatternOutTime = time; //store time for \out
 		if(interpStreams != nil, {
 			if(now, {
-				interpStreams.algaReschedulingEventStreamPlayer.stop;
-				//freeAllSynthsAndBussesOnReplace MUST come after algaReschedulingEventStreamPlayer.stop!
 				interpStreams.freeAllSynthsAndBussesOnReplace;
 			}, {
-				var interpStreamsOld = interpStreams;
+				var interpStreamsOld = interpStreams.copy;
 				if(time == nil, { time = longestWaitTime });
 				if(interpStreamsOld != nil, {
 					fork {
 						(time + 1.0).wait;
-						interpStreamsOld.algaReschedulingEventStreamPlayer.stop;
-						//freeAllSynthsAndBussesOnReplace MUST come after algaReschedulingEventStreamPlayer.stop!
 						interpStreamsOld.freeAllSynthsAndBussesOnReplace;
 					}
 				});
@@ -2718,16 +2726,7 @@ AlgaPattern : AlgaNode {
 	//Stop pattern
 	stopPattern { | sched = 0 |
 		sched = sched ? 0;
-		if(sched == 0, {
-			interpStreams.algaReschedulingEventStreamPlayer.stop
-		}, {
-			scheduler.addAction(
-				func: {
-					interpStreams.algaReschedulingEventStreamPlayer.stop
-				},
-				sched: sched
-			)
-		});
+		interpStreams.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched)
 	}
 
 	//Resume pattern

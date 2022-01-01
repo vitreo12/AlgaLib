@@ -89,15 +89,19 @@ AlgaProxySpace {
 				//Copy relevant vars over
 				pattern.copyVars(node);
 
-				//Play back
-				if(wasPlaying, { pattern.play });
-
 				//Clear the old one
 				node.clear;
+
+				//Play new one
+				if(wasPlaying, { pattern.play });
 
 				//Replace entry
 				nodes[key] = pattern;
 				^pattern;
+			}, {
+				//Check for differences in the Event to perform interpolations
+
+				//If at least one would require .replace, just run it once
 			});
 		});
 
@@ -127,6 +131,10 @@ AlgaProxySpace {
 		currentNode = nil;
 		nodes.clear;
 		paramsArgs.clear;
+	}
+
+	clock {
+		^Alga.clock(server)
 	}
 }
 

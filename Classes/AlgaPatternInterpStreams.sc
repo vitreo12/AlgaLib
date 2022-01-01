@@ -443,6 +443,8 @@ AlgaPatternInterpStreams {
 
 	//Play a pattern as an AlgaReschedulingEventStreamPlayer and return it
 	playAlgaReschedulingEventStreamPlayer { | pattern, clock |
-		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(clock:clock)
+		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
+			clock: clock
+		)
 	}
 }
