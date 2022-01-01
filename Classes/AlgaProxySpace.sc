@@ -2,9 +2,11 @@ AlgaProxySpace {
 	classvar <nodes;
 	classvar <paramsArgs;
 	classvar <currentNode;
+	var <server;
 
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var newSpace;
+		server = server ? Server.default;
 		Alga.boot(onBoot, server, algaServerOptions, clock);
 		newSpace = this.new.init;
 		newSpace.push;
@@ -46,7 +48,7 @@ AlgaProxySpace {
 	}
 
 	newNode {
-		^AlgaNode(\alga_silent);
+		^AlgaNode(\alga_silent, server: server);
 	}
 
 	//This allows to retrieve Symbol.kr / Symbol.ar
@@ -60,13 +62,44 @@ AlgaProxySpace {
 		var currentArgsID, currentArgs;
 		var node = this.at(key);
 
-		//If user explicitly sets an AlgaNode, use that
+		//If user explicitly sets an AlgaNode, e.g. ~a = AN( ),
+		//use that and just replace the entry, clearing the old one.
 		if(def.isAlgaNode, {
+			node.clear;
 			nodes[key] = def;
 			^def;
 		});
 
-		//Otherwise, go on with the replacing
+		//New AlgaPattern (Event)
+		if(def.isEvent, {
+			//If old node was AlgaNode, otherwise, go forward with the .replace mechanism
+			if(node.isAlgaPattern.not, {
+				var wasPlaying = node.isPlaying;
+				var interpTime = node.connectionTime;
+				var interpShape = node.interpShape;
+				var playTime = node.playTime;
+				var pattern = AlgaPattern(
+					def: def,
+					interpTime: interpTime,
+					interpShape: interpShape,
+					playTime: playTime,
+					server: server
+				);
+
+				//Copy relevant vars over
+				pattern.copyVars(node);
+
+				//Play back
+				if(wasPlaying, { pattern.play });
+
+				//Clear the old one
+				node.clear;
+
+				//Replace entry
+				nodes[key] = pattern;
+				^pattern;
+			});
+		});
 
 		//This allows to retrieve Symbol.kr / Symbol.ar using AlgaNodes
 		this.triggerDef(node, def);

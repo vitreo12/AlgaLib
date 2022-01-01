@@ -2628,7 +2628,8 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Replace: run parsing of def before running (so the SynthDefs of Functions are sent right away)
-	replace { | def, args, time, sched, outsMapping, reset = false, keepOutsMappingIn = true,
+	//Note that AlgaPattern's sched is 1 by default
+	replace { | def, args, time, sched = 1, outsMapping, reset = false, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
 		//Parse the def
