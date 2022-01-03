@@ -261,7 +261,7 @@ AlgaSynthDef : SynthDef {
 
 			//Only makeFadeEnv if the Synth can't free itself
 			canFree = UGen.buildSynthDef.children.algaCanFreeSynth;
-			makeFadeEnv = makeFadeEnv and: { (isScalar || canFree).not };
+			makeFadeEnv = makeFadeEnv and: { (isScalar || canFree || makePatternDef).not };
 
 			//the AlgaEnvGate will take care of freeing the synth, even if not used to multiply
 			//with output! This is fundamental for the \fadeTime mechanism in Alga to work,
@@ -280,9 +280,10 @@ AlgaSynthDef : SynthDef {
 					);
 				});
 
-				//Check against output for silence to free synth (makePatternDef).
+				//If not already able to free itself, and makePatternDef,
+				//check against output for silence to free synth.
 				//Should it check against \amp instead?
-				if(makePatternDef, {
+				if((canFree.not).and(makePatternDef), {
 					if(rate === \audio,
 						{ output = AlgaDetectSilence.ar(output) },
 						{ output = AlgaDetectSilence.kr(output) }
