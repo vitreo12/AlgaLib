@@ -128,7 +128,7 @@ AlgaPattern : AlgaNode {
 			var bundle;
 
 			//The AlgaSynthDef
-			var algaSynthDef = ~synthDefName.valueEnvir;
+			var algaSynthDef = (~synthDefName.valueEnvir ++ "_algaPattern").asSymbol;
 
 			//AlgaPattern, the synthBus and its server / clock
 			var algaPattern = ~algaPattern;
@@ -1175,7 +1175,7 @@ AlgaPattern : AlgaNode {
 			this.createOutConnection(algaOut, algaSynthBus, outTempBus, patternBussesAndSynths);
 
 			//Update the synthDef symbol to use the patternTempOut version
-			algaSynthDef = (algaSynthDef.asString ++ "_patternTempOut").asSymbol;
+			algaSynthDef = (algaSynthDef.asString ++ "_algaPatternTempOut").asSymbol;
 
 			//Add patternTempOut writing to patternSynthArgs
 			patternSynthArgs = patternSynthArgs.add(\patternTempOut).add(outTempBus.index);
@@ -1473,12 +1473,6 @@ AlgaPattern : AlgaNode {
 
 		var synthDescControlNames;
 
-		//Detect if AlgaSynthDef can be freed automatically. Otherwise, error!
-		if(synthDef.explicitFree.not, {
-			("AlgaPattern: AlgaSynthDef '" ++ synthDef.name.asString ++ "' can't free itself: it doesn't implement any Done action.").error;
-			^this
-		});
-
 		//Retrieve controlNames from SynthDesc
 		synthDescControlNames = synthDef.asSynthDesc.controls;
 
@@ -1570,11 +1564,6 @@ AlgaPattern : AlgaNode {
 				if(synthDefEntry.class != AlgaSynthDef, {
 					("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++"'").error;
 					^nil;
-				});
-
-				if(synthDefEntry.explicitFree.not, {
-					("AlgaPattern: AlgaSynthDef '" ++ synthDefEntry.name.asString ++ "' can't free itself: it doesn't implement any Done action.").error;
-					^nil
 				});
 
 				if(numChannelsCount == nil, {
@@ -1999,10 +1988,13 @@ AlgaPattern : AlgaNode {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
 			//The synthDef will be sent later! just use the def and the desc for now
-			synthDefFx = AlgaSynthDef(
+			synthDefFx = AlgaSynthDef.new_inner(
 				defName,
-				def
-			).synthDef; //Ignore AlgaSynthDefSpec
+				def,
+				makeFadeEnv: false,
+				makePatternDef: false,
+				makeOutDef: false
+			);
 
 			//Get the desc
 			synthDescFx = synthDefFx.asSynthDesc;
@@ -2254,7 +2246,7 @@ AlgaPattern : AlgaNode {
 			def,
 			outsMapping: outsMapping,
 			sampleAccurate: true
-		); //Important: it returns AlgaSynthDefSpec (for pattern_out)
+		); //Important: it returns AlgaSynthDefSpec (for _algaPattern and _algaPatternTempOut)
 
 		//Return the Symbol
 		^defName

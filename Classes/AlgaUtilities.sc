@@ -92,18 +92,20 @@ AlgaOut {
 //This class is used to create a temporary AlgaNode for a parameter in an AlgaPattern
 AlgaTemp {
 	var <def, <chans, <scale;
+	var <sampleAccurate = false;
 	var <controlNames;
 	var <numChannels, <rate;
 	var <valid = false;
 
-	*new { | def, chans, scale |
-		^super.new.init(def, chans, scale)
+	*new { | def, chans, scale, sampleAccurate |
+		^super.new.init(def, chans, scale, sampleAccurate)
 	}
 
-	init { | argDef, argChans, argScale |
+	init { | argDef, argChans, argScale, argSampleAccurate |
 		def    = argDef;
 		chans  = argChans.algaAsStream;  //Pattern support
 		scale  = argScale.algaAsStream;  //Pattern support
+		sampleAccurate = argSampleAccurate ? false;
 	}
 
 	setDef { | argDef |

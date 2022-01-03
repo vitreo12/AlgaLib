@@ -3116,7 +3116,7 @@ AlgaNode {
 
 	//Check if connection was already in place at any param
 	checkConnectionAlreadyInPlace { | sender |
-		if(sender.isAlgaTemp, { sender = sender.sender });
+		if(sender.isAlgaArg, { sender = sender.sender });
 
 		inNodes.do({ | sendersSet |
 			if(sender.isListPattern, {
@@ -3497,12 +3497,16 @@ AlgaNode {
 			{ defDef.isFunction } {
 				var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
-				//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
+				//AlgaTemp can be sampleAccurate in AlgaPatterns!
 				functionSynthDefDict[defName] = [
-					AlgaSynthDef(
+					AlgaSynthDef.new_inner(
 						defName,
-						defDef
-					).synthDef, //Ignore AlgaSynthDefSpec
+						defDef,
+						sampleAccurate: algaTemp.sampleAccurate,
+						makeFadeEnv: false,
+						makePatternDef: false,
+						makeOutDef: false
+					),
 					algaTemp
 				];
 
@@ -3533,12 +3537,16 @@ AlgaNode {
 		{ def.isFunction } {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
-			//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
+			//AlgaTemp can be sampleAccurate in AlgaPatterns!
 			functionSynthDefDict[defName] = [
-				AlgaSynthDef(
+				AlgaSynthDef.new_inner(
 					defName,
-					def
-				).synthDef, //Ignore AlgaSynthDefSpec
+					def,
+					sampleAccurate: algaTemp.sampleAccurate,
+					makeFadeEnv: false,
+					makePatternDef: false,
+					makeOutDef: false
+				),
 				algaTemp
 			];
 

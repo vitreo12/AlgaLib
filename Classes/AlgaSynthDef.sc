@@ -17,42 +17,48 @@
 //Stores both synthDef and synthDef with \out control (for AlgaPattern).
 //and dispatches the methods to both of them.
 AlgaSynthDefSpec {
-	var <synthDef, <synthDefPatternOut;
+	var <synthDef, <synthDefPattern, <synthDefPatternOut;
 
-	*new { | synthDef, synthDefPatternOut |
-		^super.new.init(synthDef, synthDefPatternOut)
+	*new { | synthDef, synthDefPattern, synthDefPatternOut |
+		^super.new.init(synthDef, synthDefPattern, synthDefPatternOut)
 	}
 
-	init { | argSynthDef, argSynthDefPatternOut |
+	init { | argSynthDef, argSynthDefPattern, argSynthDefPatternOut |
 		synthDef = argSynthDef;
+		synthDefPattern = argSynthDefPattern;
 		synthDefPatternOut = argSynthDefPatternOut;
 	}
 
 	add { | libname, completionMsg, keepDef = true |
 		synthDef.add(libname, completionMsg, keepDef);
-		synthDefPatternOut.add(libname, completionMsg, keepDef);
+		if(synthDefPattern != nil, { synthDefPattern.add(libname, completionMsg, keepDef) });
+		if(synthDefPatternOut != nil, { synthDefPatternOut.add(libname, completionMsg, keepDef) });
 	}
 
 	send { | server, completionMsg |
 		synthDef.send(server, completionMsg.value(server));
-		synthDefPatternOut.send(server, completionMsg);
+		if(synthDefPattern != nil, { synthDefPattern.send(server, completionMsg) });
+		if(synthDefPatternOut != nil, { synthDefPatternOut.send(server, completionMsg) });
 	}
 
 	sendAndAddToGlobalDescLib { | server, completionMsg |
 		synthDef.sendAndAddToGlobalDescLib(server, completionMsg);
-		synthDefPatternOut.sendAndAddToGlobalDescLib(server, completionMsg);
+		if(synthDefPattern != nil, { synthDefPattern.sendAndAddToGlobalDescLib(server, completionMsg) });
+		if(synthDefPatternOut != nil, { synthDefPatternOut.sendAndAddToGlobalDescLib(server, completionMsg) });
 	}
 
 	load { | server, completionMsg, dir |
 		dir = dir ? AlgaSynthDef.synthDefDir;
 		synthDef.load(server, completionMsg, dir);
-		synthDefPatternOut.load(server, completionMsg, dir);
+		if(synthDefPattern != nil, { synthDefPattern.load(server, completionMsg, dir) });
+		if(synthDefPatternOut != nil, { synthDefPatternOut.load(server, completionMsg, dir) });
 	}
 
 	store { | libname=\global, dir, completionMsg, mdPlugin |
 		dir = dir ? AlgaSynthDef.synthDefDir;
 		synthDef.store(libname, dir, completionMsg, mdPlugin);
-		synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin);
+		if(synthDefPattern != nil, { synthDefPattern.store(libname, dir, completionMsg, mdPlugin) });
+		if(synthDefPatternOut != nil, { synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin) });
 	}
 
 	asSynthDesc { | libname=\global, keepDef = true |
@@ -112,7 +118,11 @@ AlgaSynthDef : SynthDef {
 	}
 
 	*new_inner { | name, func, rates, prependArgs, outsMapping,
-		sampleAccurate = false, variants, metadata, makeFadeEnv = true, makeOutDef = true |
+		sampleAccurate = false, variants, metadata, makeFadeEnv = true,
+		makePatternDef = true, makeOutDef = true |
+		var defPattern, defOut;
+		var result;
+
 		var def = this.new_inner_inner(
 			name: name,
 			func: func,
@@ -126,11 +136,10 @@ AlgaSynthDef : SynthDef {
 			makeOutDef: false
 		);
 
-		if(makeOutDef, {
-			var defOut;
-			name = (name.asString ++ "_patternTempOut").asSymbol;
-			defOut = this.new_inner_inner(
-				name: name,
+		if(makePatternDef, {
+			var namePattern = (name.asString ++ "_algaPattern").asSymbol;
+			defPattern = this.new_inner_inner(
+				name: namePattern,
 				func: func,
 				rates: rates,
 				prependArgs: prependArgs,
@@ -139,21 +148,41 @@ AlgaSynthDef : SynthDef {
 				variants: variants,
 				metadata: metadata,
 				makeFadeEnv: makeFadeEnv,
-				makeOutDef: true
+				makePatternDef: true,
+				makeOutDef: false
 			);
-			^AlgaSynthDefSpec(def, defOut);
 		});
 
+		if(makeOutDef, {
+			var namePatternTempOut = (name.asString ++ "_algaPatternTempOut").asSymbol;
+			defOut = this.new_inner_inner(
+				name: namePatternTempOut,
+				func: func,
+				rates: rates,
+				prependArgs: prependArgs,
+				outsMapping: outsMapping,
+				sampleAccurate: sampleAccurate,
+				variants: variants,
+				metadata: metadata,
+				makeFadeEnv: makeFadeEnv,
+				makePatternDef: makePatternDef, //Can be used here too!
+				makeOutDef: true
+			);
+		});
+
+		if(makePatternDef.or(makeOutDef), { ^AlgaSynthDefSpec(def, defPattern, defOut) });
 		^def;
 	}
 
 	*new_inner_inner { | name, func, rates, prependArgs, outsMapping,
-		sampleAccurate = false, variants, metadata, makeFadeEnv = true, makeOutDef = false, ignoreOutWarning = false |
+		sampleAccurate = false, variants, metadata, makeFadeEnv = true,
+		makePatternDef = false, makeOutDef = false, ignoreOutWarning = false |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var outerBuildSynthDef = UGen.buildSynthDef;
 
 		def = super.new(name, {
 			var out, outCtl, buildSynthDef;
+			var ampProvided = false;
 
 			//invalid func
 			if(func.isFunction.not, {
@@ -180,6 +209,9 @@ AlgaSynthDef : SynthDef {
 			buildSynthDef.allControlNames.do({ | controlName |
 				var error = false;
 				var controlNameName = controlName.name;
+
+				//Check if amp was there already
+				if(controlNameName == \amp, { ampProvided = true });
 
 				//Don't \gate arg when makeFadeEnv is true, otherwise it's fine (it's used in AlgaStartup)
 				if((makeFadeEnv.and(controlNameName == \gate)).or(controlNameName == \out).or(controlNameName == \patternTempOut), {
@@ -236,9 +268,28 @@ AlgaSynthDef : SynthDef {
 			//freeing synths at the right time.
 			envgen = if(makeFadeEnv, { AlgaEnvGate.kr(i_level: 0, doneAction:2) }, { 1.0 });
 
+			//Scalar == ir
 			if(isScalar, {
 				output
 			}, {
+				//Add \amp if needed
+				if(ampProvided.not, {
+					if(rate === \audio,
+						{ output = output * \amp.ar(1) },
+						{ output = output * \amp.kr(1) }
+					);
+				});
+
+				//Check against output for silence to free synth (makePatternDef).
+				//Should it check against \amp instead?
+				if(makePatternDef, {
+					if(rate === \audio,
+						{ output = AlgaDetectSilence.ar(output) },
+						{ output = AlgaDetectSilence.kr(output) }
+					)
+				});
+
+				//\out control business
 				outCtl = Control.names(\out).ir(0);
 				(if(rate === \audio and: { sampleAccurate }) { OffsetOut } { Out }).multiNewList([rate, outCtl] ++ output);
 				if(makeOutDef, {
