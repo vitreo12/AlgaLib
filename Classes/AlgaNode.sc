@@ -245,6 +245,7 @@ AlgaNode {
 			this.currentPatternBussesAndSynths = IdentityDictionary(10);
 			this.currentActivePatternParamSynths = IdentityDictionary(10);
 			this.currentActiveInterpBusses = IdentityDictionary(10);
+			this.scheduledStepActions = IdentityDictionary(10);
 		});
 
 		^true;

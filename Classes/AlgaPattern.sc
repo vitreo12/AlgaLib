@@ -108,6 +108,9 @@ AlgaPattern : AlgaNode {
 	//If false: normal play fadeIn / fadeOut mechanism
 	var <stopPatternBeforeReplace = true;
 
+	//Actions scheduled on a step
+	var <>scheduledStepActions;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -159,6 +162,10 @@ AlgaPattern : AlgaNode {
 
 			//Create the bundle with all needed Synths for this Event.
 			bundle = algaPatternServer.makeBundle(false, {
+				//First, consume scheduledStepActions if there were any
+				~algaPattern.advanceAndConsumeScheduledStepActions;
+
+				//Then, create all needed synths
 				~algaPattern.createEventSynths(
 					algaSynthDef: algaSynthDef,
 					algaSynthBus: algaSynthBus,
@@ -237,6 +244,28 @@ AlgaPattern : AlgaNode {
 				interpBussesToFree.remove(interpBus);
 				currentActiveInterpBusses.removeAt(interpBus);
 			});
+		});
+	}
+
+	//
+	advanceAndConsumeScheduledStepActions {
+		scheduledStepActions.keysValuesDo({ | action, step |
+			step = step - 1;
+			if(step <= 0, {
+				action.value;
+				scheduledStepActions.removeAt(action);
+			}, {
+				scheduledStepActions[action] = step;
+			});
+		});
+	}
+
+	//
+	addScheduledStepAction { | action, step |
+		if(step.isNumber, {
+			scheduledStepActions[action] = step + 1
+		}, {
+			scheduledStepActions[action] = 1
 		});
 	}
 
@@ -2434,8 +2463,8 @@ AlgaPattern : AlgaNode {
 	}
 
 	//<<, <<+ and <|
-	makeConnectionInner { | param = \in, sender, senderChansMapping, scale,
-		sampleAndHold, time = 0, shape |
+	makeConnectionInner { | sender, param = \in, senderChansMapping, scale,
+		sampleAndHold = false, time = 0, shape |
 
 		var isDefault = false;
 		var paramConnectionTime = paramsConnectionTime[param];
@@ -2508,8 +2537,8 @@ AlgaPattern : AlgaNode {
 				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
 				func: {
 					this.makeConnectionInner(
-						param: param,
 						sender: sender,
+						param: param,
 						senderChansMapping: senderChansMapping,
 						scale: scale,
 						sampleAndHold: sampleAndHold,
