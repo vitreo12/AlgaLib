@@ -23,12 +23,25 @@ p = AlgaProxySpace.boot;
 ~c = (def: {SinOsc.ar * EnvPerc.ar(release: 3)}, dur:1)
 ~c = (def: {Saw.ar * EnvPerc.ar(release: 3) * 0.7}, dur:1)
 
-/*
-AP:
 
-1) copy all relevant stuff (playTime, interpTime, interpShape, etc...)
-to the new AP and return that
+~d.interpTime = 4
+~d.playTime = 2
+~d.play
+(
+~d = (
+	def: { SinOsc.ar(\freq.kr(440)) * EnvPerc.ar * 2 },
+	dur: 0.1,
+	freq: Pseq([440, 880], inf)
+)
+)
 
-2) perform differential checks
 
-*/
+
+( hello: Pwhite() ).asString == ( hello: Pwhite(3) ).code
+
+{ Pwhite(3) }.def.code == { Pwhite(3) }.def.code
+
+{ Pwhite(3) }.def.code == { 2 }.def.code
+
+
+Pwhite(3, 1).asCompileString

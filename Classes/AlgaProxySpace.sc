@@ -2,6 +2,7 @@ AlgaProxySpace {
 	classvar <nodes;
 	classvar <paramsArgs;
 	classvar <currentNode;
+	classvar <patternsEvents;
 	var <server;
 
 	*boot { | onBoot, server, algaServerOptions, clock |
@@ -16,6 +17,7 @@ AlgaProxySpace {
 	*initClass {
 		nodes = IdentityDictionary(10);
 		paramsArgs = IdentityDictionary(10);
+		patternsEvents = IdentityDictionary(10);
 	}
 
 	*addParamArgs { | param, value |
@@ -78,6 +80,7 @@ AlgaProxySpace {
 				var interpTime = node.connectionTime;
 				var interpShape = node.interpShape;
 				var playTime = node.playTime;
+				var defBeforeMod = def.copy; //def gets modified in AlgaPattern. Store the original one
 				var pattern = AlgaPattern(
 					def: def,
 					interpTime: interpTime,
@@ -85,6 +88,9 @@ AlgaProxySpace {
 					playTime: playTime,
 					server: server
 				);
+
+				//Store
+				patternsEvents[pattern] = defBeforeMod;
 
 				//Copy relevant vars over
 				pattern.copyVars(node);
@@ -99,31 +105,72 @@ AlgaProxySpace {
 				nodes[key] = pattern;
 				^pattern;
 			}, {
-				//Check for differences in the Event to perform interpolations
+				var defBeforeMod = def.copy;
+				var currentEventPairs = patternsEvents[node];
+				var newConnections = IdentityDictionary();
 
-				//If at least one would require .replace, just run it once
+				//Check for differences in the Event to perform interpolations.
+				//OR perform a single .replace if there's at least one replaceable element.
+				block { | break |
+					def.keysValuesDo({ | key, newEntry |
+						var currentEntry = currentEventPairs[key];
+
+						//Trick to compare actual differences in the source code
+						var currentEntryCompileString = currentEntry.asCompileString;
+						var newEntryCompileString = newEntry.asCompileString;
+						if(newEntryCompileString != currentEntryCompileString, {
+							newConnections[key] = newEntry;
+							if(node.connectionTriggersReplace(key).or(
+								node.patternOrAlgaPatternArgContainsBuffers(newEntry)), {
+								newConnections.clear;
+								break.value(nil);
+							});
+						});
+					});
+				};
+
+				//Update
+				patternsEvents[node] = defBeforeMod;
+
+				//If no replaces, perform differential
+				if(newConnections.size > 0, {
+					newConnections.keysValuesDo({ | param, entry |
+						var sched = 0;
+						if((param == \dur).or(param == \delta), { sched = 1 });
+						(param ++ ": " ++ entry.asString).warn;
+						node.from(
+							sender: entry,
+							param: param,
+							sched: sched
+						);
+					});
+					^node
+				});
 			});
 		});
 
-		//This allows to retrieve Symbol.kr / Symbol.ar using AlgaNodes
-		this.triggerDef(node, def);
+		//AlgaPattern doesn't have args, you use the Event directly
+		if(node.isAlgaPattern.not, {
+			//This allows to retrieve Symbol.kr / Symbol.ar using AlgaNodes
+			this.triggerDef(node, def);
 
-		//These are updated thanks to triggerDef
-		currentArgsID = paramsArgs[currentNode];
-		if(currentArgsID != nil, {
-			currentArgs = Array();
-			currentArgsID.keysValuesDo({ | param, val |
-				currentArgs = currentArgs.add(param).add(val);
-			});
-			if(currentArgs.size > 0, {
-				^node.replace(
-					def: def,
-					args: currentArgs
-				);
+			//These are updated thanks to triggerDef
+			currentArgsID = paramsArgs[currentNode];
+			if(currentArgsID != nil, {
+				currentArgs = Array();
+				currentArgsID.keysValuesDo({ | param, val |
+					currentArgs = currentArgs.add(param).add(val);
+				});
+				if(currentArgs.size > 0, {
+					^node.replace(
+						def: def,
+						args: currentArgs
+					);
+				});
 			});
 		});
 
-		//Standard replace
+		//Fallback: standard replace
 		^node.replace(def);
 	}
 

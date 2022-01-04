@@ -2423,6 +2423,7 @@ AlgaPattern : AlgaNode {
 
 	//ListPattern that contains Buffers
 	patternOrAlgaPatternArgContainsBuffers { | pattern |
+		if(pattern.isBuffer, { ^true });
 		if(pattern.isAlgaArg, { if(pattern.sender.isBuffer, { ^true }) });
 		if(pattern.isListPattern, {
 			pattern.list.do({ | entry |
@@ -2521,6 +2522,16 @@ AlgaPattern : AlgaNode {
 				topPriority: true //This is essential for scheduled times to work correctly!
 			)
 		});
+	}
+
+	//Used in AlgaProxySpace
+	connectionTriggersReplace { | param = \in |
+		if((((param == \delta).or(param == \dur)).and(replaceDur)).or(param == \def).or(param == \fx).or(param == \out), {
+			if(controlNames[param] == nil, {
+				^true
+			});
+		});
+		^false
 	}
 
 	//from implementation
