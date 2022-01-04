@@ -183,6 +183,7 @@ AlgaSynthDef : SynthDef {
 		def = super.new(name, {
 			var out, outCtl, buildSynthDef;
 			var ampProvided = false;
+			var gateProvided = false;
 
 			//invalid func
 			if(func.isFunction.not, {
@@ -213,13 +214,20 @@ AlgaSynthDef : SynthDef {
 				//Check if amp was there already
 				if(controlNameName == \amp, { ampProvided = true });
 
-				//Don't \gate arg when makeFadeEnv is true, otherwise it's fine (it's used in AlgaStartup)
-				if((makeFadeEnv.and(controlNameName == \gate)).or(controlNameName == \out).or(controlNameName == \patternTempOut), {
-					error = true
+				//Check \gate
+				if(controlNameName == \gate, {
+					if(controlName.rate != \control, {
+						Error("AlgaSynthDef: 'gate' can only be a control rate parameter").algaThrow
+					});
+					gateProvided = true;
 				});
 
-				if(error, {
-					Error("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally.").algaThrow;
+				//Check for invalid names
+				if((controlNameName == \out).or(
+					controlNameName == \patternTempOut).or(
+					controlNameName == \fadeTime).or(
+					controlNameName == \sustain), {
+					Error("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally. Choose another name.").algaThrow;
 				});
 			});
 
@@ -266,7 +274,15 @@ AlgaSynthDef : SynthDef {
 			//the AlgaEnvGate will take care of freeing the synth, even if not used to multiply
 			//with output! This is fundamental for the \fadeTime mechanism in Alga to work,
 			//freeing synths at the right time.
-			envgen = if(makeFadeEnv, { AlgaEnvGate.kr(i_level: 0, doneAction:2) }, { 1.0 });
+			envgen = if(makeFadeEnv, {
+				if(gateProvided, {
+					AlgaEnvGate.kr(gate: \gate.kr, fadeTime: \fadeTime.kr(0), i_level: 0, doneAction: 2)
+				}, {
+					AlgaEnvGate.kr(gate: \gate.kr(0), fadeTime: \fadeTime.kr(0), i_level: 0, doneAction: 2)
+				});
+			}, {
+				1.0
+			});
 
 			//Scalar == ir
 			if(isScalar, {

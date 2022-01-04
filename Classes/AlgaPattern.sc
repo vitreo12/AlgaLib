@@ -103,6 +103,10 @@ AlgaPattern : AlgaNode {
 	//Skip an iteration for FX
 	var skipIterationFX = false;
 
+	//Used to set sustain's gate
+	var <>isSustainTrig = false;
+	var <>sustainIDs;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -148,9 +152,22 @@ AlgaPattern : AlgaNode {
 			//Other things for pattern syncing / clocking / scheduling
 			var offset = ~timingOffset;
 			var lag = ~lag;
+			var latency = ~latency;
+			var sustain = ~sustain.value;
+			var hasSustain = sustain.isNumber;
 
 			//Needed ?
 			~isPlaying = true;
+
+			//Reset allPatternAndTempSynths (for sustain)
+			if(hasSustain, {
+				if(sustain > 0, {
+					~algaPattern.isSustainTrig = true;
+					~algaPattern.sustainIDs = Array();
+				}, {
+					hasSustain = false
+				});
+			});
 
 			//Create the bundle with all needed Synths for this Event.
 			bundle = algaPatternServer.makeBundle(false, {
@@ -170,8 +187,22 @@ AlgaPattern : AlgaNode {
 				algaPatternClock,
 				bundle,
 				lag,
-				algaPatternServer
+				algaPatternServer,
+				latency
 			);
+
+			//Sched sustain if provided
+			if(hasSustain, {
+				~algaPattern.scheduleSustain(
+					sustain,
+					offset,
+					lag,
+					latency
+				);
+			});
+
+			//Always reset isSustainTrig
+			~algaPattern.isSustainTrig = false;
 		});
 	}
 
@@ -226,10 +257,24 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
+	//Schedule sustain
+	scheduleSustain { | sustain, offset, lag, latency |
+		if(sustainIDs.size > 0, {
+			schedBundleArrayOnClock(
+				sustain + offset,
+				this.clock,
+				[15 /* \n_set */, sustainIDs, \gate, 0].flop,
+				lag,
+				server,
+				latency
+			);
+		});
+	}
+
 	//Create a temporary synth according to the specs of the AlgaTemp
 	createAlgaTempSynth { | algaTemp, patternBussesAndSynths |
 		var tempBus, tempSynth;
-		var tempSynthArgs = Array.newClear;
+		var tempSynthArgs = [ \gate, 1 ];
 		var tempNumChannels = algaTemp.numChannels;
 		var tempRate = algaTemp.rate;
 		var def, algaTempDef, controlNames;
@@ -315,6 +360,11 @@ AlgaPattern : AlgaNode {
 		//Add Bus and Synth to patternBussesAndSynths
 		patternBussesAndSynths.add(tempBus);
 		patternBussesAndSynths.add(tempSynth);
+
+		//If sustain, add tempSynth's ID to sustains'
+		if(isSustainTrig, {
+			sustainIDs = sustainIDs.add(tempSynth.nodeID)
+		});
 
 		//Return the AlgaBus that the tempSynth writes to
 		^tempBus.busArg;
@@ -1192,6 +1242,11 @@ AlgaPattern : AlgaNode {
 
 			//Add pattern synth to algaPatternSynths, and free it when patternSynth gets freed
 			algaPatternInterpStreams.algaPatternSynths.add(patternSynth);
+
+			//If sustain, add patternSynth to sustains'
+			if(isSustainTrig, {
+				sustainIDs = sustainIDs.add(patternSynth.nodeID)
+			});
 		});
 
 		//Free all normBusses, normSynths, interpBusses and interpSynths on patternSynth's release
@@ -3232,6 +3287,7 @@ AMP : AlgaMonoPattern {}
 					tempSynthArgs = [
 						\in, outTempBus.busArg,
 						\out, interpBus.index,
+						\gate, 1,
 						\fadeTime, 0,
 						\env, envBus.busArg
 					];

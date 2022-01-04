@@ -97,7 +97,7 @@ AlgaTemp {
 	var <numChannels, <rate;
 	var <valid = false;
 
-	*new { | def, chans, scale, sampleAccurate |
+	*new { | def, chans, scale, sampleAccurate = false |
 		^super.new.init(def, chans, scale, sampleAccurate)
 	}
 
