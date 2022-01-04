@@ -2,7 +2,7 @@
 (
 Alga.boot({
 	a = AP((
-		def: { SinOsc.ar * EnvGen.ar(Env.adsr, \gate.kr) }, //use can use \gate
+		def: { SinOsc.ar * EnvGen.ar(Env.adsr, \gate.kr) }, //user can use \gate
 		sustain: Pseq([1, 2], inf), //reserved keyword
 		dur: 3
 	)).play
