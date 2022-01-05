@@ -191,6 +191,10 @@ AlgaPattern : AlgaNode {
 					~algaPattern.isSustainTrig = true;
 					~algaPattern.sustainIDs = Array();
 				}, {
+					if(~algaPattern.sustainToDur, {
+						("AlgaPattern: your 'sustain' is 0 or less: " ++
+							sustain ++ ". This might cause the Synths not to be released").warn;
+					});
 					hasSustain = false
 				});
 			});
