@@ -113,7 +113,8 @@ AlgaPattern : AlgaNode {
 	var <schedSustainInSeconds = false;
 
 	//If false, sustain must be explicitly set by the user.
-	//If true, sustain will be: sustain + dur.
+	//If true, sustain will be: (sustain * stretch) + dur.
+	//legato will apply in both cases.
 	var <>sustainToDur = false;
 
 	//Add the \algaNote event to Event
@@ -159,23 +160,33 @@ AlgaPattern : AlgaNode {
 			var algaOut = ~algaOut;
 
 			//Other things for pattern syncing / clocking / scheduling
+			var dur = ~dur;
 			var offset = ~timingOffset;
 			var lag = ~lag;
 			var latency = ~latency;
 			var sustain = ~sustain;
+			var stretch = ~stretch;
+			var legato = ~legato;
 			var hasSustain = sustain.isNumber;
 
-			//Needed ?
+			//Needed for Event syncing
 			~isPlaying = true;
 
-			//sustainEqualsDur if sustain is not specified
-			if(hasSustain.and(~algaPattern.sustainToDur), {
-				sustain = sustain + ~dur;
-				hasSustain = true;
-			});
-
-			//Reset allPatternAndTempSynths (for sustain)
+			//Deal with sustain
 			if(hasSustain, {
+				//scale by stretch
+				sustain = sustain * stretch;
+
+				//scale by legato
+				if(legato > 0, { sustain = sustain * legato });
+
+				//If sustainToDur, add to dur. This allows to do things like sustain: -0.5 (from dur).
+				//Also, if sustain is 0 here, it will then use \dur
+				if(~algaPattern.sustainToDur, {
+					sustain = sustain + dur; //dur already includes stretch!
+				});
+
+				//Finally, if the result is a positive number, go ahead
 				if(sustain > 0, {
 					~algaPattern.isSustainTrig = true;
 					~algaPattern.sustainIDs = Array();

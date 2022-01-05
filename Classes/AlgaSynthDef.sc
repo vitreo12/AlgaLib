@@ -225,8 +225,7 @@ AlgaSynthDef : SynthDef {
 				//Check for invalid names
 				if((controlNameName == \out).or(
 					controlNameName == \patternTempOut).or(
-					controlNameName == \fadeTime).or(
-					controlNameName == \sustain), {
+					controlNameName == \fadeTime), {
 					Error("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally. Choose another name.").algaThrow;
 				});
 			});
