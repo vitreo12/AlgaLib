@@ -191,10 +191,10 @@ AlgaSynthDef : SynthDef {
 				});
 			});
 
-			//Check if user has explicit Outs, this is not permitted
+			//Check if user has explicit Outs, this is not permitted (allow LocalOut for inner fb)
 			if(ignoreOutWarning.not, {
 				buildSynthDef.children.do({ | ugen |
-					if(ugen.isKindOf(AbstractOut), {
+					if((ugen.isKindOf(AbstractOut)).and(ugen.isKindOf(LocalOut).not), {
 						Error("AlgaSynthDef: Out / OffsetOut cannot be explicitly set. They are declared internally.").algaThrow;
 					});
 				});
