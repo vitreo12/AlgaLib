@@ -158,7 +158,7 @@ AlgaPattern : AlgaNode {
 			var offset = ~timingOffset;
 			var lag = ~lag;
 			var latency = ~latency;
-			var sustain = ~sustain; //NOT .value (that will consider stretch and such)
+			var sustain = ~sustain;
 			var hasSustain = sustain.isNumber;
 
 			//Needed ?
@@ -217,6 +217,15 @@ AlgaPattern : AlgaNode {
 			interpStreams.dur = value.algaAsStream
 		}, {
 			newInterpStreams.dur = value.algaAsStream
+		});
+	}
+
+	//Set sustain asStream for it to work within Pfuncn
+	setSustain { | value, newInterpStreams |
+		if(newInterpStreams == nil, {
+			interpStreams.sustain = value.algaAsStream
+		}, {
+			newInterpStreams.sustain = value.algaAsStream
 		});
 	}
 
@@ -1800,6 +1809,7 @@ AlgaPattern : AlgaNode {
 	//Build the actual pattern
 	createPattern { | replace = false, keepChannelsMapping = false, keepScale = false, sched |
 		var foundDurOrDelta = false;
+		var foundSustain = false, resetSustain = false;
 		var manualDur = false;
 		var foundFX = false;
 		var parsedFX;
@@ -1883,6 +1893,13 @@ AlgaPattern : AlgaNode {
 				isAlgaParam = true;
 			});
 
+			//Found \sustain
+			if(paramName == \sustain, {
+				foundSustain = true;
+				isAlgaParam = true;
+				this.setSustain(value, newInterpStreams);
+			});
+
 			//Add \fx key (parsing everything correctly)
 			if(paramName == \fx, {
 				parsedFX = value;
@@ -1918,7 +1935,7 @@ AlgaPattern : AlgaNode {
 		//Store current out for replaces
 		if(foundOut, { currentOut = parsedOut });
 
-		//If no dur and replace, get it from previous interpStreams
+		//If replace, find keys in the old pattern if they are not redefined
 		if(replace, {
 			//Check reset for alga params
 			var resetSet = this.parseResetOnReplaceParams;
@@ -1941,6 +1958,11 @@ AlgaPattern : AlgaNode {
 						interpStreams = nil;
 					});
 
+					//reset \sustain
+					if((foundSustain.not).and(resetSet.findMatch(\sustain) != nil), {
+						resetSustain = true;
+					});
+
 					//reset generic params
 					resetSet.do({ | entry | currentGenericParams.removeAt(entry) });
 				}
@@ -1948,18 +1970,28 @@ AlgaPattern : AlgaNode {
 					parsedFX = nil; currentFX = nil; //reset \fx
 					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil; prevPatternOutNodes = nil; //reset \out
 					interpStreams = nil; //reset \dur
+					resetSustain = true; //reset \sustain
 
 					//reset all generic params
 					if(currentGenericParams != nil, { currentGenericParams.clear });
 				};
 			});
 
-			//Set dur according to previous one
+			//No \dur from user, set to previous one
 			if(foundDurOrDelta.not, {
 				if((interpStreams == nil).or(algaWasBeingCleared), {
 					this.setDur(1, newInterpStreams)
 				}, {
 					this.setDur(interpStreams.dur, newInterpStreams)
+				});
+			});
+
+			//No \sustain from user, set to previous one
+			if(foundSustain.not, {
+				if(resetSustain, {
+					this.setSustain(0, newInterpStreams)
+				}, {
+					this.setSustain(interpStreams.sustain, newInterpStreams)
 				});
 			});
 
@@ -1990,8 +2022,9 @@ AlgaPattern : AlgaNode {
 				})
 			});
 		}, {
-			//Else, default it to 1
+			//Else, default them
 			if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
+			if(foundSustain.not, { this.setSustain(0, newInterpStreams) });
 		});
 
 		//Set the correct synthBus in newInterpStreams!!!
@@ -2010,6 +2043,11 @@ AlgaPattern : AlgaNode {
 			\algaPatternInterpStreams, newInterpStreams //Lock current one: will work on .replace
 		]);
 
+		//Add \sustain
+		patternPairs = patternPairs.add(\sustain).add(
+			Pfuncn( { newInterpStreams.sustain.next }, inf)
+		);
+
 		//Manual or automatic dur management
 		if(manualDur.not, {
 			//Pfuncn allows to modify the value
@@ -2024,7 +2062,6 @@ AlgaPattern : AlgaNode {
 
 		//Determine if \out interpolation is required
 		this.createPatternOutReceivers;
-
 		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
 		//createPattern function is non scheduled as it it better to create it right away.
 		if(manualDur.not, {
@@ -2416,6 +2453,22 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
+	//Interpolate sustain (uses replaceDur)
+	interpolateSustain { | value, time, sched |
+		if(replaceDur, {
+			("AlgaPattern: 'sustain' interpolation is not supported yet. Running 'replace' instead.").warn;
+			^this.replace(
+				def: (def: this.getSynthDef, sustain: value),
+				time: time,
+				sched: sched
+			);
+		}, {
+			if(sched == nil, { sched = 0 });
+			("AlgaPattern: 'sustain' interpolation is not supported yet. Rescheduling 'sustain' at the " ++ sched ++ " quantization.").warn;
+			^this.setSustainAtSched(value, sched);
+		});
+	}
+
 	//Interpolate def == replace
 	interpolateDef { | def, time, sched |
 		"AlgaPattern: changing the 'def' key. This will trigger 'replace'.".warn;
@@ -2577,6 +2630,11 @@ AlgaPattern : AlgaNode {
 		//Special case, \dur
 		if(param == \dur, {
 			^this.interpolateDur(sender, time, sched);
+		});
+
+		//Special case, \sustain
+		if(param == \sustain, {
+			^this.interpolateSustain(sender, time, sched);
 		});
 
 		//Special case, \def
@@ -2818,6 +2876,15 @@ AlgaPattern : AlgaNode {
 					algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, { this.setDur(value) });
 				})
 			}
+		);
+	}
+
+	//Set sustain at sched
+	setSustainAtSched { | value, sched |
+		scheduler.addAction(
+			func: { this.setSustain(value) },
+			sched: sched,
+			topPriority: true
 		);
 	}
 
