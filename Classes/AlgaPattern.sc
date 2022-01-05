@@ -153,7 +153,7 @@ AlgaPattern : AlgaNode {
 			var offset = ~timingOffset;
 			var lag = ~lag;
 			var latency = ~latency;
-			var sustain = ~sustain.value;
+			var sustain = ~sustain; //NOT .value (that will consider stretch and such)
 			var hasSustain = sustain.isNumber;
 
 			//Needed ?
