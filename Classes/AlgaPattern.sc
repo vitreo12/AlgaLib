@@ -105,7 +105,12 @@ AlgaPattern : AlgaNode {
 
 	//Used to set sustain's gate
 	var <>isSustainTrig = false;
+
+	//The list of IDs of active synths to send \gate,0 to
 	var <>sustainIDs;
+
+	//Schedule sustain to the internal clock or seconds
+	var <schedSustainInSeconds = false;
 
 	//Add the \algaNote event to Event
 	*initClass {
@@ -243,6 +248,15 @@ AlgaPattern : AlgaNode {
 		this.useMultiChannelExpansion(value)
 	}
 
+	//Set schedSustainInSeconds
+	schedSustainInSeconds_ { | value = false |
+		if((value != false).and(value != true), {
+			"AlgaPattern: 'scheduleSustainToBeats' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		schedSustainInSeconds = value
+	}
+
 	//Free all unused busses from interpStreams
 	freeUnusedInterpBusses { | algaPatternInterpStreams |
 		var interpBussesToFree = algaPatternInterpStreams.interpBussesToFree;
@@ -260,14 +274,16 @@ AlgaPattern : AlgaNode {
 	//Schedule sustain
 	scheduleSustain { | sustain, offset, lag, latency |
 		if(sustainIDs.size > 0, {
+			var clock = this.clock;
+			if(schedSustainInSeconds, { clock = SystemClock });
 			schedBundleArrayOnClock(
 				sustain + offset,
-				this.clock,
+				clock,
 				[15 /* \n_set */, sustainIDs, \gate, 0].flop,
 				lag,
 				server,
 				latency
-			);
+			)
 		});
 	}
 
