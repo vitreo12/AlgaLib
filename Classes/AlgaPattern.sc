@@ -112,6 +112,10 @@ AlgaPattern : AlgaNode {
 	//Schedule sustain to the internal clock or seconds
 	var <schedSustainInSeconds = false;
 
+	//If false, sustain must be explicitly set by the user.
+	//If true, sustain will be: sustain + dur.
+	var <>sustainToDur = false;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -163,6 +167,12 @@ AlgaPattern : AlgaNode {
 
 			//Needed ?
 			~isPlaying = true;
+
+			//sustainEqualsDur if sustain is not specified
+			if(hasSustain.and(~algaPattern.sustainToDur), {
+				sustain = sustain + ~dur;
+				hasSustain = true;
+			});
 
 			//Reset allPatternAndTempSynths (for sustain)
 			if(hasSustain, {
