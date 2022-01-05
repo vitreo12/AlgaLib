@@ -239,6 +239,24 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
+	//Set stretch asStream for it to work within Pfuncn
+	setStretch { | value, newInterpStreams |
+		if(newInterpStreams == nil, {
+			interpStreams.stretch = value.algaAsStream
+		}, {
+			newInterpStreams.stretch = value.algaAsStream
+		});
+	}
+
+	//Set stretch asStream for it to work within Pfuncn
+	setLegato { | value, newInterpStreams |
+		if(newInterpStreams == nil, {
+			interpStreams.legato = value.algaAsStream
+		}, {
+			newInterpStreams.legato = value.algaAsStream
+		});
+	}
+
 	//Set replaceDur
 	replaceDur_ { | value = false |
 		if((value != false).and(value != true), {
@@ -312,7 +330,7 @@ AlgaPattern : AlgaNode {
 		var tempSynthArgs = [ \gate, 1 ];
 		var tempNumChannels = algaTemp.numChannels;
 		var tempRate = algaTemp.rate;
-		var def, algaTempDef, controlNames;
+		var def, algaTempDef, tempControlNames;
 		var defIsEvent = false;
 
 		//Check AlgaTemp validity
@@ -332,10 +350,10 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Unpack controlNames
-		controlNames = algaTemp.controlNames;
+		tempControlNames = algaTemp.controlNames;
 
 		//Loop around the controlNames to set relevant parameters
-		controlNames.do({ | controlName |
+		tempControlNames.do({ | controlName |
 			var paramName = controlName.name;
 			var paramNumChannels = controlName.numChannels;
 			var paramRate = controlName.rate;
@@ -1820,6 +1838,8 @@ AlgaPattern : AlgaNode {
 	createPattern { | replace = false, keepChannelsMapping = false, keepScale = false, sched |
 		var foundDurOrDelta = false;
 		var foundSustain = false, resetSustain = false;
+		var foundStretch = false, resetStretch = false;
+		var foundLegato = false, resetLegato = false;
 		var manualDur = false;
 		var foundFX = false;
 		var parsedFX;
@@ -1910,6 +1930,20 @@ AlgaPattern : AlgaNode {
 				this.setSustain(value, newInterpStreams);
 			});
 
+			//Found \stretch
+			if(paramName == \stretch, {
+				foundStretch = true;
+				isAlgaParam = true;
+				this.setStretch(value, newInterpStreams);
+			});
+
+			//Found \legato
+			if(paramName == \legato, {
+				foundLegato = true;
+				isAlgaParam = true;
+				this.setLegato(value, newInterpStreams);
+			});
+
 			//Add \fx key (parsing everything correctly)
 			if(paramName == \fx, {
 				parsedFX = value;
@@ -1973,6 +2007,16 @@ AlgaPattern : AlgaNode {
 						resetSustain = true;
 					});
 
+					//reset \stretch
+					if((foundStretch.not).and(resetSet.findMatch(\stretch) != nil), {
+						resetStretch = true;
+					});
+
+					//reset \legato
+					if((foundLegato.not).and(resetSet.findMatch(\legato) != nil), {
+						resetLegato = true;
+					});
+
 					//reset generic params
 					resetSet.do({ | entry | currentGenericParams.removeAt(entry) });
 				}
@@ -1981,6 +2025,8 @@ AlgaPattern : AlgaNode {
 					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil; prevPatternOutNodes = nil; //reset \out
 					interpStreams = nil; //reset \dur
 					resetSustain = true; //reset \sustain
+					resetStretch = true; //reset \stretch
+					resetLegato = true;  //reset \legato
 
 					//reset all generic params
 					if(currentGenericParams != nil, { currentGenericParams.clear });
@@ -2002,6 +2048,24 @@ AlgaPattern : AlgaNode {
 					this.setSustain(0, newInterpStreams)
 				}, {
 					this.setSustain(interpStreams.sustain, newInterpStreams)
+				});
+			});
+
+			//No \stretch from user, set to previous one
+			if(foundStretch.not, {
+				if(resetStretch, {
+					this.setStretch(1, newInterpStreams)
+				}, {
+					this.setStretch(interpStreams.stretch, newInterpStreams)
+				});
+			});
+
+			//No \stretch from user, set to previous one
+			if(foundLegato.not, {
+				if(resetLegato, {
+					this.setLegato(0, newInterpStreams)
+				}, {
+					this.setLegato(interpStreams.legato, newInterpStreams)
 				});
 			});
 
@@ -2035,6 +2099,8 @@ AlgaPattern : AlgaNode {
 			//Else, default them
 			if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
 			if(foundSustain.not, { this.setSustain(0, newInterpStreams) });
+			if(foundStretch.not, { this.setStretch(1, newInterpStreams) });
+			if(foundLegato.not, { this.setLegato(0, newInterpStreams) });
 		});
 
 		//Set the correct synthBus in newInterpStreams!!!
@@ -2054,9 +2120,11 @@ AlgaPattern : AlgaNode {
 		]);
 
 		//Add \sustain
-		patternPairs = patternPairs.add(\sustain).add(
-			Pfuncn( { newInterpStreams.sustain.next }, inf)
-		);
+		patternPairs = patternPairs.addAll([
+			\sustain, Pfuncn( { newInterpStreams.sustain.next }, inf),
+			\stretch, Pfuncn( { newInterpStreams.stretch.next }, inf),
+			\legato, Pfuncn( { newInterpStreams.legato.next }, inf)
+		]);
 
 		//Manual or automatic dur management
 		if(manualDur.not, {
@@ -2479,6 +2547,38 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
+	//Interpolate stretch (uses replaceDur)
+	interpolateStretch { | value, time, sched |
+		if(replaceDur, {
+			("AlgaPattern: 'stretch' interpolation is not supported yet. Running 'replace' instead.").warn;
+			^this.replace(
+				def: (def: this.getSynthDef, stretch: value),
+				time: time,
+				sched: sched
+			);
+		}, {
+			if(sched == nil, { sched = 0 });
+			("AlgaPattern: 'stretch' interpolation is not supported yet. Rescheduling 'stretch' at the " ++ sched ++ " quantization.").warn;
+			^this.setStretchAtSched(value, sched);
+		});
+	}
+
+	//Interpolate legato (uses replaceDur)
+	interpolateLegato { | value, time, sched |
+		if(replaceDur, {
+			("AlgaPattern: 'legato' interpolation is not supported yet. Running 'replace' instead.").warn;
+			^this.replace(
+				def: (def: this.getSynthDef, legato: value),
+				time: time,
+				sched: sched
+			);
+		}, {
+			if(sched == nil, { sched = 0 });
+			("AlgaPattern: 'legato' interpolation is not supported yet. Rescheduling 'legato' at the " ++ sched ++ " quantization.").warn;
+			^this.setLegatoAtSched(value, sched);
+		});
+	}
+
 	//Interpolate def == replace
 	interpolateDef { | def, time, sched |
 		"AlgaPattern: changing the 'def' key. This will trigger 'replace'.".warn;
@@ -2645,6 +2745,16 @@ AlgaPattern : AlgaNode {
 		//Special case, \sustain
 		if(param == \sustain, {
 			^this.interpolateSustain(sender, time, sched);
+		});
+
+		//Special case, \stretch
+		if(param == \stretch, {
+			^this.interpolateStretch(sender, time, sched);
+		});
+
+		//Special case, \legato
+		if(param == \legato, {
+			^this.interpolateLegato(sender, time, sched);
 		});
 
 		//Special case, \def
@@ -2893,6 +3003,24 @@ AlgaPattern : AlgaNode {
 	setSustainAtSched { | value, sched |
 		scheduler.addAction(
 			func: { this.setSustain(value) },
+			sched: sched,
+			topPriority: true
+		);
+	}
+
+	//Set stretch at sched
+	setStretchAtSched { | value, sched |
+		scheduler.addAction(
+			func: { this.setStretch(value) },
+			sched: sched,
+			topPriority: true
+		);
+	}
+
+	//Set leagto at sched
+	setLegatoAtSched { | value, sched |
+		scheduler.addAction(
+			func: { this.setLegato(value) },
 			sched: sched,
 			topPriority: true
 		);
