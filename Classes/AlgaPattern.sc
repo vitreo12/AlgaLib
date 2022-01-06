@@ -14,13 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//AlgaPattern
 AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
 	1) mixFrom()
-	2) \dur interpolation
+	2) \dur - \sustain - \stretch - \legato interpolations
 	*/
 
 	//Special groups used in AlgaPattern
