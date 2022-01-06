@@ -177,14 +177,14 @@ AlgaPattern : AlgaNode {
 				//scale by stretch
 				sustain = sustain * stretch;
 
-				//scale by legato
-				if(legato > 0, { sustain = sustain * legato });
-
 				//If sustainToDur, add to dur. This allows to do things like sustain: -0.5 (from dur).
 				//Also, if sustain is 0 here, it will then use \dur
 				if(~algaPattern.sustainToDur, {
 					sustain = sustain + dur; //dur already includes stretch!
 				});
+
+				//scale by legato
+				if(legato > 0, { sustain = sustain * legato });
 
 				//Finally, if the result is a positive number, go ahead
 				if(sustain > 0, {
