@@ -16,10 +16,12 @@
 
 AlgaDetectSilence {
 	*ar { arg in = 0.0, amp = 0.0001, time = 0.1, doneAction = 2;
-		^(DetectSilence.ar(Impulse.ar(0) + in, amp, time, doneAction))
+		DetectSilence.ar(Impulse.ar(0) + in, amp, time, doneAction);
+		^in;
 	}
 
-	*kr { arg in = 0.0, amp = 0.0001, time = 0.1, doneAction = 0;
-		^(DetectSilence.kr(Impulse.ar(0) + in, amp, time, doneAction))
+	*kr { arg in = 0.0, amp = 0.0001, time = 0.1, doneAction = 2;
+		DetectSilence.kr(Impulse.kr(0) + in, amp, time, doneAction);
+		^in;
 	}
 }
