@@ -277,7 +277,7 @@ AlgaSynthDef : SynthDef {
 				if(gateProvided, {
 					AlgaEnvGate.kr(gate: \gate.kr, fadeTime: \fadeTime.kr(0), i_level: 0, doneAction: 2)
 				}, {
-					AlgaEnvGate.kr(gate: \gate.kr(0), fadeTime: \fadeTime.kr(0), i_level: 0, doneAction: 2)
+					AlgaEnvGate.kr(gate: \gate.kr(1), fadeTime: \fadeTime.kr(0), i_level: 0, doneAction: 2)
 				});
 			}, {
 				1.0
