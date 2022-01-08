@@ -1,40 +1,34 @@
 (
 Alga.boot({
 	AlgaSynthDef(\test, {
-		(SinOsc.ar(\f.kr(440)) * EnvPerc.ar * 0.5).poll
+		SinOsc.ar(\f.kr(440)) * EnvPerc.ar(release:2)
 	}).add;
 
 	AlgaSynthDef(\test2, {
-		Saw.ar(\f.kr(440)) * EnvPerc.ar * 0.5
+		Saw.ar(\f.kr(440)) * EnvPerc.ar(release:2) * 0.5
 	}).add;
 
 	s.sync;
 
-	a = AP( (
+	a = AP((
 		def: \test,
-		dur: 1
-	)).play;
+		dur: 0.5
+	), playTime:2 ).play;
 
-	s.scope
+	//b = AN({ \in.ar }, [\in, a]).play
+	//s.plotTree;
 })
 )
 
-//The inner version is the one that works, as it would be scheduled rn
-a.addScheduledStepAction({ a.makeConnectionInner(220, \f, time:1) }, 2);
+a.from(220, \f, sched: AlgaStep(2))
 
-//There's a weird "fadein" happening with replace
-a.addScheduledStepAction({ a.replace((def: \test2)) }, 0);
-
-//Also, this is a bug: the second trigger onwards will DC
-a.addScheduledStepAction({ a.replace((def: \test)) }, 0);
+//The fadein is play's fault!
+//a.stopPatternBeforeReplace=true doesn't work
+a.replace(\test, sched:AlgaStep(2))
 
 
+//exec again: AlgaStep(2) will be AlgaStep(0) bug
+a.from(440, \f, sched: AlgaStep(2))
 
-//the issue of fadein is in .play
-b = AN({\in.ar}).play;
-a >> b;
-a.stop;
-
-//no more fade in
-a.replace(\test2, sched:2)
-a.replace(\test, sched:2)
+a.stopPatternBeforeReplace=true
+a.replace(\test2, sched:1)

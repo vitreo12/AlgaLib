@@ -245,10 +245,44 @@ AlgaNode {
 			this.currentPatternBussesAndSynths = IdentityDictionary(10);
 			this.currentActivePatternParamSynths = IdentityDictionary(10);
 			this.currentActiveInterpBusses = IdentityDictionary(10);
-			this.scheduledStepActions = IdentityDictionary(10);
+			this.scheduledStepActions = OrderedIdentitySet(10);
 		});
 
 		^true;
+	}
+
+	//Add an action to scheduler. This takes into account sched == AlgaStep
+	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
+		//AlgaStep scheduling
+		if(sched.isAlgaStep, {
+			if(this.isAlgaPattern, {
+				this.addScheduledStepAction(
+					step: sched,
+					condition: condition,
+					func: func
+				);
+			}, {
+				//AlgaNodes don't support AlgaStep
+				sched = sched.step;
+				("AlgaNode: only AlgaPatterns support AlgaStep actions. Scheduling action at " ++ sched).error;
+				scheduler.addAction(
+					condition: condition,
+					func: func,
+					sched: sched,
+					topPriority: topPriority,
+					preCheck: preCheck
+				)
+			});
+		}, {
+			//Normal scheduling (sched is a number)
+			scheduler.addAction(
+				condition: condition,
+				func: func,
+				sched: sched,
+				topPriority: topPriority,
+				preCheck: preCheck
+			)
+		});
 	}
 
 	//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
@@ -278,7 +312,7 @@ AlgaNode {
 					server.sync(wait);
 				};
 
-				scheduler.addAction(
+				this.addAction(
 					condition: { wait.test == true },
 					func: { func.value },
 					preCheck: true //execute right away if possible (most unlikely)
@@ -337,7 +371,7 @@ AlgaNode {
 				func: {
 					//Make sure that all AlgaArgs' nodes are instantiated
 					if(algaArgs != nil, {
-						scheduler.addAction(
+						this.addAction(
 							condition: {
 								var instantiated = true;
 								algaArgs.do({ | algaArg |
@@ -1182,7 +1216,7 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Create actual synths
-		scheduler.addAction(
+		this.addAction(
 			func: {
 				this.createAllSynths(
 					replace,
@@ -1244,7 +1278,7 @@ AlgaNode {
 		};
 
 		//Go ahead with the build function when Sdef is sent
-		scheduler.addAction(
+		this.addAction(
 			condition: { wait.test == true },
 			func: {
 				this.buildFromSynthDef(
@@ -2843,7 +2877,7 @@ AlgaNode {
 				if(interpSynthAtParam.algaInstantiated, {
 					fadeOutFunc.value
 				}, {
-					scheduler.addAction(
+					this.addAction(
 						condition: {
 							interpSynthAtParam.algaInstantiated
 						},
@@ -3397,7 +3431,7 @@ AlgaNode {
 		replaceMix = false, senderChansMapping, scale, time, shape, sched = 0 |
 
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
-			scheduler.addAction(
+			this.addAction(
 				condition: {
 					(this.algaInstantiatedAsReceiver(param, sender, mix)).and(sender.algaInstantiatedAsSender)
 				},
@@ -3810,7 +3844,7 @@ AlgaNode {
 			^this;
 		});
 
-		scheduler.addAction(
+		this.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, oldSender, true)).and(
 					oldSender.algaInstantiatedAsSender).and(
@@ -3852,7 +3886,7 @@ AlgaNode {
 	}
 
 	resetParam { | param = \in, oldSender = nil, time, shape, sched |
-		scheduler.addAction(
+		this.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, oldSender, false)).and(oldSender.algaInstantiatedAsSender)
 			},
@@ -3886,7 +3920,7 @@ AlgaNode {
 
 	//On .replace on an already running mix connection
 	replaceMixConnection { | param = \in, sender, senderChansMapping, scale, time, shape |
-		scheduler.addAction(
+		this.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, sender, true)).and(sender.algaInstantiatedAsSender)
 			},
@@ -4046,7 +4080,7 @@ AlgaNode {
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
 		//Check global algaInstantiated
-		scheduler.addAction(
+		this.addAction(
 			condition: { this.algaInstantiated },
 			func: {
 				this.replaceInner(
@@ -4056,7 +4090,7 @@ AlgaNode {
 					keepOutsMappingIn:keepOutsMappingIn,
 					keepOutsMappingOut:keepOutsMappingOut,
 					keepScalesIn:keepScalesIn, keepScalesOut:keepScalesOut
-				)
+				);
 			},
 			sched: sched,
 			topPriority: true //always top priority
@@ -4173,7 +4207,7 @@ AlgaNode {
 			^this;
 		});
 
-		scheduler.addAction(
+		this.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, oldSender, true)).and(oldSender.algaInstantiatedAsSender)
 			},
@@ -4260,7 +4294,7 @@ AlgaNode {
 
 	//for clear, check algaInstantiated and not isPlaying
 	clear { | onClear, time, sched |
-		scheduler.addAction(
+		this.addAction(
 			condition: { this.algaInstantiated },
 			func: { this.clearInner(onClear, time) },
 			sched: sched
@@ -4375,7 +4409,7 @@ AlgaNode {
 	playInner { | time, channelsToPlay, scale, sched, replace = false, usePrevPlayScale = false |
 		//Check only for synthBus, it makes more sense than also checking for synth.algaIstantiated,
 		//As it allows meanwhile to create the play synth while synth is getting instantiated
-		scheduler.addAction(
+		this.addAction(
 			condition: { synthBus != nil },
 			func: {
 				this.createPlaySynth(
@@ -4429,7 +4463,7 @@ AlgaNode {
 		};
 
 		//Normal case
-		scheduler.addAction(
+		this.addAction(
 			condition: { this.isPlaying },
 			func: { this.freePlaySynth(time, false, action); },
 			sched: sched

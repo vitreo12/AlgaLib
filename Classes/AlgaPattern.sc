@@ -163,16 +163,32 @@ AlgaPattern : AlgaNode {
 			//Create the bundle with all needed Synths for this Event.
 			bundle = algaPatternServer.makeBundle(false, {
 				//First, consume scheduledStepActions if there were any
-				~algaPattern.advanceAndConsumeScheduledStepActions;
+				var interpStreamsOnReplace = ~algaPattern.advanceAndConsumeScheduledStepActions;
+				var thisInterpStreamShouldBeStopped = false;
+				if(~algaPattern.stopPatternBeforeReplace, {
+					interpStreamsOnReplace.do({ | interpStreamOnReplace |
+						interpStreamOnReplace.algaSynthBus.index.postln;
+						algaPatternInterpStreams.algaSynthBus.index.postln;
+						if(interpStreamOnReplace == algaPatternInterpStreams, {
+							algaPatternInterpStreams.algaReschedulingEventStreamPlayer.stop;
+							thisInterpStreamShouldBeStopped = true;
+						})
+					})
+				});
+
+				thisInterpStreamShouldBeStopped.asString.error;
+				"".postln;
 
 				//Then, create all needed synths
-				~algaPattern.createEventSynths(
-					algaSynthDef: algaSynthDef,
-					algaSynthBus: algaSynthBus,
-					algaPatternInterpStreams: algaPatternInterpStreams,
-					fx: fx,
-					algaOut: algaOut
-				)
+				if(thisInterpStreamShouldBeStopped.not, {
+					~algaPattern.createEventSynths(
+						algaSynthDef: algaSynthDef,
+						algaSynthBus: algaSynthBus,
+						algaPatternInterpStreams: algaPatternInterpStreams,
+						fx: fx,
+						algaOut: algaOut
+					)
+				});
 			});
 
 			//Send bundle to server using the same server / clock as the AlgaPattern
@@ -247,26 +263,53 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//
+	//Iterate through all scheduledStepActions and execute them accordingly
 	advanceAndConsumeScheduledStepActions {
-		scheduledStepActions.keysValuesDo({ | action, step |
-			step = step - 1;
-			if(step <= 0, {
-				action.value;
-				scheduledStepActions.removeAt(action);
-			}, {
-				scheduledStepActions[action] = step;
+		var returns = Array.newClear();
+		scheduledStepActions.do({ | step |
+			var condition = step.condition;
+			var func = step.func;
+			var retryOnFailedCondition = step.retryOnFailedCondition;
+			var numberOfTries = step.numberOfTries;
+			var stepCount = step.step;
+
+			if(stepCount <= 0, {
+				if(condition.value, {
+					var interpStreamsOnReplace = func.value;
+					if(interpStreamsOnReplace.isKindOf(AlgaPatternInterpStreams), {
+						returns = returns.add(interpStreamsOnReplace);
+					}, {
+						scheduledStepActions.remove(step);
+					});
+
+				}, {
+					if(retryOnFailedCondition.not, {
+						scheduledStepActions.remove(step);
+					}, {
+						if(numberOfTries <= 0, {
+							scheduledStepActions.remove(step);
+						}, {
+							step.numberOfTries = numberOfTries - 1;
+						});
+					});
+				});
 			});
+
+			step.step = stepCount - 1;
 		});
+		scheduledStepActions.postln;
+		^returns;
 	}
 
-	//
-	addScheduledStepAction { | action, step |
-		if(step.isNumber, {
-			scheduledStepActions[action] = step + 1
-		}, {
-			scheduledStepActions[action] = 1
-		});
+	//Creates a new AlgaStep with set condition and func
+	addScheduledStepAction { | step, condition, func |
+		//A new action must be created, otherwise, if two addActions are being pushed
+		//with the same AlgaStep, only one of the action would be executed (the last one),
+		//as the entry would be overwritten in the OrderedIdentitySet
+		var newStep = step.copy;
+		newStep.condition = condition ? { true };
+		newStep.func = func;
+		scheduledStepActions.add(newStep);
 	}
 
 	//Create a temporary synth according to the specs of the AlgaTemp
@@ -1720,7 +1763,7 @@ AlgaPattern : AlgaNode {
 			prevPatternOutNodes.do({ | outNodeAndParam |
 				var outNode = outNodeAndParam[0];
 				var param = outNodeAndParam[1];
-				scheduler.addAction(
+				this.addAction(
 					//condition: { outNode.algaInstantiatedAsReceiver(param) },
 					func: {
 						outNode.removePatternOutsAtParam(
@@ -1740,7 +1783,7 @@ AlgaPattern : AlgaNode {
 			currentPatternOutNodes.do({ | outNodeAndParam |
 				var outNode = outNodeAndParam[0];
 				var param = outNodeAndParam[1];
-				scheduler.addAction(
+				this.addAction(
 					condition: { outNode.algaInstantiatedAsReceiver(param) },
 					func: {
 						outNode.receivePatternOutsAtParam(
@@ -2011,7 +2054,7 @@ AlgaPattern : AlgaNode {
 		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
 		//createPattern function is non scheduled as it it better to create it right away.
 		if(manualDur.not, {
-			scheduler.addAction(
+			this.addAction(
 				func: {
 					newInterpStreams.playAlgaReschedulingEventStreamPlayer(
 						pattern: pattern,
@@ -2533,7 +2576,7 @@ AlgaPattern : AlgaNode {
 
 		//All other cases
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
-			scheduler.addAction(
+			this.addAction(
 				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
 				func: {
 					this.makeConnectionInner(
@@ -2688,7 +2731,7 @@ AlgaPattern : AlgaNode {
 
 		//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
 		//Otherwise, it will just execute func
-		^this.compileFunctionSynthDefDictIfNeeded(
+		this.compileFunctionSynthDefDictIfNeeded(
 			func: {
 				//The actual replacement
 				super.replace(
@@ -2714,7 +2757,9 @@ AlgaPattern : AlgaNode {
 				});
 			},
 			functionSynthDefDict: functionSynthDefDict
-		)
+		);
+
+		^this;
 	}
 
 	//IMPORTANT: this function must be empty. It's called from replaceInner, but synthBus is actually
@@ -2762,7 +2807,7 @@ AlgaPattern : AlgaNode {
 			if(sched == 0, {
 				patternAsStream.next(()).play; //Empty event as protoEvent!
 			}, {
-				scheduler.addAction(
+				this.addAction(
 					func: {
 						patternAsStream.next(()).play; //Empty event as protoEvent!
 					},
@@ -2778,7 +2823,18 @@ AlgaPattern : AlgaNode {
 	//Stop pattern
 	stopPattern { | sched = 0 |
 		sched = sched ? 0;
-		interpStreams.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched)
+		if(sched.isAlgaStep, {
+			var interpStreamsLock = interpStreams;
+			this.addAction(
+				func: {
+				//	interpStreamsLock.algaReschedulingEventStreamPlayer.stopAtTopPriority(0);
+					interpStreamsLock; //This is picked up in createEventSynths
+				},
+				sched: sched
+			)
+		}, {
+			interpStreams.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched)
+		});
 	}
 
 	//Resume pattern
@@ -2787,7 +2843,7 @@ AlgaPattern : AlgaNode {
 		if(sched == 0, {
 			interpStreams.algaReschedulingEventStreamPlayer.play
 		}, {
-			scheduler.addAction(
+			this.addAction(
 				func: {
 					interpStreams.algaReschedulingEventStreamPlayer.play
 				},
@@ -2799,7 +2855,7 @@ AlgaPattern : AlgaNode {
 	//Set dur at sched
 	setDurAtSched { | value, sched |
 		//Add to scheduler just to make cascadeMode work
-		scheduler.addAction(
+		this.addAction(
 			condition: { this.algaInstantiated },
 			func: {
 				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
@@ -3003,7 +3059,7 @@ AMP : AlgaMonoPattern {}
 		if(patternOutNodes != nil, {
 			patternOutNodes.keysValuesDo({ | param, patternOutNodesAtParam |
 				patternOutNodesAtParam.do({ | algaPattern |
-					scheduler.addAction(
+					this.addAction(
 						condition: { this.algaInstantiatedAsReceiver(param) },
 						func: {
 							this.receivePatternOutsAtParam(
