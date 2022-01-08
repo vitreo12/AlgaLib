@@ -16,20 +16,8 @@ Alga.boot({
 	), playTime:2 );
 
 	b = AN({ \in.ar }, [\in, a], interpTime: 2).play
-	//s.plotTree;
 })
 )
 
-a.from(220, \f, sched: AlgaStep(2))
-
-//The fadein is play's fault!
-//a.stopPatternBeforeReplace=true doesn't work
-a.replace(\test2, sched:AlgaStep(1))
-
-
-//exec again: AlgaStep(2) will be AlgaStep(0) bug
-a.from(440, \f, sched: AlgaStep(2))
-
-//This does
-a.stopPatternBeforeReplace=true
+//stopPatternBeforeReplace doesn't work with interp connections
 a.replace(\test2, sched:1)
