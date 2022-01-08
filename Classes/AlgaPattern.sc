@@ -792,7 +792,7 @@ AlgaPattern : AlgaNode {
 		var fxRate = fx[\rate];
 
 		//Args to fxSynth
-		var fxSynthArgs = Array.newClear;
+		var fxSynthArgs = [\gate, 1];
 
 		//Actual fxSynth
 		var fxSynthSymbol;

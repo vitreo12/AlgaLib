@@ -1273,7 +1273,8 @@ AlgaNode {
 		//as it will be set eventually in the case of .clear / etc...
 		var synthArgs = [
 			\out, synthBus.index,
-			\fadeTime, longestWaitTime
+			\fadeTime, longestWaitTime,
+			\gate, 1
 		];
 
 		//connect each param with the already allocated normBus
@@ -2154,7 +2155,7 @@ AlgaNode {
 	createAlgaTempSynth { | algaTemp, tempSynthsAndBusses |
 		//The bus the tempSynth will write to
 		var tempBus, tempSynth;
-		var tempSynthArgs = Array.newClear;
+		var tempSynthArgs = [\gate, 1];
 		var tempNumChannels = algaTemp.numChannels;
 		var tempRate = algaTemp.rate;
 		var def, algaTempDef, controlNames;
