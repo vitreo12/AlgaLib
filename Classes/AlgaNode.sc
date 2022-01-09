@@ -3222,6 +3222,11 @@ AlgaNode {
 			time:time, shape:shape
 		);
 
+		//If replacing an AlgaPattern + stopPatternBeforeReplace, time is 0 for the new synth
+		if(replace.and(sender.isAlgaPattern), {
+			if(sender.stopPatternBeforeReplace, { time = 0 })
+		});
+
 		//Spawn new interp synth (fades in)
 		this.createInterpSynthAtParam(
 			sender, param,
@@ -3272,6 +3277,11 @@ AlgaNode {
 				sender, param, mix:true,
 				replace:true, time:time, shape:shape
 			);
+		});
+
+		//If replacing an AlgaPattern + stopPatternBeforeReplace, time is 0 for the new synth
+		if(replace.and(sender.isAlgaPattern), {
+			if(sender.stopPatternBeforeReplace, { time = 0 })
 		});
 
 		//Spawn new interp mix node
