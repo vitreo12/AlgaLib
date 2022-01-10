@@ -23,8 +23,18 @@ Alga.boot({
 a.from(220, \f, sched: AlgaStep(2))
 a.from(440, \f, sched: AlgaStep(0))
 
-//a.stopPatternBeforeReplace=true doesn't work
-a.replace(\test2, sched:AlgaStep(1))
+(
+a.from(220, \f, sched: AlgaStep(1));
+a.replace(\test2, sched:AlgaStep(1));
+)
+
+(
+a.replace(\test2, sched:AlgaStep(1));
+a.from(220, \f, sched: AlgaStep(1));
+)
+
+
+
 a.replace(\test, sched:AlgaStep(1))
 
 

@@ -109,7 +109,7 @@ AlgaPattern : AlgaNode {
 	var <stopPatternBeforeReplace = true;
 
 	//Actions scheduled on a step
-	var <>scheduledStepActions;
+	var <scheduledStepActionsPre, <scheduledStepActionsPost;
 
 	//Add the \algaNote event to Event
 	*initClass {
@@ -162,8 +162,8 @@ AlgaPattern : AlgaNode {
 
 			//Create the bundle with all needed Synths for this Event.
 			bundle = algaPatternServer.makeBundle(false, {
-				//First, consume scheduledStepActions if there were any
-				~algaPattern.advanceAndConsumeScheduledStepActions;
+				//First, consume scheduledStepActionsPre if there are any
+				~algaPattern.advanceAndConsumeScheduledStepActions(false);
 
 				//Then, create all needed synths
 				~algaPattern.createEventSynths(
@@ -172,7 +172,10 @@ AlgaPattern : AlgaNode {
 					algaPatternInterpStreams: algaPatternInterpStreams,
 					fx: fx,
 					algaOut: algaOut
-				)
+				);
+
+				//Finally, consume scheduledStepActionsPost if there are any
+				~algaPattern.advanceAndConsumeScheduledStepActions(true);
 			});
 
 			//Send bundle to server using the same server / clock as the AlgaPattern
@@ -248,39 +251,54 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Iterate through all scheduledStepActions and execute them accordingly
-	advanceAndConsumeScheduledStepActions {
+	advanceAndConsumeScheduledStepActions { | post = false |
 		var stepsToRemove = IdentitySet();
 
-		scheduledStepActions.do({ | step |
-			var condition = step.condition;
-			var func = step.func;
-			var retryOnFailedCondition = step.retryOnFailedCondition;
-			var numberOfTries = step.numberOfTries;
-			var stepCount = step.step;
+		//Pre or post
+		var scheduledStepActions;
+		if(post.not, {
+			scheduledStepActions = scheduledStepActionsPre;
+		}, {
+			scheduledStepActions = scheduledStepActionsPost;
+		});
 
-			if(stepCount <= 0, {
-				if(condition.value, {
-					func.value;
-					stepsToRemove.add(step);
-				}, {
-					if(retryOnFailedCondition.not, {
+		//Go ahead with the advancing + removal
+		if(scheduledStepActions.size > 0, {
+			scheduledStepActions.do({ | step |
+				var condition = step.condition;
+				var func = step.func;
+				var retryOnFailedCondition = step.retryOnFailedCondition;
+				var numberOfTries = step.numberOfTries;
+				var stepCount = step.step;
+
+				step.postln;
+
+				if(stepCount <= 0, {
+					if(condition.value, {
+						func.value;
 						stepsToRemove.add(step);
 					}, {
-						if(numberOfTries <= 0, {
+						if(retryOnFailedCondition.not, {
 							stepsToRemove.add(step);
 						}, {
-							step.numberOfTries = numberOfTries - 1;
+							if(numberOfTries <= 0, {
+								stepsToRemove.add(step);
+							}, {
+								step.numberOfTries = numberOfTries - 1;
+							});
 						});
 					});
 				});
-			});
 
-			step.step = stepCount - 1;
+				step.step = stepCount - 1;
+			});
 		});
 
 		//stepsToRemove is needed or it won't execute two consecutive true
 		//functions if remove was inserted directly in the call earlier
-		stepsToRemove.do({ | step | scheduledStepActions.remove(step) });
+		if(stepsToRemove.size > 0, {
+			stepsToRemove.do({ | step | scheduledStepActions.remove(step) })
+		});
 	}
 
 	//Creates a new AlgaStep with set condition and func
@@ -289,16 +307,36 @@ AlgaPattern : AlgaNode {
 		//with the same AlgaStep, only one of the action would be executed (the last one),
 		//as the entry would be overwritten in the OrderedIdentitySet
 		var newStep = step.copy;
+		var post = step.post;
+		var scheduledStepActions;
 		newStep.condition = condition ? { true };
 		newStep.func = func;
+
+		//Create if needed
+		if(post.not, {
+			scheduledStepActionsPre = scheduledStepActionsPre ? OrderedIdentitySet(10);
+			scheduledStepActions = scheduledStepActionsPre;
+		}, {
+			scheduledStepActionsPost = scheduledStepActionsPost ? OrderedIdentitySet(10);
+			scheduledStepActions = scheduledStepActionsPost;
+		});
+
+		//If not top priority, just add to tail
 		if(topPriority.not, {
 			scheduledStepActions.add(newStep)
 		}, {
-			//Just create a new OrderedIdentitySet with newStep on top.
-			//Copy back the old steps too.
+			//If top priority, add to head. To do so, create a new one
+			//and copy the old ones back in.
 			var oldScheduledStepActions = scheduledStepActions;
 			scheduledStepActions = OrderedIdentitySet[newStep];
 			oldScheduledStepActions.do({ | oldStep | scheduledStepActions.add(oldStep) });
+
+			//Re-assign to the new one
+			if(post.not, {
+				scheduledStepActionsPre = scheduledStepActions
+			}, {
+				scheduledStepActionsPost = scheduledStepActions
+			});
 		});
 	}
 
@@ -2573,6 +2611,7 @@ AlgaPattern : AlgaNode {
 			this.addAction(
 				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
 				func: {
+					"CONNECT".warn;
 					this.makeConnectionInner(
 						sender: sender,
 						param: param,
@@ -2821,8 +2860,9 @@ AlgaPattern : AlgaNode {
 			var interpStreamsLock = interpStreams;
 			this.addAction(
 				func: {
-					//This will be then checked against in createEventSynths!3
-					if(stopPatternBeforeReplace, { interpStreamsLock.beingStopped = true });
+					//This will be then checked against in createEventSynths!
+					"STOP".warn;
+					if(stopPatternBeforeReplace.and(sched.post.not), { interpStreamsLock.beingStopped = true });
 					interpStreamsLock.algaReschedulingEventStreamPlayer.stop;
 				},
 				sched: sched,
