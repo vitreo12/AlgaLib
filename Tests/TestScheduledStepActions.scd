@@ -21,15 +21,11 @@ Alga.boot({
 )
 
 a.from(220, \f, sched: AlgaStep(2))
+a.from(440, \f, sched: AlgaStep(0))
 
-//The fadein is play's fault!
 //a.stopPatternBeforeReplace=true doesn't work
 a.replace(\test2, sched:AlgaStep(1))
+a.replace(\test, sched:AlgaStep(1))
 
 
-//exec again: AlgaStep(2) will be AlgaStep(0) bug
-a.from(440, \f, sched: AlgaStep(2))
-
-//This does
-a.stopPatternBeforeReplace=true
-a.replace(\test2, sched:1)
+//Now fix the fade in play time!!!!

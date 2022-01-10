@@ -163,32 +163,16 @@ AlgaPattern : AlgaNode {
 			//Create the bundle with all needed Synths for this Event.
 			bundle = algaPatternServer.makeBundle(false, {
 				//First, consume scheduledStepActions if there were any
-				var interpStreamsOnReplace = ~algaPattern.advanceAndConsumeScheduledStepActions;
-				var thisInterpStreamShouldBeStopped = false;
-				if(~algaPattern.stopPatternBeforeReplace, {
-					interpStreamsOnReplace.do({ | interpStreamOnReplace |
-						interpStreamOnReplace.algaSynthBus.index.postln;
-						algaPatternInterpStreams.algaSynthBus.index.postln;
-						if(interpStreamOnReplace == algaPatternInterpStreams, {
-							algaPatternInterpStreams.algaReschedulingEventStreamPlayer.stop;
-							thisInterpStreamShouldBeStopped = true;
-						})
-					})
-				});
-
-				thisInterpStreamShouldBeStopped.asString.error;
-				"".postln;
+				~algaPattern.advanceAndConsumeScheduledStepActions;
 
 				//Then, create all needed synths
-				if(thisInterpStreamShouldBeStopped.not, {
-					~algaPattern.createEventSynths(
-						algaSynthDef: algaSynthDef,
-						algaSynthBus: algaSynthBus,
-						algaPatternInterpStreams: algaPatternInterpStreams,
-						fx: fx,
-						algaOut: algaOut
-					)
-				});
+				~algaPattern.createEventSynths(
+					algaSynthDef: algaSynthDef,
+					algaSynthBus: algaSynthBus,
+					algaPatternInterpStreams: algaPatternInterpStreams,
+					fx: fx,
+					algaOut: algaOut
+				)
 			});
 
 			//Send bundle to server using the same server / clock as the AlgaPattern
@@ -265,7 +249,8 @@ AlgaPattern : AlgaNode {
 
 	//Iterate through all scheduledStepActions and execute them accordingly
 	advanceAndConsumeScheduledStepActions {
-		var returns = Array.newClear();
+		var stepsToRemove = IdentitySet();
+
 		scheduledStepActions.do({ | step |
 			var condition = step.condition;
 			var func = step.func;
@@ -275,19 +260,14 @@ AlgaPattern : AlgaNode {
 
 			if(stepCount <= 0, {
 				if(condition.value, {
-					var interpStreamsOnReplace = func.value;
-					if(interpStreamsOnReplace.isKindOf(AlgaPatternInterpStreams), {
-						returns = returns.add(interpStreamsOnReplace);
-					}, {
-						scheduledStepActions.remove(step);
-					});
-
+					func.value;
+					stepsToRemove.add(step);
 				}, {
 					if(retryOnFailedCondition.not, {
-						scheduledStepActions.remove(step);
+						stepsToRemove.add(step);
 					}, {
 						if(numberOfTries <= 0, {
-							scheduledStepActions.remove(step);
+							stepsToRemove.add(step);
 						}, {
 							step.numberOfTries = numberOfTries - 1;
 						});
@@ -297,8 +277,10 @@ AlgaPattern : AlgaNode {
 
 			step.step = stepCount - 1;
 		});
-		scheduledStepActions.postln;
-		^returns;
+
+		//stepsToRemove is needed or it won't execute two consecutive true
+		//functions if remove was inserted directly in the call earlier
+		stepsToRemove.do({ | step | scheduledStepActions.remove(step) });
 	}
 
 	//Creates a new AlgaStep with set condition and func
@@ -1421,6 +1403,10 @@ AlgaPattern : AlgaNode {
 			controlNamesToUse = controlNamesList[algaSynthDef];
 			if(controlNamesToUse == nil, { controlNamesToUse = controlNames });
 		});
+
+		//If streams being stopped (happens for AlgaStep + stopPatternBeforeReplace)
+		//This must be checked here as the eventSynth is already being triggered
+		if(algaPatternInterpStreams.beingStopped, { ^this });
 
 		//Check MC mismatches and create patternSynths accordingly
 		if(useMultiChannelExpansion, {
@@ -2827,8 +2813,9 @@ AlgaPattern : AlgaNode {
 			var interpStreamsLock = interpStreams;
 			this.addAction(
 				func: {
-				//	interpStreamsLock.algaReschedulingEventStreamPlayer.stopAtTopPriority(0);
-					interpStreamsLock; //This is picked up in createEventSynths
+					//This will be then checked against in createEventSynths!
+					if(stopPatternBeforeReplace, { interpStreamsLock.beingStopped = true });
+					interpStreamsLock.algaReschedulingEventStreamPlayer.stop;
 				},
 				sched: sched
 			)
