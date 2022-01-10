@@ -258,8 +258,7 @@ AlgaNode {
 				this.addScheduledStepAction(
 					step: sched,
 					condition: condition,
-					func: func,
-					topPriority: topPriority
+					func: func
 				);
 			}, {
 				//AlgaNodes don't support AlgaStep

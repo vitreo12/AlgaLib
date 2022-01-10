@@ -271,8 +271,6 @@ AlgaPattern : AlgaNode {
 				var numberOfTries = step.numberOfTries;
 				var stepCount = step.step;
 
-				step.postln;
-
 				if(stepCount <= 0, {
 					if(condition.value, {
 						func.value;
@@ -302,7 +300,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Creates a new AlgaStep with set condition and func
-	addScheduledStepAction { | step, condition, func, topPriority = false |
+	addScheduledStepAction { | step, condition, func |
 		//A new action must be created, otherwise, if two addActions are being pushed
 		//with the same AlgaStep, only one of the action would be executed (the last one),
 		//as the entry would be overwritten in the OrderedIdentitySet
@@ -321,23 +319,8 @@ AlgaPattern : AlgaNode {
 			scheduledStepActions = scheduledStepActionsPost;
 		});
 
-		//If not top priority, just add to tail
-		if(topPriority.not, {
-			scheduledStepActions.add(newStep)
-		}, {
-			//If top priority, add to head. To do so, create a new one
-			//and copy the old ones back in.
-			var oldScheduledStepActions = scheduledStepActions;
-			scheduledStepActions = OrderedIdentitySet[newStep];
-			oldScheduledStepActions.do({ | oldStep | scheduledStepActions.add(oldStep) });
-
-			//Re-assign to the new one
-			if(post.not, {
-				scheduledStepActionsPre = scheduledStepActions
-			}, {
-				scheduledStepActionsPost = scheduledStepActions
-			});
-		});
+		//Add
+		scheduledStepActions.add(newStep)
 	}
 
 	//Create a temporary synth according to the specs of the AlgaTemp
@@ -2861,12 +2844,10 @@ AlgaPattern : AlgaNode {
 			this.addAction(
 				func: {
 					//This will be then checked against in createEventSynths!
-					"STOP".warn;
 					if(stopPatternBeforeReplace.and(sched.post.not), { interpStreamsLock.beingStopped = true });
 					interpStreamsLock.algaReschedulingEventStreamPlayer.stop;
 				},
-				sched: sched,
-				topPriority: true
+				sched: sched
 			)
 		}, {
 			interpStreams.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched)
