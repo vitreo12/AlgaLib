@@ -2594,7 +2594,6 @@ AlgaPattern : AlgaNode {
 			this.addAction(
 				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
 				func: {
-					"CONNECT".warn;
 					this.makeConnectionInner(
 						sender: sender,
 						param: param,
