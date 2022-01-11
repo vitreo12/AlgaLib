@@ -23,6 +23,7 @@
 	isAlgaArg { ^false }
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
+	isAlgaStep { ^false }
 	isBuffer { ^false }
 	isPattern { ^false }
 	isStream { ^false }

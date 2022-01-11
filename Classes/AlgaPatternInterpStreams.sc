@@ -44,6 +44,9 @@ AlgaPatternInterpStreams {
 	var <scaleArraysAndChans;
 	var <sampleAndHolds;
 
+	//Used for AlgaPattern.stopPatternBeforeReplace
+	var <>beingStopped = false;
+
 	*new { | algaPattern |
 		^super.new.init(algaPattern)
 	}
