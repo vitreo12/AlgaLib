@@ -2860,9 +2860,7 @@ AlgaPattern : AlgaNode {
 			interpStreams.algaReschedulingEventStreamPlayer.play
 		}, {
 			this.addAction(
-				func: {
-					interpStreams.algaReschedulingEventStreamPlayer.play
-				},
+				func: { interpStreams.algaReschedulingEventStreamPlayer.play },
 				sched: sched
 			)
 		});

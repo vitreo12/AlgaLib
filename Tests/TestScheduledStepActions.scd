@@ -39,4 +39,7 @@ a.from(1, \dur, sched: AlgaStep(0))
 
 s.scope
 
+
+//When merge, support ALgaStep for sustain / legato / stretch too!!!!
+
 //Now fix the fade in play time!!!!
