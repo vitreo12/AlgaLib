@@ -3170,14 +3170,14 @@ AlgaNode {
 	checkConnectionAlreadyInPlace { | sender |
 		case
 		{ sender.isAlgaTemp } { sender = sender.def }
-		{ sender.isAlgaArg } { sender = sender.sender};
+		{ sender.isAlgaArg } { sender = sender.sender };
 
 		inNodes.do({ | sendersSet |
 			if(sender.isListPattern, {
 				sender.do({ | entry |
 					case
 					{ entry.isAlgaTemp } { entry = entry.def }
-					{ entry.isAlgaArg } { entry = entry.sender};
+					{ entry.isAlgaArg } { entry = entry.sender };
 					if(blockIndex != entry.blockIndex, { ^false });
 					if(sendersSet.includes(entry), { ^true })
 				})
