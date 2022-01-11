@@ -4446,7 +4446,8 @@ AlgaNode {
 					usePrevPlayScale: usePrevPlayScale
 				)
 			},
-			sched: sched
+			sched: sched,
+			preCheck: true
 		);
 	}
 
@@ -4492,7 +4493,8 @@ AlgaNode {
 		this.addAction(
 			condition: { this.isPlaying },
 			func: { this.freePlaySynth(time, false, action); },
-			sched: sched
+			sched: sched,
+			preCheck: true
 		);
 	}
 
