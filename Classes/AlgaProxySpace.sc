@@ -105,6 +105,7 @@ AlgaProxySpace {
 				nodes[key] = pattern;
 				^pattern;
 			}, {
+				//Differential
 				var defBeforeMod = def.copy;
 				var currentEventPairs = patternsEvents[node];
 				var newConnections = IdentityDictionary();
