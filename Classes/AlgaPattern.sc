@@ -3169,7 +3169,7 @@ AlgaPattern : AlgaNode {
 
 	//Set sustain at sched
 	setSustainAtSched { | value, sched |
-		scheduler.addAction(
+		this.addAction(
 			func: { this.setSustain(value) },
 			sched: sched,
 			topPriority: true
@@ -3178,7 +3178,7 @@ AlgaPattern : AlgaNode {
 
 	//Set stretch at sched
 	setStretchAtSched { | value, sched |
-		scheduler.addAction(
+		this.addAction(
 			func: { this.setStretch(value) },
 			sched: sched,
 			topPriority: true
@@ -3187,7 +3187,7 @@ AlgaPattern : AlgaNode {
 
 	//Set leagto at sched
 	setLegatoAtSched { | value, sched |
-		scheduler.addAction(
+		this.addAction(
 			func: { this.setLegato(value) },
 			sched: sched,
 			topPriority: true
