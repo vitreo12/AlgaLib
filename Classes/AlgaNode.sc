@@ -1325,7 +1325,8 @@ AlgaNode {
 		//as it will be set eventually in the case of .clear / etc...
 		var synthArgs = [
 			\out, synthBus.index,
-			\fadeTime, longestWaitTime
+			\fadeTime, longestWaitTime,
+			\gate, 1
 		];
 
 		//connect each param with the already allocated normBus
@@ -2206,7 +2207,7 @@ AlgaNode {
 	createAlgaTempSynth { | algaTemp, tempSynthsAndBusses |
 		//The bus the tempSynth will write to
 		var tempBus, tempSynth;
-		var tempSynthArgs = Array.newClear;
+		var tempSynthArgs = [\gate, 1];
 		var tempNumChannels = algaTemp.numChannels;
 		var tempRate = algaTemp.rate;
 		var def, algaTempDef, controlNames;
@@ -3563,12 +3564,16 @@ AlgaNode {
 			{ defDef.isFunction } {
 				var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
-				//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
+				//AlgaTemp can be sampleAccurate in AlgaPatterns!
 				functionSynthDefDict[defName] = [
-					AlgaSynthDef(
+					AlgaSynthDef.new_inner(
 						defName,
-						defDef
-					).synthDef, //Ignore AlgaSynthDefSpec
+						defDef,
+						sampleAccurate: algaTemp.sampleAccurate,
+						makeFadeEnv: false,
+						makePatternDef: false,
+						makeOutDef: false
+					),
 					algaTemp
 				];
 
@@ -3599,12 +3604,16 @@ AlgaNode {
 		{ def.isFunction } {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
-			//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
+			//AlgaTemp can be sampleAccurate in AlgaPatterns!
 			functionSynthDefDict[defName] = [
-				AlgaSynthDef(
+				AlgaSynthDef.new_inner(
 					defName,
-					def
-				).synthDef, //Ignore AlgaSynthDefSpec
+					def,
+					sampleAccurate: algaTemp.sampleAccurate,
+					makeFadeEnv: false,
+					makePatternDef: false,
+					makeOutDef: false
+				),
 				algaTemp
 			];
 

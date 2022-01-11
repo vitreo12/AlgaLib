@@ -14,13 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//AlgaPattern
 AlgaPattern : AlgaNode {
 	/*
 	TODOs:
 
 	1) mixFrom()
-	2) \dur interpolation
+	2) \dur - \sustain - \stretch - \legato interpolations
 	*/
 
 	//Special groups used in AlgaPattern
@@ -111,6 +110,20 @@ AlgaPattern : AlgaNode {
 	//Actions scheduled on a step
 	var <scheduledStepActionsPre, <scheduledStepActionsPost;
 
+	//Used to set sustain's gate
+	var <>isSustainTrig = false;
+
+	//The list of IDs of active synths to send \gate,0 to
+	var <>sustainIDs;
+
+	//Schedule sustain to the internal clock or seconds
+	var <schedSustainInSeconds = false;
+
+	//If false, sustain must be explicitly set by the user.
+	//If true, sustain will be: (sustain * stretch) + dur.
+	//legato will apply in both cases.
+	var <>sustainToDur = false;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -136,7 +149,7 @@ AlgaPattern : AlgaNode {
 			var bundle;
 
 			//The AlgaSynthDef
-			var algaSynthDef = ~synthDefName.valueEnvir;
+			var algaSynthDef = (~synthDefName.valueEnvir ++ "_algaPattern").asSymbol;
 
 			//AlgaPattern, the synthBus and its server / clock
 			var algaPattern = ~algaPattern;
@@ -154,11 +167,44 @@ AlgaPattern : AlgaNode {
 			var algaOut = ~algaOut;
 
 			//Other things for pattern syncing / clocking / scheduling
+			var dur = ~dur;
 			var offset = ~timingOffset;
 			var lag = ~lag;
+			var latency = ~latency;
+			var sustain = ~sustain;
+			var stretch = ~stretch;
+			var legato = ~legato;
+			var hasSustain = sustain.isNumber;
 
-			//Needed ?
+			//Needed for Event syncing
 			~isPlaying = true;
+
+			//Deal with sustain
+			if(hasSustain, {
+				//scale by stretch
+				sustain = sustain * stretch;
+
+				//If sustainToDur, add to dur. This allows to do things like sustain: -0.5 (from dur).
+				//Also, if sustain is 0 here, it will then use \dur
+				if(~algaPattern.sustainToDur, {
+					sustain = sustain + dur; //dur already includes stretch!
+				});
+
+				//scale by legato
+				if(legato > 0, { sustain = sustain * legato });
+
+				//Finally, if the result is a positive number, go ahead
+				if(sustain > 0, {
+					~algaPattern.isSustainTrig = true;
+					~algaPattern.sustainIDs = Array();
+				}, {
+					if(~algaPattern.sustainToDur, {
+						("AlgaPattern: your 'sustain' is 0 or less: " ++
+							sustain ++ ". This might cause the Synths not to be released").warn;
+					});
+					hasSustain = false
+				});
+			});
 
 			//Create the bundle with all needed Synths for this Event.
 			bundle = algaPatternServer.makeBundle(false, {
@@ -185,8 +231,22 @@ AlgaPattern : AlgaNode {
 				algaPatternClock,
 				bundle,
 				lag,
-				algaPatternServer
+				algaPatternServer,
+				latency
 			);
+
+			//Sched sustain if provided
+			if(hasSustain, {
+				~algaPattern.scheduleSustain(
+					sustain,
+					offset,
+					lag,
+					latency
+				);
+			});
+
+			//Always reset isSustainTrig
+			~algaPattern.isSustainTrig = false;
 		});
 	}
 
@@ -196,6 +256,33 @@ AlgaPattern : AlgaNode {
 			interpStreams.dur = value.algaAsStream
 		}, {
 			newInterpStreams.dur = value.algaAsStream
+		});
+	}
+
+	//Set sustain asStream for it to work within Pfuncn
+	setSustain { | value, newInterpStreams |
+		if(newInterpStreams == nil, {
+			interpStreams.sustain = value.algaAsStream
+		}, {
+			newInterpStreams.sustain = value.algaAsStream
+		});
+	}
+
+	//Set stretch asStream for it to work within Pfuncn
+	setStretch { | value, newInterpStreams |
+		if(newInterpStreams == nil, {
+			interpStreams.stretch = value.algaAsStream
+		}, {
+			newInterpStreams.stretch = value.algaAsStream
+		});
+	}
+
+	//Set stretch asStream for it to work within Pfuncn
+	setLegato { | value, newInterpStreams |
+		if(newInterpStreams == nil, {
+			interpStreams.legato = value.algaAsStream
+		}, {
+			newInterpStreams.legato = value.algaAsStream
 		});
 	}
 
@@ -236,6 +323,15 @@ AlgaPattern : AlgaNode {
 		stopPatternBeforeReplace = value
 	}
 
+	//Set schedSustainInSeconds
+	schedSustainInSeconds_ { | value = false |
+		if((value != false).and(value != true), {
+			"AlgaPattern: 'scheduleSustainToBeats' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		schedSustainInSeconds = value
+	}
+
 	//Free all unused busses from interpStreams
 	freeUnusedInterpBusses { | algaPatternInterpStreams |
 		var interpBussesToFree = algaPatternInterpStreams.interpBussesToFree;
@@ -247,6 +343,22 @@ AlgaPattern : AlgaNode {
 				interpBussesToFree.remove(interpBus);
 				currentActiveInterpBusses.removeAt(interpBus);
 			});
+		});
+	}
+
+	//Schedule sustain
+	scheduleSustain { | sustain, offset, lag, latency |
+		if(sustainIDs.size > 0, {
+			var clock = this.clock;
+			if(schedSustainInSeconds, { clock = SystemClock });
+			schedBundleArrayOnClock(
+				sustain + offset,
+				clock,
+				[15 /* \n_set */, sustainIDs, \gate, 0].flop,
+				lag,
+				server,
+				latency
+			)
 		});
 	}
 
@@ -326,10 +438,10 @@ AlgaPattern : AlgaNode {
 	//Create a temporary synth according to the specs of the AlgaTemp
 	createAlgaTempSynth { | algaTemp, patternBussesAndSynths |
 		var tempBus, tempSynth;
-		var tempSynthArgs = Array.newClear;
+		var tempSynthArgs = [ \gate, 1 ];
 		var tempNumChannels = algaTemp.numChannels;
 		var tempRate = algaTemp.rate;
-		var def, algaTempDef, controlNames;
+		var def, algaTempDef, tempControlNames;
 		var defIsEvent = false;
 
 		//Check AlgaTemp validity
@@ -349,10 +461,10 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Unpack controlNames
-		controlNames = algaTemp.controlNames;
+		tempControlNames = algaTemp.controlNames;
 
 		//Loop around the controlNames to set relevant parameters
-		controlNames.do({ | controlName |
+		tempControlNames.do({ | controlName |
 			var paramName = controlName.name;
 			var paramNumChannels = controlName.numChannels;
 			var paramRate = controlName.rate;
@@ -412,6 +524,11 @@ AlgaPattern : AlgaNode {
 		//Add Bus and Synth to patternBussesAndSynths
 		patternBussesAndSynths.add(tempBus);
 		patternBussesAndSynths.add(tempSynth);
+
+		//If sustain, add tempSynth's ID to sustains'
+		if(isSustainTrig, {
+			sustainIDs = sustainIDs.add(tempSynth.nodeID)
+		});
 
 		//Return the AlgaBus that the tempSynth writes to
 		^tempBus.busArg;
@@ -772,7 +889,7 @@ AlgaPattern : AlgaNode {
 		var fxRate = fx[\rate];
 
 		//Args to fxSynth
-		var fxSynthArgs = Array.newClear;
+		var fxSynthArgs = [\gate, 1];
 
 		//Actual fxSynth
 		var fxSynthSymbol;
@@ -1272,7 +1389,7 @@ AlgaPattern : AlgaNode {
 			this.createOutConnection(algaOut, algaSynthBus, outTempBus, patternBussesAndSynths);
 
 			//Update the synthDef symbol to use the patternTempOut version
-			algaSynthDef = (algaSynthDef.asString ++ "_patternTempOut").asSymbol;
+			algaSynthDef = (algaSynthDef.asString.replace("_algaPattern", "_algaPatternTempOut")).asSymbol;
 
 			//Add patternTempOut writing to patternSynthArgs
 			patternSynthArgs = patternSynthArgs.add(\patternTempOut).add(outTempBus.index);
@@ -1289,6 +1406,11 @@ AlgaPattern : AlgaNode {
 
 			//Add pattern synth to algaPatternSynths, and free it when patternSynth gets freed
 			algaPatternInterpStreams.algaPatternSynths.add(patternSynth);
+
+			//If sustain, add patternSynth to sustains'
+			if(isSustainTrig, {
+				sustainIDs = sustainIDs.add(patternSynth.nodeID)
+			});
 		});
 
 		//Free all normBusses, normSynths, interpBusses and interpSynths on patternSynth's release
@@ -1574,12 +1696,6 @@ AlgaPattern : AlgaNode {
 
 		var synthDescControlNames;
 
-		//Detect if AlgaSynthDef can be freed automatically. Otherwise, error!
-		if(synthDef.explicitFree.not, {
-			("AlgaPattern: AlgaSynthDef '" ++ synthDef.name.asString ++ "' can't free itself: it doesn't implement any Done action.").error;
-			^this
-		});
-
 		//Retrieve controlNames from SynthDesc
 		synthDescControlNames = synthDef.asSynthDesc.controls;
 
@@ -1671,11 +1787,6 @@ AlgaPattern : AlgaNode {
 				if(synthDefEntry.class != AlgaSynthDef, {
 					("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++"'").error;
 					^nil;
-				});
-
-				if(synthDefEntry.explicitFree.not, {
-					("AlgaPattern: AlgaSynthDef '" ++ synthDefEntry.name.asString ++ "' can't free itself: it doesn't implement any Done action.").error;
-					^nil
 				});
 
 				if(numChannelsCount == nil, {
@@ -1841,6 +1952,9 @@ AlgaPattern : AlgaNode {
 	//Build the actual pattern
 	createPattern { | replace = false, keepChannelsMapping = false, keepScale = false, sched |
 		var foundDurOrDelta = false;
+		var foundSustain = false, resetSustain = false;
+		var foundStretch = false, resetStretch = false;
+		var foundLegato = false, resetLegato = false;
 		var manualDur = false;
 		var foundFX = false;
 		var parsedFX;
@@ -1924,6 +2038,27 @@ AlgaPattern : AlgaNode {
 				isAlgaParam = true;
 			});
 
+			//Found \sustain
+			if(paramName == \sustain, {
+				foundSustain = true;
+				isAlgaParam = true;
+				this.setSustain(value, newInterpStreams);
+			});
+
+			//Found \stretch
+			if(paramName == \stretch, {
+				foundStretch = true;
+				isAlgaParam = true;
+				this.setStretch(value, newInterpStreams);
+			});
+
+			//Found \legato
+			if(paramName == \legato, {
+				foundLegato = true;
+				isAlgaParam = true;
+				this.setLegato(value, newInterpStreams);
+			});
+
 			//Add \fx key (parsing everything correctly)
 			if(paramName == \fx, {
 				parsedFX = value;
@@ -1959,7 +2094,7 @@ AlgaPattern : AlgaNode {
 		//Store current out for replaces
 		if(foundOut, { currentOut = parsedOut });
 
-		//If no dur and replace, get it from previous interpStreams
+		//If replace, find keys in the old pattern if they are not redefined
 		if(replace, {
 			//Check reset for alga params
 			var resetSet = this.parseResetOnReplaceParams;
@@ -1982,6 +2117,21 @@ AlgaPattern : AlgaNode {
 						interpStreams = nil;
 					});
 
+					//reset \sustain
+					if((foundSustain.not).and(resetSet.findMatch(\sustain) != nil), {
+						resetSustain = true;
+					});
+
+					//reset \stretch
+					if((foundStretch.not).and(resetSet.findMatch(\stretch) != nil), {
+						resetStretch = true;
+					});
+
+					//reset \legato
+					if((foundLegato.not).and(resetSet.findMatch(\legato) != nil), {
+						resetLegato = true;
+					});
+
 					//reset generic params
 					resetSet.do({ | entry | currentGenericParams.removeAt(entry) });
 				}
@@ -1989,18 +2139,48 @@ AlgaPattern : AlgaNode {
 					parsedFX = nil; currentFX = nil; //reset \fx
 					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil; prevPatternOutNodes = nil; //reset \out
 					interpStreams = nil; //reset \dur
+					resetSustain = true; //reset \sustain
+					resetStretch = true; //reset \stretch
+					resetLegato = true;  //reset \legato
 
 					//reset all generic params
 					if(currentGenericParams != nil, { currentGenericParams.clear });
 				};
 			});
 
-			//Set dur according to previous one
+			//No \dur from user, set to previous one
 			if(foundDurOrDelta.not, {
 				if((interpStreams == nil).or(algaWasBeingCleared), {
 					this.setDur(1, newInterpStreams)
 				}, {
 					this.setDur(interpStreams.dur, newInterpStreams)
+				});
+			});
+
+			//No \sustain from user, set to previous one
+			if(foundSustain.not, {
+				if(resetSustain, {
+					this.setSustain(0, newInterpStreams)
+				}, {
+					this.setSustain(interpStreams.sustain, newInterpStreams)
+				});
+			});
+
+			//No \stretch from user, set to previous one
+			if(foundStretch.not, {
+				if(resetStretch, {
+					this.setStretch(1, newInterpStreams)
+				}, {
+					this.setStretch(interpStreams.stretch, newInterpStreams)
+				});
+			});
+
+			//No \stretch from user, set to previous one
+			if(foundLegato.not, {
+				if(resetLegato, {
+					this.setLegato(0, newInterpStreams)
+				}, {
+					this.setLegato(interpStreams.legato, newInterpStreams)
 				});
 			});
 
@@ -2031,8 +2211,11 @@ AlgaPattern : AlgaNode {
 				})
 			});
 		}, {
-			//Else, default it to 1
+			//Else, default them
 			if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
+			if(foundSustain.not, { this.setSustain(0, newInterpStreams) });
+			if(foundStretch.not, { this.setStretch(1, newInterpStreams) });
+			if(foundLegato.not, { this.setLegato(0, newInterpStreams) });
 		});
 
 		//Set the correct synthBus in newInterpStreams!!!
@@ -2051,6 +2234,13 @@ AlgaPattern : AlgaNode {
 			\algaPatternInterpStreams, newInterpStreams //Lock current one: will work on .replace
 		]);
 
+		//Add \sustain
+		patternPairs = patternPairs.addAll([
+			\sustain, Pfuncn( { newInterpStreams.sustain.next }, inf),
+			\stretch, Pfuncn( { newInterpStreams.stretch.next }, inf),
+			\legato, Pfuncn( { newInterpStreams.legato.next }, inf)
+		]);
+
 		//Manual or automatic dur management
 		if(manualDur.not, {
 			//Pfuncn allows to modify the value
@@ -2065,7 +2255,6 @@ AlgaPattern : AlgaNode {
 
 		//Determine if \out interpolation is required
 		this.createPatternOutReceivers;
-
 		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
 		//createPattern function is non scheduled as it it better to create it right away.
 		if(manualDur.not, {
@@ -2103,10 +2292,13 @@ AlgaPattern : AlgaNode {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
 			//The synthDef will be sent later! just use the def and the desc for now
-			synthDefFx = AlgaSynthDef(
+			synthDefFx = AlgaSynthDef.new_inner(
 				defName,
-				def
-			).synthDef; //Ignore AlgaSynthDefSpec
+				def,
+				makeFadeEnv: false,
+				makePatternDef: false,
+				makeOutDef: false
+			);
 
 			//Get the desc
 			synthDescFx = synthDefFx.asSynthDesc;
@@ -2358,7 +2550,7 @@ AlgaPattern : AlgaNode {
 			def,
 			outsMapping: outsMapping,
 			sampleAccurate: true
-		); //Important: it returns AlgaSynthDefSpec (for pattern_out)
+		); //Important: it returns AlgaSynthDefSpec (for _algaPattern and _algaPatternTempOut)
 
 		//Return the Symbol
 		^defName
@@ -2454,6 +2646,54 @@ AlgaPattern : AlgaNode {
 			if(sched == nil, { sched = 0 });
 			("AlgaPattern: 'dur' interpolation is not supported yet. Rescheduling 'dur' at the " ++ sched ++ " quantization.").warn;
 			^this.setDurAtSched(value, sched);
+		});
+	}
+
+	//Interpolate sustain (uses replaceDur)
+	interpolateSustain { | value, time, sched |
+		if(replaceDur, {
+			("AlgaPattern: 'sustain' interpolation is not supported yet. Running 'replace' instead.").warn;
+			^this.replace(
+				def: (def: this.getSynthDef, sustain: value),
+				time: time,
+				sched: sched
+			);
+		}, {
+			if(sched == nil, { sched = 0 });
+			("AlgaPattern: 'sustain' interpolation is not supported yet. Rescheduling 'sustain' at the " ++ sched ++ " quantization.").warn;
+			^this.setSustainAtSched(value, sched);
+		});
+	}
+
+	//Interpolate stretch (uses replaceDur)
+	interpolateStretch { | value, time, sched |
+		if(replaceDur, {
+			("AlgaPattern: 'stretch' interpolation is not supported yet. Running 'replace' instead.").warn;
+			^this.replace(
+				def: (def: this.getSynthDef, stretch: value),
+				time: time,
+				sched: sched
+			);
+		}, {
+			if(sched == nil, { sched = 0 });
+			("AlgaPattern: 'stretch' interpolation is not supported yet. Rescheduling 'stretch' at the " ++ sched ++ " quantization.").warn;
+			^this.setStretchAtSched(value, sched);
+		});
+	}
+
+	//Interpolate legato (uses replaceDur)
+	interpolateLegato { | value, time, sched |
+		if(replaceDur, {
+			("AlgaPattern: 'legato' interpolation is not supported yet. Running 'replace' instead.").warn;
+			^this.replace(
+				def: (def: this.getSynthDef, legato: value),
+				time: time,
+				sched: sched
+			);
+		}, {
+			if(sched == nil, { sched = 0 });
+			("AlgaPattern: 'legato' interpolation is not supported yet. Rescheduling 'legato' at the " ++ sched ++ " quantization.").warn;
+			^this.setLegatoAtSched(value, sched);
 		});
 	}
 
@@ -2629,6 +2869,21 @@ AlgaPattern : AlgaNode {
 		//Special case, \dur
 		if(param == \dur, {
 			^this.interpolateDur(sender, time, sched);
+		});
+
+		//Special case, \sustain
+		if(param == \sustain, {
+			^this.interpolateSustain(sender, time, sched);
+		});
+
+		//Special case, \stretch
+		if(param == \stretch, {
+			^this.interpolateStretch(sender, time, sched);
+		});
+
+		//Special case, \legato
+		if(param == \legato, {
+			^this.interpolateLegato(sender, time, sched);
 		});
 
 		//Special case, \def
@@ -2910,6 +3165,33 @@ AlgaPattern : AlgaNode {
 				}
 			);
 		})
+	}
+
+	//Set sustain at sched
+	setSustainAtSched { | value, sched |
+		scheduler.addAction(
+			func: { this.setSustain(value) },
+			sched: sched,
+			topPriority: true
+		);
+	}
+
+	//Set stretch at sched
+	setStretchAtSched { | value, sched |
+		scheduler.addAction(
+			func: { this.setStretch(value) },
+			sched: sched,
+			topPriority: true
+		);
+	}
+
+	//Set leagto at sched
+	setLegatoAtSched { | value, sched |
+		scheduler.addAction(
+			func: { this.setLegato(value) },
+			sched: sched,
+			topPriority: true
+		);
 	}
 
 	//stop and reschedule in the future
@@ -3394,6 +3676,7 @@ AMP : AlgaMonoPattern {}
 					tempSynthArgs = [
 						\in, outTempBus.busArg,
 						\out, interpBus.index,
+						\gate, 1,
 						\fadeTime, 0,
 						\env, envBus.busArg
 					];

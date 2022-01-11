@@ -96,3 +96,123 @@
     }, algaServerOptions: AlgaServerOptions(latency: 1))
     )
     ```
+
+- Added support for using the same `AlgaSynthDefs` for both `AlgaNodes` and `AlgaPatterns`:
+
+    ```SuperCollider
+    //1
+    (
+    Alga.boot({
+        AlgaSynthDef(\test, {
+            SinOsc.ar(\freq.kr(440))
+        }, sampleAccurate: true).add;
+
+        s.sync;
+
+        //a = AN(\test).play;
+
+        b = AP((
+            def: \test,
+            amp: AlgaTemp({
+                EnvPerc.ar(\atk.kr(0.01), \rel.kr(0.25), \curve.kr(-2), 0)
+            }, sampleAccurate: true),
+            dur: 0.5,
+        )).play(chans:2)
+    });
+    )
+
+    //2
+    (
+    Alga.boot({
+        y = AP((
+            def: { SinOsc.ar(\freq.kr(440)) * \amp.kr(1) },
+            amp: AlgaTemp({
+                EnvPerc.kr(\atk.kr(0.01), \rel.kr(0.25), \curve.kr(-2), 0)
+            }),
+            dur: 0.5,
+        )).play(chans:2)
+    })
+    )
+
+    //3
+    (
+    Alga.boot({
+        y = AP((
+            def: { SinOsc.ar(\freq.kr(440)) },
+            amp: Pseq([
+                AlgaTemp({
+                    EnvPerc.ar(\atk.kr(0.01), \rel.kr(0.25), \curve.kr(-2), 0) * 0.25
+                }, sampleAccurate: true),
+                AlgaTemp({
+                    EnvPerc.ar(\atk.kr(0.001), \rel.kr(0.1), \curve.kr(-2), 0) * 0.25
+                }, sampleAccurate: true),
+            ], inf),
+            freq: Pwhite(440, 880),
+            dur: Pwhite(0.01, 0.2),
+        )).play(chans:2)
+    })
+    )
+    ```
+
+- Added support for `sustain / stretch / legato` to `AlgaPatterns`:
+    
+    ```SuperCollider
+    //1
+    (
+    Alga.boot({
+        a = AP((
+            def: { SinOsc.ar * EnvGen.ar(Env.adsr, \gate.kr) }, //user can use \gate
+            sustain: Pseq([1, 2], inf), //reserved keyword
+            dur: 3
+        )).play
+    })
+    )
+
+    //2
+    (
+    Alga.boot({
+        a = AP((
+            def: { SinOsc.ar },
+            amp: AlgaTemp({ EnvGen.ar(Env.adsr, \gate.kr) }, sampleAccurate: true),
+            sustain: Pseq([1, 2], inf),
+            dur: 3
+        )).play
+    })
+    )
+    (
+    Alga.boot({
+        a = AP((
+            def: { SinOsc.ar(\freq.kr(440)) *
+                EnvGen.kr(Env.adsr(\atk.kr(0.01), \del.kr(0.3), \sus.kr(0.5), \rel.kr(1.0)), \gate.kr, doneAction: 2) *
+                \amp.kr(0.5)
+            },
+            dur: 4,
+            freq: Pseed(1, Pexprand(100.0, 800.0).round(27.3)),
+            amp: Pseq([0.3, 0.2], inf),
+            //sustain: 4,
+            legato: Pseq([1, 0.5], inf),
+            rel: 0.1,
+            callback: { |ev| ev.postln },
+        )).sustainToDur_(true).play
+    })
+    )
+
+    //Same as:
+    (
+    Alga.boot({
+        a = AP((
+            def: { SinOsc.ar(\freq.kr(440)) *
+                EnvGen.kr(Env.adsr(\atk.kr(0.01), \del.kr(0.3), \sus.kr(0.5), \rel.kr(1.0)), \gate.kr, doneAction: 2) *
+                \amp.kr(0.5)
+            },
+            dur: 4,
+            freq: Pseed(1, Pexprand(100.0, 800.0).round(27.3)),
+            amp: Pseq([0.3, 0.2], inf),
+            sustain: 4,
+            legato: Pseq([1, 0.5], inf),
+            rel: 0.1,
+            callback: { |ev| ev.postln },
+        )).play
+    })
+    )
+    ```
