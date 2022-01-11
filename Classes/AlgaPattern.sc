@@ -1292,7 +1292,7 @@ AlgaPattern : AlgaNode {
 			this.createOutConnection(algaOut, algaSynthBus, outTempBus, patternBussesAndSynths);
 
 			//Update the synthDef symbol to use the patternTempOut version
-			algaSynthDef = (algaSynthDef.asString ++ "_algaPatternTempOut").asSymbol;
+			algaSynthDef = (algaSynthDef.asString.replace("_algaPattern", "_algaPatternTempOut")).asSymbol;
 
 			//Add patternTempOut writing to patternSynthArgs
 			patternSynthArgs = patternSynthArgs.add(\patternTempOut).add(outTempBus.index);
