@@ -2870,16 +2870,37 @@ AlgaPattern : AlgaNode {
 
 	//Set dur at sched
 	setDurAtSched { | value, sched |
-		//Add to scheduler just to make cascadeMode work
-		this.addAction(
-			condition: { this.algaInstantiated },
-			func: {
-				var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
-				if(algaReschedulingEventStreamPlayer != nil, {
-					algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, { this.setDur(value) });
-				})
-			}
-		);
+		if(sched.isAlgaStep, {
+			//sched == AlgaStep: at sched, schedule the set of duration AND
+			//the beingStopped = true / false. This allows to just play once (or it would play twice)
+			this.addAction(
+				condition: { this.algaInstantiated },
+				func: {
+					var interpStreamsLock = interpStreams;
+					var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
+					if(algaReschedulingEventStreamPlayer != nil, {
+						interpStreamsLock.beingStopped = true;
+						algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
+							this.setDur(value);
+							interpStreamsLock.beingStopped = false;
+						})
+					})
+				},
+				sched: sched
+			);
+		}, {
+			//sched == number: reschedule the stream in the future
+			//Add to scheduler just to make cascadeMode work
+			this.addAction(
+				condition: { this.algaInstantiated },
+				func: {
+					var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
+					if(algaReschedulingEventStreamPlayer != nil, {
+						algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, { this.setDur(value) });
+					})
+				}
+			);
+		})
 	}
 
 	//stop and reschedule in the future
