@@ -1,7 +1,7 @@
 # 1.2.0
 
 - Added the `interpShape` option. This allows to specify an interpolation shape in the form of an
-  `Env`. All connection methods have also been updated to receive a `shape` argument to set the `Env` 
+  `Env`. All connection methods have also been updated to receive a `shape` argument to set the `Env`
   for the specific connection. Check the `Examples/AlgaNode/11_InterpShape.scd` below:
 
     ```SuperCollider
@@ -155,7 +155,7 @@
     ```
 
 - Added support for `sustain / stretch / legato` to `AlgaPatterns`:
-    
+
     ```SuperCollider
     //1
     (
@@ -215,4 +215,24 @@
         )).play
     })
     )
+    ```
+
+- Added the `AlgaStep` class. This class allows to schedule actions not on a specific beat,
+  but at a specific "pattern trigger" that will happen in the future:
+
+    ```SuperCollider
+    (
+    Alga.boot({
+        a = AlgaPattern((
+            def: { SinOsc.ar(\freq.ar(440)) * EnvPerc.ar * 0.5 },
+            dur: 1
+        )).play
+    })
+    )
+
+    //Schedule 2 triggers from now
+    a.from(Pseq([220, 880], inf), \freq, time: 1, sched: AlgaStep(2))
+
+    //Schedule at the next trigger
+    a.from(Pseq([0.5, 0.25], inf), \dur, sched: AlgaStep(0))
     ```

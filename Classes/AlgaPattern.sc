@@ -2749,7 +2749,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//ListPattern that contains Buffers
-	patternOrAlgaPatternArgContainsBuffers { | pattern |
+	patternOrListPatternArgContainsBuffers { | pattern |
 		if(pattern.isBuffer, { ^true });
 		if(pattern.isAlgaArg, { if(pattern.sender.isBuffer, { ^true }) });
 		if(pattern.isListPattern, {
@@ -2820,7 +2820,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Special case: ListPattern with Buffers
-		if(this.patternOrAlgaPatternArgContainsBuffers(sender), {
+		if(this.patternOrListPatternArgContainsBuffers(sender), {
 			^this.interpolateBuffer(sender, param, time, sched)
 		});
 
