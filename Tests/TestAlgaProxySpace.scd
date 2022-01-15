@@ -29,19 +29,8 @@ p = AlgaProxySpace.boot;
 ~d.play
 (
 ~d = (
-	def: { SinOsc.ar(\freq.kr(440)) * EnvPerc.ar * 2 },
+	def: { SinOsc.ar(\freq.kr(440)) * EnvPerc.ar * 0.1 },
 	dur: 0.1,
 	freq: Pseq([440, 880], inf)
 )
 )
-
-
-
-( hello: Pwhite() ).asString == ( hello: Pwhite(3) ).code
-
-{ Pwhite(3) }.def.code == { Pwhite(3) }.def.code
-
-{ Pwhite(3) }.def.code == { 2 }.def.code
-
-
-Pwhite(3, 1).asCompileString

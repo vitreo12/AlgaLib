@@ -4,8 +4,8 @@ AlgaProxySpace {
 	classvar <currentNode;
 	classvar <patternsEvents;
 	var <server;
-	var <sched;
-	var <interpTime = 0, <interpShape, <playTime = 0, <replacePlayTime = 0, <playSafety = \clip;
+	var <sched = 1;
+	var <interpTime = 0, <interpShape, <playTime = 0, <replacePlayTime = true, <playSafety = \clip;
 
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var newSpace;
@@ -176,7 +176,7 @@ AlgaProxySpace {
 				if(newEntryCompileString != currentEntryCompileString, {
 					newConnections[key] = newEntry;
 					if(node.connectionTriggersReplace(key).or(
-						node.patternOrAlgaPatternArgContainsBuffers(newEntry)), {
+						node.patternOrListPatternArgContainsBuffers(newEntry)), {
 						newConnections.clear;
 						break.value(nil);
 					});
