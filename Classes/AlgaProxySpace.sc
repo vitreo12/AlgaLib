@@ -78,6 +78,14 @@ AlgaProxySpace {
 
 	ps_ { | value | this.playSafety_(value) }
 
+	copyAllProxySpaceParams { | node |
+		node.interpTime = interpTime;
+		node.interpShape = interpShape;
+		node.playTime = playTime;
+		node.replacePlayTime = replacePlayTime;
+		node.playSafety = playSafety;
+	}
+
 	sched_ { | value |
 		if(value.isNumber.not, {
 			"AlgaProxySpace: 'sched' must be a number".error;
@@ -104,7 +112,9 @@ AlgaProxySpace {
 	}
 
 	newNode {
-		^AlgaNode(\alga_silent, server: server);
+		var node = AlgaNode(\alga_silent, server: server);
+		this.copyAllProxySpaceParams(node);
+		^node
 	}
 
 	//This allows to retrieve Symbol.kr / Symbol.ar BEFORE they're sent to the server.
