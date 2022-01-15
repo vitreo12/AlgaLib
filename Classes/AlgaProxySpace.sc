@@ -4,6 +4,7 @@ AlgaProxySpace {
 	classvar <currentNode;
 	classvar <patternsEvents;
 	var <server;
+	var <sched;
 	var <interpTime = 0, <interpShape, <playTime = 0, <replacePlayTime = 0, <playSafety = \clip;
 
 	*boot { | onBoot, server, algaServerOptions, clock |
@@ -78,6 +79,14 @@ AlgaProxySpace {
 	ps { ^playSafety }
 
 	ps_ { | value | this.playSafety_(value) }
+
+	sched_ { | value |
+		if(value.isNumber.not, {
+			"AlgaProxySpace: 'sched' must be a number".error;
+			^this
+		});
+		sched = value;
+	}
 
 	push {
 		if(currentEnvironment !== this, {
@@ -154,7 +163,6 @@ AlgaProxySpace {
 		block { | break |
 			def.keysValuesDo({ | key, newEntry |
 				var currentEntry = currentEventPairs[key];
-
 				//Trick to compare actual differences in the source code
 				var currentEntryCompileString = currentEntry.asCompileString;
 				var newEntryCompileString = newEntry.asCompileString;
@@ -169,14 +177,12 @@ AlgaProxySpace {
 			});
 		};
 
-		//Update
+		//Update patternsEvents
 		patternsEvents[node] = defBeforeMod;
 
-		//If no replaces, perform differential
+		//Perform differential connections
 		if(newConnections.size > 0, {
 			newConnections.keysValuesDo({ | param, entry |
-				var sched = 0;
-				if((param == \dur).or(param == \delta), { sched = 1 });
 				(param ++ ": " ++ entry.asString).warn;
 				node.from(
 					sender: entry,
@@ -207,14 +213,18 @@ AlgaProxySpace {
 				if(currentArgs.size > 0, {
 					^node.replace(
 						def: def,
-						args: currentArgs
+						args: currentArgs,
+						sched: sched
 					);
 				});
 			});
 		});
 
 		//Standard replace
-		^node.replace(def);
+		^node.replace(
+			def: def,
+			sched: sched
+		);
 	}
 
 	put { | key, def |
