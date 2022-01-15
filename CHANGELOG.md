@@ -236,3 +236,10 @@
     //Schedule at the next trigger
     a.from(Pseq([0.5, 0.25], inf), \dur, sched: AlgaStep(0))
     ```
+
+- Added the `AlgaProxySpace` class. This allows to quickly define `AlgaNodes` and `AlgaPatterns` in a fashion that
+  is similar to SC's `ProxySpace`. Check the help files and the Examples folder for a deeper look at all of its features.
+
+  ```SuperCollider
+  
+  ```
