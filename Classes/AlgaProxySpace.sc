@@ -4,7 +4,7 @@ AlgaProxySpace {
 	classvar <currentNode;
 	classvar <patternsEvents;
 	var <server;
-	var <interpTime = 0, <interpShape, <playTime = 0, <playSafety = \clip;
+	var <interpTime = 0, <interpShape, <playTime = 0, <replacePlayTime = 0, <playSafety = \clip;
 
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var newSpace;
@@ -39,20 +39,45 @@ AlgaProxySpace {
 		nodes.do({ | node | node.interpTime = value });
 	}
 
+	it { ^interpTime }
+
+	it_ { | value | this.interpTime_(value) }
+
 	interpShape_ { | value |
 		interpShape = value;
 		nodes.do({ | node | node.interpShape = value });
 	}
+
+	is { ^interpShape }
+
+	is_ { | value | this.interpShape(value) }
 
 	playTime_ { | value |
 		playTime = value;
 		nodes.do({ | node | node.playTime = value });
 	}
 
+	pt { ^playTime }
+
+	pt_ { | value | this.playTime_(value) }
+
+	replacePlayTime_ { | value |
+		replacePlayTime = value;
+		nodes.do({ | node | node.replacePlayTime = value });
+	}
+
+	rpt { ^replacePlayTime }
+
+	rpt_ { | value | this.replacePlayTime_(value) }
+
 	playSafety_ { | value |
 		playSafety = value;
 		nodes.do({ | node | node.playSafety = value });
 	}
+
+	ps { ^playSafety }
+
+	ps_ { | value | this.playSafety_(value) }
 
 	push {
 		if(currentEnvironment !== this, {

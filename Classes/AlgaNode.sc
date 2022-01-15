@@ -525,6 +525,10 @@ AlgaNode {
 		});
 	}
 
+	is { ^interpShape }
+
+	is_ { | value, param, all = false | this.interpShape(value, param, all) }
+
 	paramInterpShape_ { | param, value |
 		this.interpShape_(value, param);
 	}
@@ -683,6 +687,10 @@ AlgaNode {
 			"AlgaNode: 'playSafety' must be either 'clip', 'tanh', 'softclip' or 'limiter'.".error
 		})
 	}
+
+	ps { ^playSafety }
+
+	ps_ { | value | this.playSafety_(value) }
 
 	//Used in AlgaProxySpace
 	copyVars { | nodeToCopy |
