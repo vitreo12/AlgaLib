@@ -122,7 +122,7 @@ AlgaPattern : AlgaNode {
 	//If false, sustain must be explicitly set by the user.
 	//If true, sustain will be: (sustain * stretch) + dur.
 	//legato will apply in both cases.
-	var <>sustainToDur = false;
+	var <sustainToDur = false;
 
 	//Add the \algaNote event to Event
 	*initClass {
@@ -330,6 +330,15 @@ AlgaPattern : AlgaNode {
 			value = false;
 		});
 		schedSustainInSeconds = value
+	}
+
+	//Set sustainToDur
+	sustainToDur_ { | value = false |
+		if((value != false).and(value != true), {
+			"AlgaPattern: 'sustainToDur' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		sustainToDur = value
 	}
 
 	//Free all unused busses from interpStreams
