@@ -23,9 +23,7 @@ AlgaProxySpace {
 	}
 
 	*addParamArgs { | param, value |
-		if(paramsArgs[currentNode] == nil, {
-			paramsArgs[currentNode] = IdentityDictionary()
-		});
+		if(paramsArgs[currentNode] == nil, { paramsArgs[currentNode] = IdentityDictionary() });
 		paramsArgs[currentNode][param] = value;
 	}
 
@@ -109,8 +107,7 @@ AlgaProxySpace {
 		^AlgaNode(\alga_silent, server: server);
 	}
 
-	//This allows to retrieve Symbol.kr / Symbol.ar
-	//BEFORE they're sent to the server.
+	//This allows to retrieve Symbol.kr / Symbol.ar BEFORE they're sent to the server.
 	triggerDef { | node, def |
 		currentNode = node;
 		def.value;
