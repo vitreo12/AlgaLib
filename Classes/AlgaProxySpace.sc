@@ -175,6 +175,9 @@ AlgaProxySpace {
 				var newEntryCompileString = newEntry.asCompileString;
 				if(newEntryCompileString != currentEntryCompileString, {
 					newConnections[key] = newEntry;
+					//If the connection would trigger a replace (including a Buffer connection),
+					//just reset all things to go through with a normal SINGLE replace call,
+					//instead of piling up multiple ones
 					if(node.connectionTriggersReplace(key).or(
 						node.patternOrListPatternArgContainsBuffers(newEntry)), {
 						newConnections.clear;
@@ -190,7 +193,6 @@ AlgaProxySpace {
 		//Perform differential connections
 		if(newConnections.size > 0, {
 			newConnections.keysValuesDo({ | param, entry |
-				(param ++ ": " ++ entry.asString).warn;
 				node.from(
 					sender: entry,
 					param: param,
