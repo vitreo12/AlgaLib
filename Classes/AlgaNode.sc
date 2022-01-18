@@ -21,6 +21,9 @@ AlgaNode {
 	//The AlgaScheduler @ this server
 	var <scheduler;
 
+	//The sched used internally if set
+	var schedInner;
+
 	//Index of the corresponding AlgaBlock in the AlgaBlocksDict.
 	//This is being set in AlgaBlock
 	var <>blockIndex = -1;
@@ -473,6 +476,16 @@ AlgaNode {
 		);
 
 		^this;
+	}
+
+	sched { ^schedInner }
+
+	sched_ { | value |
+		if((value.isNumber.or(value.isAlgaStep)).not, {
+			"AlgaNode: 'sched' can only be a Number or AlgaStep".error;
+			^this;
+		});
+		schedInner = value
 	}
 
 	setParamsConnectionTime { | value, param, all = false |
@@ -1225,6 +1238,9 @@ AlgaNode {
 
 		//Create busses
 		this.createAllBusses;
+
+		//Check sched
+		sched = sched ? schedInner;
 
 		//Create actual synths
 		this.addAction(
@@ -3456,6 +3472,9 @@ AlgaNode {
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time, shape, sched = 0 |
 
+		//Check sched
+		sched = sched ? schedInner;
+
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			this.addAction(
 				condition: {
@@ -3664,8 +3683,10 @@ AlgaNode {
 
 		var functionSynthDefDict = IdentityDictionary();
 		var algaTemp = this.parseAlgaTempParam(sender, functionSynthDefDict);
-
 		if(algaTemp == nil, { ^this });
+
+		//Check sched
+		sched = sched ? schedInner;
 
 		^this.compileFunctionSynthDefDictIfNeeded(
 			{
@@ -3878,6 +3899,9 @@ AlgaNode {
 			^this;
 		});
 
+		//Check sched
+		sched = sched ? schedInner;
+
 		this.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, oldSender, true)).and(
@@ -3920,6 +3944,10 @@ AlgaNode {
 	}
 
 	resetParam { | param = \in, oldSender = nil, time, shape, sched |
+		//Check sched
+		sched = sched ? schedInner;
+
+		//Exec on instantiated receiver / sender
 		this.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, oldSender, false)).and(oldSender.algaInstantiatedAsSender)
@@ -4113,6 +4141,9 @@ AlgaNode {
 	replace { | def, args, time, sched, outsMapping, reset = false, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
+		//Check sched
+		sched = sched ? schedInner;
+
 		//Check global algaInstantiated
 		this.addAction(
 			condition: { this.algaInstantiated },
@@ -4216,6 +4247,9 @@ AlgaNode {
 
 	//Remove individual mix entries at param
 	disconnect { | param = \in, oldSender = nil, time, shape, sched |
+		//Check sched
+		sched = sched ? schedInner;
+
 		//If it wasn't a mix param, but the only entry, run <| instead
 		if(inNodes[param].size == 1, {
 			if(inNodes[param].findMatch(oldSender) != nil, {
@@ -4328,6 +4362,10 @@ AlgaNode {
 
 	//for clear, check algaInstantiated and not isPlaying
 	clear { | onClear, time, sched |
+		//Check sched
+		sched = sched ? schedInner;
+
+		//Exec clear on algaInstantiated
 		this.addAction(
 			condition: { this.algaInstantiated },
 			func: { this.clearInner(onClear, time) },
@@ -4441,6 +4479,9 @@ AlgaNode {
 	}
 
 	playInner { | time, channelsToPlay, scale, sched, replace = false, usePrevPlayScale = false |
+		//Check sched
+		sched = sched ? schedInner;
+
 		//Check only for synthBus, it makes more sense than also checking for synth.algaIstantiated,
 		//As it allows meanwhile to create the play synth while synth is getting instantiated
 		this.addAction(
@@ -4496,6 +4537,9 @@ AlgaNode {
 			//Already in a scheduled action
 			^this.freePlaySynth(time, true, action);
 		};
+
+		//Check sched
+		sched = sched ? schedInner;
 
 		//Normal case
 		this.addAction(

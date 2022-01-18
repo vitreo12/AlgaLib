@@ -1715,7 +1715,8 @@ AlgaPattern : AlgaNode {
 		numChannels = synthDef.numChannels;
 		rate = synthDef.rate;
 
-		//Sched must be a num
+		//Check sched
+		sched = sched ? schedInner;
 		sched = sched ? 0;
 
 		//Generate outsMapping (for outsMapping connectinons)
@@ -1741,7 +1742,8 @@ AlgaPattern : AlgaNode {
 	buildFromListPattern { | initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
-		//Sched must be a num
+		//Check sched
+		sched = sched ? schedInner;
 		sched = sched ? 0;
 
 		//Generate outsMapping (for outsMapping connectinons)
@@ -1976,6 +1978,9 @@ AlgaPattern : AlgaNode {
 		//will be overwritten when using replace. This allows to separate the "global" one
 		//from the one that's being created here.
 		var newInterpStreams = AlgaPatternInterpStreams(this);
+
+		//Check sched
+		sched = sched ? schedInner;
 
 		//Loop over controlNames and retrieve which parameters the user has set explicitly.
 		//All other parameters will be dealt with later.
@@ -2750,6 +2755,8 @@ AlgaPattern : AlgaNode {
 	//Interpolate a parameter that is not in controlNames (like \lag)
 	interpolateGenericParam { | sender, param, time, sched |
 		("AlgaPattern: changing the '" ++ param.asString ++ "' key, which is not present in the AlgaSynthDef. This will trigger 'replace'.").warn;
+		//Check sched
+		sched = sched ? schedInner;
 		^this.replace(
 			def: (def: this.getSynthDef, (param): sender), //escape param with ()
 			time: time,
@@ -2818,6 +2825,9 @@ AlgaPattern : AlgaNode {
 	//<<, <<+ and <|
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, sampleAndHold, time, shape, sched |
+
+		//Check sched
+		sched = sched ? schedInner;
 
 		//Default to false
 		sampleAndHold = sampleAndHold ? false;
@@ -3091,6 +3101,8 @@ AlgaPattern : AlgaNode {
 
 	//Manually advance the pattern. 'next' as function name won't work as it's reserved, apparently
 	advance { | sched = 0 |
+		//Check sched
+		sched = sched ? schedInner;
 		sched = sched ? 0;
 		if(patternAsStream != nil, {
 			//If sched is 0, go right away: user might have its own scheduling setup
@@ -3112,6 +3124,8 @@ AlgaPattern : AlgaNode {
 
 	//Stop pattern
 	stopPattern { | sched = 0 |
+		//Check sched
+		sched = sched ? schedInner;
 		sched = sched ? 0;
 		if(sched.isAlgaStep, {
 			var interpStreamsLock = interpStreams;
@@ -3130,6 +3144,8 @@ AlgaPattern : AlgaNode {
 
 	//Resume pattern
 	resumePattern { | sched |
+		//Check sched
+		sched = sched ? schedInner;
 		sched = sched ? 0;
 		if(sched == 0, {
 			interpStreams.algaReschedulingEventStreamPlayer.play
@@ -3143,6 +3159,10 @@ AlgaPattern : AlgaNode {
 
 	//Set dur at sched
 	setDurAtSched { | value, sched |
+		//Check sched
+		sched = sched ? schedInner;
+
+		//Check sched type
 		if(sched.isAlgaStep, {
 			//sched == AlgaStep: at sched, schedule the set of duration AND
 			//the beingStopped = true / false. This allows to just play once (or it would play twice)
@@ -3178,6 +3198,10 @@ AlgaPattern : AlgaNode {
 
 	//Set sustain at sched
 	setSustainAtSched { | value, sched |
+		//Check sched
+		sched = sched ? schedInner;
+
+		//Execute on scheduler
 		this.addAction(
 			func: { this.setSustain(value) },
 			sched: sched,
@@ -3187,6 +3211,10 @@ AlgaPattern : AlgaNode {
 
 	//Set stretch at sched
 	setStretchAtSched { | value, sched |
+		//Check sched
+		sched = sched ? schedInner;
+
+		//Execute on scheduler
 		this.addAction(
 			func: { this.setStretch(value) },
 			sched: sched,
@@ -3196,6 +3224,10 @@ AlgaPattern : AlgaNode {
 
 	//Set leagto at sched
 	setLegatoAtSched { | value, sched |
+		//Check sched
+		sched = sched ? schedInner;
+
+		//Execute on scheduler
 		this.addAction(
 			func: { this.setLegato(value) },
 			sched: sched,

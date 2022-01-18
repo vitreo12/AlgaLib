@@ -1,3 +1,20 @@
+// AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
+// Copyright (C) 2020-2021 Francesco Cameli.
+
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
 AlgaProxySpace {
 	classvar <nodes;
 	classvar <paramsArgs;
@@ -87,11 +104,7 @@ AlgaProxySpace {
 	}
 
 	sched_ { | value |
-		if(value.isNumber.not, {
-			"AlgaProxySpace: 'sched' must be a number".error;
-			^this
-		});
-		sched = value;
+		nodes.do({ | node | node.sched = value });
 	}
 
 	push {
@@ -195,8 +208,7 @@ AlgaProxySpace {
 			newConnections.keysValuesDo({ | param, entry |
 				node.from(
 					sender: entry,
-					param: param,
-					sched: sched
+					param: param
 				);
 			});
 			^true
@@ -222,8 +234,7 @@ AlgaProxySpace {
 				if(currentArgs.size > 0, {
 					^node.replace(
 						def: def,
-						args: currentArgs,
-						sched: sched
+						args: currentArgs
 					);
 				});
 			});
@@ -231,8 +242,7 @@ AlgaProxySpace {
 
 		//Standard replace
 		^node.replace(
-			def: def,
-			sched: sched
+			def: def
 		);
 	}
 
