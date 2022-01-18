@@ -101,6 +101,7 @@ AlgaProxySpace {
 		node.playTime = playTime;
 		node.replacePlayTime = replacePlayTime;
 		node.playSafety = playSafety;
+		node.sched = sched;
 	}
 
 	sched_ { | value |
