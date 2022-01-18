@@ -31,11 +31,11 @@ p = AlgaProxySpace.boot;
 //AlgaPattern: differential
 ~d.interpTime = 4
 ~d.playTime = 2
-~d.play
+~d.play(chans:2)
 (
 ~d = (
 	def: { SinOsc.ar(\freq.kr(440)) * EnvPerc.ar * 0.1 },
-	dur: 0.1,
+	dur: 0.5,
 	freq: Pseq([440, 880], inf)
 )
 )
