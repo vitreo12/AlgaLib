@@ -277,9 +277,10 @@ AlgaProxySpace {
 	clock { ^Alga.clock(server) }
 }
 
+//Support for AlgaNode and AlgaArg
 +Symbol {
 	ar { | val, lag, spec |
-		if(val.isAlgaNode, {
+		if((val.isAlgaNode).or(val.isAlgaArg), {
 			AlgaProxySpace.addParamArgs(this, val);
 			^NamedControl.ar(this, 0, lag, spec)
 		});
@@ -287,7 +288,7 @@ AlgaProxySpace {
 	}
 
 	kr { | val, lag, fixedLag = false, spec |
-		if(val.isAlgaNode, {
+		if((val.isAlgaNode).or(val.isAlgaArg), {
 			AlgaProxySpace.addParamArgs(this, val);
 			^NamedControl.kr(this, 0, lag, fixedLag, spec)
 		});
