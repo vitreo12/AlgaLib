@@ -338,18 +338,15 @@ AlgaSynthDef : SynthDef {
 		});
 
 		//Must be array.
-		if(outsMapping.class == Array, {
+		if(outsMapping.isArray, {
 			var chanCount = 0;
 			outsMapping.do({ | entry, i |
-				if(entry.class == Symbol, {
+				if(entry.isSymbol, {
 					var name = outsMapping[i];
 					var val  = outsMapping[i+1];
-
-					if((val.class != Symbol).and(val != nil), {
-
+					if((val.isSymbol.not).and(val != nil), {
 						chanCount = chanCount + 1;
-
-						if(val.class == Array, {
+						if(val.isArray, {
 							val.do({ | arrayEntry, arrayIndex |
 								if(arrayEntry < numChannels, {
 									def.outsMapping[name] = val;
@@ -365,9 +362,7 @@ AlgaSynthDef : SynthDef {
 							});
 						});
 					}, {
-
 						def.outsMapping[name] = chanCount;
-
 						chanCount = chanCount + 1;
 					});
 				});
