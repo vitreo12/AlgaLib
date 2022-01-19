@@ -43,6 +43,9 @@ AlgaNode {
 	//On replace, use this scaling if possible.
 	var <prevPlayScale = 1.0;
 
+	//On replace, use this out if possible
+	var <prevPlayOut = 0;
+
 	//This is the longestConnectionTime between all the outNodes.
 	//It's used when .replacing a node connected to something, in order for it to be kept alive
 	//for all the connected nodes to run their interpolator on it
@@ -4124,7 +4127,8 @@ AlgaNode {
 					this.playInner(
 						time: playTimeOnReplace,
 						replace: true,
-						usePrevPlayScale: true
+						usePrevPlayScale: true,
+						usePrevPlayOut: true
 					)
 				});
 
@@ -4375,7 +4379,7 @@ AlgaNode {
 
 	//Number plays those number of channels sequentially
 	//Array selects specific output
-	createPlaySynth { | time, channelsToPlay, scale, replace = false, usePrevPlayScale = false |
+	createPlaySynth { | time, channelsToPlay, scale, out = 0, replace = false, usePrevPlayScale = false, usePrevPlayOut = false |
 		var actualNumChannels, playSynthSymbol;
 
 		//Can't play a kr node!
@@ -4385,11 +4389,19 @@ AlgaNode {
 		if(usePrevPlayScale, { scale = prevPlayScale }, { scale = scale ? 1.0 });
 		if(scale.isNumber.not, {
 			"AlgaNode: play: the 'scale' argument can only be a Number.".error;
-			^nil;
+			^this;
 		});
-
 		//Store prevPlayScale
 		prevPlayScale = scale;
+
+		//Out for a play can only be a num (prevPlayOut is used on .replace)
+		if(usePrevPlayOut, { out = prevPlayOut }, { out = out ? 0 });
+		if(out.isNumber.not, {
+			"AlgaNode: play: the 'out' argument can only be a Number. This will point to the first Bus index to play to.".error;
+			^this;
+		});
+		//Store prevPlayOut
+		prevPlayOut = out;
 
 		//If not replace, if it was playing and not being stopped, free the previous one.
 		//This is used to dynamically change the scale of the output.
@@ -4441,7 +4453,8 @@ AlgaNode {
 					\indices, channelsToPlay,
 					\gate, 1,
 					\fadeTime, time,
-					\scale, scale
+					\scale, scale,
+					\out, out
 				],
 				playGroup,
 				waitForInst:false
@@ -4467,7 +4480,8 @@ AlgaNode {
 					\in, synthBus.busArg,
 					\gate, 1,
 					\fadeTime, time,
-					\scale, scale
+					\scale, scale,
+					\out, out
 				],
 				playGroup,
 				waitForInst:false
@@ -4478,7 +4492,7 @@ AlgaNode {
 		beingStopped = false;
 	}
 
-	playInner { | time, channelsToPlay, scale, sched, replace = false, usePrevPlayScale = false |
+	playInner { | time, channelsToPlay, scale, out, sched, replace = false, usePrevPlayScale = false, usePrevPlayOut = false |
 		//Check sched
 		sched = sched ? schedInner;
 
@@ -4491,8 +4505,10 @@ AlgaNode {
 					time: time,
 					channelsToPlay: channelsToPlay,
 					scale: scale,
+					out: out,
 					replace: replace,
-					usePrevPlayScale: usePrevPlayScale
+					usePrevPlayScale: usePrevPlayScale,
+					usePrevPlayOut: usePrevPlayOut
 				)
 			},
 			sched: sched,
@@ -4500,8 +4516,14 @@ AlgaNode {
 		);
 	}
 
-	play { | time, chans, scale, sched |
-		this.playInner(time, chans, scale, sched);
+	play { | time, chans, scale, out = 0, sched |
+		this.playInner(
+			time: time,
+			channelsToPlay: chans,
+			scale: scale,
+			out: out,
+			sched: sched
+		);
 	}
 
 	freePlaySynth { | time, isClear = false, action |
