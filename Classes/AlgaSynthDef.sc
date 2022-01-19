@@ -184,6 +184,7 @@ AlgaSynthDef : SynthDef {
 			var out, outCtl, buildSynthDef;
 			var ampProvided = false;
 			var gateProvided = false;
+			var fadeTimeProvided = false;
 
 			//invalid func
 			if(func.isFunction.not, {
@@ -222,10 +223,16 @@ AlgaSynthDef : SynthDef {
 					gateProvided = true;
 				});
 
+				//Check \fadeTime
+				if(controlNameName == \fadeTime, {
+					if(controlName.rate != \control, {
+						Error("AlgaSynthDef: 'fadeTime' can only be a control rate parameter").algaThrow
+					});
+					fadeTimeProvided = true;
+				});
+
 				//Check for invalid names
-				if((controlNameName == \out).or(
-					controlNameName == \patternTempOut).or(
-					controlNameName == \fadeTime), {
+				if((controlNameName == \out).or(controlNameName == \patternTempOut), {
 					Error("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally. Choose another name.").algaThrow;
 				});
 			});
@@ -274,11 +281,11 @@ AlgaSynthDef : SynthDef {
 			//with output! This is fundamental for the \fadeTime mechanism in Alga to work,
 			//freeing synths at the right time.
 			envgen = if(makeFadeEnv, {
-				if(gateProvided, {
-					AlgaEnvGate.kr(gate: \gate.kr, fadeTime: \fadeTime.kr(0), i_level: 0, doneAction: 2)
-				}, {
-					AlgaEnvGate.kr(gate: \gate.kr(1), fadeTime: \fadeTime.kr(0), i_level: 0, doneAction: 2)
-				});
+				AlgaEnvGate.kr(
+					gate: if(gateProvided, { \gate.kr }, { \gate.kr(1) }),
+					fadeTime: if(fadeTimeProvided, { \fadeTime.kr }, { \fadeTime.kr(0) }),
+					i_level: 0, doneAction: 2
+				)
 			}, {
 				1.0
 			});

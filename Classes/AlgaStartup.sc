@@ -137,7 +137,6 @@ AlgaStartup {
 			});
 
 			algaMaxIO.do({ | y |
-
 				var sdef, arrayOfIndices, currentPair, isAlreadyDone;
 
 				y = y + 1;
@@ -161,16 +160,17 @@ AlgaStartup {
 					//Limiter to make sure not to blow up speakers.
 					//Note: Using AlgaEnvGate.ar here instead of AlgaDynamicIEnvGen.
 					//no need for dynamic fade times for play / stop, and AlgaEnvGate is cheaper!
-					["clip", "tanh", "softclip", "limiter"].do({ | funcName |
+					["none", "clip", "tanh", "softclip", "limiter"].do({ | funcName |
 						var func = funcName;
 						case
+						{ funcName == "none" } { func = "" }
 						{ funcName == "clip" } { func = "clip2" }
 						{ funcName == "limiter" } { func = "Limiter.ar" };
 						sdef = "
 AlgaSynthDef.new_inner(\\alga_play_" ++ funcName ++ "_" ++ i ++ "_" ++ y ++ ", {
 var input = AlgaReplaceBadValues.ar(\\in.ar(" ++ arrayOfZeros_in ++ "));
 input = Select.ar(\\indices.ir(" ++ arrayOfIndices ++ "), input);
-input = " ++ func ++ "(input * \\scale.kr(1)) * AlgaEnvGate.kr;
+input = " ++ func ++ "(input * \\scale.kr(1)) * AlgaEnvGate.kr(gate:\\gate.kr(1), fadeTime:\\fadeTime.kr(0));
 }, makeFadeEnv:false, sampleAccurate:false, makePatternDef:false, makeOutDef:false).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);
 ";
 						sdef.interpret;

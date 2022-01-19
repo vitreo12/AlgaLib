@@ -697,10 +697,10 @@ AlgaNode {
 
 	playSafety_ { | value |
 		var valueSymbol = value.asSymbol;
-		if((valueSymbol == \clip).or(valueSymbol == \tanh).or(valueSymbol == \softclip).or(valueSymbol == \limiter), {
+		if((valueSymbol == \none).or(valueSymbol == \clip).or(valueSymbol == \tanh).or(valueSymbol == \softclip).or(valueSymbol == \limiter), {
 			playSafety = valueSymbol
 		}, {
-			"AlgaNode: 'playSafety' must be either 'clip', 'tanh', 'softclip' or 'limiter'.".error
+			"AlgaNode: 'playSafety' must be either 'none', 'clip', 'tanh', 'softclip' or 'limiter'.".error
 		})
 	}
 
