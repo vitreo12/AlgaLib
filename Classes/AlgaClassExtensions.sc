@@ -29,6 +29,7 @@
 	isSymbol { ^false }
 	isEvent { ^false }
 	isListPattern { ^false }
+	isFilterPattern { ^false }
 	isTempoClock { ^false }
 	isSet { ^false }
 	def { ^nil }
@@ -245,6 +246,10 @@
 
 +ListPattern {
 	isListPattern { ^true }
+}
+
++FilterPattern {
+	isFilterPattern { ^true }
 }
 
 //List extensions are used in AlgaScheduler to manage actions
