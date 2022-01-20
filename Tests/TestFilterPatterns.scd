@@ -6,7 +6,7 @@ Alga.boot({
 				{ SinOsc.ar(\freq.kr(440)) * \amp.kr(1) },
 				{ LFTri.ar(\freq.kr(440)) * \amp.kr(1) },
 				{ LFSaw.ar(\freq.kr(440)) * \amp.kr(1) },
-				{ LFPulse.ar(\freq.kr(440)) * \amp.kr(1) },
+				{ LFPulse.ar(\freq.kr(440)) * \amp.kr(1) }
 			], inf)),
 			dur: Pseq([0.5, 0.3, 0.3, 0.5], inf),
 			freq: Pdup(Pseq((1..4) ++ [3, 2], inf), Pseq([500, 700, 350], inf)),
