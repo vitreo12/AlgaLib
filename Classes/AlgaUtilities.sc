@@ -142,30 +142,30 @@ AlgaTemp {
 //This class is used to schedule actions on steps
 AlgaStep {
 	var <>step = 0;
-	var <>retryOnFailedCondition = true;
-	var <>numberOfTries = 2;
+	var <>retryOnFailure = true;
+	var <>tries = 2;
 	var <post = false;
 	var <>func;
 	var <>condition;
 
-	*new { | step = 0, retryOnFailedCondition = true, numberOfTries = 2, post = false |
+	*new { | step = 0, retryOnFailure = true, tries = 2, post = false |
 		if(step.isNumber.not, {
 			"AlgaStep: step must be a number. Using 0.".warn;
 			step = 0
 		});
-		if((retryOnFailedCondition != true).and(retryOnFailedCondition != false), {
-			"AlgaStep: delayOnFailedCondition must be a boolean. Using true.".warn;
-			retryOnFailedCondition = true
+		if((retryOnFailure != true).and(retryOnFailure != false), {
+			"AlgaStep: retryOnFailure must be a boolean. Using true.".warn;
+			retryOnFailure = true
 		});
-		if(numberOfTries.isNumber.not, {
-			"AlgaStep: numberOfTries must be a number. Using 2.".warn;
-			numberOfTries = 2
+		if(tries.isNumber.not, {
+			"AlgaStep: tries must be a number. Using 2.".warn;
+			tries = 2
 		});
 		if((post != true).and(post != false), {
 			"AlgaStep: post must be a boolean. Using false.".warn;
 			post = false
 		});
-		^super.newCopyArgs(step, retryOnFailedCondition, numberOfTries, post)
+		^super.newCopyArgs(step, retryOnFailure, tries, post)
 	}
 
 	isAlgaStep { ^true }

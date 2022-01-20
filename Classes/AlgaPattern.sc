@@ -315,7 +315,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Set stopPatternBeforeReplace
-	stopPatternBeforeReplace_ { | value = false |
+	stopPatternBeforeReplace_ { | value = true |
 		if((value != false).and(value != true), {
 			"AlgaPattern: 'stopPatternBeforeReplace' only supports boolean values. Setting it to false".error;
 			value = false;
@@ -388,8 +388,8 @@ AlgaPattern : AlgaNode {
 			scheduledStepActions.do({ | step |
 				var condition = step.condition;
 				var func = step.func;
-				var retryOnFailedCondition = step.retryOnFailedCondition;
-				var numberOfTries = step.numberOfTries;
+				var retryOnFailure = step.retryOnFailure;
+				var tries = step.tries;
 				var stepCount = step.step;
 
 				if(stepCount <= 0, {
@@ -397,13 +397,13 @@ AlgaPattern : AlgaNode {
 						func.value;
 						stepsToRemove.add(step);
 					}, {
-						if(retryOnFailedCondition.not, {
+						if(retryOnFailure.not, {
 							stepsToRemove.add(step);
 						}, {
-							if(numberOfTries <= 0, {
+							if(tries <= 0, {
 								stepsToRemove.add(step);
 							}, {
-								step.numberOfTries = numberOfTries - 1;
+								step.tries = tries - 1;
 							});
 						});
 					});
@@ -2912,7 +2912,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Special case: ListPattern with Buffers
-		if(this.patternOrListPatternArgContainsBuffers(sender), {
+		if(this.patternOrAlgaPatternArgContainsBuffers(sender), {
 			^this.interpolateBuffer(sender, param, time, sched)
 		});
 
