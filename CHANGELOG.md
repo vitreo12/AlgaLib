@@ -241,5 +241,20 @@
   is similar to SC's `ProxySpace`. Check the help files and the Examples folder for a deeper look at all of its features.
 
   ```SuperCollider
-  
+  p = AlgaProxySpace.boot;
+
+  //A simple node
+  ~a = { SinOsc.ar(100) };
+
+  //Use it as FM input for another node
+  ~b.play(chans:2);
+  ~b.interpTime = 2;
+  ~b.playTime = 0.5;
+  ~b = { SinOsc.ar(\freq.ar(~a).range(200, 400)) };
+
+  //Replace
+  ~a = { SinOsc.ar(440) };
+
+  //New connection as usual
+  ~b.from({ LFNoise1.ar(100) }, \freq, time:3)
   ```
