@@ -1034,60 +1034,106 @@ AlgaNode {
 		^true;
 	}
 
+	//Unpack controlNames for a single SynthDef
+	unpackSynthDefSymbol { | synthDefSymbol, outsMappingSum |
+		var synthDef = SynthDescLib.global.at(synthDefSymbol).def;
+		if(synthDef == nil, {
+			("AlgaPattern: Invalid AlgaSynthDef: '" ++
+				synthDefSymbol.asString ++ "'").error;
+			^nil
+		});
+		synthDef.outsMapping.keysValuesDo({ | key, outMapping |
+			var oldOutsMapping = outsMappingSum[key];
+			if(oldOutsMapping == nil, {
+				outsMappingSum[key] = outMapping
+			}, {
+				if(oldOutsMapping != outMapping, {
+					("AlgaPattern: outsMapping mismatch of SynthDef '" ++
+						synthDefSymbol ++ "' for key '" ++ key ++ "'. Expected '" ++
+						oldOutsMapping ++ "' but got '" ++ outMapping ++ "'").error;
+					^nil;
+				})
+			});
+		});
+	}
+
 	//This if for AlgaPattern + ListPattern
 	unpackListPatternRecursive { | listPattern |
 		var outsMappingListPattern = IdentityDictionary();
 		listPattern.list.do({ | listEntry |
-			if(listEntry.isListPattern, {
+			case
+			{ listEntry.isListPattern } {
 				var outsMappingListPatternRecursive = this.unpackListPatternRecursive(listEntry);
-				outsMappingListPatternRecursive.keysValuesDo({ | key, outMapping | outsMappingListPattern[key] = outMapping });
-			}, {
-				var synthDef = SynthDescLib.global.at(listEntry).def;
-				if(synthDef == nil, { ("AlgaPattern: Invalid AlgaSynthDef: '" ++ listEntry ++ "'").error; ^nil });
-				synthDef.outsMapping.keysValuesDo({ | key, outMapping |
-					var oldOutsMapping = outsMappingListPattern[key];
-					if(oldOutsMapping == nil, {
-						outsMappingListPattern[key] = outMapping
-					}, {
-						if(oldOutsMapping != outMapping, {
-							("AlgaPattern: outsMapping mismatch of SynthDef '" ++ listEntry ++ "' for key '" ++ key ++ "'. Expected '" ++ oldOutsMapping ++ "' but got '" ++ outMapping ++ "'").error;
-							^nil;
-						})
-					});
+				outsMappingListPatternRecursive.keysValuesDo({ | key, outMapping |
+					outsMappingListPattern[key] = outMapping
 				});
-			});
+			}
+			{ listEntry.isFilterPattern } {
+				var outsMappingFilterPatternRecursive = this.unpackFilterPatternRecursive(listEntry);
+				outsMappingFilterPatternRecursive.keysValuesDo({ | key, outMapping |
+					outsMappingListPattern[key] = outMapping
+				});
+			}
+			{ listEntry.isSymbol } {
+				if(this.unpackSynthDefSymbol(listEntry, outsMappingListPattern) == nil, { ^nil });
+			};
 		});
 		^outsMappingListPattern;
 	}
 
-	//This is for AlgaPattern + ListPattern
-	unpackListPatternOutsMapping {
-		var outsMappingSum = IdentityDictionary();
-
-		synthDef.list.do({ | synthDefSymbol |
-			var synthDef;
-
-			//Unpack ListPatterns recursively
-			if(synthDefSymbol.isListPattern, {
-				var outsMappingListPattern = this.unpackListPatternRecursive(synthDefSymbol);
-				outsMappingListPattern.keysValuesDo({ | key, outMapping | outsMappingSum[key] = outMapping });
-			}, {
-				synthDef = SynthDescLib.global.at(synthDefSymbol).def;
-				if(synthDef == nil, { ("AlgaPattern: Invalid AlgaSynthDef: '" ++ synthDefSymbol.asString ++ "'").error; ^nil });
-				synthDef.outsMapping.keysValuesDo({ | key, outMapping |
-					var oldOutsMapping = outsMappingSum[key];
-					if(oldOutsMapping == nil, {
-						outsMappingSum[key] = outMapping
-					}, {
-						if(oldOutsMapping != outMapping, {
-							("AlgaPattern: outsMapping mismatch of SynthDef '" ++ synthDefSymbol ++ "' for key '" ++ key ++ "'. Expected '" ++ oldOutsMapping ++ "' but got '" ++ outMapping ++ "'").error;
-							^nil;
-						})
-					});
-				});
+	//This if for AlgaPattern + FilterPattern
+	unpackFilterPatternRecursive { | filterPattern |
+		var outsMappingFilterPattern = IdentityDictionary();
+		var entry = filterPattern.pattern;
+		case
+		{ entry.isListPattern } {
+			var outsMappingListPatternRecursive = this.unpackListPatternRecursive(entry);
+			outsMappingListPatternRecursive.keysValuesDo({ | key, outMapping |
+				outsMappingFilterPattern[key] = outMapping
 			});
-		});
+		}
+		{ entry.isFilterPattern } {
+			var outsMappingFilterPatternRecursive = this.unpackFilterPatternRecursive(entry);
+			outsMappingFilterPatternRecursive.keysValuesDo({ | key, outMapping |
+				outsMappingFilterPattern[key] = outMapping
+			});
+		}
+		{ entry.isSymbol } {
+			if(this.unpackSynthDefSymbol(entry, outsMappingFilterPattern) == nil, { ^nil });
+		};
+		^outsMappingFilterPattern;
+	}
 
+	//This is for AlgaPattern + ListPattern / FilterPattern
+	unpackListPatternOrFilterPatternOutsMapping {
+		var outsMappingSum = IdentityDictionary();
+		case
+		{ synthDef.isListPattern } {
+			synthDef.list.do({ | synthDefSymbol |
+				case
+				{ synthDefSymbol.isListPattern } {
+					var outsMappingListPattern = this.unpackListPatternRecursive(synthDefSymbol);
+					outsMappingListPattern.keysValuesDo({ | key, outMapping |
+						outsMappingSum[key] = outMapping
+					});
+				}
+				{ synthDefSymbol.isFilterPattern } {
+					var outsMappingFilterPattern = this.unpackFilterPatternRecursive(synthDefSymbol);
+					outsMappingFilterPattern.keysValuesDo({ | key, outMapping |
+						outsMappingSum[key] = outMapping
+					});
+				}
+				{ synthDefSymbol.isSymbol } {
+					if(this.unpackSynthDefSymbol(synthDefSymbol, outsMappingSum) == nil, { ^nil });
+				};
+			});
+		}
+		{ synthDef.isFilterPattern } {
+			var outsMappingFilterPattern = this.unpackFilterPatternRecursive(synthDef);
+			outsMappingFilterPattern.keysValuesDo({ | key, outMapping |
+				outsMappingSum[key] = outMapping
+			});
+		};
 		^outsMappingSum;
 	}
 
@@ -1095,9 +1141,9 @@ AlgaNode {
 	calculateOutsMapping { | replace = false, keepChannelsMapping = false |
 		var outsMappingSynthDef;
 
-		//For AlgaPattern: synthDef can be a ListPattern. In that case, sum all outsMappings
-		if((this.isAlgaPattern).and(synthDef.isListPattern), {
-			outsMappingSynthDef = this.unpackListPatternOutsMapping;
+		//For AlgaPattern: synthDef can be a ListPattern / FilterPatterm. In that case, sum all outsMappings
+		if((this.isAlgaPattern).and((synthDef.isListPattern).or(synthDef.isFilterPattern)), {
+			outsMappingSynthDef = this.unpackListPatternOrFilterPatternOutsMapping;
 			if(outsMappingSynthDef == nil, { ^nil });
 		}, {
 			//Normal case (no ListPattern): synthDef is an actual synthDef
@@ -1621,11 +1667,13 @@ AlgaNode {
 	//Remove activeInNodes / outNodes and reorder block
 	removeActiveNodesAndRearrangeBlocks { | param, sender |
 		if(sender.isListPattern, {
-			sender.list.do({ | entry |
-				this.removeActiveNodeAndRearrangeBlock(param, entry)
-			});
+			sender.list.do({ | entry | this.removeActiveNodeAndRearrangeBlock(param, entry) });
 		}, {
-			this.removeActiveNodeAndRearrangeBlock(param, sender)
+			if(sender.isFilterPattern, {
+				this.removeActiveNodesAndRearrangeBlocks(param, sender.pattern) //NOTE: plural form
+			}, {
+				this.removeActiveNodeAndRearrangeBlock(param, sender)
+			});
 		});
 	}
 
@@ -3120,18 +3168,21 @@ AlgaNode {
 		if(sender.isAlgaArg, { sender = sender.sender });
 
 		inNodes.do({ | sendersSet |
-			if(sender.isListPattern, {
+			case
+			{ sender.isListPattern } {
 				sender.do({ | entry |
 					if(entry.isAlgaTemp, { entry = entry.sender });
 					if(blockIndex != entry.blockIndex, { ^false });
 					if(sendersSet.includes(entry), { ^true })
 				})
-			});
-
-			if(sender.isAlgaNode, {
+			}
+			{ sender.isFilterPattern } {
+				if(this.checkConnectionAlreadyInPlace(sender.pattern), { ^true });
+			}
+			{ sender.isAlgaNode } {
 				if(blockIndex != sender.blockIndex, { ^false });
 				if(sendersSet.includes(sender), { ^true })
-			});
+			};
 		});
 
 		^false;
@@ -3519,14 +3570,19 @@ AlgaNode {
 			def.keysValuesDo({ | key, entry |
 				if(key != \def, {
 					var parsedEntry = entry;
-					if(entry.isListPattern, {
+					case
+					{ entry.isListPattern } {
 						parsedEntry = this.parseListPatternParam(parsedEntry, functionSynthDefDict);
 						if(parsedEntry == nil, { ^nil })
-					});
-					if(entry.isAlgaTemp, {
+					}
+					{ entry.isFilterPattern } {
+						parsedEntry = this.parseFilterPatternParam(parsedEntry, functionSynthDefDict);
+						if(parsedEntry == nil, { ^nil })
+					}
+					{ entry.isAlgaTemp } {
 						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict);
 						if(parsedEntry == nil, { ^nil })
-					});
+					};
 					def[key] = parsedEntry.algaAsStream;
 				});
 			});
