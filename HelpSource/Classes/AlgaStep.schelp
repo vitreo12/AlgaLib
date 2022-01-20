@@ -1,0 +1,48 @@
+TITLE:: AlgaStep
+summary:: Utility class to schedule actions on specific future triggers of an AlgaPattern
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaPattern
+
+DESCRIPTION::
+An link::Classes/AlgaStep:: is a utility class that allows the user to schedule actions on specific future triggers of an link::Classes/AlgaPattern::
+
+CLASSMETHODS::
+METHOD:: new
+ARGUMENT:: step
+Specify how many triggers in the future should the action happen.
+ARGUMENT:: retryOnFailure
+Specify if, on failure, there should be more tries on the successive triggers.
+ARGUMENT:: tries
+Specify how many tries to attempt.
+ARGUMENT:: post
+Specify if the action should be executed AFTER the triggering of the pattern.
+
+INSTANCEMETHODS::
+private:: condition
+private:: func
+private:: isAlgaStep
+private:: tries
+private:: post
+private:: retryOnFailure
+private:: step
+
+EXAMPLES::
+code::
+(
+Alga.boot({
+	a = AlgaPattern((
+		def: { SinOsc.ar(\freq.kr(440)) * EnvPerc.ar },
+		dur: 1
+	)).play;
+})
+)
+
+//One trigger from now
+a.from(220, \freq, sched: AlgaStep(1));
+
+//Two triggers from now
+a.replace({ Saw.ar(\freq.kr(440)) * EnvPerc.ar * 0.5}, sched: AlgaStep(2));
+
+//Next trigger
+a.from(440, \freq, sched: AlgaStep(0));
+::
