@@ -145,11 +145,42 @@ AlgaNode {
 	var <name;
 
 	*new { | def, args, interpTime, interpShape, playTime, sched, outsMapping, server |
-		^super.new.init(def, args, interpTime, interpShape, playTime, sched, outsMapping, server)
+		^super.new.init(
+			argDef: def,
+			argArgs: args,
+			argConnectionTime: interpTime,
+			argInterpShape: interpShape,
+			argPlayTime: playTime,
+			argSched: sched,
+			argOutsMapping: outsMapping,
+			argServer: server,
+		)
+	}
+
+	*new_ap { | def, interpTime, interpShape, playTime, sched = 1, sampleAccurateFuncs = true,  server |
+		^super.new.init(
+			argDef: def,
+			argConnectionTime: interpTime,
+			argInterpShape: interpShape,
+			argPlayTime: playTime,
+			argSched: sched,
+			argSampleAccurateFuncs: sampleAccurateFuncs,
+			argServer: server,
+		)
 	}
 
 	*debug { | def, args, interpTime, interpShape, playTime, sched, outsMapping, server, name |
-		^super.new.init(def, args, interpTime, interpShape, playTime, sched, outsMapping, server, name)
+		^super.new.init(
+			argDef: def,
+			argArgs: args,
+			argConnectionTime: interpTime,
+			argInterpShape: interpShape,
+			argPlayTime: playTime,
+			argSched: sched,
+			argOutsMapping: outsMapping,
+			argServer: server,
+			argName: name
+		)
 	}
 
 	initAllVariables { | argServer |
@@ -408,7 +439,8 @@ AlgaNode {
 	}
 
 	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
-		argPlayTime = 0, argSched = 0, argOutsMapping, argServer, argName |
+		argPlayTime = 0, argSched = 0, argOutsMapping,
+		argSampleAccurateFuncs = true, argServer, argName |
 
 		//Check supported classes for argObj, so that things won't even init if wrong.
 		//Also check for AlgaPattern
@@ -444,12 +476,16 @@ AlgaNode {
 
 		//If AlgaPattern, parse the def and then dispatch accordingly (waiting for server if needed)
 		if(this.isAlgaPattern, {
-			var argDefAndFunctionSynthDefDict = this.parseDef(argDef);
-			var functionSynthDefDict;
+			var argDefAndFunctionSynthDefDict, functionSynthDefDict;
 
+			//Init sampleAccurateFuncs: must happen BEFORE parseDef
+			this.sampleAccurateFuncs_(argSampleAccurateFuncs);
+
+			argDefAndFunctionSynthDefDict = this.parseDef(argDef);
 			argDef = argDefAndFunctionSynthDefDict[0];
 			functionSynthDefDict = argDefAndFunctionSynthDefDict[1];
 
+			//Go through
 			this.compileFunctionSynthDefDictIfNeeded(
 				func: {
 					this.dispatchNode(

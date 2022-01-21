@@ -124,6 +124,9 @@ AlgaPattern : AlgaNode {
 	//legato will apply in both cases.
 	var <sustainToDur = false;
 
+	//If sampleAccurate for Functions
+	var <sampleAccurateFuncs = true;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -131,14 +134,15 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
-	*new { | def, interpTime, interpShape, playTime, sched = 1, server |
-		^super.new(
+	*new { | def, interpTime, interpShape, playTime, sched = 1, sampleAccurateFuncs = true,  server |
+		^super.new_ap(
 			def: def,
 			interpTime: interpTime,
 			interpShape: interpShape,
 			playTime: playTime,
-			server: server,
-			sched: sched
+			sched: sched,
+			sampleAccurateFuncs: sampleAccurateFuncs,
+			server: server
 		);
 	}
 
@@ -317,8 +321,8 @@ AlgaPattern : AlgaNode {
 	//Set stopPatternBeforeReplace
 	stopPatternBeforeReplace_ { | value = true |
 		if((value != false).and(value != true), {
-			"AlgaPattern: 'stopPatternBeforeReplace' only supports boolean values. Setting it to false".error;
-			value = false;
+			"AlgaPattern: 'stopPatternBeforeReplace' only supports boolean values. Setting it to true".error;
+			value = true;
 		});
 		stopPatternBeforeReplace = value
 	}
@@ -339,6 +343,15 @@ AlgaPattern : AlgaNode {
 			value = false;
 		});
 		sustainToDur = value
+	}
+
+	//Set sampleAccurateFuncs
+	sampleAccurateFuncs_ { | value = true |
+		if((value != false).and(value != true), {
+			"AlgaPattern: 'sampleAccurateFuncs' only supports boolean values. Setting it to true".error;
+			value = true;
+		});
+		sampleAccurateFuncs = value
 	}
 
 	//Free all unused busses from interpStreams
@@ -2618,12 +2631,14 @@ AlgaPattern : AlgaNode {
 		//New defName
 		var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
-		//Important: use sampleAccurate!
+		sampleAccurateFuncs.asString.warn;
+
+		//sampleAccurate is set according to sampleAccurateFuncs
 		functionSynthDefDict[defName] = AlgaSynthDef(
 			defName,
 			def,
 			outsMapping: outsMapping,
-			sampleAccurate: true
+			sampleAccurate: sampleAccurateFuncs
 		); //Important: it returns AlgaSynthDefSpec (for _algaPattern and _algaPatternTempOut)
 
 		//Return the Symbol
