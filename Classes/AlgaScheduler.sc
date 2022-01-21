@@ -448,7 +448,7 @@ AlgaScheduler : AlgaThread {
 	}
 
 	//Default condition is just { true }, just execute it when its time comes on the scheduler
-	addAction { | condition, func, sched = 0, topPriority = false |
+	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
 		var action;
 
 		//Only numbers
@@ -464,6 +464,16 @@ AlgaScheduler : AlgaThread {
 		if((condition.isFunction.not).or(func.isFunction.not), {
 			"AlgaScheduler: addAction only accepts Functions as both the condition and the func arguments".error;
 			^this;
+		});
+
+		//If preCheck, if the condition is already true, execute the function without adding it to the scheduler
+		if(preCheck, {
+			if(condition.value, {
+				if(verbose, {
+					("AlgaScheduler: executing function:" + func.def.context.asString + "as condition was true already").postcln;
+				});
+				^func.value
+			});
 		});
 
 		//Only positive numbers

@@ -44,6 +44,9 @@ AlgaPatternInterpStreams {
 	var <scaleArraysAndChans;
 	var <sampleAndHolds;
 
+	//Used for AlgaPattern.stopPatternBeforeReplace
+	var <>beingStopped = false;
+
 	*new { | algaPattern |
 		^super.new.init(algaPattern)
 	}
@@ -309,13 +312,13 @@ AlgaPatternInterpStreams {
 	}
 
 	//Wrapper around AlgaNode's addInOutNodesDict.
-	//If entry is a ListPattern, loop around it and add each entry that is an AlgaNode.
+	//If entry is a ListPattern / FilterPattern, loop around it and add each entry that is an AlgaNode.
 	addInOutNodesDictAtParam { | sender, param, mix = false |
 		algaPattern.addInOutNodesDict(sender, param, mix);
 	}
 
 	//Wrapper around AlgaNode's removeInOutNodesDict.
-	//If entry is a ListPattern, loop around it and remove each entry that is an AlgaNode.
+	//If entry is a ListPattern/ FilterPattern, loop around it and remove each entry that is an AlgaNode.
 	removeAllInOutNodesDictAtParam { | sender, paramName |
 		//This is then picked up in addInNode in AlgaPattern. This must come before removeInOutNodesDict
 		algaPattern.connectionAlreadyInPlace = algaPattern.checkConnectionAlreadyInPlace(sender);
@@ -397,7 +400,7 @@ AlgaPatternInterpStreams {
 		this.removeAllInOutNodesDictAtParam(entryOriginal, paramName);
 
 		//Add proper inNodes / outNodes / connectionTimeOutNodes. Use entryOriginal in order
-		//to retrieve if it is a ListPattern.
+		//to retrieve if it is a ListPattern / FilterPattern.
 		this.addInOutNodesDictAtParam(entryOriginal, paramName, false);
 
 		//Get shape
@@ -443,6 +446,8 @@ AlgaPatternInterpStreams {
 
 	//Play a pattern as an AlgaReschedulingEventStreamPlayer and return it
 	playAlgaReschedulingEventStreamPlayer { | pattern, clock |
-		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(clock:clock)
+		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
+			clock: clock
+		)
 	}
 }

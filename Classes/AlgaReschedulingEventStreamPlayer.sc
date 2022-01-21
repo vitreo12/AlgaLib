@@ -34,6 +34,31 @@ AlgaReschedulingEventStreamPlayer {
 	reset { player.reset }
 	refresh { player.refresh }
 
+	//Stops and remove all actions that relate to the same EventStreamPlayer
+	//that were scheduled for the exact time of the stopping.
+	stopAtTopPriority { | when = 0 |
+		var clock  = player.clock;
+		clock.algaSchedAtQuantOnceWithTopPriority(when, {
+			var queue = clock.queue;
+			this.stop; //Stop first
+			if(queue.size > 0, {
+				forBy(1, queue.size-1, 3, { | i |
+					var currentTime  = queue[i];
+					var currentEntry = queue[i + 1];
+
+					//If time and entry both match, remove it
+					if((clock.beats == currentTime).and(currentEntry == player), {
+						//Remove the 3 entries that belong to the EventStreamPlayer
+						//being scheduled at this time. The array shifts back.
+						//The - 1 is needed as forBy starts from 1, and first element
+						//is the index of the queue
+						3.do({ queue.removeAt(i - 1) });
+					});
+				});
+			});
+		})
+	}
+
 	reschedule { | when = 0, func |
 		var stream = player.stream;
 		var clock  = player.clock;
@@ -71,9 +96,7 @@ AlgaReschedulingEventStreamPlayer {
 		var clock  = player.clock;
 
 		//TempoClock's schedAbs still expect beats, I need seconds here
-		if(clock.isTempoClock, {
-			clock = SystemClock
-		});
+		if(clock.isTempoClock, { clock = SystemClock });
 
 		//absolute scaling
 		when = clock.seconds + when;

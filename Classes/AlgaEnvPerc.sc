@@ -20,7 +20,7 @@ AlgaEnvPerc {
 		^EnvGen.ar(Env.perc(attack, release, 1.0, curve), doneAction: doneAction)
 	}
 
-	*kr { | attack = 0, release = 1, curve = -4.0, doneAction = 2  |
+	*kr { | attack = 0, release = 1, curve = -4.0, doneAction = 2 |
 		^EnvGen.kr(Env.perc(attack, release, 1.0, curve), doneAction: doneAction)
 	}
 }

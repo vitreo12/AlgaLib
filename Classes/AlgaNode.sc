@@ -21,6 +21,9 @@ AlgaNode {
 	//The AlgaScheduler @ this server
 	var <scheduler;
 
+	//The sched used internally if set
+	var schedInner;
+
 	//Index of the corresponding AlgaBlock in the AlgaBlocksDict.
 	//This is being set in AlgaBlock
 	var <>blockIndex = -1;
@@ -39,6 +42,9 @@ AlgaNode {
 
 	//On replace, use this scaling if possible.
 	var <prevPlayScale = 1.0;
+
+	//On replace, use this out if possible
+	var <prevPlayOut = 0;
 
 	//This is the longestConnectionTime between all the outNodes.
 	//It's used when .replacing a node connected to something, in order for it to be kept alive
@@ -250,6 +256,44 @@ AlgaNode {
 		^true;
 	}
 
+	//Add an action to scheduler. This takes into account sched == AlgaStep
+	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
+		//AlgaStep scheduling.
+		//I reverted the support for topPriority for one simple reason: it would only be used for replace.
+		//As such, the problem is that any connection that was scheduled at the same time won't happen anyways,
+		//cause the .replaced node won't be algaInstatiated, and the connection would not be made until the next round.
+		//It's probably better to just keep the user's declaration order.
+		if(sched.isAlgaStep, {
+			if(this.isAlgaPattern, {
+				this.addScheduledStepAction(
+					step: sched,
+					condition: condition,
+					func: func
+				);
+			}, {
+				//AlgaNodes don't support AlgaStep
+				sched = sched.step;
+				("AlgaNode: only AlgaPatterns support AlgaStep actions. Scheduling action at " ++ sched).error;
+				scheduler.addAction(
+					condition: condition,
+					func: func,
+					sched: sched,
+					topPriority: topPriority,
+					preCheck: preCheck
+				)
+			});
+		}, {
+			//Normal scheduling (sched is a number)
+			scheduler.addAction(
+				condition: condition,
+				func: func,
+				sched: sched,
+				topPriority: topPriority,
+				preCheck: preCheck
+			)
+		});
+	}
+
 	//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
 	//Otherwise, it will just execute func
 	compileFunctionSynthDefDictIfNeeded { | func, functionSynthDefDict |
@@ -277,9 +321,10 @@ AlgaNode {
 					server.sync(wait);
 				};
 
-				scheduler.addAction(
+				this.addAction(
 					condition: { wait.test == true },
-					func: { func.value }
+					func: { func.value },
+					preCheck: true //execute right away if possible (most unlikely)
 				);
 
 				^this
@@ -288,6 +333,78 @@ AlgaNode {
 
 		//No Functions to consume
 		^func.value;
+	}
+
+	//Wait for all args to be instantiated before going forward
+	executeOnArgsInstantiation { | args, dispatchFunc |
+		if(args.isArray, {
+			var functionSynthDefDict;
+			var algaArgs;
+			args.do({ | entry, i |
+				case
+				{ entry.isAlgaTemp } {
+					if(i == 0, {
+						("AlgaNode: 'args' first element can't be an AlgaTemp").error;
+						^this
+					});
+
+					functionSynthDefDict = functionSynthDefDict ? IdentityDictionary();
+					entry = this.parseAlgaTempParam(entry, functionSynthDefDict);
+					args[i] = entry;
+				}
+				{ (entry.isAlgaArg).or(entry.isAlgaNode) } {
+					var sender = entry;
+
+					if(i == 0, {
+						("AlgaNode: 'args' first element can't be an AlgaArg").error;
+						^this
+					});
+
+					algaArgs = algaArgs ? IdentitySet();
+
+					if(entry.isAlgaArg, { sender = entry.sender });
+					if(sender.isAlgaNode, {
+						var param = args[i-1];
+						algaArgs.add(sender); //This is used later to check instantiation
+						//If previous entry was symbol, use that to map inNodes
+						if(param.isSymbol, {
+							this.addInOutNodesDict(entry, param); //Add entry to inNodes. entry MUST be the AlgaArg!
+							AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
+						});
+					});
+				};
+			});
+
+			//Make sure to compile the AlgaTemps' Functions
+			this.compileFunctionSynthDefDictIfNeeded(
+				func: {
+					//Make sure that all AlgaArgs' nodes are instantiated
+					if(algaArgs != nil, {
+						this.addAction(
+							condition: {
+								var instantiated = true;
+								algaArgs.do({ | algaArg |
+									if(algaArg.algaInstantiatedAsSender.not, {
+										instantiated = false
+									});
+								});
+								instantiated
+							},
+							func: dispatchFunc,
+							preCheck: true //execute right away if possible
+						);
+					}, {
+						dispatchFunc.value
+					});
+				},
+				functionSynthDefDict: functionSynthDefDict
+			);
+
+			^this;
+		});
+
+		//If no args, execute the function right away
+		dispatchFunc.value;
 	}
 
 	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
@@ -312,9 +429,7 @@ AlgaNode {
 
 		//initialize all IdentityDictionaries. Check if init went through correctly,
 		//otherwise, don't go through with anything
-		if(this.initAllVariables(argServer).not, {
-			^this
-		});
+		if(this.initAllVariables(argServer).not, { ^this });
 
 		//Init debug name
 		name = argName;
@@ -351,88 +466,29 @@ AlgaNode {
 		});
 
 		//Parse args looking for AlgaTemps / AlgaArgs / AlgaNodes
-		if(argArgs.isArray, {
-			var functionSynthDefDict;
-			var algaArgs;
-			argArgs.do({ | entry, i |
-				case
-				{ entry.isAlgaTemp } {
-					if(i == 0, {
-						("AlgaNode: 'args' first element can't be an AlgaTemp").error;
-						^this
-					});
+		this.executeOnArgsInstantiation(
+			args: argArgs,
+			dispatchFunc: {
+				this.dispatchNode(
+					argDef, argArgs,
+					initGroups: true,
+					outsMapping: argOutsMapping,
+					sched: argSched
+				)
+			}
+		);
 
-					functionSynthDefDict = functionSynthDefDict ? IdentityDictionary();
-					entry = this.parseAlgaTempParam(entry, functionSynthDefDict);
-					argArgs[i] = entry;
-				}
-				{ (entry.isAlgaArg).or(entry.isAlgaNode) } {
-					var sender = entry;
+		^this;
+	}
 
-					if(i == 0, {
-						("AlgaNode: 'args' first element can't be an AlgaArg").error;
-						^this
-					});
+	sched { ^schedInner }
 
-					algaArgs = algaArgs ? IdentitySet();
-
-					if(entry.isAlgaArg, { sender = entry.sender });
-					if(sender.isAlgaNode, {
-						var param = argArgs[i-1];
-						algaArgs.add(sender); //This is used later to check instantiation
-						//If previous entry was symbol, use that to map inNodes
-						if(param.isSymbol, {
-							this.addInOutNodesDict(entry, param); //Add entry to inNodes. entry MUST be the AlgaArg!
-							AlgaBlocksDict.createNewBlockIfNeeded(this, sender);
-						});
-					});
-				};
-			});
-
-			//Make sure to compile the AlgaTemps' Functions
-			this.compileFunctionSynthDefDictIfNeeded(
-				func: {
-					var dispatchFunc = {
-						this.dispatchNode(
-							argDef, argArgs,
-							initGroups: true,
-							outsMapping: argOutsMapping,
-							sched: argSched
-						);
-					};
-
-					//Make sure that all AlgaArgs' nodes are instantiated
-					if(algaArgs != nil, {
-						scheduler.addAction(
-							condition: {
-								var instantiated = true;
-								algaArgs.do({ | algaArg |
-									if(algaArg.algaInstantiatedAsSender.not, {
-										instantiated = false
-									});
-								});
-								instantiated
-							},
-							func: dispatchFunc
-						);
-					}, {
-						dispatchFunc.value
-					});
-				},
-				functionSynthDefDict: functionSynthDefDict
-			);
-
-			//Always return this
+	sched_ { | value |
+		if((value.isNumber.or(value.isAlgaStep)).not, {
+			"AlgaNode: 'sched' can only be a Number or AlgaStep".error;
 			^this;
 		});
-
-		//AlgaNode dispatch
-		this.dispatchNode(
-			argDef, argArgs,
-			initGroups: true,
-			outsMapping: argOutsMapping,
-			sched: argSched
-		);
+		schedInner = value
 	}
 
 	setParamsConnectionTime { | value, param, all = false |
@@ -484,6 +540,10 @@ AlgaNode {
 			});
 		});
 	}
+
+	is { ^interpShape }
+
+	is_ { | value, param, all = false | this.interpShape(value, param, all) }
 
 	paramInterpShape_ { | param, value |
 		this.interpShape_(value, param);
@@ -637,11 +697,27 @@ AlgaNode {
 
 	playSafety_ { | value |
 		var valueSymbol = value.asSymbol;
-		if((valueSymbol == \clip).or(valueSymbol == \tanh).or(valueSymbol == \softclip).or(valueSymbol == \limiter), {
+		if((valueSymbol == \none).or(valueSymbol == \clip).or(valueSymbol == \tanh).or(valueSymbol == \softclip).or(valueSymbol == \limiter), {
 			playSafety = valueSymbol
 		}, {
-			"AlgaNode: 'playSafety' must be either 'clip', 'tanh', 'softclip' or 'limiter'.".error
+			"AlgaNode: 'playSafety' must be either 'none', 'clip', 'tanh', 'softclip' or 'limiter'.".error
 		})
+	}
+
+	ps { ^playSafety }
+
+	ps_ { | value | this.playSafety_(value) }
+
+	//Used in AlgaProxySpace
+	copyVars { | nodeToCopy |
+		if(nodeToCopy.isAlgaNode, {
+			this.interpTime = nodeToCopy.connectionTime;
+			this.playTime = nodeToCopy.playTime;
+			this.replacePlayTime = nodeToCopy.replacePlayTime;
+			playSafety = nodeToCopy.playSafety;
+			paramsConnectionTime = nodeToCopy.paramsConnectionTime;
+			paramsInterpShapes = nodeToCopy.paramsInterpShapes;
+		});
 	}
 
 	//maximum between longestConnectionTime and playTime...
@@ -1212,8 +1288,11 @@ AlgaNode {
 		//Create busses
 		this.createAllBusses;
 
+		//Check sched
+		sched = sched ? schedInner;
+
 		//Create actual synths
-		scheduler.addAction(
+		this.addAction(
 			func: {
 				this.createAllSynths(
 					replace,
@@ -1275,7 +1354,7 @@ AlgaNode {
 		};
 
 		//Go ahead with the build function when Sdef is sent
-		scheduler.addAction(
+		this.addAction(
 			condition: { wait.test == true },
 			func: {
 				this.buildFromSynthDef(
@@ -2877,7 +2956,7 @@ AlgaNode {
 				if(interpSynthAtParam.algaInstantiated, {
 					fadeOutFunc.value
 				}, {
-					scheduler.addAction(
+					this.addAction(
 						condition: {
 							interpSynthAtParam.algaInstantiated
 						},
@@ -3165,13 +3244,17 @@ AlgaNode {
 
 	//Check if connection was already in place at any param
 	checkConnectionAlreadyInPlace { | sender |
-		if(sender.isAlgaArg, { sender = sender.sender });
+		case
+		{ sender.isAlgaTemp } { sender = sender.def }
+		{ sender.isAlgaArg } { sender = sender.sender };
 
 		inNodes.do({ | sendersSet |
 			case
 			{ sender.isListPattern } {
 				sender.do({ | entry |
-					if(entry.isAlgaTemp, { entry = entry.sender });
+					case
+					{ entry.isAlgaTemp } { entry = entry.def }
+					{ entry.isAlgaArg } { entry = entry.sender };
 					if(blockIndex != entry.blockIndex, { ^false });
 					if(sendersSet.includes(entry), { ^true })
 				})
@@ -3225,6 +3308,11 @@ AlgaNode {
 			time:time, shape:shape
 		);
 
+		//If replacing an AlgaPattern + stopPatternBeforeReplace, time is 0 for the new synth
+		if(replace.and(sender.isAlgaPattern), {
+			if(sender.stopPatternBeforeReplace, { time = 0 })
+		});
+
 		//Spawn new interp synth (fades in)
 		this.createInterpSynthAtParam(
 			sender, param,
@@ -3275,6 +3363,11 @@ AlgaNode {
 				sender, param, mix:true,
 				replace:true, time:time, shape:shape
 			);
+		});
+
+		//If replacing an AlgaPattern + stopPatternBeforeReplace, time is 0 for the new synth
+		if(replace.and(sender.isAlgaPattern), {
+			if(sender.stopPatternBeforeReplace, { time = 0 })
 		});
 
 		//Spawn new interp mix node
@@ -3433,8 +3526,11 @@ AlgaNode {
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time, shape, sched = 0 |
 
+		//Check sched
+		sched = sched ? schedInner;
+
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
-			scheduler.addAction(
+			this.addAction(
 				condition: {
 					(this.algaInstantiatedAsReceiver(param, sender, mix)).and(sender.algaInstantiatedAsSender)
 				},
@@ -3646,8 +3742,10 @@ AlgaNode {
 
 		var functionSynthDefDict = IdentityDictionary();
 		var algaTemp = this.parseAlgaTempParam(sender, functionSynthDefDict);
-
 		if(algaTemp == nil, { ^this });
+
+		//Check sched
+		sched = sched ? schedInner;
 
 		^this.compileFunctionSynthDefDictIfNeeded(
 			{
@@ -3860,7 +3958,10 @@ AlgaNode {
 			^this;
 		});
 
-		scheduler.addAction(
+		//Check sched
+		sched = sched ? schedInner;
+
+		this.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, oldSender, true)).and(
 					oldSender.algaInstantiatedAsSender).and(
@@ -3902,7 +4003,11 @@ AlgaNode {
 	}
 
 	resetParam { | param = \in, oldSender = nil, time, shape, sched |
-		scheduler.addAction(
+		//Check sched
+		sched = sched ? schedInner;
+
+		//Exec on instantiated receiver / sender
+		this.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, oldSender, false)).and(oldSender.algaInstantiatedAsSender)
 			},
@@ -3936,7 +4041,7 @@ AlgaNode {
 
 	//On .replace on an already running mix connection
 	replaceMixConnection { | param = \in, sender, senderChansMapping, scale, time, shape |
-		scheduler.addAction(
+		this.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, sender, true)).and(sender.algaInstantiatedAsSender)
 			},
@@ -4019,60 +4124,76 @@ AlgaNode {
 		//calc temporary time
 		time = this.calculateTemporaryLongestWaitTime(time, time);
 
-		//If it was playing, free previous playSynth
-		if(isPlaying, {
-			this.stopInner(
-				time: playTimeOnReplace,
-				replace: true
-			);
-			wasPlaying = true;
-		});
+		//Wait for instantiation of all args before going forward
+		this.executeOnArgsInstantiation(
+			args: args,
+			dispatchFunc: {
+				//If it was playing, free previous playSynth
+				if(isPlaying, {
+					this.stopInner(
+						time: playTimeOnReplace,
+						replace: true
+					);
+					wasPlaying = true;
+				});
 
-		//Free all previous out: connections from patterns
-		this.freeAllPatternOutConnections(time);
+				//Free all previous out: connections from patterns
+				this.freeAllPatternOutConnections(time);
 
-		//This doesn't work with feedbacks, as synths would be freed slightly before
-		//The new ones finish the rise, generating click. These should be freed
-		//When the new synths/busses are surely algaInstantiated on the server!
-		//The cheap solution that it's in place now is to wait 1.0 longer than longestConnectionTime.
-		//Work out a better solution now that AlgaScheduler is well tested!
-		this.freeAllSynths(false, false, time);
+				//This doesn't work with feedbacks, as synths would be freed slightly before
+				//The new ones finish the rise, generating click. These should be freed
+				//When the new synths/busses are surely algaInstantiated on the server!
+				//The cheap solution that it's in place now is to wait 1.0 longer than longestConnectionTime.
+				//Work out a better solution now that AlgaScheduler is well tested!
+				this.freeAllSynths(false, false, time);
 
-		//Free all previous busses
-		this.freeAllBusses;
+				//Free all previous busses
+				this.freeAllBusses;
 
-		//Reset interp / norm dictionaries
-		this.resetInterpNormDicts;
+				//Reset interp / norm dictionaries
+				this.resetInterpNormDicts;
 
-		//New node
-		this.dispatchNode(
-			def:def,
-			args:args,
-			initGroups:initGroups,
-			replace:true,
-			reset:reset,
-			keepChannelsMapping:keepOutsMappingIn, outsMapping:outsMapping,
-			keepScale:keepScalesIn
+				//New node
+				this.dispatchNode(
+					def:def,
+					args:args,
+					initGroups:initGroups,
+					replace:true,
+					reset:reset,
+					keepChannelsMapping:keepOutsMappingIn, outsMapping:outsMapping,
+					keepScale:keepScalesIn
+				);
+
+				//Re-enstablish connections that were already in place
+				this.replaceConnections(
+					keepChannelsMapping:keepOutsMappingOut,
+					keepScale:keepScalesOut,
+					time:time
+				);
+
+				//If node was playing, or .replace has been called while .stop / .clear, play again
+				if(wasPlaying/*.or(beingStopped)*/, {
+					//In this case, no fadeIn must be provided
+					if(this.isAlgaPattern, {
+						if(this.stopPatternBeforeReplace, {
+							playTimeOnReplace = 0
+						})
+					});
+
+					this.playInner(
+						time: playTimeOnReplace,
+						replace: true,
+						usePrevPlayScale: true,
+						usePrevPlayOut: true
+					)
+				});
+
+				//Reset flag
+				algaWasBeingCleared = false;
+			}
 		);
 
-		//Re-enstablish connections that were already in place
-		this.replaceConnections(
-			keepChannelsMapping:keepOutsMappingOut,
-			keepScale:keepScalesOut,
-			time:time
-		);
-
-		//If node was playing, or .replace has been called while .stop / .clear, play again
-		if(wasPlaying/*.or(beingStopped)*/, {
-			this.playInner(
-				time: playTimeOnReplace,
-				replace: true,
-				usePrevPlayScale: true
-			)
-		});
-
-		//Reset flag
-		algaWasBeingCleared = false;
+		^this;
 	}
 
 	//replace content of the node, re-making all the connections.
@@ -4080,8 +4201,11 @@ AlgaNode {
 	replace { | def, args, time, sched, outsMapping, reset = false, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
+		//Check sched
+		sched = sched ? schedInner;
+
 		//Check global algaInstantiated
-		scheduler.addAction(
+		this.addAction(
 			condition: { this.algaInstantiated },
 			func: {
 				this.replaceInner(
@@ -4091,7 +4215,7 @@ AlgaNode {
 					keepOutsMappingIn:keepOutsMappingIn,
 					keepOutsMappingOut:keepOutsMappingOut,
 					keepScalesIn:keepScalesIn, keepScalesOut:keepScalesOut
-				)
+				);
 			},
 			sched: sched,
 			topPriority: true //always top priority
@@ -4183,6 +4307,9 @@ AlgaNode {
 
 	//Remove individual mix entries at param
 	disconnect { | param = \in, oldSender = nil, time, shape, sched |
+		//Check sched
+		sched = sched ? schedInner;
+
 		//If it wasn't a mix param, but the only entry, run <| instead
 		if(inNodes[param].size == 1, {
 			if(inNodes[param].findMatch(oldSender) != nil, {
@@ -4208,7 +4335,7 @@ AlgaNode {
 			^this;
 		});
 
-		scheduler.addAction(
+		this.addAction(
 			condition: {
 				(this.algaInstantiatedAsReceiver(param, oldSender, true)).and(oldSender.algaInstantiatedAsSender)
 			},
@@ -4295,7 +4422,11 @@ AlgaNode {
 
 	//for clear, check algaInstantiated and not isPlaying
 	clear { | onClear, time, sched |
-		scheduler.addAction(
+		//Check sched
+		sched = sched ? schedInner;
+
+		//Exec clear on algaInstantiated
+		this.addAction(
 			condition: { this.algaInstantiated },
 			func: { this.clearInner(onClear, time) },
 			sched: sched
@@ -4304,7 +4435,7 @@ AlgaNode {
 
 	//Number plays those number of channels sequentially
 	//Array selects specific output
-	createPlaySynth { | time, channelsToPlay, scale, replace = false, usePrevPlayScale = false |
+	createPlaySynth { | time, channelsToPlay, scale, out = 0, replace = false, usePrevPlayScale = false, usePrevPlayOut = false |
 		var actualNumChannels, playSynthSymbol;
 
 		//Can't play a kr node!
@@ -4314,11 +4445,19 @@ AlgaNode {
 		if(usePrevPlayScale, { scale = prevPlayScale }, { scale = scale ? 1.0 });
 		if(scale.isNumber.not, {
 			"AlgaNode: play: the 'scale' argument can only be a Number.".error;
-			^nil;
+			^this;
 		});
-
 		//Store prevPlayScale
 		prevPlayScale = scale;
+
+		//Out for a play can only be a num (prevPlayOut is used on .replace)
+		if(usePrevPlayOut, { out = prevPlayOut }, { out = out ? 0 });
+		if(out.isNumber.not, {
+			"AlgaNode: play: the 'out' argument can only be a Number. This will point to the first Bus index to play to.".error;
+			^this;
+		});
+		//Store prevPlayOut
+		prevPlayOut = out;
 
 		//If not replace, if it was playing and not being stopped, free the previous one.
 		//This is used to dynamically change the scale of the output.
@@ -4370,7 +4509,8 @@ AlgaNode {
 					\indices, channelsToPlay,
 					\gate, 1,
 					\fadeTime, time,
-					\scale, scale
+					\scale, scale,
+					\out, out
 				],
 				playGroup,
 				waitForInst:false
@@ -4396,7 +4536,8 @@ AlgaNode {
 					\in, synthBus.busArg,
 					\gate, 1,
 					\fadeTime, time,
-					\scale, scale
+					\scale, scale,
+					\out, out
 				],
 				playGroup,
 				waitForInst:false
@@ -4407,26 +4548,38 @@ AlgaNode {
 		beingStopped = false;
 	}
 
-	playInner { | time, channelsToPlay, scale, sched, replace = false, usePrevPlayScale = false |
+	playInner { | time, channelsToPlay, scale, out, sched, replace = false, usePrevPlayScale = false, usePrevPlayOut = false |
+		//Check sched
+		sched = sched ? schedInner;
+
 		//Check only for synthBus, it makes more sense than also checking for synth.algaIstantiated,
 		//As it allows meanwhile to create the play synth while synth is getting instantiated
-		scheduler.addAction(
+		this.addAction(
 			condition: { synthBus != nil },
 			func: {
 				this.createPlaySynth(
 					time: time,
 					channelsToPlay: channelsToPlay,
 					scale: scale,
+					out: out,
 					replace: replace,
-					usePrevPlayScale: usePrevPlayScale
+					usePrevPlayScale: usePrevPlayScale,
+					usePrevPlayOut: usePrevPlayOut
 				)
 			},
-			sched: sched
+			sched: sched,
+			preCheck: true
 		);
 	}
 
-	play { | time, chans, scale, sched |
-		this.playInner(time, chans, scale, sched);
+	play { | time, chans, scale, out = 0, sched |
+		this.playInner(
+			time: time,
+			channelsToPlay: chans,
+			scale: scale,
+			out: out,
+			sched: sched
+		);
 	}
 
 	freePlaySynth { | time, isClear = false, action |
@@ -4463,11 +4616,15 @@ AlgaNode {
 			^this.freePlaySynth(time, true, action);
 		};
 
+		//Check sched
+		sched = sched ? schedInner;
+
 		//Normal case
-		scheduler.addAction(
+		this.addAction(
 			condition: { this.isPlaying },
 			func: { this.freePlaySynth(time, false, action); },
-			sched: sched
+			sched: sched,
+			preCheck: true
 		);
 	}
 

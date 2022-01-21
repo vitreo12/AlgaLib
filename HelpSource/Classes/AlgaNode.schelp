@@ -61,6 +61,12 @@ ARGUMENT:: time
 Define a temporary connection time that the method takes to complete, applying the necessary interpolations. If not specified, emphasis::playTime:: will be used.
 ARGUMENT:: chans
 Specify an link::Classes/Array:: of output channels to play, which can contain emphasis::outsMapping:: symbols. It's also possible to just specify a number, in which case it determines how many channels will be played.
+ARGUMENT:: scale
+Specify a link::Classes/Number:: to scale the output by.
+ARGUMENT:: out
+Specify a link::Classes/Bus:: index to play the node to.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 code::
 AlgaNode.ar({ SinOsc.ar([440, 450]) }).play //Play both channels
 
@@ -244,6 +250,8 @@ Shortcut for emphasis::replacePlayTime::.
 METHOD:: playSafety
 Specify a different safety method to use to scale the outut of a node when using the emphasis::play:: method. Accepted values are: code::'clip', 'tanh', 'softclip', 'limiter'::.
 
+METHOD:: sched
+Specify a sched value to use for new actions. This will be used if sched is not provided in the arguments of the called function.
 
 EXAMPLES::
 code::
@@ -533,3 +541,13 @@ private:: removeActiveNodeAndRearrangeBlock
 private:: removeActiveNodesAndRearrangeBlocks
 private:: removeActiveOutNode
 private:: prevPlayScale
+
+private:: addAction
+private:: copyVars
+private:: executeOnArgsInstantiation
+private:: prevPlayOut
+private:: is
+private:: ps
+private:: unpackFilterPatternRecursive
+private:: unpackListPatternOrFilterPatternOutsMapping
+private:: unpackSynthDefSymbol

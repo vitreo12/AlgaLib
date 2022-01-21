@@ -23,6 +23,7 @@
 	isAlgaArg { ^false }
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
+	isAlgaStep { ^false }
 	isBuffer { ^false }
 	isPattern { ^false }
 	isStream { ^false }
@@ -310,7 +311,7 @@
 	}
 
 	algaSched { | when, task |
-		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
+		//if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
 		this.sched(when, task);
 	}
 
@@ -325,7 +326,7 @@
 
 	algaSchedOnce { | when, task |
 		var taskOnce = { task.value; nil };
-		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
+		//if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
 		this.sched(when, taskOnce);
 	}
 
@@ -454,7 +455,8 @@
 
 					//Order the entries by pushing the last entry, task, to the first index
 					entries[currentTime] = entries[currentTime].move(
-						entriesSize - 1, 0
+						entriesSize - 1,
+						0
 					);
 
 					//Now re-order the queue entries according to the correct index / entry pairs

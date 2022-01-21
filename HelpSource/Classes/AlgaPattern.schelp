@@ -1,7 +1,7 @@
 TITLE:: AlgaPattern
 summary:: Alga module representing multiple instances of sonic processes
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut, Classes/AlgaStep
 
 
 DESCRIPTION::
@@ -54,7 +54,16 @@ METHOD:: multiChannelExpansion
 Alias for emphasis::useMultiChannelExpansion::.
 
 METHOD:: replaceDur
-Set the if emphasis::replace:: should be executed when changing the code::'dur':: parameter.
+Set if emphasis::replace:: should be executed when changing the code::'dur':: parameter.
+
+METHOD:: stopPatternBeforeReplace
+Set the mode for how emphasis::replace:: should be executed. If code::true:: (default), the pattern will be stopped before the replace happens. If code::false::, the pattern will only be stopped after the entire replace has happened.
+
+METHOD:: schedSustainInSeconds
+Set if the code::'sustain':: parameter should be scheduled in seconds. If false (default), it will be scheduled using the AlgaPattern's clock, whose tempo could be scaled.
+
+METHOD:: sustainToDur
+Set if the code::'dur':: parameter should be added to the code::'sustain':: one. Basically, this permits to scale the code::'sustain':: according to code::'dur'::.
 
 EXAMPLES::
 code::
@@ -197,3 +206,26 @@ private:: fxConvGroup
 private:: fxGroup
 private:: synthConvGroup
 private:: prevPatternOutNodes
+private:: addInNodeFilterPattern
+private:: checkListPatternOrFilterPatternValidityAndReturnControlNames
+private:: dispatchListPatternOrFilterPattern
+private:: interpolateLegato
+private:: interpolateStretch
+private:: interpolateSustain
+private:: isSustainTrig
+private:: parseFilterPatternDefEntry
+private:: parseFilterPatternParam
+private:: scheduleSustain
+private:: setLegato
+private:: setLegatoAtSched
+private:: setStretch
+private:: setStretchAtSched
+private:: setSustain
+private:: setSustainAtSched
+private:: sustainIDs
+private:: addScheduledStepAction
+private:: advanceAndConsumeScheduledStepActions
+private:: connectionTriggersReplace
+private:: scheduledStepActionsPost
+private:: scheduledStepActionsPre
+private:: stopPatternAndFreeInterpNormSynths

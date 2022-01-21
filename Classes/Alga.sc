@@ -173,6 +173,12 @@ Alga {
 		^true;
 	}
 
+	*addAlgaSilent {
+		AlgaSynthDef.new_inner(\alga_silent, {
+			Silent.ar
+		}, sampleAccurate:false, makeOutDef:false).add
+	}
+
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
 		var envAlgaServerOptions = topEnvironment[\algaServerOptions];
@@ -248,6 +254,12 @@ Alga {
 			server.waitForBoot({
 				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
 				this.restoreSynthDefsDir;
+
+				//Add alga_silent
+				this.addAlgaSilent;
+
+				//Sync
+				server.sync;
 
 				//Execute onBoot function
 				onBoot.value;
