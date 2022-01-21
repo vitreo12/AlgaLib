@@ -1,0 +1,16 @@
+TITLE:: AlgaProxySpace
+summary:: Provides an Environment to work on Alga modules
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern
+
+DESCRIPTION::
+An link::Classes/AlgaProxySpace:: allows to create an link::Classes/Environment:: where all newly created variables are link::Classes/AlgaNode::s or link::Classes/AlgaPattern::s.
+
+CLASSMETHODS::
+
+INSTANCEMETHODS::
+
+EXAMPLES::
+code::
+ye
+::
