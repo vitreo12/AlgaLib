@@ -15,10 +15,10 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 AlgaProxySpace {
-	classvar <nodes;
 	classvar <paramsArgs;
 	classvar <currentNode;
-	classvar <patternsEvents;
+	var <nodes;
+	var <patternsEvents;
 	var <server;
 	var <sched = 1;
 	var <interpTime = 0, <interpShape, <playTime = 0;
@@ -34,9 +34,7 @@ AlgaProxySpace {
 	}
 
 	*initClass {
-		nodes = IdentityDictionary(10);
 		paramsArgs = IdentityDictionary(10);
-		patternsEvents = IdentityDictionary(10);
 	}
 
 	*addParamArgs { | param, value |
@@ -46,6 +44,8 @@ AlgaProxySpace {
 
 	init {
 		CmdPeriod.add(this);
+		nodes = IdentityDictionary(10);
+		patternsEvents = IdentityDictionary(10);
 		interpShape = Env([0, 1], 1);
 		^this
 	}
