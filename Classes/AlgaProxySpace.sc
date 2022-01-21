@@ -205,7 +205,7 @@ AlgaProxySpace {
 					//just reset all things to go through with a normal SINGLE replace call,
 					//instead of piling up multiple ones
 					if(node.connectionTriggersReplace(key).or(
-						node.patternOrListPatternArgContainsBuffers(newEntry)), {
+						node.patternOrAlgaPatternArgContainsBuffers(newEntry)), {
 						newConnections.clear;
 						break.value(nil);
 					});
