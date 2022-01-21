@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 AlgaProxySpace {
 	classvar <nodes;
 	classvar <paramsArgs;
@@ -22,7 +21,8 @@ AlgaProxySpace {
 	classvar <patternsEvents;
 	var <server;
 	var <sched = 1;
-	var <interpTime = 0, <interpShape, <playTime = 0, <replacePlayTime = true, <playSafety = \clip;
+	var <interpTime = 0, <interpShape, <playTime = 0;
+	var <replacePlayTime = true, <playSafety = \clip;
 
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var newSpace;
@@ -108,12 +108,24 @@ AlgaProxySpace {
 		nodes.do({ | node | node.sched = value });
 	}
 
+	stop { | time, sched |
+		nodes.do({ | node | node.stop(time:time, sched:sched) })
+	}
+
+	clear { | time, sched |
+		nodes.do({ | node | node.clear(time:time, sched:sched) })
+	}
+
 	push {
 		if(currentEnvironment !== this, {
 			Environment.push(this)
 		}, {
 			"AlgaProxySpace: this environment is already current".warn
 		});
+	}
+
+	pop {
+		Environment.pop
 	}
 
 	at { | key |
