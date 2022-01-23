@@ -2,7 +2,7 @@
 
 - Added the `interpShape` option. This allows to specify an interpolation shape in the form of an
   `Env`. All connection methods have also been updated to receive a `shape` argument to set the `Env`
-  for the specific connection. Check the `Examples/AlgaNode/11_InterpShape.scd` below:
+  for the specific connection. Check the `Examples/AlgaNode/10_InterpShape.scd` below:
 
     ```SuperCollider
     (
@@ -27,7 +27,7 @@
 
 - Added multithreading support. Now, if booting `Alga` with `supernova`, it will automatically
   parallelize the arrangement of the nodes over the CPU cores. Check the
-  `Examples/AlgaNode/10_Multithreading.scd` below:
+  `Examples/Extras/Multithreading.scd` below:
 
     ```SuperCollider
     //Boot Alga with the supernova server
