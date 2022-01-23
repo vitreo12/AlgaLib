@@ -1311,9 +1311,8 @@ AlgaNode {
 			^this;
 		});
 
+		//Check rate
 		rate = synthDef.rate;
-
-		sched = sched ? 0;
 
 		//Calculate correct outsMapping
 		this.calculateOutsMapping(replace, keepChannelsMapping);
@@ -1325,7 +1324,8 @@ AlgaNode {
 		this.createAllBusses;
 
 		//Check sched
-		sched = sched ? schedInner;
+		if(replace.not, { sched = sched ? schedInner });
+		sched = sched ? 0;
 
 		//Create actual synths
 		this.addAction(
@@ -1345,14 +1345,12 @@ AlgaNode {
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
 		var synthDesc = SynthDescLib.global.at(def);
-
 		if(synthDesc == nil, {
 			("AlgaNode: Invalid AlgaSynthDef: '" ++ def.asString ++ "'").error;
 			^this;
 		});
 
 		synthDef = synthDesc.def;
-
 		if(synthDef.class != AlgaSynthDef, {
 			("AlgaNode: Invalid AlgaSynthDef: '" ++ def.asString ++"'").error;
 			^this;
@@ -3563,7 +3561,7 @@ AlgaNode {
 		replaceMix = false, senderChansMapping, scale, time, shape, sched = 0 |
 
 		//Check sched
-		sched = sched ? schedInner;
+		if(replace.not, { sched = sched ? schedInner });
 
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			this.addAction(
@@ -3781,7 +3779,7 @@ AlgaNode {
 		if(algaTemp == nil, { ^this });
 
 		//Check sched
-		sched = sched ? schedInner;
+		if(replace.not, { sched = sched ? schedInner });
 
 		^this.compileFunctionSynthDefDictIfNeeded(
 			{
@@ -4343,9 +4341,6 @@ AlgaNode {
 
 	//Remove individual mix entries at param
 	disconnect { | param = \in, oldSender = nil, time, shape, sched |
-		//Check sched
-		sched = sched ? schedInner;
-
 		//If it wasn't a mix param, but the only entry, run <| instead
 		if(inNodes[param].size == 1, {
 			if(inNodes[param].findMatch(oldSender) != nil, {
@@ -4370,6 +4365,10 @@ AlgaNode {
 			("AlgaNode: " ++ (oldSender.class.asString) ++ " is not an AlgaNode").error;
 			^this;
 		});
+
+		//Check sched. resetParam will already check its own.
+		//This needs to be here, not on top
+		sched = sched ? schedInner;
 
 		this.addAction(
 			condition: {
@@ -4471,7 +4470,8 @@ AlgaNode {
 
 	//Number plays those number of channels sequentially
 	//Array selects specific output
-	createPlaySynth { | time, channelsToPlay, scale, out = 0, replace = false, usePrevPlayScale = false, usePrevPlayOut = false |
+	createPlaySynth { | time, channelsToPlay, scale, out = 0, replace = false,
+		usePrevPlayScale = false, usePrevPlayOut = false |
 		var actualNumChannels, playSynthSymbol;
 
 		//Can't play a kr node!
@@ -4584,9 +4584,11 @@ AlgaNode {
 		beingStopped = false;
 	}
 
-	playInner { | time, channelsToPlay, scale, out, sched, replace = false, usePrevPlayScale = false, usePrevPlayOut = false |
-		//Check sched
-		sched = sched ? schedInner;
+	playInner { | time, channelsToPlay, scale, out, sched, replace = false,
+		usePrevPlayScale = false, usePrevPlayOut = false |
+
+		//Check sched. If replace, it's always 0 (it's already been considered)
+		if(replace.not, { sched = sched ? schedInner });
 
 		//Check only for synthBus, it makes more sense than also checking for synth.algaIstantiated,
 		//As it allows meanwhile to create the play synth while synth is getting instantiated
@@ -4652,8 +4654,8 @@ AlgaNode {
 			^this.freePlaySynth(time, true, action);
 		};
 
-		//Check sched
-		sched = sched ? schedInner;
+		//Check sched. If replace.not, don't consider schedInner
+		if(replace.not, { sched = sched ? schedInner });
 
 		//Normal case
 		this.addAction(

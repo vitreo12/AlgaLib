@@ -50,6 +50,12 @@ AlgaProxySpace {
 		^this
 	}
 
+	cmdPeriod {
+		currentNode = nil;
+		nodes.clear;
+		paramsArgs.clear;
+	}
+
 	interpTime_ { | value |
 		interpTime = value;
 		nodes.do({ | node | node.interpTime = value });
@@ -281,14 +287,11 @@ AlgaProxySpace {
 		^this.replaceNode(node, key, def);
 	}
 
-	cmdPeriod {
-		currentNode = nil;
-		nodes.clear;
-		paramsArgs.clear;
-	}
-
 	clock { ^Alga.clock(server) }
 }
+
+//Alias
+APS : AlgaProxySpace { }
 
 //Support for AlgaNode and AlgaArg
 +Symbol {

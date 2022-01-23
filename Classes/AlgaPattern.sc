@@ -1712,7 +1712,6 @@ AlgaPattern : AlgaNode {
 		};
 
 		//No dispatchFunction, as the parsing has already happened and def contains only Symbols
-
 		("AlgaPattern: '" ++ defEntry.asString ++ "' is an invalid 'def'").error;
 	}
 
@@ -1731,10 +1730,6 @@ AlgaPattern : AlgaNode {
 		//Retrieve channels and rate
 		numChannels = synthDef.numChannels;
 		rate = synthDef.rate;
-
-		//Check sched
-		sched = sched ? schedInner;
-		sched = sched ? 0;
 
 		//Generate outsMapping (for outsMapping connectinons)
 		this.calculateOutsMapping(replace, keepChannelsMapping);
@@ -1758,10 +1753,6 @@ AlgaPattern : AlgaNode {
 	//Build spec from ListPattern
 	buildFromListPattern { | initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
-
-		//Check sched
-		sched = sched ? schedInner;
-		sched = sched ? 0;
 
 		//Generate outsMapping (for outsMapping connectinons)
 		if(this.calculateOutsMapping(replace, keepChannelsMapping) == nil, { ^this });
@@ -2012,7 +2003,7 @@ AlgaPattern : AlgaNode {
 		var newInterpStreams = AlgaPatternInterpStreams(this);
 
 		//Check sched
-		sched = sched ? schedInner;
+		if(replace.not, { sched = sched ? schedInner });
 
 		//Loop over controlNames and retrieve which parameters the user has set explicitly.
 		//All other parameters will be dealt with later.
@@ -2838,8 +2829,6 @@ AlgaPattern : AlgaNode {
 	//Interpolate a parameter that is not in controlNames (like \lag)
 	interpolateGenericParam { | sender, param, time, sched |
 		("AlgaPattern: changing the '" ++ param.asString ++ "' key, which is not present in the AlgaSynthDef. This will trigger 'replace'.").warn;
-		//Check sched
-		sched = sched ? schedInner;
 		^this.replace(
 			def: (def: this.getSynthDef, (param): sender), //escape param with ()
 			time: time,
@@ -2915,7 +2904,7 @@ AlgaPattern : AlgaNode {
 		replaceMix = false, senderChansMapping, scale, sampleAndHold, time, shape, sched |
 
 		//Check sched
-		sched = sched ? schedInner;
+		if(replace.not, { sched = sched ? schedInner });
 
 		//Default to false
 		sampleAndHold = sampleAndHold ? false;
@@ -3195,12 +3184,12 @@ AlgaPattern : AlgaNode {
 		if(patternAsStream != nil, {
 			//If sched is 0, go right away: user might have its own scheduling setup
 			if(sched == 0, {
-				patternAsStream.next(()).play; //Empty event as protoEvent!
+				//Empty event as protoEvent!
+				patternAsStream.next(()).play;
 			}, {
 				this.addAction(
-					func: {
-						patternAsStream.next(()).play; //Empty event as protoEvent!
-					},
+					//Empty event as protoEvent!
+					func: { patternAsStream.next(()).play },
 					sched: sched
 				);
 			});
