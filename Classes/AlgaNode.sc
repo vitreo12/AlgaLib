@@ -3503,8 +3503,8 @@ AlgaNode {
 		if(mix, {
 			var currentDefaultNodeAtParam = currentDefaultNodes[param];
 
-			//trying to <<+ instead of << on first connection
-			if((currentDefaultNodeAtParam == nil), {
+			//trying to <<+ instead of << on first connection, OR inNodes' size is 0
+			if((currentDefaultNodeAtParam == nil).or(inNodes.size == 0), {
 				("AlgaNode: first connection. Running 'from' instead.").warn;
 				mix = false;
 			});
@@ -3522,7 +3522,7 @@ AlgaNode {
 				^this;
 			});
 
-			//trying to run replaceMix / mixFrom / mixTo when sender is the only entry!
+			//Trying to run replaceMix / mixFrom / mixTo when sender is the only entry!
 			if(inNodes[param].size == 1, {
 				if(inNodes[param].findMatch(sender) != nil, {
 					"AlgaNode: sender was the only entry. Running 'makeConnection' instead".warn;
