@@ -315,4 +315,5 @@ APS : AlgaProxySpace { }
 //This fixes bug when doing def.value in AlgaProxySpace.triggerDef
 +Nil {
 	addAr { ^nil }
+	addKr { ^nil }
 }
