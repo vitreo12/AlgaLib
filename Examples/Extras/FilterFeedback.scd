@@ -14,5 +14,3 @@ APS.boot({
 ~a <<.freq { LFNoise1.kr(LFNoise0.kr(3).range(1, 10)).range(50, 3500) }
 
 ~b <<.freq { LFNoise0.kr(LFNoise1.kr(2).range(1, 20)).range(0.1, 30) }
-
-Server.killAll

@@ -1894,8 +1894,9 @@ AlgaNode {
 								prevSender = prevSender.sender;
 							});
 
+							//If prevSender == this, it's a FB connection: consider it valid
 							//Make sure that the algaNode can actually send the connection
-							if(prevSender.isAlgaNode.and(prevSender.algaInstantiatedAsSender), {
+							if((prevSender == this).or(prevSender.isAlgaNode.and(prevSender.algaInstantiatedAsSender)), {
 								prevSenderRate = prevSender.rate;
 								prevSenderNumChannels = prevSender.numChannels;
 
@@ -2224,7 +2225,7 @@ AlgaNode {
 	//Create all synths for each param
 	createAllSynths { | replace = false, keepChannelsMapping = false, keepScale = false |
 		this.createInterpNormSynths(
-			replace,
+			replace:replace,
 			keepChannelsMapping:keepChannelsMapping,
 			keepScale:keepScale
 		);
@@ -4094,26 +4095,29 @@ AlgaNode {
 				var oldParamsChansMapping = nil;
 				var oldScale = nil;
 
-				//Restore old channels mapping! It can either be a symbol, number or array here
-				if(keepChannelsMapping, { oldParamsChansMapping = receiver.getParamChansMapping(param, this) });
+				//Ignore FB: it's been done already in createInterpNormSynths
+				if(this != receiver, {
+					//Restore old channels mapping! It can either be a symbol, number or array here
+					if(keepChannelsMapping, { oldParamsChansMapping = receiver.getParamChansMapping(param, this) });
 
-				//Restore old scale mapping!
-				if(keepScale, { oldScale = receiver.getParamScaling(param, this) });
+					//Restore old scale mapping!
+					if(keepScale, { oldScale = receiver.getParamScaling(param, this) });
 
-				//If it was a mix connection, use replaceMixConnection
-				if(receiver.mixParamContainsSender(param, this), {
-					//use the scheduler version! don't know if receiver and this are both instantiated
-					receiver.replaceMixConnection(param, this,
-						senderChansMapping:oldParamsChansMapping,
-						scale:oldScale, time:time
-					);
-				}, {
-					//use the scheduler version! don't know if receiver and this are both instantiated
-					//Normal connection, use makeConnection to re-enstablish it
-					receiver.makeConnection(this, param,
-						replace:true, senderChansMapping:oldParamsChansMapping,
-						scale:oldScale, time:time
-					);
+					//If it was a mix connection, use replaceMixConnection
+					if(receiver.mixParamContainsSender(param, this), {
+						//use the scheduler version! don't know if receiver and this are both instantiated
+						receiver.replaceMixConnection(param, this,
+							senderChansMapping:oldParamsChansMapping,
+							scale:oldScale, time:time
+						);
+					}, {
+						//use the scheduler version! don't know if receiver and this are both instantiated
+						//Normal connection, use makeConnection to re-enstablish it
+						receiver.makeConnection(this, param,
+							replace:true, senderChansMapping:oldParamsChansMapping,
+							scale:oldScale, time:time
+						);
+					});
 				});
 			});
 		});
