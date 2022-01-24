@@ -17,6 +17,7 @@
 AlgaProxySpace {
 	classvar <paramsArgs;
 	classvar <currentNode;
+	classvar <isTriggerDef = false;
 	var <nodes;
 	var <patternsEvents;
 	var <server;
@@ -25,11 +26,10 @@ AlgaProxySpace {
 	var <replacePlayTime = true, <playSafety = \clip;
 
 	*boot { | onBoot, server, algaServerOptions, clock |
-		var newSpace;
+		var newSpace = this.new.init;
+		newSpace.push;
 		server = server ? Server.default;
 		Alga.boot(onBoot, server, algaServerOptions, clock);
-		newSpace = this.new.init;
-		newSpace.push;
 		^newSpace;
 	}
 
@@ -152,7 +152,9 @@ AlgaProxySpace {
 	//This allows to retrieve Symbol.kr / Symbol.ar BEFORE they're sent to the server.
 	triggerDef { | node, def |
 		currentNode = node;
+		isTriggerDef = true;
 		def.value;
+		isTriggerDef = false;
 	}
 
 	explicitNode { | node, key, def |
@@ -298,17 +300,33 @@ APS : AlgaProxySpace { }
 	ar { | val, lag, spec |
 		if((val.isAlgaNode).or(val.isAlgaArg), {
 			AlgaProxySpace.addParamArgs(this, val);
-			^NamedControl.ar(this, 0, lag, spec)
+			if(AlgaProxySpace.isTriggerDef.not, {
+				^NamedControl.ar(this, 0, lag, spec);
+			}, {
+				DC.ar(0)
+			});
 		});
-		^NamedControl.ar(this, val, lag, spec)
+		if(AlgaProxySpace.isTriggerDef.not, {
+			^NamedControl.ar(this, val, lag, spec)
+		}, {
+			^DC.ar(0)
+		});
 	}
 
 	kr { | val, lag, fixedLag = false, spec |
 		if((val.isAlgaNode).or(val.isAlgaArg), {
 			AlgaProxySpace.addParamArgs(this, val);
-			^NamedControl.kr(this, 0, lag, fixedLag, spec)
+			if(AlgaProxySpace.isTriggerDef.not, {
+				^NamedControl.kr(this, 0, lag, fixedLag, spec)
+			}, {
+				^DC.kr(0)
+			});
 		});
-		^NamedControl.kr(this, val, lag, fixedLag, spec)
+		if(AlgaProxySpace.isTriggerDef.not, {
+			^NamedControl.kr(this, val, lag, fixedLag, spec)
+		}, {
+			^DC.kr(0)
+		});
 	}
 }
 
