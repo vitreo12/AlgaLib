@@ -2010,11 +2010,12 @@ AlgaPattern : AlgaNode {
 			var paramName = controlName.name;
 			var paramValue = eventPairs[paramName]; //Retrieve it directly from eventPairs
 			var defaultValue = controlName.defaultValue;
+			var explicitParam = paramValue != nil;
 			var chansMapping, scale;
 			var addToPatternPairs = true;
 
 			//if not set explicitly yet
-			if(paramValue == nil, {
+			if(explicitParam.not, {
 				//When replace, getDefaultOrArg will return LATEST set parameter, via replaceArgs
 				paramValue = this.getDefaultOrArg(controlName, paramName, replace);
 
@@ -2048,8 +2049,8 @@ AlgaPattern : AlgaNode {
 			//Remove param entry from eventPairs
 			eventPairs[paramName] = nil;
 
-			//Add the entry to defaults ONLY if != defaultVAlue
-			if(paramValue != defaultValue, { defArgs[paramName] = paramValue });
+			//Add the entry to defaults ONLY if explicit
+			if(explicitParam, { defArgs[paramName] = paramValue });
 		});
 
 		//Loop over all other input from the user, setting all entries that are not part of controlNames
