@@ -763,7 +763,6 @@ AlgaPattern : AlgaNode {
 					addScaling: false, //don't update the AlgaNode's scalings dict
 				);
 
-
 				if(scaleArray != nil, {
 					patternParamSynthArgs = patternParamSynthArgs.addAll(scaleArray);
 				});
@@ -2010,6 +2009,7 @@ AlgaPattern : AlgaNode {
 		controlNames.do({ | controlName |
 			var paramName = controlName.name;
 			var paramValue = eventPairs[paramName]; //Retrieve it directly from eventPairs
+			var defaultValue = controlName.defaultValue;
 			var chansMapping, scale;
 			var addToPatternPairs = true;
 
@@ -2048,8 +2048,8 @@ AlgaPattern : AlgaNode {
 			//Remove param entry from eventPairs
 			eventPairs[paramName] = nil;
 
-			//Add the entry to defaults
-			defArgs[paramName] = paramValue;
+			//Add the entry to defaults ONLY if != defaultVAlue
+			if(paramValue != defaultValue, { defArgs[paramName] = paramValue });
 		});
 
 		//Loop over all other input from the user, setting all entries that are not part of controlNames
@@ -2621,8 +2621,6 @@ AlgaPattern : AlgaNode {
 	parseFunctionDefEntry { | def, functionSynthDefDict |
 		//New defName
 		var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-		sampleAccurateFuncs.asString.warn;
 
 		//sampleAccurate is set according to sampleAccurateFuncs
 		functionSynthDefDict[defName] = AlgaSynthDef(
@@ -3401,6 +3399,10 @@ AlgaPattern : AlgaNode {
 
 	//Wrapper for addInNode
 	addInNode { | sender, param = \in, mix = false |
+		var controlNameAtParam = controlNames[param];
+		var defaultValue;
+		if(controlNameAtParam != nil, { defaultValue = controlNameAtParam.defaultValue });
+
 		//First of all, remove the outNodes that the previous sender had with the
 		//param of this node, if there was any. Only apply if mix==false (no <<+ / >>+)
 		if(mix == false, {
@@ -3430,7 +3432,7 @@ AlgaPattern : AlgaNode {
 		//Use replaceArgs to set LATEST parameter, for retrieval after .replace ...
 		//AlgaNode only uses this for number parameters, but AlgaPattern uses it for any
 		//kind of parameter, including AlgaNodes and AlgaArgs.
-		replaceArgs[param] = sender;
+		if(sender != defaultValue, { replaceArgs[param] = sender });
 
 		//Reset connectionAlreadyInPlace
 		connectionAlreadyInPlace = false;

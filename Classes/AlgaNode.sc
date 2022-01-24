@@ -1483,6 +1483,7 @@ AlgaNode {
 				//Pattern needs to be returned whatever the case (it's parsed later)
 				if(this.isAlgaPattern, { ^defArg });
 
+				//Special cases
 				if((defArg.isAlgaNode).or(defArg.isAlgaTemp).or(defArg.isNumberOrArray).or(defArg.isAlgaArg), {
 					defaultOrArg = defArg;
 				});
