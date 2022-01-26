@@ -24,6 +24,9 @@ AlgaNode {
 	//The sched used internally if set
 	var schedInner;
 
+	//Sched action in seconds instead of beats
+	var <schedInSeconds = false;
+
 	//Index of the corresponding AlgaBlock in the AlgaBlocksDict.
 	//This is being set in AlgaBlock
 	var <>blockIndex = -1;
@@ -144,7 +147,8 @@ AlgaNode {
 	//Debugging tool
 	var <name;
 
-	*new { | def, args, interpTime, interpShape, playTime, sched, outsMapping, server |
+	*new { | def, args, interpTime, interpShape, playTime, sched,
+		schedInSeconds = false, outsMapping,server |
 		^super.new.init(
 			argDef: def,
 			argArgs: args,
@@ -152,24 +156,28 @@ AlgaNode {
 			argInterpShape: interpShape,
 			argPlayTime: playTime,
 			argSched: sched,
+			argSchedInSeconds: schedInSeconds,
 			argOutsMapping: outsMapping,
 			argServer: server,
 		)
 	}
 
-	*new_ap { | def, interpTime, interpShape, playTime, sched = 1, sampleAccurateFuncs = true,  server |
+	*new_ap { | def, interpTime, interpShape, playTime, sched = 1,
+		schedInSeconds = false, sampleAccurateFuncs = true, server |
 		^super.new.init(
 			argDef: def,
 			argConnectionTime: interpTime,
 			argInterpShape: interpShape,
 			argPlayTime: playTime,
 			argSched: sched,
+			argSchedInSeconds: schedInSeconds,
 			argSampleAccurateFuncs: sampleAccurateFuncs,
 			argServer: server,
 		)
 	}
 
-	*debug { | def, args, interpTime, interpShape, playTime, sched, outsMapping, server, name |
+	*debug { | def, args, interpTime, interpShape, playTime, sched,
+		schedInSeconds = false, outsMapping, server, name |
 		^super.new.init(
 			argDef: def,
 			argArgs: args,
@@ -177,6 +185,7 @@ AlgaNode {
 			argInterpShape: interpShape,
 			argPlayTime: playTime,
 			argSched: sched,
+			argSchedInSeconds: schedInSeconds,
 			argOutsMapping: outsMapping,
 			argServer: server,
 			argName: name
@@ -310,7 +319,8 @@ AlgaNode {
 					func: func,
 					sched: sched,
 					topPriority: topPriority,
-					preCheck: preCheck
+					preCheck: preCheck,
+					schedInSeconds: schedInSeconds
 				)
 			});
 		}, {
@@ -320,7 +330,8 @@ AlgaNode {
 				func: func,
 				sched: sched,
 				topPriority: topPriority,
-				preCheck: preCheck
+				preCheck: preCheck,
+				schedInSeconds: schedInSeconds
 			)
 		});
 	}
@@ -440,7 +451,7 @@ AlgaNode {
 
 	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
 		argPlayTime = 0, argSched = 0, argOutsMapping,
-		argSampleAccurateFuncs = true, argServer, argName |
+		argSampleAccurateFuncs = true, argSchedInSeconds = false, argServer, argName |
 
 		//Check supported classes for argObj, so that things won't even init if wrong.
 		//Also check for AlgaPattern
@@ -473,6 +484,9 @@ AlgaNode {
 		//Set env shape
 		interpShape = Env([0, 1], 1); //default
 		this.interpShape_(argInterpShape, all:true);
+
+		//Set schedInSeconds
+		this.schedInSeconds_(argSchedInSeconds);
 
 		//If AlgaPattern, parse the def and then dispatch accordingly (waiting for server if needed)
 		if(this.isAlgaPattern, {
@@ -525,6 +539,14 @@ AlgaNode {
 			^this;
 		});
 		schedInner = value
+	}
+
+	schedInSeconds_ { | value |
+		if((value != false).and(value != true), {
+			"AlgaNode: 'schedInSeconds' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		schedInSeconds = value
 	}
 
 	setParamsConnectionTime { | value, param, all = false |

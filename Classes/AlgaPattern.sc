@@ -134,13 +134,15 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
-	*new { | def, interpTime, interpShape, playTime, sched = 1, sampleAccurateFuncs = true,  server |
+	*new { | def, interpTime, interpShape, playTime, sched = 1,
+		schedInSeconds = false, sampleAccurateFuncs = true, server |
 		^super.new_ap(
 			def: def,
 			interpTime: interpTime,
 			interpShape: interpShape,
 			playTime: playTime,
 			sched: sched,
+			schedInSeconds: schedInSeconds,
 			sampleAccurateFuncs: sampleAccurateFuncs,
 			server: server
 		);
@@ -330,7 +332,7 @@ AlgaPattern : AlgaNode {
 	//Set schedSustainInSeconds
 	schedSustainInSeconds_ { | value = false |
 		if((value != false).and(value != true), {
-			"AlgaPattern: 'scheduleSustainToBeats' only supports boolean values. Setting it to false".error;
+			"AlgaPattern: 'schedSustainInSeconds' only supports boolean values. Setting it to false".error;
 			value = false;
 		});
 		schedSustainInSeconds = value

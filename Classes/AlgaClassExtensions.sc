@@ -367,6 +367,34 @@
 			this.algaSched(when, taskOnce)
 		});
 	}
+
+	algaSchedInSeconds { | when, task |
+		this.schedAbs(this.secs2beats(this.seconds + when), task);
+	}
+
+	algaSchedInSecondsOnce { | when, task |
+		var taskOnce = { task.value; nil };
+		this.schedAbs(this.secs2beats(this.seconds + when), taskOnce);
+	}
+
+	algaSchedInSecondsWithTopPriority { | when, task |
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedInSecondsWithTopPriority(when, task);
+		}, {
+			"Clock is not a TempoClock. Can't schedule with top priority".warn;
+			this.algaSchedInSeconds(when, task);
+		});
+	}
+
+	algaSchedInSecondsOnceWithTopPriority { | when, task |
+		var taskOnce = { task.value; nil };
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedInSecondsWithTopPriority(when, taskOnce);
+		}, {
+			"Clock is not a TempoClock. Can't schedule with top priority".warn;
+			this.algaSchedInSeconds(when, taskOnce);
+		});
+	}
 }
 
 +SystemClock {
@@ -417,6 +445,14 @@
 	algaTempoClockSchedWithTopPriority { | when, task |
 		//add to clock
 		this.algaSched(when, task);
+
+		//schedule it at top priority
+		this.algaTempoClockSchedAtTopPriority(task);
+	}
+
+	algaTempoClockSchedInSecondsWithTopPriority { | when, task |
+		//add to clock
+		this.algaSchedInSeconds(when, task);
 
 		//schedule it at top priority
 		this.algaTempoClockSchedAtTopPriority(task);

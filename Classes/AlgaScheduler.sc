@@ -306,7 +306,7 @@ AlgaScheduler : AlgaThread {
 				//This will be the core of clock / server syncing of actions
 				//Consume actions (they are ordered thanks to OrderedIdentitySet)
 				while({ actions.size > 0 }, {
-					var action, sched, topPriority;
+					var action, sched, topPriority, schedInSeconds;
 
 					if(cascadeMode, {
 						//if cascading, pop action from top of the list.
@@ -328,6 +328,9 @@ AlgaScheduler : AlgaThread {
 
 					//Check if the specific action has to be executed with top priority
 					topPriority = action[3];
+
+					//Check if the specific action has to be scheduled in seconds and not beats
+					schedInSeconds = action[4];
 
 					//Found a sched value (run in the future on the clock)
 					if(sched > 0, {
@@ -382,9 +385,17 @@ AlgaScheduler : AlgaThread {
 
 							//In sched time, execute the function
 							if(topPriority, {
-								clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
+								if(schedInSeconds, {
+									clock.algaSchedInSecondsOnceWithTopPriority(sched, functionOnSched)
+								}, {
+									clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
+								})
 							}, {
-								clock.algaSchedAtQuantOnce(sched, functionOnSched)
+								if(schedInSeconds, {
+									clock.algaSchedInSecondsOnce(sched, functionOnSched)
+								}, {
+									clock.algaSchedAtQuantOnce(sched, functionOnSched)
+								});
 							});
 						}, {
 							//Only remove the one action and postpone it in the future.
@@ -410,9 +421,17 @@ AlgaScheduler : AlgaThread {
 
 							//In sched time, execute the function
 							if(topPriority, {
-								clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
+								if(schedInSeconds, {
+									clock.algaSchedInSecondsOnceWithTopPriority(sched, functionOnSched)
+								}, {
+									clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
+								});
 							}, {
-								clock.algaSchedAtQuantOnce(sched, functionOnSched)
+								if(schedInSeconds, {
+									clock.algaSchedInSecondsOnce(sched, functionOnSched)
+								}, {
+									clock.algaSchedAtQuantOnce(sched, functionOnSched)
+								});
 							});
 						});
 					}, {
@@ -448,7 +467,7 @@ AlgaScheduler : AlgaThread {
 	}
 
 	//Default condition is just { true }, just execute it when its time comes on the scheduler
-	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
+	addAction { | condition, func, sched = 0, topPriority = false, schedInSeconds = false, preCheck = false |
 		var action;
 
 		//Only numbers
@@ -481,7 +500,7 @@ AlgaScheduler : AlgaThread {
 		if(sched < 0, { sched = 0 });
 
 		//New action
-		action = [condition, func, sched, topPriority];
+		action = [condition, func, sched, topPriority, schedInSeconds];
 
 		//We're in a callee situation: add this node after the index of currentExecAction
 		if(currentExecAction != nil, {
