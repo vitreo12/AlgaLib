@@ -153,7 +153,9 @@ AlgaProxySpace {
 	triggerDef { | node, def |
 		currentNode = node;
 		isTriggerDef = true;
-		def.value;
+		try { def.value } { | error |
+			("AlgaProxySpace: pre-evaluation did not work. Symbols containing AlgaNodes and AlgaArgs could not be executed. If your code did not contain those, it will continue to work. Here is the error that was thrown:" ++ error.errorString).warn;
+		};
 		isTriggerDef = false;
 	}
 
