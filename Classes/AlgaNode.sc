@@ -601,7 +601,7 @@ AlgaNode {
 
 	is { ^interpShape }
 
-	is_ { | value, param, all = false | this.interpShape(value, param, all) }
+	is_ { | value, param, all = false | this.interpShape_(value, param, all) }
 
 	paramInterpShape_ { | param, value |
 		this.interpShape_(value, param);
