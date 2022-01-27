@@ -330,7 +330,7 @@ APS : AlgaProxySpace { }
 	}
 }
 
-//This fixes bugs when doing def.value in AlgaProxySpace.triggerDef
+//Fixes for bugs when doing def.value in AlgaProxySpace.triggerDef
 +Nil {
 	//Symbol
 	addAr { ^nil }
