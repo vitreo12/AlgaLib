@@ -334,4 +334,8 @@ APS : AlgaProxySpace { }
 +Nil {
 	addAr { ^nil }
 	addKr { ^nil }
+
+	//Fix for LocalBuf
+	maxLocalBufs { ^nil }
+	maxLocalBufs_ { }
 }
