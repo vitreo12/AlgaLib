@@ -330,12 +330,14 @@ APS : AlgaProxySpace { }
 	}
 }
 
-//This fixes bug when doing def.value in AlgaProxySpace.triggerDef
+//This fixes bugs when doing def.value in AlgaProxySpace.triggerDef
 +Nil {
+	//Symbol
 	addAr { ^nil }
 	addKr { ^nil }
+	addTr { ^nil }
 
-	//Fix for LocalBuf
+	//LocalBuf
 	maxLocalBufs { ^nil }
 	maxLocalBufs_ { }
 }
