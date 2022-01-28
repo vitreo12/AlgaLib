@@ -294,7 +294,7 @@ AlgaPattern : AlgaNode {
 
 	//Set replaceDur
 	replaceDur_ { | value = false |
-		if((value != false).and(value != true), {
+		if(value.isKindOf(Boolean).not, {
 			"AlgaPattern: 'replaceDur' only supports boolean values. Setting it to false".error;
 			value = false;
 		});
@@ -303,7 +303,7 @@ AlgaPattern : AlgaNode {
 
 	//Set useMultiChannelExpansion
 	useMultiChannelExpansion_ { | value = false |
-		if((value != false).and(value != true), {
+		if(value.isKindOf(Boolean).not, {
 			"AlgaPattern: 'useMultiChannelExpansion' only supports boolean values. Setting it to false".error;
 			value = false;
 		});
@@ -322,7 +322,7 @@ AlgaPattern : AlgaNode {
 
 	//Set stopPatternBeforeReplace
 	stopPatternBeforeReplace_ { | value = true |
-		if((value != false).and(value != true), {
+		if(value.isKindOf(Boolean).not, {
 			"AlgaPattern: 'stopPatternBeforeReplace' only supports boolean values. Setting it to true".error;
 			value = true;
 		});
@@ -331,7 +331,7 @@ AlgaPattern : AlgaNode {
 
 	//Set schedSustainInSeconds
 	schedSustainInSeconds_ { | value = false |
-		if((value != false).and(value != true), {
+		if(value.isKindOf(Boolean).not, {
 			"AlgaPattern: 'schedSustainInSeconds' only supports boolean values. Setting it to false".error;
 			value = false;
 		});
@@ -340,7 +340,7 @@ AlgaPattern : AlgaNode {
 
 	//Set sustainToDur
 	sustainToDur_ { | value = false |
-		if((value != false).and(value != true), {
+		if(value.isKindOf(Boolean).not, {
 			"AlgaPattern: 'sustainToDur' only supports boolean values. Setting it to false".error;
 			value = false;
 		});
@@ -349,7 +349,7 @@ AlgaPattern : AlgaNode {
 
 	//Set sampleAccurateFuncs
 	sampleAccurateFuncs_ { | value = true |
-		if((value != false).and(value != true), {
+		if(value.isKindOf(Boolean).not, {
 			"AlgaPattern: 'sampleAccurateFuncs' only supports boolean values. Setting it to true".error;
 			value = true;
 		});
@@ -2911,7 +2911,7 @@ AlgaPattern : AlgaNode {
 		sampleAndHold = sampleAndHold ? false;
 
 		//Check if it's boolean
-		if((sampleAndHold != true).and(sampleAndHold != false), {
+		if(sampleAndHold.isKindOf(Boolean).not, {
 			"AlgaPattern: sampleAndHold must be a boolean value".error;
 			^this
 		});

@@ -542,7 +542,7 @@ AlgaNode {
 	}
 
 	schedInSeconds_ { | value |
-		if((value != false).and(value != true), {
+		if(value.isKindOf(Boolean).not, {
 			"AlgaNode: 'schedInSeconds' only supports boolean values. Setting it to false".error;
 			value = false;
 		});
@@ -742,7 +742,7 @@ AlgaNode {
 	pt_ { | value | this.playTime_(value) }
 
 	replacePlayTime_ { | value |
-		if((value != false).and(value != true), {
+		if(value.isKindOf(Boolean).not, {
 			"AlgaNode: 'replacePlayTime' only supports boolean values. Setting it to false".error;
 			value = false;
 		});
