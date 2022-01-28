@@ -25,7 +25,9 @@ beginning of the audio block!
 */
 AlgaStartup {
 	classvar <algaMaxIO = 8;
-	classvar <maxEnvPoints = 128;
+
+	//The less, the less cpu usage of the AlgaDynamicIEnvGen object (needs fixing)
+	classvar <maxEnvPoints = 32;
 
 	classvar <algaSynthDefPath;
 	classvar <algaSynthDefIOPath;
