@@ -23,6 +23,7 @@ private:: currentNode
 private:: nodes
 private:: paramsArgs
 private:: patternsEvents
+private:: isTriggerDef
 
 INSTANCEMETHODS::
 
@@ -83,6 +84,8 @@ private:: replaceNode
 private:: rpt
 private:: server
 private:: triggerDef
+private:: nodes
+private:: patternsEvents
 
 EXAMPLES::
 code::

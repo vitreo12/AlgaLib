@@ -1,7 +1,7 @@
 TITLE:: Alga
 summary:: live coding environment language focused on the interpolation between sonic nodes
 categories:: Alga
-related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaServerOptions
+related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaServerOptions, Clasess/AlgaProxySpace
 
 
 DESCRIPTION::
