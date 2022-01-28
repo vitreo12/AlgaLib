@@ -198,7 +198,7 @@ AlgaBlock {
 	debugFeedbacks {
 		feedbackNodes.keysValuesDo({ | sender, receiversSet |
 			receiversSet.do({ | receiver |
-				("FB: " ++ sender.asString ++ " >> " ++ receiver.asString).error;
+				("FB: " ++ sender.asString ++ " >> " ++ receiver.asString).warn;
 			});
 		});
 	}
