@@ -7,7 +7,7 @@ APS.boot({
 	~b.it = 3;
 	~b = { Saw.ar(\freq.kr(50)) };
 	~b >> ~a;
-});
+}, algaServerOptions: AlgaServerOptions(blockSize: 64));
 )
 
 ~a.mixFrom(~a, scale:0.5) //care with the fb here
