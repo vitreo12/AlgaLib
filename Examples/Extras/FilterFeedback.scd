@@ -10,6 +10,6 @@ APS.boot({
 )
 
 ~a.mixFrom(~a, scale:0.5) //care with the fb here
-~a <<.freq { LFNoise1.kr(LFNoise0.kr(3).range(1, 10)).range(50, 1500) }
+~a <<.freq { LFNoise1.kr(LFNoise0.kr(3).range(1, 10)).range(50, 2000) }
 
 ~b <<.freq { LFNoise0.kr(LFNoise1.kr(2).range(1, 20)).range(0.1, 30) }
