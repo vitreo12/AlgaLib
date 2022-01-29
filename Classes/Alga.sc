@@ -56,6 +56,14 @@ Alga {
 		AlgaStartup.algaMaxIO = value
 	}
 
+	*maxEnvPoints {
+		^AlgaStartup.maxEnvPoints;
+	}
+
+	*maxEnvPoints_ { | value |
+		AlgaStartup.maxEnvPoints = value
+	}
+
 	*setAlgaSynthDefsDir {
 		oldSynthDefsDir = "SC_SYNTHDEF_PATH".getenv;
 		"SC_SYNTHDEF_PATH".setenv(AlgaStartup.algaSynthDefPath);
