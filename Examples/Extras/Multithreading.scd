@@ -6,13 +6,13 @@ Alga.boot({
 
 	//Definition of a bank of 50 sines
 	AlgaSynthDef(\sines, {
-		Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.005 }))
+		Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.002 }))
 	}).add;
 
 	s.sync;
 
 	//A reverb effect
-	reverb = AlgaNode({ FreeVerb1.ar(\in.ar) }).play(chans: 2);
+	reverb = AlgaNode({ FreeVerb1.ar(\in.ar) }).playSafety_(\tanh).play(chans: 2);
 
 	//50 separated banks of 50 sine oscillators.
 	//Their load will be spread across multiple CPU cores.
@@ -39,13 +39,13 @@ Alga.boot({
 
 	//Definition of a bank of 50 sines
 	AlgaSynthDef(\sines, {
-		Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.005 }))
+		Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.002 }))
 	}).add;
 
 	s.sync;
 
 	//A reverb effect
-	reverb = AlgaNode({ FreeVerb1.ar(\in.ar) }).play(chans: 2);
+	reverb = AlgaNode({ FreeVerb1.ar(\in.ar) }).playSafety_(\tanh).play(chans: 2);
 
 	//50 separated banks of 50 sine oscillators.
 	//Their load will be spread across multiple threads.
