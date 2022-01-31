@@ -1264,9 +1264,7 @@ AlgaPattern : AlgaNode {
 			sampleAndHold = sampleAndHold ? false;
 
 			//MultiChannel: extract from mcEntries
-			if(useMultiChannelExpansion, {
-				mcEntriesAtParam = mcEntries[paramName]
-			});
+			if(useMultiChannelExpansion, { mcEntriesAtParam = mcEntries[paramName] });
 
 			//Create all interp synths for current param
 			this.createPatternParamSynths(
