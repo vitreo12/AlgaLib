@@ -12,7 +12,7 @@ Alga.boot({
 	s.sync;
 
 	//A reverb effect
-	reverb = AlgaNode({ FreeVerb1.ar(\in.ar) }).playSafety_(\tanh).play(chans: 2);
+	reverb = AlgaNode({ FreeVerb1.ar(\in.ar) }).play(chans: 2);
 
 	//50 separated banks of 50 sine oscillators.
 	//Their load will be spread across multiple CPU cores.
@@ -45,7 +45,7 @@ Alga.boot({
 	s.sync;
 
 	//A reverb effect
-	reverb = AlgaNode({ FreeVerb1.ar(\in.ar) }).playSafety_(\tanh).play(chans: 2);
+	reverb = AlgaNode({ FreeVerb1.ar(\in.ar) }).play(chans: 2);
 
 	//50 separated banks of 50 sine oscillators.
 	//Their load will be spread across multiple threads.
