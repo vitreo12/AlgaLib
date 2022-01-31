@@ -853,17 +853,15 @@ AlgaNode {
 		//Keep playGroup as Group: no need to multithread here
 		playGroup = AlgaGroup(group);
 
-		//Keep these ParGroups
-		if(this.isAlgaPattern, { this.fxConvGroup = AlgaParGroup(group) });
-		if(this.isAlgaPattern, { this.fxGroup = AlgaParGroup(group) });
-		if(this.isAlgaPattern, { this.synthConvGroup = AlgaParGroup(group) });
-
 		//For AlgaPattern, use a ParGroup to parallelize
 		if(this.isAlgaPattern, {
+			this.fxConvGroup = AlgaParGroup(group);
+			this.fxGroup = AlgaParGroup(group);
+			this.synthConvGroup = AlgaParGroup(group);
 			synthGroup = AlgaParGroup(group);
 			normGroup = AlgaParGroup(group);
-			tempGroup = AlgaParGroup(group);
 			interpGroup = AlgaParGroup(group);
+			tempGroup = AlgaParGroup(group);
 		}, {
 			//With mixing and everything, it's nice to parallelize interpGroup, normGroup and tempGroup.
 			//Of course, with fewer parameters and / or mix inputs, the gains will not be huge.
@@ -876,11 +874,11 @@ AlgaNode {
 			//normGroup = AlgaGroup(group);
 			normGroup = AlgaParGroup(group);
 
-			//tempGroup = AlgaGroup(group);
-			tempGroup = AlgaParGroup(group);
-
 			//interpGroup = AlgaGroup(group);
 			interpGroup = AlgaParGroup(group);
+
+			//tempGroup = AlgaGroup(group);
+			tempGroup = AlgaParGroup(group);
 		});
 	}
 
@@ -2078,7 +2076,7 @@ AlgaNode {
 					paramDefault = this.createAlgaTempSynth(
 						algaTemp: paramDefault,
 						tempSynthsAndBusses: tempSynthsAndBusses
-					); //returns the bus that tempSynth is writing to
+					); //returns busArg that tempSynth is writing to
 
 					isValid = true;
 				}
@@ -2337,7 +2335,7 @@ AlgaNode {
 	}
 
 	//Create tempSynth for AlgaTemp
-	createAlgaTempSynth { | algaTemp, tempSynthsAndBusses |
+	createAlgaTempSynth { | algaTemp, tempSynthsAndBusses, topLevelTempGroup |
 		//The bus the tempSynth will write to
 		var tempBus, tempSynth;
 		var tempSynthArgs = [\gate, 1];
@@ -2345,6 +2343,11 @@ AlgaNode {
 		var tempRate = algaTemp.rate;
 		var def, algaTempDef, controlNames;
 		var defIsEvent = false;
+
+		//Create a new top level group
+		if(topLevelTempGroup == nil, {
+			topLevelTempGroup = AlgaGroup(tempGroup, waitForInst: false);
+		});
 
 		//Check AlgaTemp validity
 		if(algaTemp.valid.not, {
@@ -2391,7 +2394,7 @@ AlgaNode {
 						var paramTempChans = entry.chans;
 
 						//Create a new AlgaTemp and return its bus (it's already registered, and it returns .busArg)
-						var paramTempBus = this.createAlgaTempSynth(entry, tempSynthsAndBusses);
+						var paramTempBus = this.createAlgaTempSynth(entry, tempSynthsAndBusses, topLevelTempGroup);
 
 						//Check for channels / rate mismatch
 						if((paramRate != entry.rate).or(paramNumChannels != entry.numChannels).or(
@@ -2414,7 +2417,10 @@ AlgaNode {
 							var converterSynth;
 
 							//converter synth args
-							var converterSynthArgs = [ \in, paramTempBus, \out, paramBus.index ];
+							var converterSynthArgs = [
+								\in, paramTempBus,
+								\out, paramBus.index
+							];
 
 							//Calculate scaleArray
 							if(paramTempScale != nil, {
@@ -2445,7 +2451,7 @@ AlgaNode {
 							converterSynth = AlgaSynth(
 								converterSymbol,
 								converterSynthArgs,
-								tempGroup, //Use tempGroup as it's Group for AlgaNode
+								topLevelTempGroup,
 								\addToTail,
 								false
 							);
@@ -2457,7 +2463,7 @@ AlgaNode {
 							tempSynthsAndBusses.add(paramBus);
 						}, {
 							//Same rate / num channels: use paramTempBus directly
-							tempSynthArgs = tempSynthArgs.add(paramName).add(paramTempBus.busArg);
+							tempSynthArgs = tempSynthArgs.add(paramName).add(paramTempBus);
 						});
 					}
 					//If entry is a Number / Array
@@ -2487,7 +2493,7 @@ AlgaNode {
 								var converterSynth = AlgaSynth(
 									converterSymbol,
 									[ \in, entry, \out, paramBus.index ],
-									tempGroup, //Use tempGroup as it's Group for AlgaNode
+									topLevelTempGroup,
 									\addToTail,
 									false
 								);
@@ -2500,7 +2506,7 @@ AlgaNode {
 							})
 						})
 					};
-				})
+				});
 			});
 		});
 
@@ -2514,13 +2520,15 @@ AlgaNode {
 		tempSynth = AlgaSynth(
 			def,
 			tempSynthArgs,
-			tempGroup,
+			topLevelTempGroup,
 			\addToTail,
 			false
 		);
 
-		//Free the tempSynth on synth's free
-		tempSynthsAndBusses.add(tempSynth);
+		//Free the group on synth's free (it will free all synths too)
+		tempSynthsAndBusses.add(topLevelTempGroup);
+
+		//Free the bus on synth's free
 		tempSynthsAndBusses.add(tempBus);
 
 		//Return the AlgaBus that the tempSynth writes to
@@ -2734,7 +2742,7 @@ AlgaNode {
 				paramVal = this.createAlgaTempSynth(
 					algaTemp: sender,
 					tempSynthsAndBusses: tempSynthsAndBusses
-				); //returns the bus that tempSynth is writing to
+				); //returns busArg that tempSynth is writing to
 
 				isValid = true;
 			}
@@ -3788,9 +3796,15 @@ AlgaNode {
 		^nil
 	}
 
-
+	//Overload so that it errors out
 	parseAlgaTempListPatternParam { | value, functionSynthDefDict |
 		"AlgaNode: AlgaTemp does not support ListPatterns".error;
+		^nil
+	}
+
+	//Overload so that it errors out
+	parseFilterPatternParam { | value, functionSynthDefDict |
+		"AlgaNode: AlgaTemp does not support FilterPatterns".error;
 		^nil
 	}
 

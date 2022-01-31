@@ -139,6 +139,9 @@ AlgaTemp {
 	isAlgaTemp { ^true }
 }
 
+//Alias
+AT : AlgaTemp { }
+
 //This class is used to schedule actions on steps
 AlgaStep {
 	var <>step = 0;
@@ -170,3 +173,6 @@ AlgaStep {
 
 	isAlgaStep { ^true }
 }
+
+//Alias
+AS : AlgaStep { }

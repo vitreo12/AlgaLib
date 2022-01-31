@@ -96,6 +96,9 @@ AlgaPattern : AlgaNode {
 	//Needed to store current generic params
 	var <currentGenericParams;
 
+	//This is used for nested AlgaTemps
+	var <currentAlgaTempGroup;
+
 	//Skip an iteration
 	var skipIteration = false;
 
@@ -460,13 +463,20 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create a temporary synth according to the specs of the AlgaTemp
-	createAlgaTempSynth { | algaTemp, patternBussesAndSynths |
+	createAlgaTempSynth { | algaTemp, patternBussesAndSynths, createAlgaTempGroup = false |
 		var tempBus, tempSynth;
 		var tempSynthArgs = [ \gate, 1 ];
 		var tempNumChannels = algaTemp.numChannels;
 		var tempRate = algaTemp.rate;
 		var def, algaTempDef, tempControlNames;
 		var defIsEvent = false;
+
+		//New AlgaTemp at top level: create a new currentAlgaTempGroup.
+		//This is used to do AlgaTemps into AlgaTemps into AlgaTemps ...
+		if(createAlgaTempGroup, {
+			currentAlgaTempGroup = AlgaGroup(tempGroup, waitForInst: false);
+			patternBussesAndSynths.add(currentAlgaTempGroup); //Free on synth's free
+		});
 
 		//Check AlgaTemp validity
 		if(algaTemp.valid.not, {
@@ -524,7 +534,7 @@ AlgaPattern : AlgaNode {
 						paramDefault: paramDefault,
 						patternInterpSumBus: patternParamBus,
 						patternBussesAndSynths: patternBussesAndSynths,
-						isFX: true //use isFX (it's the same behaviour)
+						isAlgaTemp: true
 					)
 				});
 			});
@@ -540,19 +550,19 @@ AlgaPattern : AlgaNode {
 		tempSynth = AlgaSynth(
 			def,
 			tempSynthArgs,
-			tempGroup,
+			currentAlgaTempGroup ? tempGroup, //currentAlgaTempGroup comes from the top AlgaTemp in a nested statement
 			\addToTail,
 			false
 		);
 
-		//Add Bus and Synth to patternBussesAndSynths
+		//Add Bus to patternBussesAndSynths
 		patternBussesAndSynths.add(tempBus);
-		patternBussesAndSynths.add(tempSynth);
+
+		//The synth is already contained in currentAlgaTempGroup if it's valid
+		if(currentAlgaTempGroup == nil, { patternBussesAndSynths.add(tempSynth) });
 
 		//If sustain, add tempSynth's ID to sustains'
-		if(isSustainTrig, {
-			sustainIDs = sustainIDs.add(tempSynth.nodeID)
-		});
+		if(isSustainTrig, { sustainIDs = sustainIDs.add(tempSynth.nodeID) });
 
 		//Return the AlgaBus that the tempSynth writes to
 		^tempBus.busArg;
@@ -582,15 +592,19 @@ AlgaPattern : AlgaNode {
 	//This is the core of the interpolation behaviour for AlgaPattern !!
 	createPatternParamSynth { | entry, uniqueID, paramName, paramNumChannels, paramRate,
 		paramDefault, patternInterpSumBus, patternBussesAndSynths, scaleArraysAndChansAtParam,
-		sampleAndHold, algaPatternInterpStreams, isFX = false, isTemporary = false |
+		sampleAndHold, algaPatternInterpStreams, isFX = false, isAlgaTemp = false, isTemporary = false |
 
 		var sender, senderNumChannels, senderRate;
 		var chansMapping, scale;
 		var validParam = false;
+		var isNotFxAndAlgaTemp = (isFX.not).and(isAlgaTemp.not);
+
+		//Reset currentAlgaTempGroup
+		if(isAlgaTemp.not, { currentAlgaTempGroup = nil });
 
 		//Unpack Pattern value
 		//(Only if not using MC, or isFX (no MC in FX) or isTemporary (no MC in temporary))
-		if((useMultiChannelExpansion.not).or(isFX).or(isTemporary), {
+		if((useMultiChannelExpansion.not).or(isFX).or(isAlgaTemp).or(isTemporary), {
 			if(entry.isStream, { entry = entry.next });
 		});
 
@@ -610,7 +624,8 @@ AlgaPattern : AlgaNode {
 			//If valid, this returns the AlgaBus that the tempSynth will write to
 			entry = this.createAlgaTempSynth(
 				algaTemp: algaTemp,
-				patternBussesAndSynths: patternBussesAndSynths
+				patternBussesAndSynths: patternBussesAndSynths,
+				createAlgaTempGroup: isAlgaTemp.not //Top level AlgaTemp
 			);
 
 			if(entry.isNil.not, {
@@ -702,7 +717,7 @@ AlgaPattern : AlgaNode {
 		//It's very important not to use Rest() here, as \dur will also pick it up, generating
 		//an actual double Rest(). Rest() should only be used in \dur / \delta.
 		{ entry.isSymbol } {
-			if(isFX.not, { skipIteration = true }, { skipIterationFX = true });
+			if(isNotFxAndAlgaTemp, { skipIteration = true }, { skipIterationFX = true });
 			^this;
 		};
 
@@ -716,7 +731,7 @@ AlgaPattern : AlgaNode {
 			var patternParamEnvBus;
 			var validPatternParamEnvBus = true;
 
-			if(isFX.not, {
+			if(isNotFxAndAlgaTemp, {
 				//Not \fx parameter: retrieve correct envelope bus
 				patternParamEnvBus = algaPatternInterpStreams.interpBusses[paramName][uniqueID];
 				validPatternParamEnvBus = patternParamEnvBus != nil;
@@ -731,7 +746,7 @@ AlgaPattern : AlgaNode {
 				var scaleArray;
 				var indices;
 
-				if(isFX.not, {
+				if(isNotFxAndAlgaTemp, {
 					//Args for patternParamSynth
 					patternParamSynthArgs = [
 						\in, entry,
@@ -770,7 +785,7 @@ AlgaPattern : AlgaNode {
 				});
 
 				//\fx parameter does not use global scaleArrayAndChans
-				if(isFX.not, {
+				if(isNotFxAndAlgaTemp, {
 					//If AlgaPatternArg's is nil, use argument's one (if defined)
 					if(chansMapping == nil, {
 						if(scaleArrayAndChansAtParam != nil, { chansMapping = scaleArrayAndChansAtParam[1] }); //1 == chans
@@ -795,7 +810,7 @@ AlgaPattern : AlgaNode {
 					patternParamSynthArgs = patternParamSynthArgs.add(\sampleAndHold).add(1).add(\t_sah).add(1);
 				});
 
-				if(isFX.not, {
+				if(isNotFxAndAlgaTemp, {
 					//Standard case
 					patternParamSymbol = (
 						"alga_pattern_" ++
@@ -822,16 +837,27 @@ AlgaPattern : AlgaNode {
 				patternParamSynth = AlgaSynth(
 					patternParamSymbol,
 					patternParamSynthArgs,
-					interpGroup,
+					if(isAlgaTemp.not,
+						{ interpGroup },
+						{ currentAlgaTempGroup ? tempGroup } //currentAlgaTempGroup is used in nested AlgaTemps
+					),
 					\addToTail,
 					waitForInst: false
 				);
 
-				//Register patternParamSynth to be freed
-				patternBussesAndSynths.add(patternParamSynth);
+				//Register patternParamSynth to be freed.
+				if(isAlgaTemp.not, {
+					patternBussesAndSynths.add(patternParamSynth)
+				}, {
+					//For AlgaTemps, also check validity of currentAlgaTempGroup
+					//If it's valid, the synths would already be freed when that group is freed.
+					if(currentAlgaTempGroup == nil, {
+						patternBussesAndSynths.add(patternParamSynth)
+					});
+				});
 
 				//Don't add the FX patternParamSynths: they're already handled
-				if(isFX.not,{
+				if(isNotFxAndAlgaTemp,{
 					//Add patternParamSynth as child of patternInterpSumBus (used to create temporary synths)
 					this.addActivePatternParamSynth(patternInterpSumBus, patternParamSynth);
 
