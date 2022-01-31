@@ -3,7 +3,7 @@
 (
 Alga.boot({
 	a = AP((
-		def: { SinOsc.ar(\freq.kr(440)) * EnvPerc.ar },
+		def: { var freq2 = \freq2.kr; SinOsc.ar(\freq1.kr) * EnvPerc.ar },
 		dur: 1,
 		freq1: 400,
 		freq2: Pseq([100, 1000], inf),
@@ -27,7 +27,7 @@ a.from(800, \freq1, time:3)
 (
 Alga.boot({
 	a = AP((
-		def: { SinOsc.ar(\freq.kr(440)) * EnvPerc.ar },
+		def: { var freq2 = \freq2.kr; SinOsc.ar(\freq1.kr) * EnvPerc.ar },
 		dur: 1,
 		freq1: 400,
 		freq2: Pseq([100, 1000], inf),
@@ -42,6 +42,28 @@ Alga.boot({
 				def: { \freq1.kr + \freq2.kr },
 				freq1: AlgaKey(\freq1),
 				freq2: AlgaKey(\freq2)
+			))
+		)),
+	)).play
+});
+)
+
+//Ex.3
+//Precedence: will look into AlgaTemp first
+(
+Alga.boot({
+	a = AP((
+		def: { var freq2 = \freq2.kr;  SinOsc.ar(\freq1.kr) * EnvPerc.ar },
+		dur: 1,
+		freq1: 400,
+		freq2: Pseq([100, 1000], inf),
+		amp: AlgaTemp((
+			def: { SinOsc.ar(\freq.kr * \freq1.kr) },
+			freq1: 800, //Same name as AlgaPattern's
+			freq: AlgaTemp((
+				def: { \freq1.kr + \freq2.kr },
+				freq1: AlgaKey(\freq1), //Will use AlgaTemp's
+				freq2: AlgaKey(\freq2)  //Will use AlgaPattern's
 			))
 		)),
 	)).play

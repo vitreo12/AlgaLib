@@ -21,4 +21,6 @@ AlgaKey {
 	*new { | key |
 		^super.newCopyArgs(key)
 	}
+
+	isAlgaKey { ^true }
 }
