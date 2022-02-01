@@ -20,6 +20,21 @@ ALGAKEYGROUP:
         freqNorm
 */
 
+//Ex.0
+(
+Alga.boot({
+	a = AP((
+		def: { SinOsc.ar(\freq1.kr + \freq2.kr) * EnvPerc.ar },
+		dur: 1,
+		freq1: 400,
+		freq2: AlgaKey(\freq1),
+	)).play
+});
+)
+
+//Interpolation is maintained: AlgaKey reads directly from the AlgaBus
+a.from(300, \freq1, time:3);
+
 //Ex.1
 //Gotta do logic on the server to keep interpolators
 (

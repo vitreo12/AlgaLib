@@ -141,7 +141,7 @@ AlgaTemp {
 }
 
 //Alias
-AT : AlgaTemp { }
+AT : AlgaTemp {}
 
 //This class is used to schedule actions on steps
 AlgaStep {
@@ -176,4 +176,4 @@ AlgaStep {
 }
 
 //Alias
-AS : AlgaStep { }
+AS : AlgaStep {}
