@@ -183,7 +183,7 @@ AlgaKey {
 	var <key;
 
 	*new { | key |
-		^super.newCopyArgs(key)
+		^super.newCopyArgs(key.asSymbol)
 	}
 
 	isAlgaKey { ^true }
