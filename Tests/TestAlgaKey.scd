@@ -24,7 +24,7 @@ ALGAKEYGROUP:
 (
 Alga.boot({
 	a = AP((
-		def: { SinOsc.ar(\freq1.kr + \freq2.kr) * EnvPerc.ar },
+		def: { SinOsc.ar(\freq1.kr + \freq2.kr.poll) * EnvPerc.ar },
 		dur: 1,
 		freq1: 400,
 		freq2: AlgaKey(\freq1),

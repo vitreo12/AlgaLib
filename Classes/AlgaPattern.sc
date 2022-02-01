@@ -592,7 +592,8 @@ AlgaPattern : AlgaNode {
 	//This is the core of the interpolation behaviour for AlgaPattern !!
 	createPatternParamSynth { | entry, uniqueID, paramName, paramNumChannels, paramRate,
 		paramDefault, patternInterpSumBus, patternBussesAndSynths, scaleArraysAndChansAtParam,
-		sampleAndHold, algaPatternInterpStreams, isFX = false, isAlgaTemp = false, isTemporary = false |
+		sampleAndHold, algaPatternInterpStreams, isFX = false, isAlgaTemp = false,
+		patternParamNormBusses, isTemporary = false |
 
 		var sender, senderNumChannels, senderRate;
 		var chansMapping, scale;
@@ -697,11 +698,20 @@ AlgaPattern : AlgaNode {
 
 		//AlgaKey
 		{ entry.isAlgaKey } {
-			if(entry.isInsideAlgaTemp, {
-				"AlgaKey inside AlgaTemp!".error;
-			}, {
-				"AlgaKey outside AlgaTemp!".warn;
+			var paramBus = patternParamNormBusses[entry.key];
+			if(paramBus != nil, {
+				entry = paramBus.busArg;
+				senderRate = paramBus.rate;
+				senderNumChannels = paramBus.numChannels;
+				validParam = true;
 			});
+
+			//Things to do:
+			/*
+			1) Differentiate between AlgaKey and AlgaKey within an AlgaTemp
+			2) Create ad-hoc groups for AlgaKeys and AlgaTemps with AlgaKeys.
+			   These must be AFTER the normGroup, and also contain the interp / norm
+			*/
 		}
 
 		//Buffer
@@ -718,7 +728,7 @@ AlgaPattern : AlgaNode {
 			senderNumChannels = paramNumChannels;
 			entry = paramDefault;
 			("AlgaPattern: trying to set 'nil' for param '" ++ paramName ++
-				"'. Using default value " ++ paramDefault.asString ++" instead").error;
+				"'. Using default value " ++ paramDefault.asString ++ " instead").error;
 			validParam = true;
 		}
 
@@ -883,7 +893,7 @@ AlgaPattern : AlgaNode {
 	createPatternParamSynths { | paramName, paramNumChannels, paramRate,
 		paramDefault, patternInterpSumBus, patternBussesAndSynths,
 		interpStreamsEntriesAtParam, scaleArraysAndChansAtParam, sampleAndHold,
-		algaPatternInterpStreams, fx, mcSynthNum, mcEntriesAtParam |
+		algaPatternInterpStreams, patternParamNormBusses, fx, mcSynthNum, mcEntriesAtParam |
 
 		//If MC, loop from mcEntriesAtParam
 		if(useMultiChannelExpansion, {
@@ -900,6 +910,7 @@ AlgaPattern : AlgaNode {
 						paramDefault: paramDefault,
 						patternInterpSumBus: patternInterpSumBus,
 						patternBussesAndSynths: patternBussesAndSynths,
+						patternParamNormBusses: patternParamNormBusses,
 						scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
 						sampleAndHold: sampleAndHold,
 						algaPatternInterpStreams: algaPatternInterpStreams
@@ -919,6 +930,7 @@ AlgaPattern : AlgaNode {
 						paramDefault: paramDefault,
 						patternInterpSumBus: patternInterpSumBus,
 						patternBussesAndSynths: patternBussesAndSynths,
+						patternParamNormBusses: patternParamNormBusses,
 						scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
 						sampleAndHold: sampleAndHold,
 						algaPatternInterpStreams: algaPatternInterpStreams
@@ -1239,10 +1251,21 @@ AlgaPattern : AlgaNode {
 		//The final free func
 		var onPatternSynthFreeFunc;
 
+		//Create patternParamNormBusses (used for AlgaKeys)
+		var patternParamNormBusses = IdentityDictionary();
+
 		//Check if it's a ListPattern and retrieve correct controlNames
 		if(controlNamesList != nil, {
 			controlNamesToUse = controlNamesList[algaSynthDef];
 			if(controlNamesToUse == nil, { controlNamesToUse = controlNames });
+		});
+
+		//Created beforehand to make AlgaKey work!
+		controlNamesToUse.do({ | controlName |
+			var paramName = controlName.name;
+			var paramNumChannels = controlName.numChannels;
+			var paramRate = controlName.rate;
+			patternParamNormBusses[paramName] = AlgaBus(server, paramNumChannels, paramRate);
 		});
 
 		//Loop over controlNames and create as many Busses and Synths as needed,
@@ -1259,7 +1282,7 @@ AlgaPattern : AlgaNode {
 			var patternInterpSumBus = AlgaBus(server, paramNumChannels + 1, paramRate);
 
 			//This is the normBus that the normSynth will write to, and patternSynth will read from
-			var patternParamNormBus = AlgaBus(server, paramNumChannels, paramRate);
+			var patternParamNormBus = patternParamNormBusses[paramName];
 
 			//Symbol for normSynth
 			var patternParamNormSynthSymbol = (
@@ -1313,6 +1336,7 @@ AlgaPattern : AlgaNode {
 				scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
 				sampleAndHold: sampleAndHold,
 				algaPatternInterpStreams: algaPatternInterpStreams,
+				patternParamNormBusses: patternParamNormBusses,
 				mcSynthNum: mcSynthNum,
 				mcEntriesAtParam: mcEntriesAtParam
 			);
