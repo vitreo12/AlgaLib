@@ -177,3 +177,17 @@ AlgaStep {
 
 //Alias
 AS : AlgaStep {}
+
+//Looks directly at an AlgaBus of a parameter. This allows to keep interpolations.
+AlgaKey {
+	var <key;
+
+	*new { | key |
+		^super.newCopyArgs(key)
+	}
+
+	isAlgaKey { ^true }
+}
+
+//Alias
+AK : AlgaKey {}
