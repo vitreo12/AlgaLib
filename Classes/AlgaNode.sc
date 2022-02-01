@@ -3675,25 +3675,26 @@ AlgaNode {
 		case
 		{ entry.isListPattern } {
 			entry.list.do({ | listEntry |
-				this.findAlgaKeys(algaTemp, listEntry);
+				this.findAlgaKeysInAlgaTemp(algaTemp, listEntry);
 			});
 		}
 		{ entry.isFilterPattern } {
 			var filterEntry = entry.pattern;
-			this.findAlgaKeys(algaTemp, filterEntry);
+			this.findAlgaKeysInAlgaTemp(algaTemp, filterEntry);
 		}
 		{ entry.isAlgaTemp } {
 			var entries = entry.def;
 			if(entries.isEvent, {
 				entries.keysValuesDo({ | key, algaTempEntry |
 					if(key != \def, {
-						this.findAlgaKeys(algaTemp, algaTempEntry);
+						this.findAlgaKeysInAlgaTemp(algaTemp, algaTempEntry);
 					});
 				});
 			});
 		}
 		{ entry.isAlgaKey } {
-			algaTemp.hasAlgaKeys = true
+			algaTemp.hasAlgaKeys = true;
+			entry.isInsideAlgaTemp = true;
 		};
 	}
 

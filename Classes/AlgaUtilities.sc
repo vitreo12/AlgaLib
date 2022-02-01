@@ -60,6 +60,9 @@ AlgaArg {
 	}
 }
 
+//Alias
+AA : AlgaArg {}
+
 //This class is used for the \out parameter... Should it also store time?
 //Perhaps, the first node -> time pair should be considered if using a ListPattern:
 /*
@@ -88,6 +91,9 @@ AlgaOut {
 
 	isAlgaOut { ^true }
 }
+
+//Alias
+AO : AlgaOut {}
 
 //This class is used to create a temporary AlgaNode for a parameter in an AlgaPattern
 AlgaTemp {
@@ -181,6 +187,7 @@ AS : AlgaStep {}
 //Looks directly at an AlgaBus of a parameter. This allows to keep interpolations.
 AlgaKey {
 	var <key;
+	var <>isInsideAlgaTemp = false;
 
 	*new { | key |
 		^super.newCopyArgs(key.asSymbol)

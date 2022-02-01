@@ -697,7 +697,11 @@ AlgaPattern : AlgaNode {
 
 		//AlgaKey
 		{ entry.isAlgaKey } {
-
+			if(entry.isInsideAlgaTemp, {
+				"AlgaKey inside AlgaTemp!".error;
+			}, {
+				"AlgaKey outside AlgaTemp!".warn;
+			});
 		}
 
 		//Buffer
