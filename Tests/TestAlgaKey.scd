@@ -1,3 +1,25 @@
+/*
+IMPLEMENTATION:
+There will be an additional AlgaGroup AFTER the norm group where 2 things are held:
+1) direct AlgaKeys (e.g. freq: AlgaKey(\freq1))
+2) AlgaTemps with AlgaKeys (e.g. freq: AlgaTemp((def: { \in.kr }, in: AlgaKey(\freq1)))
+
+In this group, the whole stack of interp -> norm is created.
+
+INTERP:
+    freq1
+
+NORM:
+    freq1
+
+ALGAKEYGROUP:
+    freq:
+        AlgaKey
+        AlgaTemp
+        freqInterp
+        freqNorm
+*/
+
 //Ex.1
 //Gotta do logic on the server to keep interpolators
 (

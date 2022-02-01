@@ -3662,6 +3662,33 @@ AlgaNode {
 		)
 	}
 
+	//Find AlgaKeys in an AlgaTemp
+	findAlgaKeysInAlgaTemp { | algaTemp, entry |
+		case
+		{ entry.isListPattern } {
+			entry.list.do({ | listEntry |
+				this.findAlgaKeys(algaTemp, listEntry);
+			});
+		}
+		{ entry.isFilterPattern } {
+			var filterEntry = entry.pattern;
+			this.findAlgaKeys(algaTemp, filterEntry);
+		}
+		{ entry.isAlgaTemp } {
+			var entries = entry.def;
+			if(entries.isEvent, {
+				entries.keysValuesDo({ | key, algaTempEntry |
+					if(key != \def, {
+						this.findAlgaKeys(algaTemp, algaTempEntry);
+					});
+				});
+			});
+		}
+		{ entry.isAlgaKey } {
+			algaTemp.hasAlgaKeys = true
+		};
+	}
+
 	//Parse an AlgaTemp
 	parseAlgaTempParam { | algaTemp, functionSynthDefDict |
 		var validAlgaTemp = false;
@@ -3737,7 +3764,12 @@ AlgaNode {
 						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict);
 						if(parsedEntry == nil, { ^nil })
 					};
+
+					//Substitute with the Stream
 					def[key] = parsedEntry.algaAsStream;
+
+					//Finally, find AlgaKeys for the entry
+					this.findAlgaKeysInAlgaTemp(algaTemp, entry);
 				});
 			});
 

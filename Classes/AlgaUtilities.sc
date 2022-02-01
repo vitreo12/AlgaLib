@@ -95,6 +95,7 @@ AlgaTemp {
 	var <sampleAccurate = false;
 	var <controlNames;
 	var <numChannels, <rate;
+	var <>hasAlgaKeys = false;
 	var <valid = false;
 
 	*new { | def, chans, scale, sampleAccurate = false |

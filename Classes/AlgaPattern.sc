@@ -680,6 +680,11 @@ AlgaPattern : AlgaNode {
 			});
 		}
 
+		//AlgaKey
+		{ entry.isAlgaKey } {
+
+		}
+
 		//Buffer
 		{ entry.isBuffer } {
 			entry = entry.bufnum;
