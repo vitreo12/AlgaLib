@@ -6,7 +6,7 @@ Alga.boot({
 
 	//Definition of a bank of 50 sines
 	AlgaSynthDef(\sines, {
-		Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.005 }))
+		Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.002 }))
 	}).add;
 
 	s.sync;
@@ -39,7 +39,7 @@ Alga.boot({
 
 	//Definition of a bank of 50 sines
 	AlgaSynthDef(\sines, {
-		Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.005 }))
+		Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.002 }))
 	}).add;
 
 	s.sync;
