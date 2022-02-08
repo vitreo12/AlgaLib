@@ -1,30 +1,44 @@
 /*
 IMPLEMENTATION:
-There will be an additional AlgaGroup AFTER the norm group where 2 things are held:
+Each norm has its own group, to which AlgaKeys are added if referring to that norm
+
 1) direct AlgaKeys (e.g. freq: AlgaKey(\freq1))
 2) AlgaTemps with AlgaKeys (e.g. freq: AlgaTemp((def: { \in.kr }, in: AlgaKey(\freq1)))
+3) AlgaKeys referring to other AlgaKeys (e.g. anotherFreq: AlgaKey(\freq) (where \freq is another AlgaKey))
 
-In this group, the whole stack of interp -> norm is created.
+All active params must be checked while interpolation in order to be assigned to the correct Group that they need to read from.
 
 INTERP:
     freq1
 
 NORM:
-    freq1
+    freq1:
+        freq1Norm
 
-ALGAKEYGROUP:
-    freq:
-        AlgaKey
-        AlgaTemp
-        freqInterp
-        freqNorm
+        freq:
+            AlgaKey
+            AlgaTemp
+            freqInterp
+            freqNorm
+
+            anotherFreq (reading from freq):
+                AlgaKey
+                AlgaTemp
+                anotherFreqInterp
+                anotherFreqNorm
+
+        amp:
+            AlgaKey
+            AlgaTemp
+            ampInterp
+            ampNorm
 */
 
 //Ex.0
 (
 Alga.boot({
 	a = AP((
-		def: { SinOsc.ar(\freq1.kr + \freq2.kr.poll) * EnvPerc.ar },
+		def: { SinOsc.ar(\freq1.kr.poll(label:"freq1") + \freq2.kr.poll(label:"freq2")) * EnvPerc.ar },
 		dur: 1,
 		freq1: 400,
 		freq2: AlgaKey(\freq1),

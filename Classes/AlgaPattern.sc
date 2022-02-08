@@ -1540,8 +1540,7 @@ AlgaPattern : AlgaNode {
 
 	//Calculate the MC mismatches and return a new array with all the correct settings.
 	//Each entry will be used to create an individual patternSynth
-	calculateMultiChannelMismatches { | controlNamesToUse, algaPatternInterpStreams,
-		fx, algaOut |
+	calculateMultiChannelMismatches { | controlNamesToUse, algaPatternInterpStreams, fx, algaOut |
 		var numOfSynths = 0;
 		var entries = IdentityDictionary();
 
