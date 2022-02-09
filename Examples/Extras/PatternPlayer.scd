@@ -13,16 +13,16 @@ Alga.boot({
 	)).play;
 
 	~player = AP((
-		def: { Silent.ar * EnvPerc.ar(release: SampleDur.ir) },
+		def: { EnvPerc.ar(release: SampleDur.ir) },
 		dur: Pwhite(0.2, 0.7),
 		trig: Pfunc {
 			//This avoids overlaps caused by changing \dur in the player!
-			~time = ~player.clock.seconds;
-			if(~time != ~oldTime, {
+			var time = ~player.clock.seconds;
+			if(time != ~time, {
 				~freq = ~freqStream.next;
-				~pattern.step;
+				~pattern.();
 			});
-			~oldTime = ~time;
+			~time = time;
 		},
 		time: Pfunc { ("player - " ++ ~player.clock.seconds.asString).postln; }
 	))

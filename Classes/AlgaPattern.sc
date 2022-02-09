@@ -3226,6 +3226,9 @@ AlgaPattern : AlgaNode {
 	//Alias of advance
 	step { | sched = 0 | this.advance(sched) }
 
+	//Alias of advance. This allows pattern.()
+	value { | sched = 0 | this.advance(sched) }
+
 	//Stop pattern
 	stopPattern { | sched = 0 |
 		//Check sched
