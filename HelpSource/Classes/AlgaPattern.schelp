@@ -46,6 +46,9 @@ Schedule the triggering at a specific time.
 METHOD:: step
 Alias for emphasis::advance::.
 
+METHOD:: value
+Alias for emphasis::advance::.
+
 METHOD:: stopPattern
 Stop the link::Classes/AlgaPattern::.
 ARGUMENT:: sched
@@ -236,3 +239,4 @@ private:: connectionTriggersReplace
 private:: scheduledStepActionsPost
 private:: scheduledStepActionsPre
 private:: stopPatternAndFreeInterpNormSynths
+private:: currentAlgaTempGroup
