@@ -24,6 +24,8 @@
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
 	isAlgaStep { ^false }
+	isAlgaPatternPlayer { ^false }
+	isAlgaReader { ^false }
 	isBuffer { ^false }
 	isPattern { ^false }
 	isStream { ^false }
@@ -43,6 +45,8 @@
 	algaCleared { ^false }
 	algaToBeCleared { ^false }
 	algaCanFreeSynth { ^false }
+	algaAdvance { }
+	algaAdvanceArrayScaleValues { }
 
 	//Like asStream, but also converts inner elements of an Array
 	algaAsStream { ^(this.asStream) }

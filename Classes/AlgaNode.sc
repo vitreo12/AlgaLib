@@ -1518,7 +1518,6 @@ AlgaNode {
 		if(paramNumChannels == nil, {
 			^scaleEntry
 		});
-		scaleEntry = scaleEntry.next; //Patten support
 		if(scaleEntry.isSequenceableCollection, {
 			var scaleEntrySize = scaleEntry.size;
 			if(scaleEntrySize != paramNumChannels, {
@@ -1564,9 +1563,6 @@ AlgaNode {
 	//Calculate scale to send to interp synth
 	calculateScaling { | param, sender, paramNumChannels, scale, addScaling = true |
 		var scaleCopy;
-
-		scale = scale.next; //Pattern support
-
 		if(scale == nil, { ^nil });
 
 		if(scale.isNumberOrArray.not, {
@@ -1720,8 +1716,6 @@ AlgaNode {
 		senderNumChans, paramNumChans, updateParamsChansMapping = true |
 
 		var actualSenderChansMapping;
-
-		senderChansMapping = senderChansMapping.next; //Pattern support
 
 		actualSenderChansMapping = senderChansMapping.copy;
 

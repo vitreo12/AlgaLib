@@ -608,13 +608,15 @@ AlgaPattern : AlgaNode {
 			if(entry.isStream, { entry = entry.next });
 		});
 
+		//If not AlgaReader (AlgaPatternPlayer, which already does this),
+		//unpack Pattern values for AA, AT and AO
+		if(entry.isAlgaReader.not, { entry.algaAdvance });
+
 		//Check if it's an AlgaArg. Unpack it.
 		if(entry.isAlgaArg, {
 			chansMapping = entry.chans;
 			scale        = entry.scale;
 			entry        = entry.sender;
-			//Unpack Pattern value
-			if(entry.isStream, { entry = entry.next });
 		});
 
 		//Check if it's an AlgaTemp. Create it

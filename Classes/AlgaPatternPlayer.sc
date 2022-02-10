@@ -14,8 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+//Play and dispatch streams to registered AlgaPatterns
 AlgaPatternPlayer {
 
+	//Parse AlgaTemps like AlgaPattern!
+
+
+	isAlgaPatternPlayer { ^true }
 }
 
 //alias
@@ -23,3 +28,8 @@ AlgaPlayer : AlgaPatternPlayer {}
 
 //alias
 APP : AlgaPatternPlayer {}
+
+//Used under the hood in AlgaPattern to read from an AlgaPatternPlayer
+AlgaReader {
+	isAlgaReader { ^true }
+}
