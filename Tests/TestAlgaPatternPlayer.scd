@@ -12,9 +12,9 @@ Alga.boot({
 	//\dur is not used with a player
 	~pattern = AP((
 		def: { SinOsc.ar(\freq.kr + \freq2.kr) * EnvPerc.ar },
-		freq: ~player[\freq], //single key access (returns Pfunc)
+		freq: ~player[\freq], //single key access (returns AlgaReader)
 		freq2: ~player.read({ | freq |
-			if(freq == 440, { freq * 2 }, { 0 }) //function access (also returns Pfunc)
+			if(freq == 440, { freq * 2 }, { 0 }) //function access (also returns AlgaReader)
 		}),
 	), player: ~player).play;
 })

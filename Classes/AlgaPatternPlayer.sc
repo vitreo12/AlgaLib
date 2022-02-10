@@ -19,6 +19,9 @@ AlgaPatternPlayer {
 
 	//Parse AlgaTemps like AlgaPattern!
 
+	//Advance entries
+
+	//Store entries in AlgaReaders (these will be read from the AlgaPatterns)
 
 	isAlgaPatternPlayer { ^true }
 }

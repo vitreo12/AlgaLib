@@ -603,13 +603,14 @@ AlgaPattern : AlgaNode {
 		if(isAlgaTemp.not, { currentAlgaTempGroup = nil });
 
 		//Unpack Pattern value
-		//(Only if not using MC, or isFX (no MC in FX) or isTemporary (no MC in temporary))
+		//Only if not using MC (it's already been unpacked) OR
+		//is FX / AlgaTemp / Temporary (the mid-interpolation ones)
 		if((useMultiChannelExpansion.not).or(isFX).or(isAlgaTemp).or(isTemporary), {
 			if(entry.isStream, { entry = entry.next });
 		});
 
-		//If not AlgaReader (AlgaPatternPlayer, which already does this),
-		//unpack Pattern values for AA, AT and AO
+		//Unpack Pattern values for AA, AT and AO
+		//Only if not AlgaReader (coming from an AlgaPatternPlayer, which already unpacks)
 		if(entry.isAlgaReader.not, { entry.algaAdvance });
 
 		//Check if it's an AlgaArg. Unpack it.
