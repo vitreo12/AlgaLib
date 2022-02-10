@@ -16,12 +16,78 @@
 
 //Play and dispatch streams to registered AlgaPatterns
 AlgaPatternPlayer {
+	var <pattern, <timeInner = 0, <schedInner = 1;
+	var <entries;
+	var <readers;
+	var <algaPatterns;
 
-	//Parse AlgaTemps like AlgaPattern!
+	*initClass {
+		StartUp.add({ this.addAlgaPatternPlayerEventType });
+	}
 
-	//Advance entries
+	*addAlgaPatternPlayerEventType {
+		Event.addEventType(\algaPatternPlayer, #{
+			var algaPatternPlayer = ~algaPatternPlayer;
+			var entries = algaPatternPlayer.entries;
+			var readers = algaPatternPlayer.readers;
+			var algaPatterns = algaPatternPlayer.algaPatterns;
 
-	//Store entries in AlgaReaders (these will be read from the AlgaPatterns)
+			//Advance entries and readers' pointers
+			entries.keysValuesDo({ | key, value |
+				//For interpolation, value can be IdentityDictionary(UniqueID -> entry)
+			});
+
+			//Dispatch children's triggering
+			algaPatterns.do({ | algaPattern |
+				algaPattern.advance;
+			});
+		});
+	}
+
+	*new { | def, sched = 1|
+		^super.new.init(def, sched)
+	}
+
+	init { | argDef, argSched = 1 |
+		var patternPairs = Array.newClear;
+
+		readers = IdentityDictionary();
+		algaPatterns = IdentitySet();
+
+		//Run parser for what's needed! Is it only AlgaTemps?
+		//Parse AlgaTemps like AlgaPattern!
+
+		case
+		{ argDef.isArray } {
+			patternPairs = patternPairs.add(\type).add(\algaPatternPlayer);
+			patternPairs = patternPairs.add(\algaPatternPlayer).add(this);
+		}
+		{ argDef.isEvent } {
+			entries = argDef;
+			argDef[\type] = \algaPatternPlayer;
+			argDef[\algaPatternPlayer] = this;
+			argDef.keysValuesDo({ | key, value |
+				patternPairs = patternPairs.add(key).add(value);
+			});
+		};
+
+		pattern = Pbind(*patternPairs);
+		pattern.play;
+	}
+
+	at { }
+
+	read { }
+
+	value { }
+
+	//Like AlgaPattern: retriggers at specific sched
+	interpolateDur { }
+
+	//This will trigger interpolation on all registered AlgaPatterns
+	from { }
+
+	<< { }
 
 	isAlgaPatternPlayer { ^true }
 }
@@ -34,5 +100,15 @@ APP : AlgaPatternPlayer {}
 
 //Used under the hood in AlgaPattern to read from an AlgaPatternPlayer
 AlgaReader {
+	var <entry;
+
+	*new {
+
+	}
+
+	init {
+
+	}
+
 	isAlgaReader { ^true }
 }
