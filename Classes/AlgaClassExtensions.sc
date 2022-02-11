@@ -26,6 +26,7 @@
 	isAlgaStep { ^false }
 	isAlgaPatternPlayer { ^false }
 	isAlgaReader { ^false }
+	isAlgaReaderPfunc { ^false }
 	isBuffer { ^false }
 	isPattern { ^false }
 	isStream { ^false }

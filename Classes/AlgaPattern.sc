@@ -180,7 +180,7 @@ AlgaPattern : AlgaNode {
 			var algaOut = ~algaOut;
 
 			//Other things for pattern syncing / clocking / scheduling
-			var dur = ~dur;
+			var dur = ~dur ? 0; //for \none dur
 			var offset = ~timingOffset;
 			var lag = ~lag;
 			var latency = ~latency;
@@ -2089,6 +2089,11 @@ AlgaPattern : AlgaNode {
 
 			//Add the entry to defaults ONLY if explicit
 			if(explicitParam, { defArgs[paramName] = paramValue });
+
+			//Finally, look for AlgaReaderPfuncs and add combo
+			if(paramValue.isAlgaReaderPfunc, {
+				this.addAlgaPatternEntryToAlgaPatternPlayer(paramName, paramValue);
+			});
 		});
 
 		//Loop over all other input from the user, setting all entries that are not part of controlNames
@@ -2997,6 +3002,21 @@ AlgaPattern : AlgaNode {
 		^false
 	}
 
+	//Used to connect an AlgaPatternPlayer to this AlgaPattern via an AlgaReaderPfunc
+	addAlgaPatternEntryToAlgaPatternPlayer { | param = \in, algaReaderPfunc |
+		var algaPatternPlayer = algaReaderPfunc.patternPlayer;
+		var algaPatternPlayerKeyOrFunc = algaReaderPfunc.keyOrFunc;
+		var algaPatternPlayerParams = algaReaderPfunc.params;
+		if(algaPatternPlayer != nil, {
+			algaPatternPlayer.algaPatternEntry(
+				algaPattern: this,
+				algaPatternParam: param,
+				entry: algaPatternPlayerKeyOrFunc,
+				algaPatternPlayerParams: algaPatternPlayerParams
+			)
+		});
+	}
+
 	//from implementation
 	fromInner { | sender, param = \in, chans, scale, sampleAndHold, time, shape, sched |
 		//delta == dur
@@ -3040,6 +3060,11 @@ AlgaPattern : AlgaNode {
 		//Entry is a Buffer == replace
 		if(sender.isBuffer, {
 			^this.interpolateBuffer(sender, param, time, sched);
+		});
+
+		//Entry is an AlgaReaderPfunc: also add it accordingly
+		if(sender.isAlgaReaderPfunc, {
+			this.addAlgaPatternEntryToAlgaPatternPlayer(param, sender)
 		});
 
 		//Param is not in controlNames. Probably setting another kind of parameter (like \lag)

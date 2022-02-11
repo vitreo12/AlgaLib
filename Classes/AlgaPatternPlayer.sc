@@ -28,6 +28,8 @@ AlgaPatternPlayer {
 	var <schedInSeconds = false;
 	var <scheduledStepActionsPre, <scheduledStepActionsPost;
 
+	var <algaPatternEntries;
+
 	*initClass {
 		StartUp.add({ this.addAlgaPatternPlayerEventType });
 	}
@@ -85,10 +87,11 @@ AlgaPatternPlayer {
 			^nil;
 		});
 
-		//Reset vars
+		//Create vars
 		results = IdentityDictionary();
 		entries = IdentityDictionary();
 		algaPatterns = IdentitySet();
+		algaPatternEntries = IdentityDictionary();
 
 		//Run parser for what's needed! Is it only AlgaTemps?
 		//Parse AlgaTemps like AlgaPattern!
@@ -271,24 +274,52 @@ AlgaPatternPlayer {
 		)
 	}
 
+	//Connect an algaPattern + entry / param to this AlgaPatternPlayer
+	algaPatternEntry { | algaPattern, algaPatternParam, entry, algaPatternPlayerParams |
+		algaPatternPlayerParams.do({ | algaPatternPlayerParam |
+			//AlgaPatternPlayer parameters linked to the algaPattern
+			algaPatternEntries[algaPatternPlayerParam] =
+			algaPatternEntries[algaPatternPlayerParam] ? IdentityDictionary();
+
+			//Link to algaPattern
+			algaPatternEntries[algaPatternPlayerParam][algaPattern] =
+			algaPatternEntries[algaPatternPlayerParam][algaPattern] ? IdentityDictionary();
+
+			//Link to algaPattern's param
+			algaPatternEntries[algaPatternPlayerParam][algaPattern][algaPatternParam] = entry;
+		});
+	}
+
 	//Wrap result in AlgaReader
 	at { | key |
+		var result;
+
 		//Lock ID (needs to be out of Pfunc: locked on creation)
 		var id = entries[key][\lastID];
 		if(id == nil, {
 			("AlgaPattern: undefined parameter in AlgaPatternPlayer: '" ++ key ++ "'").error;
 		});
-		^(Pfunc {
+
+		//Create AlgaReaderPfunc
+		result = AlgaReaderPfunc({
 			AlgaReader(
 				this.results[key][id]
 			)
-		})
+		});
+
+		//Assign patternPlayer
+		result.patternPlayer = this;
+		result.keyOrFunc = key;
+		result.params = [ key ];
+
+		//Return
+		^result;
 	}
 
 	//Execute func and wrap result in AlgaReader
 	read { | func |
 		var argNames, argVals, retriever;
-		var ids;
+		var ids, result;
 
 		//Must be Function
 		if(func.isFunction.not, {
@@ -321,22 +352,38 @@ AlgaPatternPlayer {
 		};
 
 		//Perform func and wrap result in AlgaReader
-		^(Pfunc {
+		result = AlgaReaderPfunc({
 			AlgaReader(
 				func.performWithEnvir(\value, retriever.value)
 			)
-		})
+		});
+
+		//Assign patternPlayer / function
+		result.patternPlayer = this;
+		result.keyOrFunc = func;
+		result.params = argNames;
+
+		//Return
+		^result;
 	}
 
 	value { | func | ^this.read(func) }
 
 	//Like AlgaPattern: retriggers at specific sched
-	interpolateDur { }
+	interpolateDur { | sender, time, sched |
+
+	}
 
 	//This will also trigger interpolation on all registered AlgaPatterns
 	from { | sender, param = \in, time, sched |
-		if((param == \dur).or(param == \delta), {
+		//check time / sched
+		time = time ? timeInner;
+		time = time ? 0;
+		sched = sched ? schedInner;
+		sched = sched ? 0;
 
+		if((param == \dur).or(param == \delta), {
+			this.interpolateDur(sender, time, sched);
 		}, {
 			this.addAction(
 				func: {
@@ -346,11 +393,30 @@ AlgaPatternPlayer {
 					entries[param][\lastID] = uniqueID;
 					entries[param][\entries][uniqueID] = sender.algaAsStream;
 
-					//Re-trigger interpolation... To achieve so, 2 things must have been stored:
-					// 1) the algaPattern -> oldEntry
-					// 2) the param used in the algaPattern
+					//Re-trigger interpolation on AlgaPatterns using the algaPatternEntries
 					algaPatterns.do({ | algaPattern |
+						var algaPatternEntry = algaPatternEntries[param][algaPattern];
+						algaPatternEntry.keysValuesDo({ | algaPatternParam, algaPatternEntry |
+							var atOrReadAlgaPatternEntry;
 
+							case
+							//at / []
+							{ algaPatternEntry.isSymbol } {
+								atOrReadAlgaPatternEntry = this.at(algaPatternEntry)
+							}
+
+							//read / value
+							{ algaPatternEntry.isFunction } {
+								atOrReadAlgaPatternEntry = this.read(algaPatternEntry)
+							};
+
+							//Actually perform interpolation
+							algaPattern.from(
+								sender: atOrReadAlgaPatternEntry,
+								param: algaPatternParam,
+								time: time
+							)
+						});
 					});
 
 					//Free old lastID stuff after time + 2 (for certainty)
@@ -387,4 +453,11 @@ AlgaReader {
 	}
 
 	isAlgaReader { ^true }
+}
+
+//Just to parse it in AlgaPattern
+AlgaReaderPfunc : Pfunc {
+	var <>patternPlayer, <>params, <>keyOrFunc;
+
+	isAlgaReaderPfunc { ^true }
 }
