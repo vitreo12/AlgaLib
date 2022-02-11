@@ -12,9 +12,9 @@ Alga.boot({
 	//\dur is not used with a player
 	~pattern = AP((
 		def: { SinOsc.ar(\freq.kr + \freq2.kr) * EnvPerc.ar },
-		freq: ~player[\freq], //single key access (returns AlgaReader)
+		freq: ~player[\freq],
 		freq2: ~player.read({ | freq |
-			if(freq == 440, { freq * 2 }, { 0 }) //function access (also returns AlgaReader)
+			if(freq == 440, { freq * 2 }, { 0 })
 		}),
 	), player: ~player).play;
 })
@@ -32,3 +32,10 @@ Alga.boot({
 
 //Removing a player stops the pattern triggering
 ~pattern.removePlayer;
+
+// !!!!!!!!!!!!
+//Run parser for what's needed! Is it only AlgaTemps?
+//Parse AlgaTemps like AlgaPattern!
+
+// !!!!!!!!!!!
+//Implement Array
