@@ -130,6 +130,9 @@ AlgaPattern : AlgaNode {
 	//If sampleAccurate for Functions
 	var <sampleAccurateFuncs = true;
 
+	//Used for AlgaPatternPlayer
+	var <>player;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -138,7 +141,7 @@ AlgaPattern : AlgaNode {
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
 	*new { | def, interpTime, interpShape, playTime, sched = 1,
-		schedInSeconds = false, sampleAccurateFuncs = true, server |
+		schedInSeconds = false, sampleAccurateFuncs = true, player, server |
 		^super.new_ap(
 			def: def,
 			interpTime: interpTime,
@@ -147,6 +150,7 @@ AlgaPattern : AlgaNode {
 			sched: sched,
 			schedInSeconds: schedInSeconds,
 			sampleAccurateFuncs: sampleAccurateFuncs,
+			player: player,
 			server: server
 		);
 	}
@@ -611,7 +615,11 @@ AlgaPattern : AlgaNode {
 
 		//Unpack Pattern values for AA, AT and AO
 		//Only if not AlgaReader (coming from an AlgaPatternPlayer, which already unpacks)
-		if(entry.isAlgaReader.not, { entry.algaAdvance });
+		if(entry.isAlgaReader.not, {
+			entry.algaAdvance
+		}, {
+			entry = entry.entry //Unpack AlgaReader
+		});
 
 		//Check if it's an AlgaArg. Unpack it.
 		if(entry.isAlgaArg, {
@@ -1500,7 +1508,7 @@ AlgaPattern : AlgaNode {
 		if(skipIteration.not, {
 			patternSynth.onFree(onPatternSynthFreeFunc)
 		}, {
-			onPatternSynthFreeFunc.value;
+			onPatternSynthFreeFunc.value
 		});
 
 		//Update latest time
@@ -1512,8 +1520,7 @@ AlgaPattern : AlgaNode {
 
 	//Calculate the MC mismatches and return a new array with all the correct settings.
 	//Each entry will be used to create an individual patternSynth
-	calculateMultiChannelMismatches { | controlNamesToUse, algaPatternInterpStreams,
-		fx, algaOut |
+	calculateMultiChannelMismatches { | controlNamesToUse, algaPatternInterpStreams, fx, algaOut |
 		var numOfSynths = 0;
 		var entries = IdentityDictionary();
 
@@ -2309,6 +2316,9 @@ AlgaPattern : AlgaNode {
 			\stretch, Pfuncn( { newInterpStreams.stretch.next }, inf),
 			\legato, Pfuncn( { newInterpStreams.legato.next }, inf)
 		]);
+
+		//If player is AlgaPatternPlayer, dur is ALWAYS manual
+		if(player.isAlgaPatternPlayer, { manualDur = true });
 
 		//Manual or automatic dur management
 		if(manualDur.not, {
@@ -3238,17 +3248,21 @@ AlgaPattern : AlgaNode {
 		sched = sched ? schedInner;
 		sched = sched ? 0;
 		if(sched.isAlgaStep, {
-			var interpStreamsLock = interpStreams;
-			this.addAction(
-				func: {
-					//This will be then checked against in createEventSynths!
-					if(stopPatternBeforeReplace.and(sched.post.not), { interpStreamsLock.beingStopped = true });
-					interpStreamsLock.algaReschedulingEventStreamPlayer.stop;
-				},
-				sched: sched
-			)
+			if(interpStreams != nil, {
+				var interpStreamsLock = interpStreams;
+				this.addAction(
+					func: {
+						//This will be then checked against in createEventSynths!
+						if(stopPatternBeforeReplace.and(sched.post.not), { interpStreamsLock.beingStopped = true });
+						interpStreamsLock.algaReschedulingEventStreamPlayer.stop;
+					},
+					sched: sched
+				)
+			});
 		}, {
-			interpStreams.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched)
+			if(interpStreams != nil, {
+				interpStreams.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched)
+			});
 		});
 	}
 
@@ -3264,6 +3278,13 @@ AlgaPattern : AlgaNode {
 				func: { interpStreams.algaReschedulingEventStreamPlayer.play },
 				sched: sched
 			)
+		});
+	}
+
+	//Remove an AlgaPatternPlayer
+	removePlayer { | sched |
+		if(player != nil, {
+			player.removePattern(this, sched)
 		});
 	}
 

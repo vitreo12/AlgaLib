@@ -163,7 +163,7 @@ AlgaNode {
 	}
 
 	*new_ap { | def, interpTime, interpShape, playTime, sched = 1,
-		schedInSeconds = false, sampleAccurateFuncs = true, server |
+		schedInSeconds = false, sampleAccurateFuncs = true, player, server |
 		^super.new.init(
 			argDef: def,
 			argConnectionTime: interpTime,
@@ -172,6 +172,7 @@ AlgaNode {
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
 			argSampleAccurateFuncs: sampleAccurateFuncs,
+			argPlayer: player,
 			argServer: server,
 		)
 	}
@@ -451,7 +452,7 @@ AlgaNode {
 
 	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
 		argPlayTime = 0, argSched = 0, argOutsMapping,
-		argSampleAccurateFuncs = true, argSchedInSeconds = false, argServer, argName |
+		argSampleAccurateFuncs = true, argSchedInSeconds = false, argPlayer, argServer, argName |
 
 		//Check supported classes for argObj, so that things won't even init if wrong.
 		//Also check for AlgaPattern
@@ -495,6 +496,16 @@ AlgaNode {
 			//Init sampleAccurateFuncs: must happen BEFORE parseDef
 			this.sampleAccurateFuncs_(argSampleAccurateFuncs);
 
+			//Assign player
+			if(argPlayer.isAlgaPatternPlayer, {
+				argPlayer.addPattern(this);
+				this.player = argPlayer;
+			}, {
+				if(argPlayer != nil, {
+					"AlgaPattern: 'player' must be an AlgaPatternPlayer".warn;
+				});
+			});
+
 			argDefAndFunctionSynthDefDict = this.parseDef(argDef);
 			argDef = argDefAndFunctionSynthDefDict[0];
 			functionSynthDefDict = argDefAndFunctionSynthDefDict[1];
@@ -510,7 +521,7 @@ AlgaNode {
 					);
 				},
 				functionSynthDefDict: functionSynthDefDict
-			)
+			);
 
 			^this;
 		});

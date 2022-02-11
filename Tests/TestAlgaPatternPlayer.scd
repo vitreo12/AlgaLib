@@ -4,10 +4,10 @@ Alga.boot({
 	//Starts the pattern on creation.
 	//Note that [] allows the entries to be executed sequentially,
 	//allowing things like Pkey to work!
-	~player = AlgaPatternPlayer([
+	~player = AlgaPatternPlayer((
 		dur: Pwhite(0.2, 0.7),
 		freq: Pseq([440, 880], inf)
-	], sched: 1);
+	)).run;
 
 	//\dur is not used with a player
 	~pattern = AP((

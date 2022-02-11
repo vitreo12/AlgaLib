@@ -176,6 +176,9 @@
 	//This avoids many problems when .clearing a node used in connections
 	busArg { ^nil }
 
+	//When APP is invalid
+	run { }
+
 	//Like handleError without stacktrace
 	algaHandleError { | error |
 		error.errorString.postln;
