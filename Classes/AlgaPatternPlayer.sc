@@ -81,6 +81,7 @@ AlgaPatternPlayer {
 		var foundDurOrDelta = false;
 		manualDur = false;
 
+		//Get scheduler
 		server = argServer ? Server.default;
 		scheduler = Alga.getScheduler(server);
 		if(scheduler == nil, {
@@ -98,15 +99,10 @@ AlgaPatternPlayer {
 		algaPatterns = IdentitySet();
 		algaPatternEntries = IdentityDictionary();
 
-		//Run parser for what's needed! Is it only AlgaTemps?
-		//Parse AlgaTemps like AlgaPattern!
+		//1) Parse AlgaTemps like AlgaPattern!
+		//2) Add support for arrays to keep ordering of execution of params!
 
-		case
-		{ argDef.isArray } {
-			patternPairs = patternPairs.add(\type).add(\algaPatternPlayer);
-			patternPairs = patternPairs.add(\algaPatternPlayer).add(this);
-		}
-		{ argDef.isEvent } {
+		if(argDef.isEvent, {
 			patternPairs = patternPairs.add(\type).add(\algaPatternPlayer);
 			patternPairs = patternPairs.add(\algaPatternPlayer).add(this);
 			argDef.keysValuesDo({ | key, entry |
@@ -125,7 +121,10 @@ AlgaPatternPlayer {
 					patternPairs = patternPairs.add(key).add(entry);
 				});
 			});
-		};
+		}, {
+			("AlgaPatternPlayer: Invalid 'def': " ++ argDef.class.asString).error;
+			^nil;
+		});
 
 		//Add reschedulable \dur
 		if(foundDurOrDelta, {
@@ -138,6 +137,34 @@ AlgaPatternPlayer {
 
 		pattern = Pbind(*patternPairs);
 		patternAsStream = pattern.algaAsStream; //Needed for things like dur: \none
+	}
+
+	sched { ^schedInner }
+
+	sched_ { | value |
+		if((value.isNumber.or(value.isAlgaStep)).not, {
+			"AlgaPatternPlayer: 'sched' can only be a Number or AlgaStep".error;
+			^this;
+		});
+		schedInner = value
+	}
+
+	time { ^timeInner }
+
+	timeInner_ { | value |
+		if(value.isNumber.not, {
+			"AlgaPatternPlayer: 'time' can only be a Number".error;
+			^this;
+		});
+		timeInner = value
+	}
+
+	schedInSeconds_ { | value |
+		if(value.isKindOf(Boolean).not, {
+			"AlgaPatternPlayer: 'schedInSeconds' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		schedInSeconds = value
 	}
 
 	//Add an action to scheduler. This takes into account sched == AlgaStep
@@ -234,9 +261,9 @@ AlgaPatternPlayer {
 		});
 	}
 
+	//Run the pattern
 	run { | sched = 1 |
 		if(manualDur.not, {
-			//Check sched
 			sched = sched ? schedInner;
 			sched = sched ? 0;
 			this.addAction(
@@ -251,8 +278,8 @@ AlgaPatternPlayer {
 		});
 	}
 
+	//Stop the pattern
 	stop { | sched = 1 |
-		//Check sched
 		sched = sched ? schedInner;
 		sched = sched ? 0;
 		if(sched.isAlgaStep, {
@@ -275,7 +302,6 @@ AlgaPatternPlayer {
 
 	//Manually advance the pattern. 'next' as function name won't work as it's reserved, apparently
 	advance { | sched = 0 |
-		//Check sched
 		sched = sched ? schedInner;
 		sched = sched ? 0;
 		if(patternAsStream != nil, {
@@ -296,14 +322,15 @@ AlgaPatternPlayer {
 	//Alias of advance
 	step { | sched = 0 | this.advance(sched) }
 
+	//Add an AlgaPattern
 	addPattern { | algaPattern |
 		if(algaPattern.isAlgaPattern, {
 			algaPatterns.add(algaPattern)
 		});
 	}
 
+	//Remove an AlgaPattern and reset its .player. Works with scheduling
 	removePattern { | algaPattern, sched |
-		//Check sched
 		sched = sched ? schedInner;
 		sched = sched ? 0;
 		algaPattern.player = nil;
@@ -351,7 +378,7 @@ AlgaPatternPlayer {
 		//Assign patternPlayer
 		result.patternPlayer = this;
 		result.keyOrFunc = key;
-		result.params = [ key ];
+		result.params = [ key ]; //it expects Array later on
 
 		//Return
 		^result;
@@ -408,6 +435,7 @@ AlgaPatternPlayer {
 		^result;
 	}
 
+	//Alias of read
 	value { | func | ^this.read(func) }
 
 	//Like AlgaPattern: retriggers at specific sched
@@ -434,7 +462,6 @@ AlgaPatternPlayer {
 
 	//This will also trigger interpolation on all registered AlgaPatterns
 	from { | sender, param = \in, time, sched |
-		//check time / sched
 		time = time ? timeInner;
 		time = time ? 0;
 		sched = sched ? schedInner;
