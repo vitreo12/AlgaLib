@@ -1,9 +1,7 @@
 //AlgaPlayer ideas. Expanded from Examples/PatternPlayer
 (
 Alga.boot({
-	//Starts the pattern on creation.
-	//Note that [] allows the entries to be executed sequentially,
-	//allowing things like Pkey to work!
+	//.play starts the player
 	~player = AlgaPatternPlayer((
 		dur: Pwhite(0.2, 0.7),
 		freq: Pseq([440, 880], inf)

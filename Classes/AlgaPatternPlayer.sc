@@ -262,7 +262,7 @@ AlgaPatternPlayer {
 	}
 
 	//Run the pattern
-	run { | sched = 1 |
+	play { | sched = 1 |
 		if(manualDur.not, {
 			sched = sched ? schedInner;
 			sched = sched ? 0;
@@ -523,10 +523,10 @@ AlgaPatternPlayer {
 	isAlgaPatternPlayer { ^true }
 }
 
-//alias
+//Alias
 AlgaPlayer : AlgaPatternPlayer {}
 
-//alias
+//Alias
 APP : AlgaPatternPlayer {}
 
 //Used under the hood in AlgaPattern to read from an AlgaPatternPlayer
@@ -540,7 +540,7 @@ AlgaReader {
 	isAlgaReader { ^true }
 }
 
-//Just to parse it in AlgaPattern
+//Allows to pass parameters from AlgaPatternPlayer to AlgaPattern via .read / .at
 AlgaReaderPfunc : Pfunc {
 	var <>patternPlayer, <>params, <>keyOrFunc;
 
