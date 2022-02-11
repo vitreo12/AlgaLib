@@ -24,7 +24,7 @@ Alga.boot({
 ~pattern.from(~player.({ | freq | freq * 0.5 }), \freq, time: 5) //.value == .read
 ~pattern.from(~player.({ | freq | freq * 2 }), \freq2, time: 5)
 
-//Modify time
+//Modify dur
 ~player.from(0.5, \dur, sched: AlgaStep(3))
 
 //This should trigger interpolation on readers

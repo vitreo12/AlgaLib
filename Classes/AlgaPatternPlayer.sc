@@ -16,7 +16,7 @@
 
 //Play and dispatch streams to registered AlgaPatterns
 AlgaPatternPlayer {
-	var <pattern, <algaReschedulingEventStreamPlayer;
+	var <pattern, <patternAsStream, <algaReschedulingEventStreamPlayer;
 	var <timeInner = 0, <schedInner = 1;
 	var <entries;
 	var <results;
@@ -29,6 +29,9 @@ AlgaPatternPlayer {
 	var <scheduledStepActionsPre, <scheduledStepActionsPost;
 
 	var <algaPatternEntries;
+
+	var <dur = 1;
+	var <manualDur = false;
 
 	*initClass {
 		StartUp.add({ this.addAlgaPatternPlayerEventType });
@@ -75,6 +78,8 @@ AlgaPatternPlayer {
 
 	init { | argDef, argServer |
 		var patternPairs = Array.newClear;
+		var foundDurOrDelta = false;
+		manualDur = false;
 
 		server = argServer ? Server.default;
 		scheduler = Alga.getScheduler(server);
@@ -102,26 +107,37 @@ AlgaPatternPlayer {
 			patternPairs = patternPairs.add(\algaPatternPlayer).add(this);
 		}
 		{ argDef.isEvent } {
+			patternPairs = patternPairs.add(\type).add(\algaPatternPlayer);
+			patternPairs = patternPairs.add(\algaPatternPlayer).add(this);
 			argDef.keysValuesDo({ | key, entry |
-				if((key != \dur).and(key != \delta), {
+				//Found \dur or \delta
+				if((key == \dur).or(key == \delta), {
+					if((entry.isSymbol).or(entry.isNil), { manualDur = true });
+					foundDurOrDelta = true;
+					dur = entry.algaAsStream;
+				}, {
 					var uniqueID = UniqueID.next;
 					results[key] = IdentityDictionary();
 					entries[key] = IdentityDictionary();
 					entries[key][\lastID] = uniqueID;
 					entries[key][\entries] = IdentityDictionary();
 					entries[key][\entries][uniqueID] = entry.algaAsStream; //.next support
-				}, {
-					entries[\dur] = entry
+					patternPairs = patternPairs.add(key).add(entry);
 				});
-			});
-			argDef[\type] = \algaPatternPlayer;
-			argDef[\algaPatternPlayer] = this;
-			argDef.keysValuesDo({ | key, value |
-				patternPairs = patternPairs.add(key).add(value);
 			});
 		};
 
+		//Add reschedulable \dur
+		if(foundDurOrDelta, {
+			if(manualDur.not, {
+				patternPairs = patternPairs.add(\dur).add(
+					Pfuncn( { dur.next }, inf)
+				);
+			});
+		});
+
 		pattern = Pbind(*patternPairs);
+		patternAsStream = pattern.algaAsStream; //Needed for things like dur: \none
 	}
 
 	//Add an action to scheduler. This takes into account sched == AlgaStep
@@ -219,18 +235,20 @@ AlgaPatternPlayer {
 	}
 
 	run { | sched = 1 |
-		//Check sched
-		sched = sched ? schedInner;
-		sched = sched ? 0;
-		this.addAction(
-			func: {
-				beingStopped = false;
-				algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
-					clock: scheduler.clock
-				);
-			},
-			sched: sched
-		);
+		if(manualDur.not, {
+			//Check sched
+			sched = sched ? schedInner;
+			sched = sched ? 0;
+			this.addAction(
+				func: {
+					beingStopped = false;
+					algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
+						clock: scheduler.clock
+					);
+				},
+				sched: sched
+			);
+		});
 	}
 
 	stop { | sched = 1 |
@@ -254,6 +272,29 @@ AlgaPatternPlayer {
 			});
 		});
 	}
+
+	//Manually advance the pattern. 'next' as function name won't work as it's reserved, apparently
+	advance { | sched = 0 |
+		//Check sched
+		sched = sched ? schedInner;
+		sched = sched ? 0;
+		if(patternAsStream != nil, {
+			//If sched is 0, go right away: user might have its own scheduling setup
+			if(sched == 0, {
+				//Empty event as protoEvent!
+				patternAsStream.next(()).play;
+			}, {
+				this.addAction(
+					//Empty event as protoEvent!
+					func: { patternAsStream.next(()).play },
+					sched: sched
+				);
+			});
+		});
+	}
+
+	//Alias of advance
+	step { | sched = 0 | this.advance(sched) }
 
 	addPattern { | algaPattern |
 		if(algaPattern.isAlgaPattern, {
@@ -370,8 +411,25 @@ AlgaPatternPlayer {
 	value { | func | ^this.read(func) }
 
 	//Like AlgaPattern: retriggers at specific sched
-	interpolateDur { | sender, time, sched |
-
+	interpolateDur { | sender, sched |
+		if(sched.isAlgaStep, {
+			//sched == AlgaStep
+			this.addAction(
+				func: {
+					beingStopped = true;
+					algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
+						dur = sender.algaAsStream;
+						beingStopped = false;
+					});
+				},
+				sched: sched
+			)
+		}, {
+			//sched == number
+			algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, {
+				dur = sender.algaAsStream;
+			});
+		});
 	}
 
 	//This will also trigger interpolation on all registered AlgaPatterns
@@ -383,7 +441,7 @@ AlgaPatternPlayer {
 		sched = sched ? 0;
 
 		if((param == \dur).or(param == \delta), {
-			this.interpolateDur(sender, time, sched);
+			this.interpolateDur(sender, sched);
 		}, {
 			this.addAction(
 				func: {
