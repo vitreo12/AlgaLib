@@ -133,6 +133,9 @@ AlgaTemp {
 	var <numChannels, <rate;
 	var <valid = false;
 
+	var <>algaReaderPfuncParams;
+	var <>algaReaderKeysOrFuncsAtParam;
+
 	*new { | def, chans, scale, sampleAccurate = false |
 		^super.new.init(def, chans, scale, sampleAccurate)
 	}
@@ -146,6 +149,7 @@ AlgaTemp {
 		chansStream  = argChans.algaAsStream;  //Pattern support
 		scaleStream  = argScale.algaAsStream;  //Pattern support
 		sampleAccurate = argSampleAccurate ? false;
+		algaReaderPfuncParams = Array.newClear();
 	}
 
 	algaAdvance {

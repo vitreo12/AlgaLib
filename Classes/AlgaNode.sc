@@ -498,7 +498,7 @@ AlgaNode {
 
 			//Assign player
 			if(argPlayer.isAlgaPatternPlayer, {
-				argPlayer.addPattern(this);
+				argPlayer.addAlgaPattern(this);
 				this.player = argPlayer;
 			}, {
 				if(argPlayer != nil, {
@@ -3676,7 +3676,7 @@ AlgaNode {
 	}
 
 	//Parse an AlgaTemp
-	parseAlgaTempParam { | algaTemp, functionSynthDefDict |
+	parseAlgaTempParam { | algaTemp, functionSynthDefDict, topAlgaTemp |
 		var validAlgaTemp = false;
 		var def = algaTemp.def;
 		var defDef;
@@ -3748,8 +3748,23 @@ AlgaNode {
 					}
 					{ entry.isAlgaTemp } {
 						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict);
-						if(parsedEntry == nil, { ^nil })
+						algaTemp.algaReaderPfuncParams = algaTemp.algaReaderPfuncParams.add(
+							parsedEntry.algaReaderPfuncParams
+						).flatten; //AlgaPatternPlayer support (add children)
+						if(parsedEntry == nil, { ^nil });
+					}
+
+					//Support for AlgaPatternPlayer
+					{ entry.isAlgaReaderPfunc } {
+						if(this.isAlgaPattern, {
+							this.algaTempContainsAlgaReaderPfunc = true;
+							algaTemp.algaReaderKeysOrFuncsAtParam = algaTemp.algaReaderKeysOrFuncsAtParam ? IdentityDictionary();
+							algaTemp.algaReaderKeysOrFuncsAtParam[key] = entry.keyOrFunc;
+							algaTemp.algaReaderPfuncParams = algaTemp.algaReaderPfuncParams.add(entry.params).flatten;
+						});
 					};
+
+					//Finally, replace in place
 					def[key] = parsedEntry.algaAsStream;
 				});
 			});
