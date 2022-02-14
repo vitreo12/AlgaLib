@@ -7,7 +7,7 @@ Alga.boot({
 	)).play(sched:1);
 
 	~pattern = AP((
-		def: { SinOsc.ar(\freq.kr.poll) * EnvPerc.ar(release: 0.1) },
+		def: { SinOsc.ar(\freq.kr) * EnvPerc.ar(release: 0.1) },
 		freq: AT((
 			def: { \in.kr },
 			in: Pseq([~player.at(\freq, 1), ~player.at(\freq2, 1)], inf)
@@ -15,3 +15,7 @@ Alga.boot({
 	), player: ~player).play(chans:2);
 })
 )
+
+~player.algaPatternEntries
+
+~player.from(AlgaTemp({DC.kr(100)}), \freq, time:5))

@@ -122,6 +122,9 @@ AO : AlgaOut {}
 AlgaTemp {
 	var <def;
 
+	//Used for AlgaReaderPfunc parsing
+	var <defOrig;
+
 	//The streams (def can't be, use Pseq of AlgaTemps for that)
 	var <chansStream, <scaleStream;
 
@@ -146,6 +149,7 @@ AlgaTemp {
 			argDef = nil;
 		});
 		def = argDef;
+		defOrig = def.copy;
 		chansStream  = argChans.algaAsStream;  //Pattern support
 		scaleStream  = argScale.algaAsStream;  //Pattern support
 		sampleAccurate = argSampleAccurate ? false;
@@ -159,7 +163,8 @@ AlgaTemp {
 	}
 
 	setDef { | argDef |
-		def = argDef
+		def = argDef;
+		defOrig = def.copy;
 	}
 
 	checkValidSynthDef { | def |

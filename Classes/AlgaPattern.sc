@@ -132,7 +132,7 @@ AlgaPattern : AlgaNode {
 
 	//Used for AlgaPatternPlayer
 	var <>player;
-	var <>algaTempContainsAlgaReaderPfunc;
+	var <>parserEntryContainsAlgaReaderPfunc;
 
 	//Add the \algaNote event to Event
 	*initClass {
@@ -2098,7 +2098,7 @@ AlgaPattern : AlgaNode {
 			if(explicitParam, { defArgs[paramName] = paramValue });
 
 			//Finally, look for AlgaReaderPfuncs or AlgaTemps that contain them
-			if((paramValue.isAlgaReaderPfunc).or(algaTempContainsAlgaReaderPfunc), {
+			if((paramValue.isAlgaReaderPfunc).or(parserEntryContainsAlgaReaderPfunc), {
 				this.addAlgaPatternEntryToAlgaPatternPlayer(paramName, paramValue);
 			});
 		});
@@ -2411,18 +2411,14 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Check that \def is valid
-		if(isFunction.not, {
-			synthDescFx = SynthDescLib.global.at(def);
-		});
+		if(isFunction.not, { synthDescFx = SynthDescLib.global.at(def) });
 
 		if(synthDescFx == nil, {
 			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "'").error;
 			^nil;
 		});
 
-		if(isFunction.not, {
-			synthDefFx = synthDescFx.def;
-		});
+		if(isFunction.not, { synthDefFx = synthDescFx.def });
 
 		if(synthDefFx.class != AlgaSynthDef, {
 			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++"'").error;
@@ -2457,7 +2453,8 @@ AlgaPattern : AlgaNode {
 		//Pass explicitFree to Event
 		value[\explicitFree] = synthDefFx.explicitFree;
 
-		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
+		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry...
+		//NOTE: this doesn't work yet with AlgaPatternPlayer / AlgaReaderPfunc
 		value.keysValuesDo({ | key, entry |
 			var parsedEntry = entry;
 			case
@@ -2611,35 +2608,52 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Parse a ListPattern
-	parseListPatternParam { | listPattern, functionSynthDefDict |
+	parseListPatternParam { | listPattern, functionSynthDefDict, isTopListPattern = false |
 		listPattern.list.do({ | listEntry, i |
 			case
 			{ listEntry.isListPattern } {
-				listPattern.list[i] = this.parseListPatternParam(listEntry, functionSynthDefDict)
+				listPattern.list[i] = this.parseListPatternParam(listEntry, functionSynthDefDict, false)
 			}
 			{ listEntry.isFilterPattern } {
-				listPattern.list[i] = this.parseFilterPatternParam(listEntry, functionSynthDefDict)
+				listPattern.list[i] = this.parseFilterPatternParam(listEntry, functionSynthDefDict, false)
 			}
 			{ listEntry.isAlgaTemp } {
-				listPattern.list[i] = this.parseAlgaTempParam(listEntry, functionSynthDefDict)
+				listPattern.list[i] = this.parseAlgaTempParam(listEntry, functionSynthDefDict, false)
 			};
 		});
+
+		//AlgaReaderPfunc support
+		if(isTopListPattern, {
+			"MMME".warn;
+			if(AlgaReaderPfuncContainer.add(listPattern), {
+				parserEntryContainsAlgaReaderPfunc = true
+			});
+		});
+
 		^listPattern;
 	}
 
 	//Parse a FilterPattern
-	parseFilterPatternParam { | filterPattern, functionSynthDefDict |
+	parseFilterPatternParam { | filterPattern, functionSynthDefDict, isTopFilterPattern = false |
 		var pattern = filterPattern.pattern;
 		case
 		{ pattern.isListPattern } {
-			filterPattern.pattern = this.parseListPatternParam(pattern, functionSynthDefDict)
+			filterPattern.pattern = this.parseListPatternParam(pattern, functionSynthDefDict, false)
 		}
 		{ pattern.isFilterPattern } {
-			filterPattern.pattern = this.parseFilterPatternParam(pattern, functionSynthDefDict)
+			filterPattern.pattern = this.parseFilterPatternParam(pattern, functionSynthDefDict, false)
 		}
 		{ pattern.isAlgaTemp } {
-			filterPattern.pattern = this.parseAlgaTempParam(pattern, functionSynthDefDict)
+			filterPattern.pattern = this.parseAlgaTempParam(pattern, functionSynthDefDict, false)
 		};
+
+		//AlgaReaderPfunc support
+		if(isTopFilterPattern, {
+			if(AlgaReaderPfuncContainer.add(filterPattern), {
+				parserEntryContainsAlgaReaderPfunc = true
+			});
+		});
+
 		^filterPattern;
 	}
 
@@ -2652,18 +2666,18 @@ AlgaPattern : AlgaNode {
 			functionSynthDefDict = IdentityDictionary();
 		});
 
-		//Reset algaTempContainsAlgaReaderPfunc
-		algaTempContainsAlgaReaderPfunc = false;
+		//Reset parserEntryContainsAlgaReaderPfunc
+		parserEntryContainsAlgaReaderPfunc = false;
 
 		case
 		{ value.isAlgaTemp } {
-			value = this.parseAlgaTempParam(value, functionSynthDefDict)
+			value = this.parseAlgaTempParam(value, functionSynthDefDict, true)
 		}
 		{ value.isListPattern } {
-			value = this.parseListPatternParam(value, functionSynthDefDict)
+			value = this.parseListPatternParam(value, functionSynthDefDict, true)
 		}
 		{ value.isFilterPattern } {
-			value = this.parseFilterPatternParam(value, functionSynthDefDict)
+			value = this.parseFilterPatternParam(value, functionSynthDefDict, true)
 		};
 
 		//Used in from {}
@@ -2762,7 +2776,7 @@ AlgaPattern : AlgaNode {
 			value = this.parseAlgaTempListPatternParam(value, functionSynthDefDict);
 			//If the AlgaTemp / ListPattern / FilterPattern contains an
 			//AlgaReaderPfunc, add it
-			if(algaTempContainsAlgaReaderPfunc, {
+			if(parserEntryContainsAlgaReaderPfunc, {
 				this.addAlgaPatternEntryToAlgaPatternPlayer(key, value);
 			});
 			def[key] = value;
@@ -2917,7 +2931,7 @@ AlgaPattern : AlgaNode {
 
 	//<<, <<+ and <|
 	makeConnectionInner { | sender, param = \in, senderChansMapping, scale,
-		sampleAndHold = false, time = 0, shape, algaTempContainsAlgaReaderPfuncLock = false |
+		sampleAndHold = false, time = 0, shape, parserEntryContainsAlgaReaderPfuncLock = false |
 
 		var isDefault = false;
 		var paramConnectionTime = paramsConnectionTime[param];
@@ -2952,7 +2966,7 @@ AlgaPattern : AlgaNode {
 		if(player != nil, { player.removeAlgaPatternEntry(this, param) });
 
 		//Entry is an AlgaReaderPfunc or an AlgaTemp containing one: also add it accordingly
-		if((sender.isAlgaReaderPfunc).or(algaTempContainsAlgaReaderPfuncLock), {
+		if((sender.isAlgaReaderPfunc).or(parserEntryContainsAlgaReaderPfuncLock), {
 			this.addAlgaPatternEntryToAlgaPatternPlayer(param, sender)
 		});
 
@@ -2972,7 +2986,7 @@ AlgaPattern : AlgaNode {
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, sampleAndHold,
 		time, shape, sched |
-		var algaTempContainsAlgaReaderPfuncLock;
+		var parserEntryContainsAlgaReaderPfuncLock;
 
 		//Check sched
 		if(replace.not, { sched = sched ? schedInner });
@@ -2998,7 +3012,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//This needs to be locked due to sched
-		algaTempContainsAlgaReaderPfuncLock = algaTempContainsAlgaReaderPfunc;
+		parserEntryContainsAlgaReaderPfuncLock = parserEntryContainsAlgaReaderPfunc;
 
 		//All other cases
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
@@ -3013,7 +3027,7 @@ AlgaPattern : AlgaNode {
 						sampleAndHold: sampleAndHold,
 						time: time,
 						shape: shape,
-						algaTempContainsAlgaReaderPfuncLock: algaTempContainsAlgaReaderPfuncLock
+						parserEntryContainsAlgaReaderPfuncLock: parserEntryContainsAlgaReaderPfuncLock
 					)
 				},
 				sched: sched,
@@ -3042,10 +3056,15 @@ AlgaPattern : AlgaNode {
 			algaPatternPlayerKeyOrFuncOrAlgaTemp = entry.keyOrFunc;
 			algaPatternPlayerParams = entry.params;
 		}
-		{ entry.isAlgaTemp } {
-			algaPatternPlayer = player;
-			algaPatternPlayerKeyOrFuncOrAlgaTemp = entry;
-			algaPatternPlayerParams = entry.algaReaderPfuncParams;
+
+		//Retrieve from AlgaReaderPfuncContainer
+		{ (entry.isAlgaTemp).or(entry.isListPattern).or(entry.isFilterPattern) } {
+			var entryDict = AlgaReaderPfuncContainer.objects[entry];
+			if(entryDict != nil, {
+				algaPatternPlayer = entry.patternPlayer;
+				algaPatternPlayerKeyOrFuncOrAlgaTemp = entry.keyOrFunc;
+				algaPatternPlayerParams = entryDict[\algaReaderPfuncParams];
+			});
 		};
 
 		if(algaPatternPlayer != nil, {

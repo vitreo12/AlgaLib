@@ -712,6 +712,11 @@ AlgaPatternPlayer {
 		});
 	}
 
+	//Re-assign correctly
+	reassignAlgaReaderPfunc { | algaReaderPfunc |
+
+	}
+
 	//Go through an AlgaTemp looking for things to re-assing to let
 	//AlgaReaderPfunc work correctly
 	reassignAlgaTemp { | algaTemp |
@@ -757,7 +762,7 @@ AlgaPatternPlayer {
 
 	//Go through AlgaTemp / ListPattern / FilterPattern looking for things
 	//to re-assing to let AlgaReaderPfunc work correctly
-	algaTempsReAssignKeyOrFunc { | value |
+	reassignKeysOrFuncs { | value |
 		case
 		{ value.isAlgaTemp } {
 			this.reassignAlgaTemp(value)
@@ -767,6 +772,9 @@ AlgaPatternPlayer {
 		}
 		{ value.isFilterPattern } {
 			this.reassignFilterPattern(value)
+		}
+		{ value.isAlgaReaderPfunc } {
+			this.reassignAlgaReaderPfunc(value)
 		};
 	}
 
@@ -806,13 +814,16 @@ AlgaPatternPlayer {
 							atOrReadAlgaPatternEntryOrAlgaTemp = this.read(algaPatternEntry)
 						}
 
-						//Whole AlgaTemp to re-trigger and re-assign keys / functions inside
-						{ algaPatternEntry.isAlgaTemp } {
+						//Whole AlgaTemp / ListPattern / FilterPattern
+						//to re-trigger and re-assign keys / functions inside
+						{ (algaPatternEntry.isAlgaTemp).or(algaPattern.isAlgaListPattern).or(
+							algaPattern.isFilterPattern)
+						} {
 							//This needs to be DEEP copied because otherwise all pointers will be kept,
 							//even with .copy. This allows to create a new AlgaTemp that permits the
 							//different ID to be retrieved
 							atOrReadAlgaPatternEntryOrAlgaTemp = algaPatternEntry.deepCopy;
-							this.algaTempsReAssignKeyOrFunc(atOrReadAlgaPatternEntryOrAlgaTemp);
+							this.reassignKeysOrFuncs(atOrReadAlgaPatternEntryOrAlgaTemp);
 						};
 
 						//Actually perform interpolation
@@ -902,4 +913,103 @@ AlgaReaderPfunc : Pfuncn {
 	var <>patternPlayer, <>params, <>keyOrFunc;
 
 	isAlgaReaderPfunc { ^true }
+}
+
+//AlgaTemps / ListPatterns / FilterPatterns containing at least one AlgaReaderPfunc
+AlgaReaderPfuncContainer {
+	classvar <objects;
+
+	*initClass {
+		objects = IdentityDictionary()
+	}
+
+	*scanAlgaTemp { | algaTemp |
+		var atLeastOneAlgaReaderPfunc = false;
+		var newObjectDict = this.createObjectEntryIfNeeded(algaTemp);
+		algaTemp.defOrig.keysValuesDo({ | key, value |
+			if(value.isAlgaReaderPfunc, {
+				newObjectDict[\algaReaderKeysOrFuncsAtParam][key] = value.keyOrFunc;
+				this.addAlgaReaderParams(newObjectDict, value);
+				atLeastOneAlgaReaderPfunc = true;
+			}, {
+				//Keep scanning AND cumulatively add params
+				var child = this.scanEntry(value)[1];
+				child.postln;
+				"SCAN MY ASS".postln;
+				this.addChildParams(newObjectDict, child);
+			});
+		});
+		^[atLeastOneAlgaReaderPfunc, algaTemp]
+	}
+
+	*scanListPattern { | listPattern |
+		var atLeastOneAlgaReaderPfunc = false;
+		var newObjectDict = this.createObjectEntryIfNeeded(listPattern);
+		"ya boi".error;
+		listPattern.list.do({ | value, i |
+			if(value.isAlgaReaderPfunc, {
+				newObjectDict[\algaReaderKeysOrFuncsAtParam][i] = value.keyOrFunc;
+				this.addAlgaReaderParams(newObjectDict, value);
+				atLeastOneAlgaReaderPfunc = true;
+			}, {
+				//Keep scanning AND cumulatively add params
+				var child = this.scanEntry(value)[1];
+				this.addChildParams(newObjectDict, child);
+			});
+		});
+		^[atLeastOneAlgaReaderPfunc, listPattern]
+	}
+
+	*scanFilterPattern { | filterPattern |
+		var atLeastOneAlgaReaderPfunc = false;
+		var value = filterPattern.pattern;
+		if(value.isAlgaReaderPfunc, {
+			var newObjectDict = this.createObjectEntryIfNeeded(filterPattern);
+			newObjectDict[\algaReaderKeysOrFuncsAtParam][0] = value.keyOrFunc;
+			this.addAlgaReaderParams(newObjectDict, value);
+			atLeastOneAlgaReaderPfunc = true;
+		});
+		^[atLeastOneAlgaReaderPfunc, filterPattern]
+	}
+
+	*scanEntry { | entry |
+		var atLeastOneAlgaReaderPfuncAndEntry = [false, entry];
+		case
+		{ entry.isAlgaTemp } {
+			atLeastOneAlgaReaderPfuncAndEntry = this.scanAlgaTemp(entry)
+		}
+		{ entry.isListPattern } {
+			atLeastOneAlgaReaderPfuncAndEntry = this.scanListPattern(entry)
+		}
+		{ entry.isFilterPattern } {
+			atLeastOneAlgaReaderPfuncAndEntry = this.scanFilterPattern(entry)
+		};
+		^atLeastOneAlgaReaderPfuncAndEntry
+	}
+
+	*add { | entry |
+		^this.scanEntry(entry)[0];
+	}
+
+	*createObjectEntryIfNeeded { | entry |
+		var newObjectDict;
+		objects[entry] = objects[entry] ? IdentityDictionary();
+		newObjectDict = objects[entry];
+		newObjectDict[\algaReaderKeysOrFuncsAtParam] = newObjectDict[\algaReaderKeysOrFuncsAtParam] ? IdentityDictionary();
+		^newObjectDict;
+	}
+
+	*addAlgaReaderParams { | newObjectDict, algaReaderPfunc |
+		newObjectDict[\algaReaderPfuncParams] = newObjectDict[\algaReaderPfuncParams] ? Array.newClear;
+		newObjectDict[\algaReaderPfuncParams] = newObjectDict[\algaReaderPfuncParams].add(algaReaderPfunc.params).flatten;
+	}
+
+	*addChildParams { | newObjectDict, child |
+		var childParams = objects[child][\algaReaderPfuncParams];
+		childParams.postln;
+		if(childParams != nil, {
+			newObjectDict[\algaReaderPfuncParams] = newObjectDict[\algaReaderPfuncParams] ? Array.newClear;
+			newObjectDict[\algaReaderPfuncParams] = newObjectDict[\algaReaderPfuncParams].add(childParams).flatten;
+		});
+	}
 }

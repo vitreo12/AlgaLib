@@ -3676,7 +3676,7 @@ AlgaNode {
 	}
 
 	//Parse an AlgaTemp
-	parseAlgaTempParam { | algaTemp, functionSynthDefDict, topAlgaTemp |
+	parseAlgaTempParam { | algaTemp, functionSynthDefDict, isTopAlgaTemp = false |
 		var validAlgaTemp = false;
 		var def = algaTemp.def;
 		var defDef;
@@ -3739,29 +3739,16 @@ AlgaNode {
 					var parsedEntry = entry;
 					case
 					{ entry.isListPattern } {
-						parsedEntry = this.parseListPatternParam(parsedEntry, functionSynthDefDict);
+						parsedEntry = this.parseListPatternParam(parsedEntry, functionSynthDefDict, false);
 						if(parsedEntry == nil, { ^nil })
 					}
 					{ entry.isFilterPattern } {
-						parsedEntry = this.parseFilterPatternParam(parsedEntry, functionSynthDefDict);
+						parsedEntry = this.parseFilterPatternParam(parsedEntry, functionSynthDefDict, false);
 						if(parsedEntry == nil, { ^nil })
 					}
 					{ entry.isAlgaTemp } {
-						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict);
-						algaTemp.algaReaderPfuncParams = algaTemp.algaReaderPfuncParams.add(
-							parsedEntry.algaReaderPfuncParams
-						).flatten; //AlgaPatternPlayer support (add children)
+						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict, false);
 						if(parsedEntry == nil, { ^nil });
-					}
-
-					//Support for AlgaPatternPlayer
-					{ entry.isAlgaReaderPfunc } {
-						if(this.isAlgaPattern, {
-							this.algaTempContainsAlgaReaderPfunc = true;
-							algaTemp.algaReaderKeysOrFuncsAtParam = algaTemp.algaReaderKeysOrFuncsAtParam ? IdentityDictionary();
-							algaTemp.algaReaderKeysOrFuncsAtParam[key] = entry.keyOrFunc;
-							algaTemp.algaReaderPfuncParams = algaTemp.algaReaderPfuncParams.add(entry.params).flatten;
-						});
 					};
 
 					//Finally, replace in place
@@ -3804,6 +3791,16 @@ AlgaNode {
 		if(defDef.class != Symbol, {
 			("AlgaPattern: Invalid AlgaTemp's definition: '" ++ defDef.asString ++ "'").error;
 			^nil
+		});
+
+		//AlgaReaderPfunc support
+		if(this.isAlgaPattern, {
+			if(isTopAlgaTemp, {
+				"ADD".warn;
+				if(AlgaReaderPfuncContainer.add(algaTemp), {
+					this.parserEntryContainsAlgaReaderPfunc = true
+				});
+			});
 		});
 
 		//Return the modified algaTemp (in case of Event / Function)
