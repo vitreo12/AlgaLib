@@ -2760,6 +2760,8 @@ AlgaPattern : AlgaNode {
 		//Parse all the other entries looking for AlgaTemps / ListPatterns
 		def.keysValuesDo({ | key, value |
 			value = this.parseAlgaTempListPatternParam(value, functionSynthDefDict);
+			//If the AlgaTemp / ListPattern / FilterPattern contains an
+			//AlgaReaderPfunc, add it
 			if(algaTempContainsAlgaReaderPfunc, {
 				this.addAlgaPatternEntryToAlgaPatternPlayer(key, value);
 			});

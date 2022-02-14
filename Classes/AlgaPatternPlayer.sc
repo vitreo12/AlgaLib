@@ -613,7 +613,7 @@ AlgaPatternPlayer {
 	}
 
 	//Wrap result in AlgaReader
-	at { | key |
+	at { | key, repeats = inf |
 		var result;
 
 		//Lock ID (needs to be out of Pfunc: locked on creation)
@@ -625,7 +625,7 @@ AlgaPatternPlayer {
 		//Create AlgaReaderPfunc
 		result = AlgaReaderPfunc({
 			AlgaReader(this.results[key][id]);
-		});
+		}, repeats ? inf);
 
 		//Assign patternPlayer
 		result.patternPlayer = this;
@@ -637,7 +637,7 @@ AlgaPatternPlayer {
 	}
 
 	//Execute func and wrap result in AlgaReader
-	read { | func |
+	read { | func, repeats = inf |
 		var argNames, argVals, retriever;
 		var ids, result;
 
@@ -676,7 +676,7 @@ AlgaPatternPlayer {
 			AlgaReader(
 				func.performWithEnvir(\value, retriever.value)
 			)
-		});
+		}, repeats ? inf);
 
 		//Assign patternPlayer / function
 		result.patternPlayer = this;
@@ -712,7 +712,8 @@ AlgaPatternPlayer {
 		});
 	}
 
-	//
+	//Go through an AlgaTemp looking for things to re-assing to let
+	//AlgaReaderPfunc work correctly
 	reassignAlgaTemp { | algaTemp |
 		var def = algaTemp.def;
 		if(def.isEvent, {
@@ -742,19 +743,20 @@ AlgaPatternPlayer {
 		});
 	}
 
-	//
+	//Loop through ListPattern (looking for AlgaTemps)
 	reassignListPattern { | listPattern |
 		listPattern.list.do({ | value, i |
 			listPattern.list[i] = this.algaTempsReAssignKeyOrFunc(value)
 		});
 	}
 
-	//
+	//Loop through ListPattern (looking for AlgaTemps)
 	reassignFilterPattern { | filterPattern |
 		filterPattern.pattern = this.algaTempsReAssignKeyOrFunc(filterPattern.pattern )
 	}
 
-	//
+	//Go through AlgaTemp / ListPattern / FilterPattern looking for things
+	//to re-assing to let AlgaReaderPfunc work correctly
 	algaTempsReAssignKeyOrFunc { | value |
 		case
 		{ value.isAlgaTemp } {
@@ -896,7 +898,7 @@ AlgaReader {
 }
 
 //Allows to pass parameters from AlgaPatternPlayer to AlgaPattern via .read / .at
-AlgaReaderPfunc : Pfunc {
+AlgaReaderPfunc : Pfuncn {
 	var <>patternPlayer, <>params, <>keyOrFunc;
 
 	isAlgaReaderPfunc { ^true }
