@@ -32,8 +32,8 @@ AlgaPatternPlayer {
 	var <manualDur = false;
 
 	/*****************************************************************************************/
-	/* Utilities copied over from AlgaNode / AlgaPattern. These should really be modularized
-	   in their own class and used both here and in AN / AP. */
+	// Utilities copied over from AlgaNode / AlgaPattern. These should really be modularized //
+	//   in their own class and used both here and in AN / AP.                               //
 	/*****************************************************************************************/
 
 	//Add an action to scheduler. This takes into account sched == AlgaStep
@@ -585,7 +585,7 @@ AlgaPatternPlayer {
 			("AlgaPattern: undefined parameter in AlgaPatternPlayer: '" ++ key ++ "'").error;
 		});
 
-		//Create AlgaReaderPfunc
+		//Create the AlgaReaderPfunc, wrapping the indexing of the result
 		result = AlgaReaderPfunc({
 			AlgaReader(this.results[key][id]);
 		}, repeats ? inf);
@@ -634,11 +634,9 @@ AlgaPatternPlayer {
 			returnPairs;
 		};
 
-		//Perform func and wrap result in AlgaReader
+		//Create the AlgaReaderPfunc, wrapping func execution
 		result = AlgaReaderPfunc({
-			AlgaReader(
-				func.performWithEnvir(\value, retriever.value)
-			)
+			AlgaReader(func.performWithEnvir(\value, retriever.value))
 		}, repeats ? inf);
 
 		//Assign patternPlayer / function
@@ -675,21 +673,6 @@ AlgaPatternPlayer {
 		});
 	}
 
-	//Go through AlgaTemp / ListPattern / FilterPattern looking for things
-	//to re-assing to let AlgaReaderPfunc work correctly
-	algaTempsReAssignKeyOrFunc { | value |
-		case
-		{ value.isAlgaTemp } {
-			this.reassignAlgaTemp(value)
-		}
-		{ value.isListPattern } {
-			this.reassignListPattern(value)
-		}
-		{ value.isFilterPattern } {
-			this.reassignFilterPattern(value)
-		};
-	}
-
 	//Implement from {}
 	fromInner { | sender, param = \in, time, sched |
 		this.addAction(
@@ -711,6 +694,7 @@ AlgaPatternPlayer {
 
 				//Re-trigger interpolation on AlgaPatterns
 				algaPatterns.do({ | algaPattern |
+					algaPattern.asString.warn;
 					// .....
 				});
 

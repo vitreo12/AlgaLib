@@ -3005,32 +3005,6 @@ AlgaPattern : AlgaNode {
 		^false
 	}
 
-	//Used to connect an AlgaPatternPlayer to this AlgaPattern via an AlgaReaderPfunc
-	addAlgaPatternEntryToAlgaPatternPlayer { | param = \in, entry |
-		var algaPatternPlayer, algaPatternPlayerKeyOrFuncOrAlgaTemp, algaPatternPlayerParams;
-
-		case
-		{ entry.isAlgaReaderPfunc } {
-			algaPatternPlayer = entry.patternPlayer;
-			algaPatternPlayerKeyOrFuncOrAlgaTemp = entry.keyOrFunc;
-			algaPatternPlayerParams = entry.params;
-		}
-		{ entry.isAlgaTemp } {
-			algaPatternPlayer = player;
-			algaPatternPlayerKeyOrFuncOrAlgaTemp = entry;
-			algaPatternPlayerParams = entry.algaReaderPfuncParams;
-		};
-
-		if(algaPatternPlayer != nil, {
-			algaPatternPlayer.addAlgaPatternEntry(
-				algaPattern: this,
-				algaPatternParam: param,
-				entry: algaPatternPlayerKeyOrFuncOrAlgaTemp,
-				algaPatternPlayerParams: algaPatternPlayerParams
-			)
-		});
-	}
-
 	//from implementation
 	fromInner { | sender, param = \in, chans, scale, sampleAndHold, time, shape, sched |
 		//delta == dur
