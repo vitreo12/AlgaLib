@@ -3748,20 +3748,7 @@ AlgaNode {
 					}
 					{ entry.isAlgaTemp } {
 						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict);
-						algaTemp.algaReaderPfuncParams = algaTemp.algaReaderPfuncParams.add(
-							parsedEntry.algaReaderPfuncParams
-						).flatten; //AlgaPatternPlayer support (add children)
 						if(parsedEntry == nil, { ^nil });
-					}
-
-					//Support for AlgaPatternPlayer
-					{ entry.isAlgaReaderPfunc } {
-						if(this.isAlgaPattern, {
-							this.algaTempContainsAlgaReaderPfunc = true;
-							algaTemp.algaReaderKeysOrFuncsAtParam = algaTemp.algaReaderKeysOrFuncsAtParam ? IdentityDictionary();
-							algaTemp.algaReaderKeysOrFuncsAtParam[key] = entry.keyOrFunc;
-							algaTemp.algaReaderPfuncParams = algaTemp.algaReaderPfuncParams.add(entry.params).flatten;
-						});
 					};
 
 					//Finally, replace in place
