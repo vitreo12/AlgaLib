@@ -48,6 +48,11 @@ Alga {
 		});
 	}
 
+	*booted { | server |
+		server = server ? Server.default;
+		^(servers[server] != nil)
+	}
+
 	*maxIO {
 		^AlgaStartup.algaMaxIO;
 	}
