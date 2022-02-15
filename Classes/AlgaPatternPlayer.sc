@@ -21,6 +21,7 @@ AlgaPatternPlayer {
 	var <entries;
 	var <results;
 	var <algaPatterns;
+	var <algaPatternEntries;
 	var <algaPatternsPrevFunc;
 	var <server, <scheduler;
 
@@ -421,6 +422,7 @@ AlgaPatternPlayer {
 		results = IdentityDictionary();
 		entries = IdentityDictionary();
 		algaPatterns = IdentitySet();
+		algaPatternEntries = IdentityDictionary();
 
 		//1) Add support for arrays to keep ordering of execution of params!
 
@@ -575,6 +577,23 @@ AlgaPatternPlayer {
 		)
 	}
 
+	//Add an AlgaPattern that has at least one AlgaReaderPfunc at param
+	addAlgaPatternEntry { | algaPattern, algaPatternParam |
+		algaPatternEntries[algaPattern] = algaPatternEntries[algaPattern] ? IdentitySet();
+		algaPatternEntries[algaPattern].add(algaPatternParam);
+	}
+
+	//Remove an AlgaPattern that has at least one AlgaReaderPfunc at param
+	removeAlgaPatternEntry { | algaPattern, algaPatternParam |
+		var paramsAtAlgaPattern = algaPatternEntries[algaPattern];
+		if(paramsAtAlgaPattern != nil, {
+			paramsAtAlgaPattern.remove(algaPatternParam);
+			if(paramsAtAlgaPattern.size == 0, {
+				algaPatternEntries.removeAt(algaPattern)
+			});
+		});
+	}
+
 	//Wrap result in AlgaReader
 	at { | key, repeats = inf |
 		var result;
@@ -587,7 +606,7 @@ AlgaPatternPlayer {
 
 		//Create the AlgaReaderPfunc, wrapping the indexing of the result
 		result = AlgaReaderPfunc({
-			AlgaReader(this.results[key][id]);
+			AlgaReader(results[key][id]);
 		}, repeats ? inf);
 
 		//Assign patternPlayer
@@ -628,7 +647,7 @@ AlgaPatternPlayer {
 			var returnPairs = ();
 			argNames.do({ | argName, i |
 				var id = ids[i];
-				var result = this.results[argName][id];
+				var result = results[argName][id];
 				returnPairs[argName] = result;
 			});
 			returnPairs;
@@ -673,6 +692,72 @@ AlgaPatternPlayer {
 		});
 	}
 
+	//Re-assign correctly
+	reassignAlgaReaderPfunc { | algaReaderPfunc, algaPatternPlayerParam |
+		var params = algaReaderPfunc.params;
+		if(params.includes(algaPatternPlayerParam), {
+			var keyOrFunc = algaReaderPfunc.keyOrFunc;
+			var repeats = algaReaderPfunc.repeats;
+
+			//Temporarily .next the stream so that results[] have a valid value ASAP...
+			//Should this be done without copy?
+			var lastID = entries[algaPatternPlayerParam][\lastID];
+			var tempEntryStream = entries[algaPatternPlayerParam][\entries][lastID].deepCopy;
+			results[algaPatternPlayerParam][lastID] = tempEntryStream.next;
+
+			//Re-build the AlgaReaderPfunc
+			case
+			{ keyOrFunc.isSymbol } { ^this.at(keyOrFunc, repeats); }
+			{ keyOrFunc.isFunction } { ^this.read(keyOrFunc, repeats) };
+		});
+		^algaReaderPfunc //fallback
+	}
+
+	//Go through an AlgaTemp looking for things to re-assing to let
+	//AlgaReaderPfunc work correctly
+	reassignAlgaTemp { | algaTemp, algaPatternPlayerParam |
+		var def = algaTemp.def;
+		if(def.isEvent, {
+			def.keysValuesDo({ | key, value |
+				def[key] = this.reassignAlgaReaderPfuncs(value, algaPatternPlayerParam)
+			});
+		});
+		^algaTemp;
+	}
+
+	//Loop through ListPattern (looking for AlgaTemps)
+	reassignListPattern { | listPattern, algaPatternPlayerParam |
+		listPattern.list.do({ | value, i |
+			listPattern.list[i] = this.reassignAlgaReaderPfuncs(value, algaPatternPlayerParam)
+		});
+		^listPattern;
+	}
+
+	//Loop through ListPattern (looking for AlgaTemps)
+	reassignFilterPattern { | filterPattern, algaPatternPlayerParam |
+		filterPattern.pattern = this.reassignAlgaReaderPfuncs(filterPattern.pattern, algaPatternPlayerParam);
+		^filterPattern;
+	}
+
+	//Go through AlgaTemp / ListPattern / FilterPattern looking for things
+	//to re-assing to let AlgaReaderPfunc work correctly
+	reassignAlgaReaderPfuncs { | value, algaPatternPlayerParam |
+		case
+		{ value.isAlgaTemp } {
+			value = this.reassignAlgaTemp(value, algaPatternPlayerParam)
+		}
+		{ value.isListPattern } {
+			value = this.reassignListPattern(value, algaPatternPlayerParam)
+		}
+		{ value.isFilterPattern } {
+			value = this.reassignFilterPattern(value, algaPatternPlayerParam)
+		}
+		{ value.isAlgaReaderPfunc } {
+			value = this.reassignAlgaReaderPfunc(value, algaPatternPlayerParam)
+		};
+		^value;
+	}
+
 	//Implement from {}
 	fromInner { | sender, param = \in, time, sched |
 		this.addAction(
@@ -692,10 +777,33 @@ AlgaPatternPlayer {
 				entries[param][\lastID] = uniqueID;
 				entries[param][\entries][uniqueID] = sender.algaAsStream;
 
-				//Re-trigger interpolation on AlgaPatterns
-				algaPatterns.do({ | algaPattern |
-					algaPattern.asString.warn;
-					// .....
+				//Re-trigger interpolation on connected AlgaPattern entries
+				algaPatternEntries.keysValuesDo({ | algaPattern, algaPatternParams |
+					var algaPatternPlayers = algaPattern.players;
+					algaPatternParams.do({ | algaPatternParam |
+						var algaPatternPlayerParamsAtParam = algaPatternPlayers[algaPatternParam][this];
+						if(algaPatternPlayerParamsAtParam != nil, {
+							//Find match with algaPatternPlayers
+							if(algaPatternPlayerParamsAtParam.includes(param), {
+								//Find the current entry plugged in the AlgaPattern at param
+								var algaPatternEventEntryAtParam = algaPattern.defPreParsing[algaPatternParam].copy;
+								if(algaPatternEventEntryAtParam != nil, {
+									//Re-assign the AlgaReaderPfuncs
+									var reassignedEntry = this.reassignAlgaReaderPfuncs(
+										value: algaPatternEventEntryAtParam,
+										algaPatternPlayerParam: param
+									);
+
+									//Re-trigger from { }
+									algaPattern.from(
+										sender: reassignedEntry,
+										param: algaPatternParam,
+										time: time
+									)
+								});
+							});
+						});
+					});
 				});
 
 				//Free old lastID stuff after time + 2 (for certainty)

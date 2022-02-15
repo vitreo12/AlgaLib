@@ -3749,6 +3749,11 @@ AlgaNode {
 					{ entry.isAlgaTemp } {
 						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict);
 						if(parsedEntry == nil, { ^nil });
+					}
+					{ entry.isAlgaReaderPfunc } {
+						if(this.isAlgaPattern, {
+							this.assignAlgaReaderPfunc(entry)
+						});
 					};
 
 					//Finally, replace in place
