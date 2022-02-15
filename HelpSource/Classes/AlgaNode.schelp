@@ -1,7 +1,7 @@
 TITLE:: AlgaNode
 summary:: Alga module representing an instance of a sonic process
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Clasess/AlgaProxySpace
+related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaProxySpace
 
 
 DESCRIPTION::

@@ -1,7 +1,7 @@
 TITLE:: AlgaPattern
 summary:: Alga module representing multiple instances of sonic processes
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut, Classes/AlgaStep, Clasess/AlgaProxySpace
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut, Classes/AlgaStep, Classes/AlgaPatternPlayer, Classes/AlgaProxySpace
 
 
 DESCRIPTION::
@@ -29,6 +29,8 @@ ARGUMENT:: schedInSeconds
 Specify if all sched actions should be scheduled in seconds, opposing to beats. Default is code::false::.
 ARGUMENT:: sampleAccurateFuncs
 Set if the link::Classes/Function::s used in the code::'def':: parameter should be sample accurate or not. Defaults to true.
+ARGUMENT:: player
+Set an instance of a link::Classes/AlgaPatternPlayer:: that will be used to trigger the pattern.
 ARGUMENT:: server
 Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaPattern:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
 
@@ -240,3 +242,16 @@ private:: scheduledStepActionsPost
 private:: scheduledStepActionsPre
 private:: stopPatternAndFreeInterpNormSynths
 private:: currentAlgaTempGroup
+
+private:: addAlgaPatternPlayerConnectionIfNeeded
+private:: assignAlgaReaderPfunc
+private:: calculatePlayersConnections
+private:: defPreParsing
+private:: latestPlayersAtParam
+private:: paramContainsAlgaReaderPfunc
+private:: patternsAsStreams
+private:: player
+private:: players
+private:: reconnectParam
+private:: removeAlgaPatternPlayerConnectionIfNeeded
+private:: removePlayer
