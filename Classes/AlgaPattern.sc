@@ -30,8 +30,8 @@ AlgaPattern : AlgaNode {
 	//The actual Pattern
 	var <pattern;
 
-	//The pattern as stream
-	var <patternAsStream;
+	//The pattern(s) as stream. Thes are used for manual .step
+	var <patternsAsStreams;
 
 	//The Event input to be manipulated
 	var <eventPairs;
@@ -2045,6 +2045,7 @@ AlgaPattern : AlgaNode {
 		var foundOut = false;
 		var foundGenericParams = IdentitySet();
 		var patternPairs = Array.newClear;
+		var patternAsStream;
 
 		//Create new interpStreams. NOTE that the Pfunc in dur uses this, as interpStreams
 		//will be overwritten when using replace. This allows to separate the "global" one
@@ -2362,6 +2363,10 @@ AlgaPattern : AlgaNode {
 
 		//Update latest interpStreams
 		interpStreams = newInterpStreams;
+
+		//Needed for manual .step + .replace
+		patternsAsStreams = (patternsAsStreams ? IdentityDictionary());
+		patternsAsStreams[interpStreams] = patternAsStream;
 	}
 
 	//Parse a single \fx event
@@ -3294,18 +3299,20 @@ AlgaPattern : AlgaNode {
 		if(interpStreams != nil, {
 			if(now, {
 				if(stopPatternBeforeReplace.not, {
-					interpStreams.algaReschedulingEventStreamPlayer.stop
+					interpStreams.algaReschedulingEventStreamPlayer.stop;
+					patternsAsStreams.removeAt(interpStreams);
 				});
 				//freeAllSynthsAndBussesOnReplace must come after the stop!
 				interpStreams.freeAllSynthsAndBussesOnReplace;
 			}, {
-				var interpStreamsOld = interpStreams.copy;
+				var interpStreamsOld = interpStreams;
 				if(time == nil, { time = longestWaitTime });
 				if(interpStreamsOld != nil, {
 					fork {
 						(time + 1.0).wait;
 						if(stopPatternBeforeReplace.not, {
-							interpStreamsOld.algaReschedulingEventStreamPlayer.stop
+							interpStreamsOld.algaReschedulingEventStreamPlayer.stop;
+							patternsAsStreams.removeAt(interpStreamsOld);
 						});
 						//freeAllSynthsAndBussesOnReplace must come after the stop!
 						interpStreamsOld.freeAllSynthsAndBussesOnReplace;
@@ -3320,17 +3327,21 @@ AlgaPattern : AlgaNode {
 		//Check sched
 		sched = sched ? schedInner;
 		sched = sched ? 0;
-		if(patternAsStream != nil, {
-			//If sched is 0, go right away: user might have its own scheduling setup
-			if(sched == 0, {
-				//Empty event as protoEvent!
-				patternAsStream.next(()).play;
-			}, {
-				this.addAction(
+
+		//Advance all streams. This happens on .replace
+		if(patternsAsStreams != nil, {
+			patternsAsStreams.do({ | patternAsStream |
+				//If sched is 0, go right away: user might have its own scheduling setup
+				if(sched == 0, {
 					//Empty event as protoEvent!
-					func: { patternAsStream.next(()).play },
-					sched: sched
-				);
+					patternAsStream.next(()).play;
+				}, {
+					this.addAction(
+						//Empty event as protoEvent!
+						func: { patternAsStream.next(()).play },
+						sched: sched
+					);
+				});
 			});
 		});
 	}
@@ -3354,6 +3365,7 @@ AlgaPattern : AlgaNode {
 						//This will be then checked against in createEventSynths!
 						if(stopPatternBeforeReplace.and(sched.post.not), { interpStreamsLock.beingStopped = true });
 						interpStreamsLock.algaReschedulingEventStreamPlayer.stop;
+						patternsAsStreams.removeAt(interpStreamsLock);
 					},
 					sched: sched
 				)
@@ -3361,8 +3373,9 @@ AlgaPattern : AlgaNode {
 		}, {
 			if(interpStreams != nil, {
 				if(interpStreams.algaReschedulingEventStreamPlayer != nil, {
-					interpStreams.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched)
+					interpStreams.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched);
 				});
+				patternsAsStreams.removeAt(interpStreams);
 			});
 		});
 	}
