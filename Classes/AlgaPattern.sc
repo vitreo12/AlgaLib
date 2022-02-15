@@ -2457,15 +2457,27 @@ AlgaPattern : AlgaNode {
 		//Pass explicitFree to Event
 		value[\explicitFree] = synthDefFx.explicitFree;
 
+		//Reset paramContainsAlgaReaderPfunc and latestPlayers
+		paramContainsAlgaReaderPfunc = false;
+		latestPlayersAtParam = IdentityDictionary();
+
 		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
 		value.keysValuesDo({ | key, entry |
 			var parsedEntry = entry;
 			case
 			{ parsedEntry.isListPattern } { parsedEntry = this.parseListPatternParam(parsedEntry, functionSynthDefDict) }
 			{ parsedEntry.isFilterPattern } { parsedEntry = this.parseFilterPatternParam(parsedEntry, functionSynthDefDict) }
-			{ parsedEntry.isAlgaTemp } { parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict) };
+			{ parsedEntry.isAlgaTemp } { parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict) }
+			{ parsedEntry.isAlgaReaderPfunc } { this.assignAlgaReaderPfunc(parsedEntry) };
 			value[key] = parsedEntry.algaAsStream;
 		});
+
+		//Check support for AlgaPatternPlayers on \fx
+		this.calculatePlayersConnections(\fx);
+
+		//Reset paramContainsAlgaReaderPfunc and latestPlayers again
+		paramContainsAlgaReaderPfunc = false;
+		latestPlayersAtParam.clear;
 
 		^value
 	}
@@ -2784,9 +2796,11 @@ AlgaPattern : AlgaNode {
 
 		//Parse all the other entries looking for AlgaTemps / ListPatterns
 		def.keysValuesDo({ | key, value |
-			value = this.parseAlgaTempListPatternParam(value, functionSynthDefDict);
-			this.calculatePlayersConnections(key); //Also removes old ones if needed
-			def[key] = value;
+			if((key != \fx).and(key != \out), {
+				value = this.parseAlgaTempListPatternParam(value, functionSynthDefDict);
+				this.calculatePlayersConnections(key); //Also removes old ones if needed
+				def[key] = value;
+			});
 		});
 
 		^[def, functionSynthDefDict];
@@ -3009,6 +3023,9 @@ AlgaPattern : AlgaNode {
 			^this
 		});
 
+		//AlgaPatternPlayer support
+		this.calculatePlayersConnections(param);
+
 		//All other cases
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			this.addAction(
@@ -3142,7 +3159,7 @@ AlgaPattern : AlgaNode {
 				latestPlayer.addAlgaPatternEntry(this, param);
 			});
 			players = players ? IdentityDictionary();
-			players[param] = latestPlayersAtParam;
+			players[param] = latestPlayersAtParam.copy;
 		});
 	}
 
@@ -3174,10 +3191,6 @@ AlgaPattern : AlgaNode {
 
 		//Replace entry in defPreParsing (used for AlgaPatternPlayer)
 		defPreParsing[param] = senderCopy;
-
-		//Remove AlgaPatternPlayers' connections if there were any.
-		//They will be re-assigned if parsing allows it.
-		this.calculatePlayersConnections(param);
 
 		//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
 		//Otherwise, it will just execute func
@@ -3257,9 +3270,7 @@ AlgaPattern : AlgaNode {
 				//The call must happen AFTER replace as both are scheduled at top priority.
 				//stopPattern, then, must happen before replace, thus why it's here
 				//(top priority will put it on top)
-				if(stopPatternBeforeReplace, {
-					this.stopPattern(sched)
-				});
+				if(stopPatternBeforeReplace, { this.stopPattern(sched) });
 			},
 			functionSynthDefDict: functionSynthDefDict
 		);

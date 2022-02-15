@@ -758,6 +758,18 @@ AlgaPatternPlayer {
 		^value;
 	}
 
+	//Special case: FX is an Event
+	reassignFXEvent { | fxEvent, algaPatternPlayerParam |
+		if(fxEvent.isEvent, {
+			fxEvent.keysValuesDo({ | key, value |
+				if(key != \def, {
+					fxEvent[key] = this.reassignAlgaReaderPfuncs(value, algaPatternPlayerParam)
+				});
+			});
+		});
+		^fxEvent
+	}
+
 	//Implement from {}
 	fromInner { | sender, param = \in, time, sched |
 		this.addAction(
@@ -788,11 +800,20 @@ AlgaPatternPlayer {
 								//Find the current entry plugged in the AlgaPattern at param
 								var algaPatternEventEntryAtParam = algaPattern.defPreParsing[algaPatternParam].copy;
 								if(algaPatternEventEntryAtParam != nil, {
-									//Re-assign the AlgaReaderPfuncs
-									var reassignedEntry = this.reassignAlgaReaderPfuncs(
-										value: algaPatternEventEntryAtParam,
-										algaPatternPlayerParam: param
-									);
+									var reassignedEntry;
+									if(algaPatternParam == \fx, {
+										//Special case: \fx
+										reassignedEntry = this.reassignFXEvent(
+											fxEvent: algaPatternEventEntryAtParam,
+											algaPatternPlayerParam: param
+										)
+									}, {
+										//Re-assign the AlgaReaderPfuncs
+										reassignedEntry = this.reassignAlgaReaderPfuncs(
+											value: algaPatternEventEntryAtParam,
+											algaPatternPlayerParam: param
+										);
+									});
 
 									//Re-trigger from { }
 									algaPattern.from(
