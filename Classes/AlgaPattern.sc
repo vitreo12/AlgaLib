@@ -2045,7 +2045,6 @@ AlgaPattern : AlgaNode {
 		var foundOut = false;
 		var foundGenericParams = IdentitySet();
 		var patternPairs = Array.newClear;
-		var patternAsStream;
 
 		//Create new interpStreams. NOTE that the Pfunc in dur uses this, as interpStreams
 		//will be overwritten when using replace. This allows to separate the "global" one
@@ -2341,12 +2340,12 @@ AlgaPattern : AlgaNode {
 			);
 		});
 
-		//Create the Pattern by calling .next from the streams
+		//Create the Pattern
 		pattern = Pbind(*patternPairs);
-		patternAsStream = pattern.algaAsStream; //Needed for things like dur: \none
 
 		//Determine if \out interpolation is required
 		this.createPatternOutReceivers;
+
 		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
 		//createPattern function is non scheduled as it it better to create it right away.
 		if(manualDur.not, {
@@ -2366,7 +2365,7 @@ AlgaPattern : AlgaNode {
 
 		//Needed for manual .step + .replace
 		patternsAsStreams = (patternsAsStreams ? IdentityDictionary());
-		patternsAsStreams[interpStreams] = patternAsStream;
+		patternsAsStreams[interpStreams] = pattern.algaAsStream;
 	}
 
 	//Parse a single \fx event
