@@ -5,7 +5,7 @@ Alga.boot({
 	~player = AlgaPatternPlayer((
 		dur: Pwhite(0.2, 0.7),
 		freq: Pseq([440, 880], inf)
-	)).run;
+	)).play;
 
 	//\dur is not used with a player
 	~pattern = AP((
@@ -30,10 +30,3 @@ Alga.boot({
 
 //Removing a player stops the pattern triggering
 ~pattern.removePlayer;
-
-// !!!!!!!!!!!!
-//Run parser for what's needed! Is it only AlgaTemps?
-//Parse AlgaTemps like AlgaPattern!
-
-// !!!!!!!!!!!
-//Implement Array
