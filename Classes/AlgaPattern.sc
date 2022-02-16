@@ -139,6 +139,9 @@ AlgaPattern : AlgaNode {
 	var <>latestPlayersAtParam;
 	var <>paramContainsAlgaReaderPfunc = false;
 
+	//Used for parsing Patterns
+	var <recursivePatternList;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -2461,22 +2464,20 @@ AlgaPattern : AlgaNode {
 		//Pass explicitFree to Event
 		value[\explicitFree] = synthDefFx.explicitFree;
 
-		//Reset paramContainsAlgaReaderPfunc and latestPlayers
-		paramContainsAlgaReaderPfunc = false;
-		latestPlayersAtParam = IdentityDictionary();
+		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursivePatternList
+		this.resetPatternParsingVars;
 
 		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
 		value.keysValuesDo({ | key, entry |
-			var parsedEntry = this.parseAlgaTempListPatternParam_inner(entry, functionSynthDefDict);
+			var parsedEntry = this.parseParam_inner(entry, functionSynthDefDict);
 			value[key] = parsedEntry.algaAsStream;
 		});
 
 		//Check support for AlgaPatternPlayers on \fx
 		this.calculatePlayersConnections(\fx);
 
-		//Reset paramContainsAlgaReaderPfunc and latestPlayers again
-		paramContainsAlgaReaderPfunc = false;
-		latestPlayersAtParam.clear;
+		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursivePatternList again
+		this.resetPatternParsingVars;
 
 		^value
 	}
@@ -2519,6 +2520,36 @@ AlgaPattern : AlgaNode {
 			if(result == nil, { ^nil });
 			value.pattern = result;
 			^value
+		}
+
+		//Generic Pattern
+		{ value.isPattern } {
+			//Protect from recursiveness
+			recursivePatternList.add(value);
+			value.class.instVarNames.do({ | instVarName |
+				try {
+					var instVar = value.perform(instVarName);
+					if(recursivePatternList.includes(instVar).not, {
+						var result = this.parseFX(instVar, functionSynthDefDict);
+						if(result == nil, { ^nil });
+						//ListPatterns and FilterPatterns are already handled
+						if((result.isListPattern.not).and(result.isFilterPattern.not), {
+							value.perform((instVarName ++ "_").asSymbol, result);
+						});
+					});
+				} { | error |
+					//Catch setter errors
+					if(error.isKindOf(DoesNotUnderstandError), {
+						if(error.selector.asString.endsWith("_"), {
+							("AlgaPattern: could not reassign '" ++
+								value.class ++ "." ++ error.selector ++
+								"' for the \fx key. The Class does implement its setter method."
+							).error
+						});
+					})
+				}
+			});
+			^value;
 		}
 
 		//Array
@@ -2636,7 +2667,7 @@ AlgaPattern : AlgaNode {
 	//Parse a ListPattern
 	parseListPatternParam { | listPattern, functionSynthDefDict |
 		listPattern.list.do({ | listEntry, i |
-			listPattern.list[i] = this.parseAlgaTempListPatternParam_inner(listEntry, functionSynthDefDict);
+			listPattern.list[i] = this.parseParam_inner(listEntry, functionSynthDefDict);
 		});
 		^listPattern;
 	}
@@ -2644,8 +2675,30 @@ AlgaPattern : AlgaNode {
 	//Parse a FilterPattern
 	parseFilterPatternParam { | filterPattern, functionSynthDefDict |
 		var pattern = filterPattern.pattern;
-		filterPattern.pattern = this.parseAlgaTempListPatternParam_inner(pattern, functionSynthDefDict);
+		filterPattern.pattern = this.parseParam_inner(pattern, functionSynthDefDict);
 		^filterPattern;
+	}
+
+	//Parse a Pattern looking for AlgaTemp / ListPattern / FilterPattern
+	parseGenericPatternParam { | value, functionSynthDefDict |
+		//Protect from recursiveness
+		recursivePatternList.add(value);
+		value.class.instVarNames.do({ | instVarName |
+			try {
+				var instVar = value.perform(instVarName);
+				if(recursivePatternList.includes(instVar).not, {
+					this.parseParam_inner(instVar, functionSynthDefDict);
+				});
+			} { | error | } //Don't catch errors
+		});
+		^value;
+	}
+
+	//Reset vars used in parsing
+	resetPatternParsingVars {
+		paramContainsAlgaReaderPfunc = false;
+		latestPlayersAtParam = IdentityDictionary();
+		recursivePatternList = IdentitySet(10);
 	}
 
 	//Parse a Function \def entry
@@ -2680,6 +2733,35 @@ AlgaPattern : AlgaNode {
 		^def
 	}
 
+	//Parse a generic Pattern \def entry
+	parseGenericPatternDefEntry { | def, functionSynthDefDict |
+		//Protect from recursiveness
+		recursivePatternList.add(def);
+		def.class.instVarNames.do({ | instVarName |
+			try {
+				var instVar = def.perform(instVarName);
+				if(recursivePatternList.includes(instVar).not, {
+					var result = this.parseDefEntry(instVar, functionSynthDefDict);
+					//ListPatterns / FilterPatterns are already handled
+					if(result.isSymbol, {
+						def.perform((instVarName ++ "_").asSymbol, result);
+					});
+				});
+			} { | error |
+				//Catch setter errors
+				if(error.isKindOf(DoesNotUnderstandError), {
+					if(error.selector.asString.endsWith("_"), {
+						("AlgaPattern: could not reassign '" ++
+							def.class ++ "." ++ error.selector ++
+							"' for the \def key. The Class does implement its setter method."
+						).error
+					});
+				})
+			}
+		});
+		^def
+	}
+
 	//Parse the \def entry
 	parseDefEntry { | def, functionSynthDefDict |
 		case
@@ -2691,6 +2773,9 @@ AlgaPattern : AlgaNode {
 		}
 		{ def.isFilterPattern } {
 			^this.parseFilterPatternDefEntry(def, functionSynthDefDict)
+		}
+		{ def.isPattern } {
+			^this.parseGenericPatternDefEntry(def, functionSynthDefDict)
 		};
 		^def
 	}
@@ -2722,9 +2807,11 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Parse and replace \def
+		recursivePatternList = IdentitySet(10); //reset for parseDefEntry
 		def[\def] = this.parseDefEntry(defDef, functionSynthDefDict);
 
 		//Parse \fx
+		recursivePatternList.clear; //reset for parseFX
 		if(defFX != nil, { def[\fx] = this.parseFX(defFX, functionSynthDefDict) });
 
 		//Parse \out (reset currentPatternOutNodes too)
@@ -2737,7 +2824,7 @@ AlgaPattern : AlgaNode {
 		//Parse all the other entries looking for AlgaTemps / ListPatterns
 		def.keysValuesDo({ | key, value |
 			if((key != \fx).and(key != \out), {
-				value = this.parseAlgaTempListPatternParam(value, functionSynthDefDict);
+				value = this.parseParam(value, functionSynthDefDict);
 				this.calculatePlayersConnections(key); //Also removes old ones if needed
 				def[key] = value;
 			});
@@ -3119,7 +3206,7 @@ AlgaPattern : AlgaNode {
 		var senderCopy = sender.deepCopy;
 
 		//Parse the sender looking for AlgaTemps and ListPatterns
-		var senderAndFunctionSynthDefDict = this.parseAlgaTempListPatternParam(sender);
+		var senderAndFunctionSynthDefDict = this.parseParam(sender);
 		var functionSynthDefDict;
 
 		//Unpack

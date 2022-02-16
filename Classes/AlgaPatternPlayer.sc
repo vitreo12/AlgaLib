@@ -132,7 +132,7 @@ AlgaPatternPlayer {
 	}
 
 	//Parse an AlgaTemp
-	parseAlgaTempParam { | algaTemp, functionSynthDefDict |
+	parseAlgaTempParam { | algaTemp, functionSynthDefDict, topAlgaTemp |
 		var validAlgaTemp = false;
 		var def = algaTemp.def;
 		var defDef;
@@ -192,20 +192,9 @@ AlgaPatternPlayer {
 			//Loop around the event entries and use as Stream, substituting entries
 			def.keysValuesDo({ | key, entry |
 				if(key != \def, {
-					var parsedEntry = entry;
-					case
-					{ entry.isListPattern } {
-						parsedEntry = this.parseListPatternParam(parsedEntry, functionSynthDefDict);
-						if(parsedEntry == nil, { ^nil })
-					}
-					{ entry.isFilterPattern } {
-						parsedEntry = this.parseFilterPatternParam(parsedEntry, functionSynthDefDict);
-						if(parsedEntry == nil, { ^nil })
-					}
-					{ entry.isAlgaTemp } {
-						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict);
-						if(parsedEntry == nil, { ^nil })
-					};
+					var parsedEntry = this.parseParam_inner(entry, functionSynthDefDict);
+					if(parsedEntry == nil, { ^nil });
+					//Finally, replace in place
 					def[key] = parsedEntry.algaAsStream;
 				});
 			});
@@ -254,16 +243,7 @@ AlgaPatternPlayer {
 	//Parse a ListPattern
 	parseListPatternParam { | listPattern, functionSynthDefDict |
 		listPattern.list.do({ | listEntry, i |
-			case
-			{ listEntry.isListPattern } {
-				listPattern.list[i] = this.parseListPatternParam(listEntry, functionSynthDefDict)
-			}
-			{ listEntry.isFilterPattern } {
-				listPattern.list[i] = this.parseFilterPatternParam(listEntry, functionSynthDefDict)
-			}
-			{ listEntry.isAlgaTemp } {
-				listPattern.list[i] = this.parseAlgaTempParam(listEntry, functionSynthDefDict)
-			};
+			listPattern.list[i] = this.parseParam_inner(listEntry, functionSynthDefDict);
 		});
 		^listPattern;
 	}
@@ -271,21 +251,41 @@ AlgaPatternPlayer {
 	//Parse a FilterPattern
 	parseFilterPatternParam { | filterPattern, functionSynthDefDict |
 		var pattern = filterPattern.pattern;
-		case
-		{ pattern.isListPattern } {
-			filterPattern.pattern = this.parseListPatternParam(pattern, functionSynthDefDict)
-		}
-		{ pattern.isFilterPattern } {
-			filterPattern.pattern = this.parseFilterPatternParam(pattern, functionSynthDefDict)
-		}
-		{ pattern.isAlgaTemp } {
-			filterPattern.pattern = this.parseAlgaTempParam(pattern, functionSynthDefDict)
-		};
+		filterPattern.pattern = this.parseParam_inner(pattern, functionSynthDefDict);
 		^filterPattern;
 	}
 
 	//Parse a param looking for AlgaTemps and ListPatterns
-	parseAlgaTempListPatternParam { | value, functionSynthDefDict |
+	parseParam_inner { | value, functionSynthDefDict |
+		//Dispatch
+		case
+		{ value.isAlgaTemp } {
+			value = this.parseAlgaTempParam(value, functionSynthDefDict);
+			if(value == nil, { ^nil });
+		}
+		{ value.isListPattern } {
+			value = this.parseListPatternParam(value, functionSynthDefDict);
+			if(value == nil, { ^nil });
+		}
+		{ value.isFilterPattern } {
+			value = this.parseFilterPatternParam(value, functionSynthDefDict);
+			if(value == nil, { ^nil });
+		}
+		/* { value.isAlgaReaderPfunc } {
+			if(this.isAlgaPattern, { this.assignAlgaReaderPfunc(value) });
+		} */
+		{ value.isPattern } {
+			//Fallback: generic Pattern
+			value = this.parseGenericPatternParam(value, functionSynthDefDict);
+			if(value == nil, { ^nil });
+		};
+
+		//Returned parsed element
+		^value;
+	}
+
+	//Parse an entry
+	parseParam { | value, functionSynthDefDict |
 		//Used in from {}
 		var returnBoth = false;
 		if(functionSynthDefDict == nil, {
@@ -293,16 +293,11 @@ AlgaPatternPlayer {
 			functionSynthDefDict = IdentityDictionary();
 		});
 
-		case
-		{ value.isAlgaTemp } {
-			value = this.parseAlgaTempParam(value, functionSynthDefDict)
-		}
-		{ value.isListPattern } {
-			value = this.parseListPatternParam(value, functionSynthDefDict)
-		}
-		{ value.isFilterPattern } {
-			value = this.parseFilterPatternParam(value, functionSynthDefDict)
-		};
+		//Reset paramContainsAlgaReaderPfunc, and latestPlayers recursivePatternList
+		//if(this.isAlgaPattern, { this.resetPatternParsingVars });
+
+		//Actual parsing
+		value = this.parseParam_inner(value, functionSynthDefDict);
 
 		//Used in from {}
 		if(returnBoth, {
@@ -438,7 +433,7 @@ AlgaPatternPlayer {
 				}, {
 					var uniqueID = UniqueID.next;
 					//Parse entry for AlgaTemps
-					entry = this.parseAlgaTempListPatternParam(entry, functionSynthDefDict);
+					entry = this.parseParam(entry, functionSynthDefDict);
 					results[key] = IdentityDictionary();
 					entries[key] = IdentityDictionary();
 					entries[key][\lastID] = uniqueID;
@@ -718,8 +713,8 @@ AlgaPatternPlayer {
 	reassignAlgaTemp { | algaTemp, algaPatternPlayerParam |
 		var def = algaTemp.def;
 		if(def.isEvent, {
-			def.keysValuesDo({ | key, value |
-				def[key] = this.reassignAlgaReaderPfuncs(value, algaPatternPlayerParam)
+			def.keysValuesDo({ | key, entry |
+				def[key] = this.reassignAlgaReaderPfuncs(entry, algaPatternPlayerParam)
 			});
 		});
 		^algaTemp;
@@ -727,8 +722,8 @@ AlgaPatternPlayer {
 
 	//Loop through ListPattern (looking for AlgaTemps)
 	reassignListPattern { | listPattern, algaPatternPlayerParam |
-		listPattern.list.do({ | value, i |
-			listPattern.list[i] = this.reassignAlgaReaderPfuncs(value, algaPatternPlayerParam)
+		listPattern.list.do({ | listEntry, i |
+			listPattern.list[i] = this.reassignAlgaReaderPfuncs(listEntry, algaPatternPlayerParam)
 		});
 		^listPattern;
 	}
@@ -740,7 +735,7 @@ AlgaPatternPlayer {
 	}
 
 	//Try to reassign a class entry (if possible)
-	reassignClass { | classInst, algaPatternPlayerParam |
+	reassignGenericPattern { | classInst, algaPatternPlayerParam |
 		classInst.class.instVarNames.do({ | instVarName |
 			try {
 				var getter = classInst.perform(instVarName);
@@ -770,27 +765,23 @@ AlgaPatternPlayer {
 	//Go through AlgaTemp / ListPattern / FilterPattern looking for things
 	//to re-assing to let AlgaReaderPfunc work correctly
 	reassignAlgaReaderPfuncs { | value, algaPatternPlayerParam |
-		var valid = false;
 		case
 		{ value.isAlgaTemp } {
 			value = this.reassignAlgaTemp(value, algaPatternPlayerParam);
-			valid = true;
 		}
 		{ value.isListPattern } {
 			value = this.reassignListPattern(value, algaPatternPlayerParam);
-			valid = true;
 		}
 		{ value.isFilterPattern } {
 			value = this.reassignFilterPattern(value, algaPatternPlayerParam);
-			valid = true;
 		}
 		{ value.isAlgaReaderPfunc } {
 			value = this.reassignAlgaReaderPfunc(value, algaPatternPlayerParam);
-			valid = true;
+		}
+		{ value.isPattern } {
+			//Fallback
+			this.reassignGenericPattern(value, algaPatternPlayerParam);
 		};
-
-		//Fallback
-		if(valid.not, { this.reassignClass(value, algaPatternPlayerParam) });
 
 		^value;
 	}
@@ -884,7 +875,7 @@ AlgaPatternPlayer {
 	//This will also trigger interpolation on all registered AlgaPatterns
 	from { | sender, param = \in, time, sched |
 		//Parse the sender looking for AlgaTemps
-		var senderAndFunctionSynthDefDict = this.parseAlgaTempListPatternParam(sender);
+		var senderAndFunctionSynthDefDict = this.parseParam(sender);
 		var functionSynthDefDict;
 
 		//Unpack

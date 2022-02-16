@@ -3736,7 +3736,7 @@ AlgaNode {
 			//Loop around the event entries and use as Stream, substituting entries
 			def.keysValuesDo({ | key, entry |
 				if(key != \def, {
-					var parsedEntry = this.parseAlgaTempListPatternParam_inner(entry, functionSynthDefDict);
+					var parsedEntry = this.parseParam_inner(entry, functionSynthDefDict);
 					if(parsedEntry == nil, { ^nil });
 					//Finally, replace in place
 					def[key] = parsedEntry.algaAsStream;
@@ -3786,62 +3786,53 @@ AlgaNode {
 
 	//Overload so that it errors out
 	parseListPatternParam { | listPattern, functionSynthDefDict |
-		"AlgaNode: AlgaTemp does not support ListPatterns".error;
+		"AlgaNode: no support for ListPatterns".error;
 		^nil
 	}
 
 	//Overload so that it errors out
 	parseFilterPatternParam { | value, functionSynthDefDict |
-		"AlgaNode: AlgaTemp does not support FilterPatterns".error;
+		"AlgaNode: no support for FilterPatterns".error;
 		^nil
 	}
 
-	//Parse any class looking for AlgaTemp / ListPattern / FilterPattern
-	parseClassParam { | value, functionSynthDefDict |
-		value.class.instVarNames.do({ | instVarName |
-			try {
-				var instVar = value.perform(instVarName);
-				this.parseAlgaTempListPatternParam_inner(instVar, functionSynthDefDict);
-			} { | error | } //Don't catch errors
-		});
-		^value;
+	//Overload so that it errors out
+	parseGenericPatternParam { | value, functionSynthDefDict |
+		"AlgaNode: no support for Patterns".error;
+		^nil
 	}
 
 	//Parse a param looking for AlgaTemps and ListPatterns
-	parseAlgaTempListPatternParam_inner { | value, functionSynthDefDict |
-		var valid = false;
-
+	parseParam_inner { | value, functionSynthDefDict |
 		//Dispatch
 		case
 		{ value.isAlgaTemp } {
 			value = this.parseAlgaTempParam(value, functionSynthDefDict);
 			if(value == nil, { ^nil });
-			valid = true;
 		}
 		{ value.isListPattern } {
 			value = this.parseListPatternParam(value, functionSynthDefDict);
 			if(value == nil, { ^nil });
-			valid = true;
 		}
 		{ value.isFilterPattern } {
 			value = this.parseFilterPatternParam(value, functionSynthDefDict);
 			if(value == nil, { ^nil });
-			valid = true;
 		}
 		{ value.isAlgaReaderPfunc } {
 			if(this.isAlgaPattern, { this.assignAlgaReaderPfunc(value) });
-			valid = true;
+		}
+		{ value.isPattern } {
+			//Fallback: generic Pattern
+			value = this.parseGenericPatternParam(value, functionSynthDefDict);
+			if(value == nil, { ^nil });
 		};
-
-		//Fallback
-		if(valid.not, { value = this.parseClassParam(value, functionSynthDefDict) });
 
 		//Returned parsed element
 		^value;
 	}
 
-	//
-	parseAlgaTempListPatternParam { | value, functionSynthDefDict |
+	//Parse an entry
+	parseParam { | value, functionSynthDefDict |
 		//Used in from {}
 		var returnBoth = false;
 		if(functionSynthDefDict == nil, {
@@ -3849,14 +3840,11 @@ AlgaNode {
 			functionSynthDefDict = IdentityDictionary();
 		});
 
-		//Reset paramContainsAlgaReaderPfunc and latestPlayers
-		if(this.isAlgaPattern, {
-			this.paramContainsAlgaReaderPfunc = false;
-			this.latestPlayersAtParam = IdentityDictionary();
-		});
+		//Reset paramContainsAlgaReaderPfunc, and latestPlayers recursivePatternList
+		if(this.isAlgaPattern, { this.resetPatternParsingVars });
 
 		//Actual parsing
-		value = this.parseAlgaTempListPatternParam_inner(value, functionSynthDefDict);
+		value = this.parseParam_inner(value, functionSynthDefDict);
 
 		//Used in from {}
 		if(returnBoth, {
