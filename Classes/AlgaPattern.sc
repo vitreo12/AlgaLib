@@ -3636,10 +3636,13 @@ AlgaPattern : AlgaNode {
 				});
 			}
 			{ listEntry.isListPattern } {
-				this.addInNodeListPattern(listEntry)
+				this.addInNodeListPattern(listEntry, param)
 			}
 			{ listEntry.isFilterPattern } {
-				this.addInNodeFilterPattern(listEntry);
+				this.addInNodeFilterPattern(listEntry, param);
+			}
+			{ listEntry.isPattern } {
+				this.addInNodeGenericPatternParam(listEntry, param);
 			};
 		});
 	}
@@ -3661,7 +3664,41 @@ AlgaPattern : AlgaNode {
 		}
 		{ entry.isFilterPattern } {
 			this.addInNodeFilterPattern(entry, param);
+		}
+		{ entry.isPattern } {
+			this.addInNodeGenericPatternParam(entry, param);
 		};
+	}
+
+	//Add entries to inNodes
+	addInNodeGenericPatternParam { | sender, param = \in |
+		//Protect from recursiveness
+		recursivePatternList.add(sender);
+		sender.class.instVarNames.do({ | instVarName |
+			try {
+				var entry = sender.perform(instVarName);
+				if(recursivePatternList.includes(entry).not, {
+					if(entry.isAlgaArg, { entry = entry.sender });
+					case
+					{ entry.isAlgaNode } {
+						if(inNodes.size == 0, {
+							this.addInNodeAlgaNode(entry, param, mix:false);
+						}, {
+							this.addInNodeAlgaNode(entry, param, mix:true);
+						});
+					}
+					{ entry.isListPattern } {
+						this.addInNodeListPattern(entry, param);
+					}
+					{ entry.isFilterPattern } {
+						this.addInNodeFilterPattern(entry, param);
+					}
+					{ entry.isPattern } {
+						this.addInNodeGenericPatternParam(entry, param);
+					};
+				});
+			} { | error | } //Don't catch errors
+		});
 	}
 
 	//Wrapper for addInNode
@@ -3681,6 +3718,9 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
+		//Reset recursivePatternList
+		recursivePatternList = IdentitySet(10);
+
 		//If AlgaArg or ListPattern, loop around entries and add each of them
 		case
 		{ sender.isAlgaNode } {
@@ -3694,6 +3734,9 @@ AlgaPattern : AlgaNode {
 		}
 		{ sender.isFilterPattern } {
 			this.addInNodeFilterPattern(sender, param);
+		}
+		{ sender.isPattern } {
+			this.addInNodeGenericPatternParam(sender, param);
 		};
 
 		//Use replaceArgs to set LATEST parameter, for retrieval after .replace ...
