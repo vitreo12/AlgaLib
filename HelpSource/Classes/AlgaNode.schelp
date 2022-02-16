@@ -558,3 +558,7 @@ private:: unpackFilterPatternRecursive
 private:: unpackListPatternOrFilterPatternOutsMapping
 private:: unpackSynthDefSymbol
 private:: parseFilterPatternParam
+
+private:: parseGenericPatternParam
+private:: parseParam
+private:: parseParam_inner
