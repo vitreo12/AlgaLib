@@ -2850,11 +2850,11 @@ AlgaPattern : AlgaNode {
 		//Store [defName] -> AlgaSynthDef
 		var functionSynthDefDict = IdentityDictionary();
 
+		//Wrap in an Event if not an Event already
+		if(def.isEvent.not, { def = (def: def) });
+
 		//Store the original def (needed for AlgaPatternPlayer)
 		defPreParsing = def.deepCopy;
-
-		//Wrap in an Event if not an Event already
-		if(def.class != Event, { def = (def: def) });
 
 		//Retrieve entries that need specific parsing
 		defDef = def[\def];
@@ -3279,7 +3279,7 @@ AlgaPattern : AlgaNode {
 		if(sender == nil, { ^this });
 
 		//Replace entry in defPreParsing (used for AlgaPatternPlayer)
-		defPreParsing[param] = senderCopy;
+		if(defPreParsing.isEvent, { defPreParsing[param] = senderCopy});
 
 		//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
 		//Otherwise, it will just execute func

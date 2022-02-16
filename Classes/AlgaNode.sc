@@ -4205,7 +4205,7 @@ AlgaNode {
 			});
 		});
 
-		//Re-create previous out: connectionswith patterns
+		//Re-create previous out: connections with patterns
 		this.createAllPatternOutConnections(time);
 	}
 
