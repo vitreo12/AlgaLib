@@ -1181,10 +1181,16 @@ AlgaPattern : AlgaNode {
 			});
 		}
 		{ algaOut.isAlgaOut } {
-			var node  = algaOut.node;
-			var param = algaOut.param;
-			var scale = algaOut.scale;
-			var chans = algaOut.chans;
+			var node, param, scale, chans;
+
+			//Advance
+			algaOut.algaAdvance;
+
+			//Unpack
+			node  = algaOut.node;
+			param = algaOut.param;
+			scale = algaOut.scale;
+			chans = algaOut.chans;
 
 			if(node.isAlgaNode, {
 				//Only if instantiated (or it will click)
@@ -2569,8 +2575,8 @@ AlgaPattern : AlgaNode {
 
 	//Parse a single \out event
 	parseOutAlgaOut { | value, alreadyParsed |
-		var node = value.node;
-		var param = value.param;
+		var node = value.nodeOrig;
+		var param = value.paramOrig;
 
 		if(param == nil, param = \in);
 		if(param.class != Symbol, {
@@ -2596,6 +2602,33 @@ AlgaPattern : AlgaNode {
 		}
 		{ node.isFilterPattern } {
 			node.pattern = this.parseOut(node.pattern, alreadyParsed)
+		}
+		{ node.isPattern } {
+			//Protect from recursiveness
+			recursivePatternList.add(value);
+			node.class.instVarNames.do({ | instVarName |
+				try {
+					var instVar = node.perform(instVarName);
+					if(recursivePatternList.includes(instVar).not, {
+						var result = this.parseOut(instVar, alreadyParsed);
+						if(result == nil, { ^nil });
+						//ListPatterns and FilterPatterns are already handled
+						if((result.isListPattern.not).and(result.isFilterPattern.not), {
+							node.perform((instVarName ++ "_").asSymbol, result);
+						});
+					});
+				} { | error |
+					//Catch setter errors
+					if(error.isKindOf(DoesNotUnderstandError), {
+						if(error.selector.asString.endsWith("_"), {
+							("AlgaPattern: could not reassign '" ++
+								node.class ++ "." ++ error.selector ++
+								"' for the \out key. The Class does implement its setter method."
+							).error
+						});
+					})
+				}
+			});
 		};
 
 		^value.algaAsStream;
@@ -2632,6 +2665,34 @@ AlgaPattern : AlgaNode {
 			var result = this.parseOut(value.pattern, alreadyParsed);
 			if(result == nil, { ^nil });
 			value.pattern = result;
+			^value.algaAsStream; //return the Stream
+		}
+		{ value.isPattern } {
+			//Protect from recursiveness
+			recursivePatternList.add(value);
+			value.class.instVarNames.do({ | instVarName |
+				try {
+					var instVar = value.perform(instVarName);
+					if(recursivePatternList.includes(instVar).not, {
+						var result = this.parseOut(instVar, alreadyParsed);
+						if(result == nil, { ^nil });
+						//ListPatterns and FilterPatterns are already handled
+						if((result.isListPattern.not).and(result.isFilterPattern.not), {
+							value.perform((instVarName ++ "_").asSymbol, result);
+						});
+					});
+				} { | error |
+					//Catch setter errors
+					if(error.isKindOf(DoesNotUnderstandError), {
+						if(error.selector.asString.endsWith("_"), {
+							("AlgaPattern: could not reassign '" ++
+								value.class ++ "." ++ error.selector ++
+								"' for the \out key. The Class does implement its setter method."
+							).error
+						});
+					})
+				}
+			});
 			^value.algaAsStream; //return the Stream
 		}
 		{ value.isArray } {
@@ -2818,6 +2879,7 @@ AlgaPattern : AlgaNode {
 		if(defOut != nil, {
 			prevPatternOutNodes = currentPatternOutNodes.copy;
 			currentPatternOutNodes = IdentitySet();
+			recursivePatternList.clear; //reset for parseOut
 			def[\out] = this.parseOut(defOut)
 		});
 

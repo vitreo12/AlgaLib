@@ -93,11 +93,16 @@ AlgaOut {
 	//The unpacked entries
 	var <node, <param, <chans, <scale;
 
+	//The original arg entries
+	var <nodeOrig, <paramOrig;
+
 	*new { | node, param = \in, chans, scale |
 		^super.new.init(node, param, chans, scale)
 	}
 
 	init { | argNode, argParam, argChans, argScale |
+		nodeOrig     = argNode;
+		paramOrig    = argParam;
 		nodeStream   = argNode.algaAsStream;  //Pattern support
 		paramStream  = argParam.algaAsStream; //Pattern support
 		chansStream  = argChans.algaAsStream; //Pattern support
