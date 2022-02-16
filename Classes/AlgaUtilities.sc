@@ -21,7 +21,7 @@ AlgaArg {
 	var <senderStream, <chansStream, <scaleStream;
 
 	//The unpacked entries
-	var <sender, <chans, scale;
+	var <sender, <chans, <scale;
 
 	*new { | node, chans, scale |
 		^super.new.init(node, chans, scale)
@@ -91,7 +91,7 @@ AlgaOut {
 	var <nodeStream, <paramStream, <chansStream, <scaleStream;
 
 	//The unpacked entries
-	var <node, <param, <chans, scale;
+	var <node, <param, <chans, <scale;
 
 	*new { | node, param = \in, chans, scale |
 		^super.new.init(node, param, chans, scale)
