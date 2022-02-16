@@ -739,22 +739,59 @@ AlgaPatternPlayer {
 		^filterPattern;
 	}
 
+	//Try to reassign a class entry (if possible)
+	reassignClass { | classInst, algaPatternPlayerParam |
+		classInst.class.instVarNames.do({ | instVarName |
+			try {
+				var getter = classInst.perform(instVarName);
+				var value = this.reassignAlgaReaderPfuncs(getter, algaPatternPlayerParam);
+				//Set the newly calculated AlgaReaderPfunc.
+				//Honestly, this "setter" method is not that safe, as it assumes that the
+				//Class implements a setter for the specific instance variable.
+				//The AlgaReaderPfunc should instead be modified in place
+				if(value.isAlgaReaderPfunc, {
+					classInst.perform((instVarName ++ "_").asSymbol, value);
+				});
+			} { | error |
+				//Catch setter errors
+				if(error.isKindOf(DoesNotUnderstandError), {
+					if(error.selector.asString.endsWith("_"), {
+						("AlgaPatternPlayer: could not reassign the AlgaReaderPfunc for '" ++
+							classInst.class ++ "." ++ error.selector ++
+							"'. The Class does implement its setter method."
+						).error
+					});
+				})
+			}
+		});
+		^classInst;
+	}
+
 	//Go through AlgaTemp / ListPattern / FilterPattern looking for things
 	//to re-assing to let AlgaReaderPfunc work correctly
 	reassignAlgaReaderPfuncs { | value, algaPatternPlayerParam |
+		var valid = false;
 		case
 		{ value.isAlgaTemp } {
-			value = this.reassignAlgaTemp(value, algaPatternPlayerParam)
+			value = this.reassignAlgaTemp(value, algaPatternPlayerParam);
+			valid = true;
 		}
 		{ value.isListPattern } {
-			value = this.reassignListPattern(value, algaPatternPlayerParam)
+			value = this.reassignListPattern(value, algaPatternPlayerParam);
+			valid = true;
 		}
 		{ value.isFilterPattern } {
-			value = this.reassignFilterPattern(value, algaPatternPlayerParam)
+			value = this.reassignFilterPattern(value, algaPatternPlayerParam);
+			valid = true;
 		}
 		{ value.isAlgaReaderPfunc } {
-			value = this.reassignAlgaReaderPfunc(value, algaPatternPlayerParam)
+			value = this.reassignAlgaReaderPfunc(value, algaPatternPlayerParam);
+			valid = true;
 		};
+
+		//Fallback
+		if(valid.not, { this.reassignClass(value, algaPatternPlayerParam) });
+
 		^value;
 	}
 
@@ -772,62 +809,66 @@ AlgaPatternPlayer {
 
 	//Implement from {}
 	fromInner { | sender, param = \in, time, sched |
-		this.addAction(
-			func: {
-				//New ID
-				var uniqueID = UniqueID.next;
-				var lastID = entries[param][\lastID];
+		//New ID
+		var uniqueID = UniqueID.next;
+		var lastID = entries[param][\lastID];
 
-				//Create new entries / results if needed
-				if(entries[param] == nil, {
-					entries[param] = IdentityDictionary();
-					entries[param][\entries] = IdentityDictionary();
-					results[param] = IdentityDictionary();
-				});
+		//Create new entries / results if needed
+		if(entries[param] == nil, {
+			entries[param] = IdentityDictionary();
+			entries[param][\entries] = IdentityDictionary();
+			results[param] = IdentityDictionary();
+		});
 
-				//New ID - sender
-				entries[param][\lastID] = uniqueID;
-				entries[param][\entries][uniqueID] = sender.algaAsStream;
+		//New ID - sender
+		entries[param][\lastID] = uniqueID;
+		entries[param][\entries][uniqueID] = sender.algaAsStream;
 
-				//Re-trigger interpolation on connected AlgaPattern entries
-				algaPatternEntries.keysValuesDo({ | algaPattern, algaPatternParams |
-					var algaPatternPlayers = algaPattern.players;
-					algaPatternParams.do({ | algaPatternParam |
-						var algaPatternPlayerParamsAtParam = algaPatternPlayers[algaPatternParam][this];
-						if(algaPatternPlayerParamsAtParam != nil, {
-							//Find match with algaPatternPlayers
-							if(algaPatternPlayerParamsAtParam.includes(param), {
-								//Find the current entry plugged in the AlgaPattern at param
-								var algaPatternEventEntryAtParam = algaPattern.defPreParsing[algaPatternParam].copy;
-								if(algaPatternEventEntryAtParam != nil, {
-									var reassignedEntry;
-									if(algaPatternParam == \fx, {
-										//Special case: \fx
-										reassignedEntry = this.reassignFXEvent(
-											fxEvent: algaPatternEventEntryAtParam,
-											algaPatternPlayerParam: param
-										)
-									}, {
-										//Re-assign the AlgaReaderPfuncs
-										reassignedEntry = this.reassignAlgaReaderPfuncs(
-											value: algaPatternEventEntryAtParam,
-											algaPatternPlayerParam: param
-										);
-									});
-
-									//Re-trigger from { }
-									algaPattern.from(
-										sender: reassignedEntry,
-										param: algaPatternParam,
-										time: time
-									)
-								});
+		//Re-trigger interpolation on connected AlgaPattern entries. Note the us of sched
+		algaPatternEntries.keysValuesDo({ | algaPattern, algaPatternParams |
+			var algaPatternPlayers = algaPattern.players;
+			algaPatternParams.do({ | algaPatternParam |
+				var algaPatternPlayerParamsAtParam = algaPatternPlayers[algaPatternParam][this];
+				if(algaPatternPlayerParamsAtParam != nil, {
+					//Find match with algaPatternPlayers
+					if(algaPatternPlayerParamsAtParam.includes(param), {
+						//Find the current entry plugged in the AlgaPattern at param
+						var algaPatternEventEntryAtParam = algaPattern.defPreParsing[algaPatternParam].copy;
+						if(algaPatternEventEntryAtParam != nil, {
+							var reassignedEntry;
+							if(algaPatternParam == \fx, {
+								//Special case: \fx
+								reassignedEntry = this.reassignFXEvent(
+									fxEvent: algaPatternEventEntryAtParam,
+									algaPatternPlayerParam: param
+								)
+							}, {
+								//Re-assign the AlgaReaderPfuncs
+								reassignedEntry = this.reassignAlgaReaderPfuncs(
+									value: algaPatternEventEntryAtParam,
+									algaPatternPlayerParam: param
+								);
 							});
+
+							reassignedEntry.postln;
+							param.postln;
+
+							//Re-trigger from { }
+							algaPattern.from(
+								sender: reassignedEntry,
+								param: algaPatternParam,
+								time: time,
+								sched: sched
+							)
 						});
 					});
 				});
+			});
+		});
 
-				//Free old lastID stuff after time + 2 (for certainty)
+		//Free old lastID stuff after time + 2 (for certainty)
+		this.addAction(
+			func: {
 				if(lastID != nil, {
 					fork {
 						(time + 2).wait;
