@@ -91,7 +91,7 @@ AlgaOut {
 	var <nodeStream, <paramStream, <chansStream, <scaleStream;
 
 	//The unpacked entries
-	var <node, <param, <chans, scale;
+	var <node, <param, <chans, <scale;
 
 	*new { | node, param = \in, chans, scale |
 		^super.new.init(node, param, chans, scale)
