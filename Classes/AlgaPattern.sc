@@ -3035,6 +3035,19 @@ AlgaPattern : AlgaNode {
 		{ pattern.isFilterPattern } {
 			var result = this.patternOrAlgaPatternArgContainsBuffers(pattern.pattern);
 			if(result, { ^true });
+		}
+		{ pattern.isPattern } {
+			//Protect from recursiveness
+			recursivePatternList.add(pattern);
+			pattern.class.instVarNames.do({ | instVarName |
+				try {
+					var instVar = pattern.perform(instVarName);
+					if(recursivePatternList.includes(instVar).not, {
+						var result = patternOrAlgaPatternArgContainsBuffers(instVar);
+						if(result, { ^true });
+					});
+				} { | error | } //Don't catch errors
+			});
 		};
 		^false
 	}
@@ -3101,7 +3114,8 @@ AlgaPattern : AlgaNode {
 			^this
 		});
 
-		//Special case: ListPattern with Buffers
+		//Special case: Patterns with Buffers
+		recursivePatternList = IdentitySet(10); //reset before patternOrAlgaPatternArgContainsBuffers
 		if(this.patternOrAlgaPatternArgContainsBuffers(sender), {
 			^this.interpolateBuffer(sender, param, time, sched)
 		});
