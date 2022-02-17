@@ -28,5 +28,3 @@ Alga.boot({
 ~pattern <<.freqPat2 440
 
 ~player.algaPatternEntries
-
-~pattern.players

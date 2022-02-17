@@ -255,3 +255,9 @@ private:: players
 private:: reconnectParam
 private:: removeAlgaPatternPlayerConnectionIfNeeded
 private:: removePlayer
+
+private:: addInNodeGenericPatternParam
+private:: parseGenericPatternDefEntry
+private:: parseGenericPatternParam
+private:: recursivePatternList
+private:: resetPatternParsingVars
