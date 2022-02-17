@@ -66,7 +66,7 @@ METHOD:: replaceDur
 Set if emphasis::replace:: should be executed when changing the code::'dur':: parameter.
 
 METHOD:: stopPatternBeforeReplace
-Set the mode for how emphasis::replace:: should be executed. If code::true:: (default), the pattern will be stopped before the replace happens. If code::false::, the pattern will only be stopped after the entire replace has happened.
+Set the mode for how code::replace:: should be executed. If code::true:: (default), the pattern will be stopped before the replace happens. If code::false::, the pattern will only be stopped after the entire code::replace:: has happened. This case allows to perform both the fade in and fade out stages of the code::replace::.
 
 METHOD:: schedSustainInSeconds
 Set if the code::'sustain':: parameter should be scheduled in seconds. If false (default), it will be scheduled using the AlgaPattern's clock, whose tempo could be scaled.

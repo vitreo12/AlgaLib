@@ -17,7 +17,7 @@ Alga.boot({
 		def: \playBuf,
 		dur: 0.5,
 		buf: b
-	)).play;
+	)).play(chans: 2).stopPatternBeforeReplace_(false);
 });
 )
 
