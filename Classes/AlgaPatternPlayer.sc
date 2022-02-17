@@ -478,7 +478,7 @@ AlgaPatternPlayer {
 
 	time { ^timeInner }
 
-	timeInner_ { | value |
+	time_ { | value |
 		if(value.isNumber.not, {
 			"AlgaPatternPlayer: 'time' can only be a Number".error;
 			^this;
@@ -590,24 +590,24 @@ AlgaPatternPlayer {
 	}
 
 	//Wrap result in AlgaReader
-	at { | key, repeats = inf |
+	at { | param, repeats = inf |
 		var result;
 
 		//Lock ID (needs to be out of Pfunc: locked on creation)
-		var id = entries[key][\lastID];
+		var id = entries[param][\lastID];
 		if(id == nil, {
-			("AlgaPattern: undefined parameter in AlgaPatternPlayer: '" ++ key ++ "'").error;
+			("AlgaPattern: undefined parameter in AlgaPatternPlayer: '" ++ param ++ "'").error;
 		});
 
 		//Create the AlgaReaderPfunc, wrapping the indexing of the result
 		result = AlgaReaderPfunc({
-			AlgaReader(results[key][id]);
+			AlgaReader(results[param][id]);
 		}, repeats ? inf);
 
 		//Assign patternPlayer
 		result.patternPlayer = this;
-		result.keyOrFunc = key;
-		result.params = [ key ]; //it expects Array later on
+		result.keyOrFunc = param;
+		result.params = [ param ]; //it expects Array later on
 
 		//Return
 		^result;
