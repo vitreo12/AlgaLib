@@ -26,7 +26,8 @@ Alga {
 	//Store if server is supernova or not
 	classvar <supernovas;
 
-	*initSynthDefs {
+	*initSynthDefs { | maxIO = 8 |
+		AlgaStartup.algaMaxIO = maxIO;
 		AlgaStartup.initSynthDefs;
 	}
 
