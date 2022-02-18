@@ -264,9 +264,7 @@ AlgaProxySpace {
 		});
 
 		//Standard replace
-		^node.replace(
-			def: def
-		);
+		^node.replace(def: def);
 	}
 
 	put { | key, def |
