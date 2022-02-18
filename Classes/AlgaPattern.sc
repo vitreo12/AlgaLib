@@ -3100,7 +3100,7 @@ AlgaPattern : AlgaNode {
 	//<<, <<+ and <|
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, sampleAndHold,
-		time, shape, sched |
+		time, shape, forceReplace = false, sched |
 
 		//Check sched
 		if(replace.not, { sched = sched ? schedInner });
@@ -3128,6 +3128,15 @@ AlgaPattern : AlgaNode {
 
 		//AlgaPatternPlayer support
 		this.calculatePlayersConnections(param);
+
+		//Force a replace
+		if(forceReplace, {
+			^this.replace(
+				def: (def: this.getSynthDef, (param): sender), //escape param with ()
+				time: time,
+				sched: sched
+			);
+		});
 
 		//All other cases
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
@@ -3161,7 +3170,8 @@ AlgaPattern : AlgaNode {
 	}
 
 	//from implementation
-	fromInner { | sender, param = \in, chans, scale, sampleAndHold, time, shape, sched |
+	fromInner { | sender, param = \in, chans, scale, sampleAndHold,
+		time, shape, forceReplace = false, sched |
 		//delta == dur
 		if(param == \delta, { param = \dur });
 
@@ -3214,7 +3224,8 @@ AlgaPattern : AlgaNode {
 		if((sender.isPattern).or(sender.isAlgaArg).or(sender.isAlgaTemp), {
 			^this.makeConnection(
 				sender: sender, param: param, senderChansMapping: chans,
-				scale: scale, sampleAndHold: sampleAndHold, time: time, shape:shape, sched: sched
+				scale: scale, sampleAndHold: sampleAndHold, time: time,
+				shape: shape, forceReplace: forceReplace, sched: sched
 			);
 		});
 
@@ -3226,14 +3237,16 @@ AlgaPattern : AlgaNode {
 			});
 			this.makeConnection(
 				sender: sender, param: param, senderChansMapping: chans,
-				scale: scale, time: time, shape:shape, sampleAndHold: sampleAndHold, sched: sched
+				scale: scale, time: time, shape:shape,
+				sampleAndHold: sampleAndHold, forceReplace: forceReplace, sched: sched
 			);
 		}, {
 			//sender == symbol is used for \def
 			if(sender.isNumberOrArray, {
 				this.makeConnection(
 					sender: sender, param: param, senderChansMapping: chans,
-					scale: scale, time: time, shape:shape, sampleAndHold: sampleAndHold, sched: sched
+					scale: scale, time: time, shape:shape,
+					sampleAndHold: sampleAndHold, forceReplace: forceReplace, sched: sched
 				);
 			}, {
 				("AlgaPattern: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
@@ -3277,7 +3290,8 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Only from is needed: to already calls into makeConnection
-	from { | sender, param = \in, chans, scale, sampleAndHold, time, shape, sched |
+	from { | sender, param = \in, chans, scale, sampleAndHold, time,
+		shape, forceReplace = false, sched |
 		//Must be copied before parsing!!
 		var senderCopy = sender.deepCopy;
 
@@ -3307,6 +3321,7 @@ AlgaPattern : AlgaNode {
 					sampleAndHold: sampleAndHold,
 					time: time,
 					shape: shape,
+					forceReplace: forceReplace,
 					sched: sched
 				)
 			},

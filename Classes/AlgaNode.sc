@@ -3595,11 +3595,18 @@ AlgaNode {
 
 	//<<.param sender
 	makeConnection { | sender, param = \in, replace = false, mix = false,
-		replaceMix = false, senderChansMapping, scale, time, shape, sched = 0 |
+		replaceMix = false, senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
 
 		//Check sched
 		if(replace.not, { sched = sched ? schedInner });
 
+		//Force a replace call
+		if(forceReplace, {
+			if(mix, { "AlgaNode: 'forceReplace' does not work with mixing".error; ^this });
+			^this.replace(synthDef.name, [param, sender], time: time, sched: sched)
+		});
+
+		//Actual makeConnection
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			this.addAction(
 				condition: {
@@ -3618,7 +3625,7 @@ AlgaNode {
 
 	//<<.param { }
 	makeConnectionFunction { | sender, param = \in, replace = false,
-		senderChansMapping, scale, time, shape, sched = 0 |
+		senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
 
 		var defName = ("alga_" ++ UniqueID.next).asSymbol;
 		var algaTemp = AlgaTemp(defName);
@@ -3641,6 +3648,7 @@ AlgaNode {
 						scale: scale,
 						time: time,
 						shape: shape,
+						forceReplace: forceReplace,
 						sched: sched
 					)
 				}, {
@@ -3653,7 +3661,7 @@ AlgaNode {
 
 	//<<.param \someDef
 	makeConnectionSymbol { | sender, param = \in, replace = false,
-		senderChansMapping, scale, time, shape, sched = 0 |
+		senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
 
 		var algaTemp = AlgaTemp(sender);
 		algaTemp.checkValidSynthDef(sender);
@@ -3671,6 +3679,7 @@ AlgaNode {
 			scale: scale,
 			time: time,
 			shape: shape,
+			forceReplace: forceReplace,
 			sched: sched
 		)
 	}
@@ -3856,7 +3865,7 @@ AlgaNode {
 
 	//<<.param AlgaTemp
 	makeConnectionAlgaTemp { | sender, param = \in, replace = false,
-		senderChansMapping, scale, time, shape, sched = 0 |
+		senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
 
 		var functionSynthDefDict = IdentityDictionary();
 		var algaTemp = this.parseAlgaTempParam(sender, functionSynthDefDict);
@@ -3876,6 +3885,7 @@ AlgaNode {
 						scale: scale,
 						time: time,
 						shape:shape,
+						forceReplace: forceReplace,
 						sched: sched
 					)
 				}, {
@@ -3887,7 +3897,7 @@ AlgaNode {
 	}
 
 	//Receive a connection
-	from { | sender, param = \in, chans, scale, time, shape, sched |
+	from { | sender, param = \in, chans, scale, time, shape, forceReplace = false, sched |
 		case
 		{ sender.isAlgaNode } {
 			if(this.server != sender.server, {
@@ -3895,7 +3905,7 @@ AlgaNode {
 				^this;
 			});
 			^this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}
 		{ sender.isAlgaArg } {
@@ -3904,22 +3914,22 @@ AlgaNode {
 		}
 		{ sender.isNumberOrArray } {
 			^this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}
 		{ sender.isFunction } {
 			^this.makeConnectionFunction(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}
 		{ sender.isSymbol } {
 			^this.makeConnectionSymbol(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}
 		{ sender.isAlgaTemp } {
 			^this.makeConnectionAlgaTemp(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}
 		{ sender.isBuffer } {
@@ -3938,14 +3948,14 @@ AlgaNode {
 	}
 
 	//Send a connection
-	to { | receiver, param = \in, chans, scale, time, shape, sched |
+	to { | receiver, param = \in, chans, scale, time, shape, forceReplace = false, sched |
 		if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
 			receiver.makeConnection(this, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}, {
 			("AlgaNode: trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
