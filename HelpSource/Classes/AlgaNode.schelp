@@ -83,10 +83,6 @@ AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1]) //Play both channels,
 
 AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1, 1, 0]) //Quadraphonic
 ::
-ARGUMENT:: scale
-Define a multiplier to scale the output value by. This will be stored and maintained across different emphasis::play:: calls.
-ARGUMENT:: sched
-Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
 
 METHOD:: stop
