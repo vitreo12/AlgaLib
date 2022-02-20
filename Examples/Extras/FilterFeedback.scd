@@ -1,15 +1,19 @@
 (
-APS.boot({
-	~a.it = 5;
-	~a.play(chans:2, scale:0.8);
-	~a = { LeakDC.ar(BMoog.ar(\in.ar, \freq.kr(440), \q.kr(0.5))) };
-	~b.it = 3;
-	~b = { Saw.ar(\freq.kr(50)) };
-	~b >> ~a;
+AlgaProxySpace.boot({
+	~filter.it = 5;
+	~filter.play(chans: 2, scale: 0.8);
+	~filter = { LeakDC.ar(BMoog.ar(\in.ar, \freq.kr(440), \q.kr(0.5))) };
+	~saw.it = 3;
+	~saw = { Saw.ar(\freq.kr(50)) };
+	~saw >> ~filter;
 }, algaServerOptions: AlgaServerOptions(blockSize: 64));
 )
 
-~a.mixFrom(~a, scale:0.5) //care with the fb here
-~a <<.freq { LFNoise1.kr(LFNoise0.kr(3).range(1, 10)).range(50, 2000) }
+//Introduce feedback in the filter
+~filter.mixFrom(~filter, scale: 0.5)
 
-~b <<.freq { LFNoise0.kr(LFNoise1.kr(2).range(1, 20)).range(0.1, 30) }
+//Modulate the filter's frequency with some smooth noise in the 50 - 2000 hz range
+~filter <<.freq { LFNoise1.kr(LFNoise0.kr(3).range(1, 10)).range(50, 2000) }
+
+//Modulate the saw's frequency with some stepped noise in the 0.1 - 30 hz range
+~saw <<.freq { LFNoise0.kr(LFNoise1.kr(2).range(1, 20)).range(0.1, 30) }
