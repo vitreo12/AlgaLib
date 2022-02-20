@@ -1,12 +1,17 @@
 (
 AlgaProxySpace.boot({
-	~filter.it = 5;
-	~filter.play(chans: 2, scale: 0.8);
+	//Define a Moog LPF and play it to speakers
 	~filter = { LeakDC.ar(BMoog.ar(\in.ar, \freq.kr(440), \q.kr(0.5))) };
-	~saw.it = 3;
+	~filter.play(chans: 2, scale: 0.8);
+	~filter.it = 5; //5 secs of interp time
+
+	//Define a Sawtooth
 	~saw = { Saw.ar(\freq.kr(50)) };
+	~saw.it = 3; //3 secs of interp time
+
+	//Patch the Sawtooth into the filter
 	~saw >> ~filter;
-}, algaServerOptions: AlgaServerOptions(blockSize: 64));
+}, algaServerOptions: AlgaServerOptions(blockSize: 64)); //This FB sounds better at 64 samples
 )
 
 //Introduce feedback in the filter
