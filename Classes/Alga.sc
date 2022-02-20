@@ -92,13 +92,17 @@ Alga {
 		if(server != nil, {
 			if(server.serverRunning, {
 				server.quit(onComplete: { prevServerQuit[0] = true });
+				fork {
+					3.wait;
+					if(server.serverRunning.not, { prevServerQuit[0] = true });
+				}
 			}, {
 				prevServerQuit[0] = true;
 			});
-			this.clearServer(server);
 		}, {
 			prevServerQuit[0] = true;
 		});
+		this.clearServer(server);
 	}
 
 	*newScheduler { | server, clock, cascadeMode = false |
