@@ -53,11 +53,7 @@
 	algaAsStream { ^(this.asStream) }
 
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
-	addAction { | condition, func, sched = 0 |
-		if(sched != 0, {
-			"AlgaSpinRoutine: 'sched' will be ignored".error;
-		});
-
+	addAction { | condition, func, sched = 0, topPriority = false, schedInSeconds = false, preCheck = false |
 		AlgaSpinRoutine.waitFor(
 			condition:condition,
 			func:func

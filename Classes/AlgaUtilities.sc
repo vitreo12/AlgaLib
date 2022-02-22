@@ -36,13 +36,13 @@ AlgaArg {
 	algaAdvance {
 		sender = senderStream.next;
 		chans  = chansStream.next;
-		scale  = scaleStream.next;
+		scale  = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
 		scale.algaAdvanceArrayScaleValues;
 	}
 
 	algaInstantiatedAsSender {
 		if(sender.isAlgaNode, { ^sender.algaInstantiatedAsSender });
-		^false
+		^true
 	}
 
 	isAlgaArg { ^true }
@@ -113,7 +113,7 @@ AlgaOut {
 		node  = nodeStream.next;
 		param = paramStream.next;
 		chans = chansStream.next;
-		scale = scaleStream.next;
+		scale = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
 		scale.algaAdvanceArrayScaleValues;
 	}
 
@@ -159,7 +159,7 @@ AlgaTemp {
 
 	algaAdvance {
 		chans = chansStream.next;
-		scale = scaleStream.next;
+		scale = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
 		scale.algaAdvanceArrayScaleValues;
 	}
 
@@ -237,8 +237,8 @@ AS : AlgaStep {}
 	algaAdvanceArrayScaleValues {
 		this.do({ | entry, i |
 			if(entry.isStream, {
-				entry = entry.next;
-				this[i] = entry;
+				var entryNext = entry.next;
+				this[i] = entryNext;
 			});
 		});
 	}
