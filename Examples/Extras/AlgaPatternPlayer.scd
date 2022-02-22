@@ -13,7 +13,7 @@ Alga.boot({
         freq2: ~player.read({ | freq |
             if(freq == 440, { freq * 2 }, { 0 })
         }),
-    ), player: ~player).play(chans: 2);
+    ), player: ~player).play(chans: 2, scale: 0.5);
 })
 )
 

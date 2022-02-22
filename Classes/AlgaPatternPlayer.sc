@@ -841,9 +841,6 @@ AlgaPatternPlayer {
 								);
 							});
 
-							reassignedEntry.postln;
-							param.postln;
-
 							//Re-trigger from { }
 							algaPattern.from(
 								sender: reassignedEntry,
