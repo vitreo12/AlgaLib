@@ -780,6 +780,7 @@ AlgaNode {
 	//Used in AlgaProxySpace
 	copyVars { | nodeToCopy |
 		if(nodeToCopy.isAlgaNode, {
+			this.sched = nodeToCopy.sched;
 			this.interpTime = nodeToCopy.connectionTime;
 			this.playTime = nodeToCopy.playTime;
 			this.replacePlayTime = nodeToCopy.replacePlayTime;

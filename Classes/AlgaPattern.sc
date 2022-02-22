@@ -2916,7 +2916,7 @@ AlgaPattern : AlgaNode {
 				sched: sched
 			);
 		}, {
-			if(sched == nil, { sched = 0 });
+			sched = sched ? schedInner;
 			("AlgaPattern: 'dur' interpolation is not supported yet. Rescheduling 'dur' at the " ++ sched ++ " quantization.").warn;
 			^this.setDurAtSched(value, sched);
 		});
@@ -2932,7 +2932,7 @@ AlgaPattern : AlgaNode {
 				sched: sched
 			);
 		}, {
-			if(sched == nil, { sched = 0 });
+			sched = sched ? schedInner;
 			("AlgaPattern: 'sustain' interpolation is not supported yet. Rescheduling 'sustain' at the " ++ sched ++ " quantization.").warn;
 			^this.setSustainAtSched(value, sched);
 		});
@@ -2948,7 +2948,7 @@ AlgaPattern : AlgaNode {
 				sched: sched
 			);
 		}, {
-			if(sched == nil, { sched = 0 });
+			sched = sched ? schedInner;
 			("AlgaPattern: 'stretch' interpolation is not supported yet. Rescheduling 'stretch' at the " ++ sched ++ " quantization.").warn;
 			^this.setStretchAtSched(value, sched);
 		});
@@ -2964,7 +2964,7 @@ AlgaPattern : AlgaNode {
 				sched: sched
 			);
 		}, {
-			if(sched == nil, { sched = 0 });
+			sched = sched ? schedInner;
 			("AlgaPattern: 'legato' interpolation is not supported yet. Rescheduling 'legato' at the " ++ sched ++ " quantization.").warn;
 			^this.setLegatoAtSched(value, sched);
 		});

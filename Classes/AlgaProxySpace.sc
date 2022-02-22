@@ -167,6 +167,8 @@ AlgaProxySpace {
 
 	newPatternFromNode { | node, key, def |
 		var wasPlaying = node.isPlaying;
+		var playChans = node.playChans;
+		var playScale = node.prevPlayScale;
 		var interpTime = node.connectionTime;
 		var interpShape = node.interpShape;
 		var playTime = node.playTime;
@@ -189,7 +191,7 @@ AlgaProxySpace {
 		node.clear;
 
 		//Play new one
-		if(wasPlaying, { pattern.play });
+		if(wasPlaying, { pattern.play(chans: playChans, scale: playScale) });
 
 		//Replace entry
 		nodes[key] = pattern;
