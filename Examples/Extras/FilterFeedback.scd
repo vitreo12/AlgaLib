@@ -3,7 +3,7 @@ AlgaProxySpace.boot({
 	//Define a Moog LPF and play it to speakers
 	~filter = { LeakDC.ar(BMoog.ar(\in.ar, \freq.kr(440), \q.kr(0.5))) };
 	~filter.playSafety = \tanh; //\tanh safety when out of bounds
-	~filter.play(chans: 2, scale: 0.8);
+	~filter.play(chans: 2, scale: 0.7);
 	~filter.it = 5; //5 secs of interp time
 
 	//Define a Sawtooth
