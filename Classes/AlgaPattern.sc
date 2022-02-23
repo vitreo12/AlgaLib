@@ -171,7 +171,7 @@ AlgaPattern : AlgaNode {
 			var bundle;
 
 			//The AlgaSynthDef
-			var algaSynthDef = (~synthDefName.valueEnvir.asString ++ "_algaPattern").asSymbol;
+			var algaSynthDef = ~synthDefName.valueEnvir;
 
 			//AlgaPattern, the synthBus and its server / clock
 			var algaPattern = ~algaPattern;
@@ -1233,7 +1233,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create all needed Synths / Busses for an individual patternSynth
-	createPatternSynth { | algaSynthDef, algaSynthBus,
+	createPatternSynth { | algaSynthDef, algaSynthDefClean, algaSynthBus,
 		algaPatternInterpStreams, controlNamesToUse, fx, algaOut,
 		mcSynthNum, mcEntries |
 		//Used to check whether using a ListPattern of \defs
@@ -1264,7 +1264,7 @@ AlgaPattern : AlgaNode {
 
 		//Check if it's a ListPattern and retrieve correct controlNames
 		if(controlNamesList != nil, {
-			controlNamesToUse = controlNamesList[algaSynthDef];
+			controlNamesToUse = controlNamesList[algaSynthDefClean];
 			if(controlNamesToUse == nil, { controlNamesToUse = controlNames });
 		});
 
@@ -1369,13 +1369,13 @@ AlgaPattern : AlgaNode {
 
 		//If ListPattern, retrieve correct numChannels
 		if(numChannelsList != nil, {
-			numChannelsToUse = numChannelsList[algaSynthDef];
+			numChannelsToUse = numChannelsList[algaSynthDefClean];
 			if(numChannelsToUse == nil, { numChannelsToUse = numChannels });
 		});
 
 		//If ListPattern, retrieve correct rate
 		if(rateList != nil, {
-			rateToUse = rateList[algaSynthDef];
+			rateToUse = rateList[algaSynthDefClean];
 			if(rateToUse == nil, { rateToUse = rate });
 		});
 
@@ -1631,13 +1631,19 @@ AlgaPattern : AlgaNode {
 	createEventSynths { | algaSynthDef, algaSynthBus,
 		algaPatternInterpStreams, fx, algaOut |
 
+		//Keep the def without _algaPattern
+		var algaSynthDefClean = algaSynthDef;
+
 		//Get controlNames and check if it's a ListPattern
 		//(in case for multiple SynthDefs). Get the correct one if available.
 		var controlNamesToUse = controlNames;
 		if(controlNamesList != nil, {
-			controlNamesToUse = controlNamesList[algaSynthDef];
+			controlNamesToUse = controlNamesList[algaSynthDefClean];
 			if(controlNamesToUse == nil, { controlNamesToUse = controlNames });
 		});
+
+		//algaSynthDef with _algaPattern
+		algaSynthDef = (algaSynthDef.asString ++ "_algaPattern").asSymbol;
 
 		//If streams being stopped (happens for AlgaStep + stopPatternBeforeReplace)
 		//This must be checked here as the eventSynth is already being triggered
@@ -1677,6 +1683,7 @@ AlgaPattern : AlgaNode {
 				numOfSynths.do({ | synthNum |
 					this.createPatternSynth(
 						algaSynthDef: algaSynthDef,
+						algaSynthDefClean: algaSynthDefClean,
 						algaSynthBus: algaSynthBus,
 						algaPatternInterpStreams: algaPatternInterpStreams,
 						controlNamesToUse: controlNamesToUse,
@@ -1692,6 +1699,7 @@ AlgaPattern : AlgaNode {
 				//numOfSynths == 0, mcSynthNum is then nil
 				^this.createPatternSynth(
 					algaSynthDef: algaSynthDef,
+					algaSynthDefClean: algaSynthDefClean,
 					algaSynthBus: algaSynthBus,
 					algaPatternInterpStreams: algaPatternInterpStreams,
 					controlNamesToUse: controlNamesToUse,
@@ -1706,6 +1714,7 @@ AlgaPattern : AlgaNode {
 		//No MC expansion used: create the single patternSynth with all its params
 		this.createPatternSynth(
 			algaSynthDef: algaSynthDef,
+			algaSynthDefClean: algaSynthDefClean,
 			algaSynthBus: algaSynthBus,
 			algaPatternInterpStreams: algaPatternInterpStreams,
 			controlNamesToUse: controlNamesToUse,
