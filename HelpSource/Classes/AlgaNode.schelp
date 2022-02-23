@@ -1,7 +1,7 @@
 TITLE:: AlgaNode
 summary:: Alga module representing an instance of a sonic process
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Clasess/AlgaProxySpace
+related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaProxySpace
 
 
 DESCRIPTION::
@@ -83,10 +83,6 @@ AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1]) //Play both channels,
 
 AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1, 1, 0]) //Quadraphonic
 ::
-ARGUMENT:: scale
-Define a multiplier to scale the output value by. This will be stored and maintained across different emphasis::play:: calls.
-ARGUMENT:: sched
-Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
 
 METHOD:: stop
@@ -153,6 +149,8 @@ ARGUMENT:: time
 Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
 ARGUMENT:: shape
 Define a temporary shape to be used in the interpolation process. This must be defined with an link::Classes/Env:: starting at 0 and ending at 1.
+ARGUMENT:: forceReplace
+Force a code::replace:: call instead of interpolating the values.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
@@ -558,3 +556,7 @@ private:: unpackFilterPatternRecursive
 private:: unpackListPatternOrFilterPatternOutsMapping
 private:: unpackSynthDefSymbol
 private:: parseFilterPatternParam
+
+private:: parseGenericPatternParam
+private:: parseParam
+private:: parseParam_inner

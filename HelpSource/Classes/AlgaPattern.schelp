@@ -1,7 +1,7 @@
 TITLE:: AlgaPattern
 summary:: Alga module representing multiple instances of sonic processes
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut, Classes/AlgaStep, Clasess/AlgaProxySpace
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut, Classes/AlgaStep, Classes/AlgaPatternPlayer, Classes/AlgaProxySpace
 
 
 DESCRIPTION::
@@ -29,6 +29,8 @@ ARGUMENT:: schedInSeconds
 Specify if all sched actions should be scheduled in seconds, opposing to beats. Default is code::false::.
 ARGUMENT:: sampleAccurateFuncs
 Set if the link::Classes/Function::s used in the code::'def':: parameter should be sample accurate or not. Defaults to true.
+ARGUMENT:: player
+Set an instance of a link::Classes/AlgaPatternPlayer:: that will be used to trigger the pattern.
 ARGUMENT:: server
 Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaPattern:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
 
@@ -64,7 +66,7 @@ METHOD:: replaceDur
 Set if emphasis::replace:: should be executed when changing the code::'dur':: parameter.
 
 METHOD:: stopPatternBeforeReplace
-Set the mode for how emphasis::replace:: should be executed. If code::true:: (default), the pattern will be stopped before the replace happens. If code::false::, the pattern will only be stopped after the entire replace has happened.
+Set the mode for how code::replace:: should be executed. If code::true:: (default), the pattern will be stopped before the replace happens. If code::false::, the pattern will only be stopped after the entire code::replace:: has happened. This case allows to perform both the fade in and fade out stages of the code::replace::.
 
 METHOD:: schedSustainInSeconds
 Set if the code::'sustain':: parameter should be scheduled in seconds. If false (default), it will be scheduled using the AlgaPattern's clock, whose tempo could be scaled.
@@ -114,6 +116,10 @@ a.from(Pwhite(0.03, 0.5), \dur, sched: 1);
 
 //Alternatively, the 'replaceDur' option can be used to trigger a 'replace' call, allowing for volume transitions
 a.replaceDur = true;
+
+//'The stopPatternBeforeReplace' option permits to either just stop the pattern before replacing (true),
+//or to wait for the crossfade to finish before stopping the old one (false)
+a.stopPatternBeforeReplace = false;
 
 //Now it will 'replace'
 a.from(0.25, \dur, time: 3, sched: 1);
@@ -240,3 +246,22 @@ private:: scheduledStepActionsPost
 private:: scheduledStepActionsPre
 private:: stopPatternAndFreeInterpNormSynths
 private:: currentAlgaTempGroup
+
+private:: addAlgaPatternPlayerConnectionIfNeeded
+private:: assignAlgaReaderPfunc
+private:: calculatePlayersConnections
+private:: defPreParsing
+private:: latestPlayersAtParam
+private:: paramContainsAlgaReaderPfunc
+private:: patternsAsStreams
+private:: player
+private:: players
+private:: reconnectParam
+private:: removeAlgaPatternPlayerConnectionIfNeeded
+private:: removePlayer
+
+private:: addInNodeGenericPatternParam
+private:: parseGenericPatternDefEntry
+private:: parseGenericPatternParam
+private:: recursivePatternList
+private:: resetPatternParsingVars

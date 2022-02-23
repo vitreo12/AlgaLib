@@ -1,5 +1,5 @@
 TITLE:: Alga
-summary:: live coding environment language focused on the interpolation between sonic nodes
+summary:: live coding environment focused on the interpolation between sonic nodes
 categories:: Alga
 related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaServerOptions, Clasess/AlgaProxySpace
 
@@ -42,6 +42,11 @@ Change the maximum number of IO connections between link::Classes/AlgaNode::s. T
 ARGUMENT:: value
 The new value. Must be an link::Classes/Integer::.
 
+METHOD:: maxEnvPoints
+Change the maximum number of points allowed for an link::Classes/Env:: used as code::interpShape:: of a module.
+ARGUMENT:: value
+The new value. Must be an link::Classes/Integer::.
+
 METHOD:: initSynthDefs
 Force the recompilation of all link::Classes/AlgaSynthDef::s necessary for link::Classes/Alga::'s runtime. This needs to be executed only once anytime the value of emphasis::maxIO:: changes. Before emphasis::boot::, link::Classes/Alga:: already checks that everything is correct.
 
@@ -69,3 +74,6 @@ private:: quitServerAndClear
 private:: setSupernova
 private:: supernova
 private:: supernovas
+
+private:: addAlgaSilent
+private:: booted

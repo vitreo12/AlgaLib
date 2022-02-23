@@ -96,3 +96,9 @@ private:: scale
 private:: setDef
 private:: valid
 private:: chans
+private:: algaAdvance
+private:: algaReaderKeysOrFuncsAtParam
+private:: algaReaderPfuncParams
+private:: chansStream
+private:: sampleAccurate
+private:: scaleStream

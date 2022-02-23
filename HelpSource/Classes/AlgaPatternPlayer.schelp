@@ -1,0 +1,145 @@
+TITLE:: AlgaPatternPlayer
+summary:: Player and dispatcher of AlgaPatterns
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaTemp
+
+DESCRIPTION::
+An link::Classes/AlgaPatternPlayer:: is an link::Classes/AlgaPattern:: player and dispatcher. It stores code::key:: / code::value:: pairs that can be retrieved and consumed by link::Classes/AlgaPattern::s in their execution. Furthermore, an link::Classes/AlgaPatternPlayer:: can take care of the triggering itself of its children link::Classes/AlgaPattern::s.
+
+CLASSMETHODS::
+
+METHOD:: new
+ARGUMENT:: def
+An link::Classes/Event:: describing the code::key:: / code::value:: pairs to be executed.
+ARGUMENT:: server
+Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaPattern:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
+
+private:: addAlgaPatternPlayerEventType
+
+INSTANCEMETHODS::
+
+METHOD:: play
+Start the execution of the link::Classes/AlgaPatternPlayer::.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+
+METHOD:: advance
+Manually advance the link::Classes/AlgaPatternPlayer::.
+
+METHOD:: step
+Alias for code::advance::.
+
+METHOD:: stop
+Stop the link::Classes/AlgaPatternPlayer::
+
+METHOD:: from
+ARGUMENT:: sender
+A new value for the parameter.
+ARGUMENT:: param
+The parameter to modify.
+ARGUMENT:: time
+The time it will take to perform the changes. Note that this will be transferred to every link::Classes/AlgaPattern::s that are using the link::Classes/AlgaPatternPlayer::.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+
+METHOD:: <<
+Alias for code::from::.
+
+METHOD:: at
+ARGUMENT:: param
+The parameter to retrieve from the link::Classes/AlgaPatternPlayer::.
+ARGUMENT:: repeats
+Similarly to link::Classes/Pfuncn::, this represents the number of times to repeat the reading of the parameter.
+
+METHOD:: read
+ARGUMENT:: func
+A link::Classes/Function:: representing the action to perform when reading a group of parameters from the link::Classes/AlgaPatternPlayer::. The arguments to the function must match the names of parameters in the link::Classes/AlgaPatternPlayer::.
+ARGUMENT:: repeats
+Similarly to link::Classes/Pfuncn::, this represents the number of times to perform the function.
+
+METHOD:: value
+Alias for code::read::.
+
+METHOD:: sched
+Manually set a code::sched:: value to use when not specified explicitly.
+
+METHOD:: time
+Manually set a code::time:: value to use when not specified explicitly.
+
+EXAMPLES::
+code::
+(
+Alga.boot({
+	//Define and start an AlgaPatternPlayer
+	~player = AlgaPatternPlayer((
+		dur: Pwhite(0.1, 0.5),
+		freq: Pseq([440, 880], inf)
+	)).play;
+
+	//Use ~player for both indexing values and triggering the pattern
+	~pattern = AP((
+		def: { SinOsc.ar(\freq.kr + \freq2.kr) * EnvPerc.ar },
+		freq: ~player[\freq],
+		freq2: ~player.read({ | freq |
+			if(freq == 440, { freq * 2 }, { 0 })
+		}),
+	), player: ~player).play(chans: 2);
+})
+)
+
+//Interpolation still works
+~pattern.from(~player.({ | freq | freq * 0.5 }), \freq, time: 5) //.value == .read
+~pattern.from(~player.({ | freq | freq * 2 }), \freq2, time: 5)
+
+//Modify dur
+~player.from(0.5, \dur, sched: AlgaStep(3))
+
+//If modifying player, the interpolation is still triggered on the children
+~player.from(Pseq([330, 660], inf), \freq, time: 5)
+
+//Removing a player stops the pattern triggering
+~pattern.removePlayer;
+::
+
+private:: addAction
+private:: addAlgaPattern
+private:: addAlgaPatternEntry
+private:: addScheduledStepAction
+private:: advance
+private:: advanceAndConsumeScheduledStepActions
+private:: algaPatternEntries
+private:: algaPatterns
+private:: algaPatternsPrevFunc
+private:: algaReschedulingEventStreamPlayer
+private:: beingStopped
+private:: compileFunctionSynthDefDictIfNeeded
+private:: dur
+private:: entries
+private:: fromInner
+private:: interpolateDur
+private:: isAlgaPatternPlayer
+private:: manualDur
+private:: parseAlgaTempParam
+private:: parseFilterPatternParam
+private:: parseListPatternParam
+private:: parseParam
+private:: parseParam_inner
+private:: pattern
+private:: patternAsStream
+private:: reassignAlgaReaderPfunc
+private:: reassignAlgaReaderPfuncs
+private:: reassignAlgaTemp
+private:: reassignFXEvent
+private:: reassignFilterPattern
+private:: reassignGenericPattern
+private:: reassignListPattern
+private:: removeAlgaPattern
+private:: removeAlgaPatternEntry
+private:: results
+private:: schedInSeconds
+private:: schedInner
+private:: scheduledStepActionsPost
+private:: scheduledStepActionsPre
+private:: scheduler
+private:: server
+private:: timeInner

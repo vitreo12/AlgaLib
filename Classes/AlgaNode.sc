@@ -163,7 +163,7 @@ AlgaNode {
 	}
 
 	*new_ap { | def, interpTime, interpShape, playTime, sched = 1,
-		schedInSeconds = false, sampleAccurateFuncs = true, server |
+		schedInSeconds = false, sampleAccurateFuncs = true, player, server |
 		^super.new.init(
 			argDef: def,
 			argConnectionTime: interpTime,
@@ -172,6 +172,7 @@ AlgaNode {
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
 			argSampleAccurateFuncs: sampleAccurateFuncs,
+			argPlayer: player,
 			argServer: server,
 		)
 	}
@@ -451,7 +452,7 @@ AlgaNode {
 
 	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
 		argPlayTime = 0, argSched = 0, argOutsMapping,
-		argSampleAccurateFuncs = true, argSchedInSeconds = false, argServer, argName |
+		argSampleAccurateFuncs = true, argSchedInSeconds = false, argPlayer, argServer, argName |
 
 		//Check supported classes for argObj, so that things won't even init if wrong.
 		//Also check for AlgaPattern
@@ -495,6 +496,16 @@ AlgaNode {
 			//Init sampleAccurateFuncs: must happen BEFORE parseDef
 			this.sampleAccurateFuncs_(argSampleAccurateFuncs);
 
+			//Assign player
+			if(argPlayer.isAlgaPatternPlayer, {
+				argPlayer.addAlgaPattern(this);
+				this.player = argPlayer;
+			}, {
+				if(argPlayer != nil, {
+					"AlgaPattern: 'player' must be an AlgaPatternPlayer".warn;
+				});
+			});
+
 			argDefAndFunctionSynthDefDict = this.parseDef(argDef);
 			argDef = argDefAndFunctionSynthDefDict[0];
 			functionSynthDefDict = argDefAndFunctionSynthDefDict[1];
@@ -510,7 +521,7 @@ AlgaNode {
 					);
 				},
 				functionSynthDefDict: functionSynthDefDict
-			)
+			);
 
 			^this;
 		});
@@ -769,6 +780,7 @@ AlgaNode {
 	//Used in AlgaProxySpace
 	copyVars { | nodeToCopy |
 		if(nodeToCopy.isAlgaNode, {
+			this.sched = nodeToCopy.sched;
 			this.interpTime = nodeToCopy.connectionTime;
 			this.playTime = nodeToCopy.playTime;
 			this.replacePlayTime = nodeToCopy.replacePlayTime;
@@ -1518,7 +1530,6 @@ AlgaNode {
 		if(paramNumChannels == nil, {
 			^scaleEntry
 		});
-		scaleEntry = scaleEntry.next; //Patten support
 		if(scaleEntry.isSequenceableCollection, {
 			var scaleEntrySize = scaleEntry.size;
 			if(scaleEntrySize != paramNumChannels, {
@@ -1564,9 +1575,6 @@ AlgaNode {
 	//Calculate scale to send to interp synth
 	calculateScaling { | param, sender, paramNumChannels, scale, addScaling = true |
 		var scaleCopy;
-
-		scale = scale.next; //Pattern support
-
 		if(scale == nil, { ^nil });
 
 		if(scale.isNumberOrArray.not, {
@@ -1720,8 +1728,6 @@ AlgaNode {
 		senderNumChans, paramNumChans, updateParamsChansMapping = true |
 
 		var actualSenderChansMapping;
-
-		senderChansMapping = senderChansMapping.next; //Pattern support
 
 		actualSenderChansMapping = senderChansMapping.copy;
 
@@ -3590,11 +3596,18 @@ AlgaNode {
 
 	//<<.param sender
 	makeConnection { | sender, param = \in, replace = false, mix = false,
-		replaceMix = false, senderChansMapping, scale, time, shape, sched = 0 |
+		replaceMix = false, senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
 
 		//Check sched
 		if(replace.not, { sched = sched ? schedInner });
 
+		//Force a replace call
+		if(forceReplace, {
+			if(mix, { "AlgaNode: 'forceReplace' does not work with mixing".error; ^this });
+			^this.replace(synthDef.name, [param, sender], time: time, sched: sched)
+		});
+
+		//Actual makeConnection
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			this.addAction(
 				condition: {
@@ -3613,7 +3626,7 @@ AlgaNode {
 
 	//<<.param { }
 	makeConnectionFunction { | sender, param = \in, replace = false,
-		senderChansMapping, scale, time, shape, sched = 0 |
+		senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
 
 		var defName = ("alga_" ++ UniqueID.next).asSymbol;
 		var algaTemp = AlgaTemp(defName);
@@ -3636,6 +3649,7 @@ AlgaNode {
 						scale: scale,
 						time: time,
 						shape: shape,
+						forceReplace: forceReplace,
 						sched: sched
 					)
 				}, {
@@ -3648,7 +3662,7 @@ AlgaNode {
 
 	//<<.param \someDef
 	makeConnectionSymbol { | sender, param = \in, replace = false,
-		senderChansMapping, scale, time, shape, sched = 0 |
+		senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
 
 		var algaTemp = AlgaTemp(sender);
 		algaTemp.checkValidSynthDef(sender);
@@ -3666,12 +3680,13 @@ AlgaNode {
 			scale: scale,
 			time: time,
 			shape: shape,
+			forceReplace: forceReplace,
 			sched: sched
 		)
 	}
 
 	//Parse an AlgaTemp
-	parseAlgaTempParam { | algaTemp, functionSynthDefDict |
+	parseAlgaTempParam { | algaTemp, functionSynthDefDict, topAlgaTemp |
 		var validAlgaTemp = false;
 		var def = algaTemp.def;
 		var defDef;
@@ -3731,20 +3746,9 @@ AlgaNode {
 			//Loop around the event entries and use as Stream, substituting entries
 			def.keysValuesDo({ | key, entry |
 				if(key != \def, {
-					var parsedEntry = entry;
-					case
-					{ entry.isListPattern } {
-						parsedEntry = this.parseListPatternParam(parsedEntry, functionSynthDefDict);
-						if(parsedEntry == nil, { ^nil })
-					}
-					{ entry.isFilterPattern } {
-						parsedEntry = this.parseFilterPatternParam(parsedEntry, functionSynthDefDict);
-						if(parsedEntry == nil, { ^nil })
-					}
-					{ entry.isAlgaTemp } {
-						parsedEntry = this.parseAlgaTempParam(parsedEntry, functionSynthDefDict);
-						if(parsedEntry == nil, { ^nil })
-					};
+					var parsedEntry = this.parseParam_inner(entry, functionSynthDefDict);
+					if(parsedEntry == nil, { ^nil });
+					//Finally, replace in place
 					def[key] = parsedEntry.algaAsStream;
 				});
 			});
@@ -3792,25 +3796,77 @@ AlgaNode {
 
 	//Overload so that it errors out
 	parseListPatternParam { | listPattern, functionSynthDefDict |
-		"AlgaNode: AlgaTemp does not support ListPatterns".error;
-		^nil
-	}
-
-	//Overload so that it errors out
-	parseAlgaTempListPatternParam { | value, functionSynthDefDict |
-		"AlgaNode: AlgaTemp does not support ListPatterns".error;
+		"AlgaNode: no support for ListPatterns".error;
 		^nil
 	}
 
 	//Overload so that it errors out
 	parseFilterPatternParam { | value, functionSynthDefDict |
-		"AlgaNode: AlgaTemp does not support FilterPatterns".error;
+		"AlgaNode: no support for FilterPatterns".error;
 		^nil
+	}
+
+	//Overload so that it errors out
+	parseGenericPatternParam { | value, functionSynthDefDict |
+		"AlgaNode: no support for Patterns".error;
+		^nil
+	}
+
+	//Parse a param looking for AlgaTemps and ListPatterns
+	parseParam_inner { | value, functionSynthDefDict |
+		//Dispatch
+		case
+		{ value.isAlgaTemp } {
+			value = this.parseAlgaTempParam(value, functionSynthDefDict);
+			if(value == nil, { ^nil });
+		}
+		{ value.isListPattern } {
+			value = this.parseListPatternParam(value, functionSynthDefDict);
+			if(value == nil, { ^nil });
+		}
+		{ value.isFilterPattern } {
+			value = this.parseFilterPatternParam(value, functionSynthDefDict);
+			if(value == nil, { ^nil });
+		}
+		{ value.isAlgaReaderPfunc } {
+			if(this.isAlgaPattern, { this.assignAlgaReaderPfunc(value) });
+		}
+		{ value.isPattern } {
+			//Fallback: generic Pattern
+			value = this.parseGenericPatternParam(value, functionSynthDefDict);
+			if(value == nil, { ^nil });
+		};
+
+		//Returned parsed element
+		^value;
+	}
+
+	//Parse an entry
+	parseParam { | value, functionSynthDefDict |
+		//Used in from {}
+		var returnBoth = false;
+		if(functionSynthDefDict == nil, {
+			returnBoth = true;
+			functionSynthDefDict = IdentityDictionary();
+		});
+
+		//Reset paramContainsAlgaReaderPfunc, and latestPlayers recursivePatternList
+		if(this.isAlgaPattern, { this.resetPatternParsingVars });
+
+		//Actual parsing
+		value = this.parseParam_inner(value, functionSynthDefDict);
+
+		//Used in from {}
+		if(returnBoth, {
+			^[value, functionSynthDefDict]
+		}, {
+			^value
+		})
 	}
 
 	//<<.param AlgaTemp
 	makeConnectionAlgaTemp { | sender, param = \in, replace = false,
-		senderChansMapping, scale, time, shape, sched = 0 |
+		senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
 
 		var functionSynthDefDict = IdentityDictionary();
 		var algaTemp = this.parseAlgaTempParam(sender, functionSynthDefDict);
@@ -3830,6 +3886,7 @@ AlgaNode {
 						scale: scale,
 						time: time,
 						shape:shape,
+						forceReplace: forceReplace,
 						sched: sched
 					)
 				}, {
@@ -3841,7 +3898,7 @@ AlgaNode {
 	}
 
 	//Receive a connection
-	from { | sender, param = \in, chans, scale, time, shape, sched |
+	from { | sender, param = \in, chans, scale, time, shape, forceReplace = false, sched |
 		case
 		{ sender.isAlgaNode } {
 			if(this.server != sender.server, {
@@ -3849,7 +3906,7 @@ AlgaNode {
 				^this;
 			});
 			^this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}
 		{ sender.isAlgaArg } {
@@ -3858,22 +3915,22 @@ AlgaNode {
 		}
 		{ sender.isNumberOrArray } {
 			^this.makeConnection(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}
 		{ sender.isFunction } {
 			^this.makeConnectionFunction(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}
 		{ sender.isSymbol } {
 			^this.makeConnectionSymbol(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}
 		{ sender.isAlgaTemp } {
 			^this.makeConnectionAlgaTemp(sender, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}
 		{ sender.isBuffer } {
@@ -3892,14 +3949,14 @@ AlgaNode {
 	}
 
 	//Send a connection
-	to { | receiver, param = \in, chans, scale, time, shape, sched |
+	to { | receiver, param = \in, chans, scale, time, shape, forceReplace = false, sched |
 		if(receiver.isAlgaNode, {
 			if(this.server != receiver.server, {
 				("AlgaNode: trying to enstablish a connection between two AlgaNodes on different servers").error;
 				^this;
 			});
 			receiver.makeConnection(this, param, senderChansMapping:chans,
-				scale:scale, time:time, shape:shape, sched:sched
+				scale:scale, time:time, shape:shape, forceReplace: forceReplace, sched:sched
 			);
 		}, {
 			("AlgaNode: trying to enstablish a connection to an invalid class: " ++ receiver.class).error;
@@ -4159,7 +4216,7 @@ AlgaNode {
 			});
 		});
 
-		//Re-create previous out: connectionswith patterns
+		//Re-create previous out: connections with patterns
 		this.createAllPatternOutConnections(time);
 	}
 

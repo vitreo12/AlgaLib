@@ -26,7 +26,8 @@ Alga {
 	//Store if server is supernova or not
 	classvar <supernovas;
 
-	*initSynthDefs {
+	*initSynthDefs { | maxIO = 8 |
+		AlgaStartup.algaMaxIO = maxIO;
 		AlgaStartup.initSynthDefs;
 	}
 
@@ -46,6 +47,11 @@ Alga {
 		if(value.isKindOf(Boolean), {
 			debug = value
 		});
+	}
+
+	*booted { | server |
+		server = server ? Server.default;
+		^(servers[server] != nil)
 	}
 
 	*maxIO {
@@ -86,13 +92,17 @@ Alga {
 		if(server != nil, {
 			if(server.serverRunning, {
 				server.quit(onComplete: { prevServerQuit[0] = true });
+				fork {
+					3.wait;
+					if(server.serverRunning.not, { prevServerQuit[0] = true });
+				}
 			}, {
 				prevServerQuit[0] = true;
 			});
-			this.clearServer(server);
 		}, {
 			prevServerQuit[0] = true;
 		});
+		this.clearServer(server);
 	}
 
 	*newScheduler { | server, clock, cascadeMode = false |

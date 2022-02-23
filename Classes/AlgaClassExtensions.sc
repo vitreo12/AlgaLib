@@ -24,6 +24,9 @@
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
 	isAlgaStep { ^false }
+	isAlgaPatternPlayer { ^false }
+	isAlgaReader { ^false }
+	isAlgaReaderPfunc { ^false }
 	isBuffer { ^false }
 	isPattern { ^false }
 	isStream { ^false }
@@ -43,16 +46,17 @@
 	algaCleared { ^false }
 	algaToBeCleared { ^false }
 	algaCanFreeSynth { ^false }
+	algaAdvance { }
+	algaAdvanceArrayScaleValues { }
+
+	//Fallback for AlgaBlock
+	blockIndex { ^(-1) }
 
 	//Like asStream, but also converts inner elements of an Array
 	algaAsStream { ^(this.asStream) }
 
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
-	addAction { | condition, func, sched = 0 |
-		if(sched != 0, {
-			"AlgaSpinRoutine: 'sched' will be ignored".error;
-		});
-
+	addAction { | condition, func, sched = 0, topPriority = false, schedInSeconds = false, preCheck = false |
 		AlgaSpinRoutine.waitFor(
 			condition:condition,
 			func:func
@@ -171,6 +175,9 @@
 
 	//This avoids many problems when .clearing a node used in connections
 	busArg { ^nil }
+
+	//When APP is invalid
+	run { }
 
 	//Like handleError without stacktrace
 	algaHandleError { | error |

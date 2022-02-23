@@ -40,7 +40,7 @@ Alga.boot({
 			def: \tanh,
 			dist: Pseq([1, 2, 4, 6],inf)
 		)
-	)).play(chans: 2);
+	)).play(chans: 2, scale: 0.5);
 });
 )
 
