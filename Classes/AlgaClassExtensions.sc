@@ -49,6 +49,9 @@
 	algaAdvance { }
 	algaAdvanceArrayScaleValues { }
 
+	//Fallback for AlgaBlock
+	blockIndex { ^(-1) }
+
 	//Like asStream, but also converts inner elements of an Array
 	algaAsStream { ^(this.asStream) }
 

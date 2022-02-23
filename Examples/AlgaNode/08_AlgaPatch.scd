@@ -9,9 +9,15 @@ Alga.boot({
 
 		a.play(chans:2); //play stereo
 
+		//Wait then change root frequencies
+		3.wait;
+
 		//Change root frequencies
 		b <<.freq 25;
 		a <<.freq 103;
+
+		//Wait then perform modulation
+		3.wait;
 
 		//Change the oscillator implementation, using a Saw wave instead
 		b.replace({ Saw.ar(\freq.kr + \fm.ar) })
