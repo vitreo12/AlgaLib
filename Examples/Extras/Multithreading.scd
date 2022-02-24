@@ -1,4 +1,5 @@
 //The code to test
+(
 c = {
 	var reverb;
 
@@ -27,6 +28,7 @@ c = {
 		}
 	}
 }
+)
 
 //Boot Alga with the supernova server
 //Alga will automatically spread the load across multiple CPU cores.
