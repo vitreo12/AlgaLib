@@ -1,5 +1,5 @@
 // AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
-// Copyright (C) 2020-2021 Francesco Cameli.
+// Copyright (C) 2020-2022 Francesco Cameli.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,16 +17,25 @@
 +Object {
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
+	isAlgaEffect { ^false }
+	isAlgaMod { ^false }
+	isAlgaNode_AlgaBlock { ^false }
 	isAlgaArg { ^false }
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
+	isAlgaStep { ^false }
+	isAlgaPatternPlayer { ^false }
+	isAlgaReader { ^false }
+	isAlgaReaderPfunc { ^false }
 	isBuffer { ^false }
 	isPattern { ^false }
 	isStream { ^false }
 	isSymbol { ^false }
 	isEvent { ^false }
 	isListPattern { ^false }
+	isFilterPattern { ^false }
 	isTempoClock { ^false }
+	isSet { ^false }
 	def { ^nil }
 	isNumberOrArray { ^((this.isNumber).or(this.isArray)) }
 
@@ -37,16 +46,17 @@
 	algaCleared { ^false }
 	algaToBeCleared { ^false }
 	algaCanFreeSynth { ^false }
+	algaAdvance { }
+	algaAdvanceArrayScaleValues { }
+
+	//Fallback for AlgaBlock
+	blockIndex { ^(-1) }
 
 	//Like asStream, but also converts inner elements of an Array
 	algaAsStream { ^(this.asStream) }
 
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
-	addAction { | condition, func, sched = 0 |
-		if(sched != 0, {
-			"AlgaSpinRoutine: sched is not a valid argument".error;
-		});
-
+	addAction { | condition, func, sched = 0, topPriority = false, schedInSeconds = false, preCheck = false |
 		AlgaSpinRoutine.waitFor(
 			condition:condition,
 			func:func
@@ -79,7 +89,7 @@
 	}
 }
 
-//Essential for 'a16' busses not to be interpreted as an Array!
+//Essential for 'c5' / 'a16' busses not to be interpreted as an Array!
 +String {
 	isNumberOrArray { ^false } //isArray would be true!!
 }
@@ -102,6 +112,19 @@
 			this.linlin(inMin, inMax, outMin, outMax, clip),
 			curvedResult
 		])
+	}
+}
+
+//Needed for AlgaIEnvGen / IEnvGen to work
++Env {
+	//Used in the AlgaSynthDef
+	algaAsArray {
+		^this.asArrayForInterpolation.unbubble;
+	}
+
+	//Used on .set to change Env
+	algaConvertEnv {
+		^this.asArrayForInterpolation.collect(_.reference).unbubble;
 	}
 }
 
@@ -153,6 +176,9 @@
 	//This avoids many problems when .clearing a node used in connections
 	busArg { ^nil }
 
+	//When APP is invalid
+	run { }
+
 	//Like handleError without stacktrace
 	algaHandleError { | error |
 		error.errorString.postln;
@@ -189,13 +215,17 @@
 	}
 }
 
++Set {
+	isSet { ^true }
+}
+
 +Dictionary {
 	//Loop over a Dict, unpacking IdentitySet.
 	//It's used in AlgaBlock to unpack inNodes of an AlgaNode
 	nodesLoop { | function |
 		this.keysValuesDo({
 			arg key, value, i;
-			if(value.class == IdentitySet, {
+			if(value.isSet, {
 				value.do({ | entry |
 					function.value(entry, i);
 				});
@@ -224,6 +254,10 @@
 
 +ListPattern {
 	isListPattern { ^true }
+}
+
++FilterPattern {
+	isFilterPattern { ^true }
 }
 
 //List extensions are used in AlgaScheduler to manage actions
@@ -284,7 +318,7 @@
 	}
 
 	algaSched { | when, task |
-		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
+		//if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
 		this.sched(when, task);
 	}
 
@@ -299,7 +333,7 @@
 
 	algaSchedOnce { | when, task |
 		var taskOnce = { task.value; nil };
-		if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
+		//if(this.isTempoClock, { "TempoClock.sched will schedule after beats, not time!".warn; });
 		this.sched(when, taskOnce);
 	}
 
@@ -338,6 +372,34 @@
 		}, {
 			"Clock is not a TempoClock. Can't schedule with top priority".warn;
 			this.algaSched(when, taskOnce)
+		});
+	}
+
+	algaSchedInSeconds { | when, task |
+		this.schedAbs(this.secs2beats(this.seconds + when), task);
+	}
+
+	algaSchedInSecondsOnce { | when, task |
+		var taskOnce = { task.value; nil };
+		this.schedAbs(this.secs2beats(this.seconds + when), taskOnce);
+	}
+
+	algaSchedInSecondsWithTopPriority { | when, task |
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedInSecondsWithTopPriority(when, task);
+		}, {
+			"Clock is not a TempoClock. Can't schedule with top priority".warn;
+			this.algaSchedInSeconds(when, task);
+		});
+	}
+
+	algaSchedInSecondsOnceWithTopPriority { | when, task |
+		var taskOnce = { task.value; nil };
+		if(this.isTempoClock, {
+			this.algaTempoClockSchedInSecondsWithTopPriority(when, taskOnce);
+		}, {
+			"Clock is not a TempoClock. Can't schedule with top priority".warn;
+			this.algaSchedInSeconds(when, taskOnce);
 		});
 	}
 }
@@ -395,6 +457,14 @@
 		this.algaTempoClockSchedAtTopPriority(task);
 	}
 
+	algaTempoClockSchedInSecondsWithTopPriority { | when, task |
+		//add to clock
+		this.algaSchedInSeconds(when, task);
+
+		//schedule it at top priority
+		this.algaTempoClockSchedAtTopPriority(task);
+	}
+
 	algaTempoClockSchedAtTopPriority { | task |
 		//indices for each of the unique times
 		var indices = IdentityDictionary();
@@ -428,7 +498,8 @@
 
 					//Order the entries by pushing the last entry, task, to the first index
 					entries[currentTime] = entries[currentTime].move(
-						entriesSize - 1, 0
+						entriesSize - 1,
+						0
 					);
 
 					//Now re-order the queue entries according to the correct index / entry pairs

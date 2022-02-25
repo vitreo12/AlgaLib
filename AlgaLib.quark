@@ -4,5 +4,5 @@
 	summary:		"Interpolating live coding environment",
 	author:			"vitreo12",
 	helpdoc:		"HelpSources/Classes/Alga.schelp",
-	version:		1.0,
+	version:		1.1,
 )

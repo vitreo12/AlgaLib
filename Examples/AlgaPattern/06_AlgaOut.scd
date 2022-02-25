@@ -35,7 +35,7 @@ Alga.boot({
 				param: \in
 			)
 		], inf)
-	));
+	)).stopPatternBeforeReplace_(false);
 });
 )
 

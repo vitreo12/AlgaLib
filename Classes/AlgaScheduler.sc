@@ -1,5 +1,5 @@
 // AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
-// Copyright (C) 2020-2021 Francesco Cameli.
+// Copyright (C) 2020-2022 Francesco Cameli.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -306,7 +306,7 @@ AlgaScheduler : AlgaThread {
 				//This will be the core of clock / server syncing of actions
 				//Consume actions (they are ordered thanks to OrderedIdentitySet)
 				while({ actions.size > 0 }, {
-					var action, sched, topPriority;
+					var action, sched, topPriority, schedInSeconds;
 
 					if(cascadeMode, {
 						//if cascading, pop action from top of the list.
@@ -328,6 +328,9 @@ AlgaScheduler : AlgaThread {
 
 					//Check if the specific action has to be executed with top priority
 					topPriority = action[3];
+
+					//Check if the specific action has to be scheduled in seconds and not beats
+					schedInSeconds = action[4];
 
 					//Found a sched value (run in the future on the clock)
 					if(sched > 0, {
@@ -382,9 +385,17 @@ AlgaScheduler : AlgaThread {
 
 							//In sched time, execute the function
 							if(topPriority, {
-								clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
+								if(schedInSeconds, {
+									clock.algaSchedInSecondsOnceWithTopPriority(sched, functionOnSched)
+								}, {
+									clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
+								})
 							}, {
-								clock.algaSchedAtQuantOnce(sched, functionOnSched)
+								if(schedInSeconds, {
+									clock.algaSchedInSecondsOnce(sched, functionOnSched)
+								}, {
+									clock.algaSchedAtQuantOnce(sched, functionOnSched)
+								});
 							});
 						}, {
 							//Only remove the one action and postpone it in the future.
@@ -410,9 +421,17 @@ AlgaScheduler : AlgaThread {
 
 							//In sched time, execute the function
 							if(topPriority, {
-								clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
+								if(schedInSeconds, {
+									clock.algaSchedInSecondsOnceWithTopPriority(sched, functionOnSched)
+								}, {
+									clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
+								});
 							}, {
-								clock.algaSchedAtQuantOnce(sched, functionOnSched)
+								if(schedInSeconds, {
+									clock.algaSchedInSecondsOnce(sched, functionOnSched)
+								}, {
+									clock.algaSchedAtQuantOnce(sched, functionOnSched)
+								});
 							});
 						});
 					}, {
@@ -425,14 +444,11 @@ AlgaScheduler : AlgaThread {
 			//All actions are completed: reset currentExecAction
 			currentExecAction = nil;
 
-			//If switchCascadeMode... This is used for AlgaPatch
+			//This is used in AlgaPatch
 			if(switchCascadeMode, {
 				if(verbose, { "AlgaPatch: switching mode".postcln; });
-				if(cascadeMode, {
-					cascadeMode = false;
-				}, {
-					cascadeMode = true;
-				});
+				if(cascadeMode, { cascadeMode = false }, { cascadeMode = true });
+				switchCascadeMode = false; //Reset or it will keep switching
 			});
 
 			//Done scheduling
@@ -451,7 +467,7 @@ AlgaScheduler : AlgaThread {
 	}
 
 	//Default condition is just { true }, just execute it when its time comes on the scheduler
-	addAction { | condition, func, sched = 0, topPriority = false |
+	addAction { | condition, func, sched = 0, topPriority = false, schedInSeconds = false, preCheck = false |
 		var action;
 
 		//Only numbers
@@ -469,12 +485,22 @@ AlgaScheduler : AlgaThread {
 			^this;
 		});
 
+		//If preCheck, if the condition is already true, execute the function without adding it to the scheduler
+		if(preCheck, {
+			if(condition.value, {
+				if(verbose, {
+					("AlgaScheduler: executing function:" + func.def.context.asString + "as condition was true already").postcln;
+				});
+				^func.value
+			});
+		});
+
 		//Only positive numbers
 		sched = sched ? 0;
 		if(sched < 0, { sched = 0 });
 
 		//New action
-		action = [condition, func, sched, topPriority];
+		action = [condition, func, sched, topPriority, schedInSeconds];
 
 		//We're in a callee situation: add this node after the index of currentExecAction
 		if(currentExecAction != nil, {
@@ -500,10 +526,8 @@ AlgaScheduler : AlgaThread {
 	}
 }
 
-//Run things concurrently in the scheduler.
-//Each event waits for the previous one to be completed...
-//NOTE that this behaviour is broken when using an AlgaNode with a Function,
-//as the server.sync call screws up the ordering of its buildFromSynthDef call
+//Run things concurrently in the scheduler, where
+//each event waits for the previous one to be completed
 AlgaPatch {
 	*new { | func, server |
 		var scheduler;
@@ -511,13 +535,15 @@ AlgaPatch {
 		scheduler = Alga.schedulers[server];
 		if(scheduler != nil, {
 			if(scheduler.cascadeMode, {
-				//If already cascadeMode
-				scheduler.addAction(func: func);
+				//If already cascadeMode, just run the func.
+				//fork in case user has waits
+				fork { func.value };
 			}, {
 				//Make cascadeMode true and switch back to false when done
 				scheduler.cascadeMode = true;
 				scheduler.switchCascadeMode = true;
-				scheduler.addAction(func: func);
+				//fork in case user has waits
+				fork { func.value };
 			});
 		}, {
 			("Alga is not booted on server" + server.name).error;

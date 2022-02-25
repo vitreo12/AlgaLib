@@ -17,7 +17,7 @@ Alga.boot({
 	a = AlgaPattern((
 		def: \sine,
 		dur: 0.5
-	)).play(chans: 2);
+	)).play(chans: 2, scale: 0.7);
 });
 )
 
@@ -35,6 +35,10 @@ a.from(Pwhite(0.03, 0.5), \dur, sched: 1);
 
 //Alternatively, the 'replaceDur' option can be used to trigger a 'replace' call, allowing for volume transitions
 a.replaceDur = true;
+
+//'The stopPatternBeforeReplace' option permits to either just stop the pattern before replacing (true),
+//or to wait for the crossfade to finish before stopping the old one (false)
+a.stopPatternBeforeReplace = false;
 
 //Now it will 'replace'
 a.from(0.25, \dur, time: 3, sched: 1);

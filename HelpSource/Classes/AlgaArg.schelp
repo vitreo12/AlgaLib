@@ -62,3 +62,7 @@ private:: isAlgaArg
 private:: outNodes
 private:: scale
 private:: sender
+private:: algaAdvance
+private:: chansStream
+private:: scaleStream
+private:: senderStream

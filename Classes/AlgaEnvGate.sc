@@ -1,5 +1,5 @@
 // AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
-// Copyright (C) 2020-2021 Francesco Cameli.
+// Copyright (C) 2020-2022 Francesco Cameli.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,20 +18,16 @@
 //It's used internally in AlgaSynthDef for makeFadeEnv and in alga_play synth
 AlgaEnvGate {
 	*ar { | i_level=0, gate, fadeTime, doneAction=2, curve='sin' |
-		var synthGate = gate ?? { NamedControl.kr(\gate, 1.0) }; //This retrieves \gate from upper AlgaSynthDef
-		var synthFadeTime = fadeTime ?? { NamedControl.kr(\fadeTime, 0) }; //This retrieves \fadeTime from upper AlgaSynthDef
 		^EnvGen.ar(
 			Env.new([ i_level, 1.0, 0.0], #[1.0, 1.0], curve, 1),
-			synthGate, 1.0, 0.0, synthFadeTime, doneAction
+			gate, 1.0, 0.0, fadeTime, doneAction
 		)
 	}
 
 	*kr { | i_level=0, gate, fadeTime, doneAction=2, curve='lin' |
-		var synthGate = gate ?? { NamedControl.kr(\gate, 1.0) }; //This retrieves \gate from upper AlgaSynthDef
-		var synthFadeTime = fadeTime ?? { NamedControl.kr(\fadeTime, 0) }; //This retrieves \fadeTime from upper AlgaSynthDef
 		^EnvGen.kr(
 			Env.new([ i_level, 1.0, 0.0], #[1.0, 1.0], curve, 1),
-			synthGate, 1.0, 0.0, synthFadeTime, doneAction
+			gate, 1.0, 0.0, fadeTime, doneAction
 		)
 	}
 }

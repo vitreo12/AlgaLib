@@ -70,3 +70,10 @@ private:: isAlgaOut
 private:: node
 private:: param
 private:: scale
+private:: algaAdvance
+private:: chansStream
+private:: nodeOrig
+private:: nodeStream
+private:: paramOrig
+private:: paramStream
+private:: scaleStream

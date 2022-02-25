@@ -1,7 +1,7 @@
 TITLE:: AlgaNode
 summary:: Alga module representing an instance of a sonic process
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp
+related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaProxySpace
 
 
 DESCRIPTION::
@@ -37,25 +37,39 @@ ARGUMENT:: args
 Define default arguments for the parameters of the function or link::Classes/AlgaSynthDef::. These can be link::Classes/Number::s, link::Classes/Array::s, link::Classes/AlgaNode::s, link::Classes/AlgaTemp::s or link::Classes/AlgaArg::s.
 ARGUMENT:: interpTime
 Specify the interpolation time it takes whenever making a new connection to any parameter of this link::Classes/AlgaNode::.
+ARGUMENT:: interpShape
+Specify the interpolation shape that is to be used to perform new connections. This must be defined with an link::Classes/Env:: that always starts at 0 and ends at 1. If not specified, a single ramp code::Env([0, 1], 1):: is used by default.
 ARGUMENT:: playTime
 Specify the fading in / fading out time that it takes for this link::Classes/AlgaNode:: to play through speakers. These values are applied when calling the emphasis::play:: or emphasis::stop:: functions.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+ARGUMENT:: schedInSeconds
+Specify if all sched actions should be scheduled in seconds, opposing to beats. Default is code::false::.
 ARGUMENT:: outsMapping
 It works just like link::Classes/AlgaSynthDef::'s emphasis::outsMapping:: argument, but for the case of using an emphasis::UGen function:: as the emphasis::obj:: argument. Specify new mappings by an array that maps symbols to specific output channels. If not specified, the default code::\out1, \out2, etc..:: symbols can be used to address specific channels.
 ARGUMENT:: server
 Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaNode:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
 
 
+private:: new_ap
+private:: debug
+
+
 INSTANCEMETHODS::
 
 
 METHOD:: play
-Play the link::Classes/AlgaNode:: to SuperCollider's output.
+Play the link::Classes/AlgaNode:: to SuperCollider's output. Note that this method also ensures that no dangerous audio signals are forwarded to your speaker's output, with an implementation inspired by the SafetyNet quark ( https://github.com/adcxyz/SafetyNet ).
 ARGUMENT:: time
-Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
+Define a temporary connection time that the method takes to complete, applying the necessary interpolations. If not specified, emphasis::playTime:: will be used.
 ARGUMENT:: chans
 Specify an link::Classes/Array:: of output channels to play, which can contain emphasis::outsMapping:: symbols. It's also possible to just specify a number, in which case it determines how many channels will be played.
+ARGUMENT:: scale
+Specify a link::Classes/Number:: to scale the output by.
+ARGUMENT:: out
+Specify a link::Classes/Bus:: index to play the node to.
+ARGUMENT:: sched
+Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 code::
 AlgaNode.ar({ SinOsc.ar([440, 450]) }).play //Play both channels
 
@@ -69,8 +83,6 @@ AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1]) //Play both channels,
 
 AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1, 1, 0]) //Quadraphonic
 ::
-ARGUMENT:: sched
-Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
 
 METHOD:: stop
@@ -79,30 +91,6 @@ Stop the output to speakers.
 
 METHOD:: clear
 Clear the link::Classes/AlgaNode::, dropping all connections in place (with appropriate interpolation) as well as the output to speakers.
-
-
-METHOD:: interpTime
-Specify a new time that the connections to any of the parameters will use to perform interpolations.
-
-
-METHOD:: it
-Shortcut for emphasis::interpTime::.
-
-
-method:: paramInterpTime
-Specify a new time that the connections to the specific emphasis::param:: will use to perform interpolations.
-
-
-method:: pit
-Shortcut for emphasis::paramInterpTime::.
-
-
-METHOD:: playTime
-Specify fade in / fade out times when calling emphasis::play:: and emphasis::stop::.
-
-
-METHOD:: pt
-Shortcut for emphasis::playTime::.
 
 
 METHOD:: replace
@@ -159,6 +147,10 @@ NUMBEREDLIST::
 Note that all the values can be specified as arrays, in which case they map for specific channels. For example, code::[-1, [1, 2], 0, [10, 20]]:: will scale the first channel to code::[-1, 1, 0, 10]::, and the second one to code::[-1, 2, 0, 20]::.
 ARGUMENT:: time
 Define a temporary connection time that the method takes to complete, applying the necessary interpolations.
+ARGUMENT:: shape
+Define a temporary shape to be used in the interpolation process. This must be defined with an link::Classes/Env:: starting at 0 and ending at 1.
+ARGUMENT:: forceReplace
+Force a code::replace:: call instead of interpolating the values.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
@@ -211,6 +203,59 @@ Same as emphasis::disconnect:: where no emphasis::oldSender:: is specified: rese
 METHOD:: <|
 Shortcut for emphasis::reset::.
 
+
+METHOD:: interpTime
+Specify a new time that the connections to any of the parameters will use to perform interpolations.
+
+
+METHOD:: it
+Shortcut for emphasis::interpTime::.
+
+
+METHOD:: paramInterpTime
+Specify a new time that the connections to the specific emphasis::param:: will use to perform interpolations.
+
+
+METHOD:: pit
+Shortcut for emphasis::paramInterpTime::.
+
+
+METHOD:: interpShape
+Specify a new interpolation shape that the connections to any of the parameters will use to perform interpolations. This must be defined with an link::Classes/Env:: that always starts at 0 and ends at 1. If not specified, a single ramp code::Env([0, 1], 1):: is used by default.
+
+
+METHOD:: paramInterpShape
+Specify a new interpolation shape that the connections to the specific emphasis::param:: will use to perform interpolations.
+
+
+METHOD:: pis
+Shortcut for emphasis::paramInterpShape::.
+
+
+METHOD:: playTime
+Specify fade in / fade out times when calling emphasis::play:: and emphasis::stop::.
+
+
+METHOD:: pt
+Shortcut for emphasis::playTime::.
+
+
+METHOD:: replacePlayTime
+Specify fade in / fade out times when calling emphasis::replace:: on a node that was playing.
+
+
+METHOD:: rpt
+Shortcut for emphasis::replacePlayTime::.
+
+
+METHOD:: playSafety
+Specify a different safety method to use to scale the outut of a node when using the emphasis::play:: method. Accepted values are: code::'clip', 'tanh', 'softclip', 'limiter'::.
+
+METHOD:: sched
+Specify a sched value to use for new actions. This will be used if sched is not provided in the arguments of the called function.
+
+METHOD:: schedInSeconds
+Specify if all sched actions should be scheduled in seconds, opposing to beats. Default is code::false::.
 
 EXAMPLES::
 code::
@@ -477,3 +522,41 @@ private:: createMixInterpBusAndNormSynthAtParam
 private:: createMixInterpSynthAndInterpBusAndNormSynthAtParam
 private:: ct
 private:: replaceInterpBusAndNormSynth
+
+private:: checkValidEnv
+private:: getInterpShape
+private:: moveToHead
+private:: moveToTail
+private:: paramsInterpShapes
+private:: tempGroup
+
+private:: activeInNodes
+private:: activeInNodesCounter
+private:: activeOutNodes
+private:: activeOutNodesCounter
+private:: addActiveInNode
+private:: addActiveOutNode
+private:: asString
+private:: checkConnectionAlreadyInPlace
+private:: connectionAlreadyInPlace
+private:: name
+private:: removeActiveInNode
+private:: removeActiveNodeAndRearrangeBlock
+private:: removeActiveNodesAndRearrangeBlocks
+private:: removeActiveOutNode
+private:: prevPlayScale
+
+private:: addAction
+private:: copyVars
+private:: executeOnArgsInstantiation
+private:: prevPlayOut
+private:: is
+private:: ps
+private:: unpackFilterPatternRecursive
+private:: unpackListPatternOrFilterPatternOutsMapping
+private:: unpackSynthDefSymbol
+private:: parseFilterPatternParam
+
+private:: parseGenericPatternParam
+private:: parseParam
+private:: parseParam_inner

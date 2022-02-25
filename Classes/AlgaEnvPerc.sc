@@ -1,5 +1,5 @@
 // AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
-// Copyright (C) 2020-2021 Francesco Cameli.
+// Copyright (C) 2020-2022 Francesco Cameli.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,12 +16,12 @@
 
 //AlgaEnvPerc
 AlgaEnvPerc {
-	*ar { | attack = 0, release = 1, curve = -4.0 |
-		^EnvGen.ar(Env.perc(attack, release, 1.0, curve), doneAction: 2)
+	*ar { | attack = 0, release = 1, curve = -4.0, doneAction = 2 |
+		^EnvGen.ar(Env.perc(attack, release, 1.0, curve), doneAction: doneAction)
 	}
 
-	*kr { | attack = 0, release = 1, curve = -4.0 |
-		^EnvGen.kr(Env.perc(attack, release, 1.0, curve), doneAction: 2)
+	*kr { | attack = 0, release = 1, curve = -4.0, doneAction = 2 |
+		^EnvGen.kr(Env.perc(attack, release, 1.0, curve), doneAction: doneAction)
 	}
 }
 

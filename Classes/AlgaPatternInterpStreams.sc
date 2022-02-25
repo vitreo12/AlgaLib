@@ -1,5 +1,5 @@
 // AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
-// Copyright (C) 2020-2021 Francesco Cameli.
+// Copyright (C) 2020-2022 Francesco Cameli.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,8 +21,8 @@ AlgaPatternInterpStreams {
 	var <algaPattern;
 	var <server;
 
-	//The \dur entry
-	var <>dur;
+	//The time entries
+	var <>dur, <>sustain, <>stretch, <>legato;
 
 	//Store it for .replace
 	var <algaReschedulingEventStreamPlayer;
@@ -43,6 +43,9 @@ AlgaPatternInterpStreams {
 
 	var <scaleArraysAndChans;
 	var <sampleAndHolds;
+
+	//Used for AlgaPattern.stopPatternBeforeReplace
+	var <>beingStopped = false;
 
 	*new { | algaPattern |
 		^super.new.init(algaPattern)
@@ -95,7 +98,7 @@ AlgaPatternInterpStreams {
 
 	//Free all active interpSynths. This triggers the onFree action that's executed in
 	//addActiveInterpSynthOnFree
-	freeActiveInterpSynthsAtParam { | paramName, time = 0 |
+	freeActiveInterpSynthsAtParam { | paramName, time = 0, shape |
 		var interpSynthsAtParam = interpSynths[paramName];
 		if(interpSynthsAtParam != nil, {
 			interpSynthsAtParam.keysValuesDo({ | uniqueID, interpSynth |
@@ -107,6 +110,7 @@ AlgaPatternInterpStreams {
 				interpSynth.set(
 					\t_release, 1,
 					\fadeTime, time,
+					\envShape, shape.algaConvertEnv
 				);
 			});
 		});
@@ -182,7 +186,10 @@ AlgaPatternInterpStreams {
 									algaPattern.currentActivePatternParamSynths[patternInterpBusAtParam];
 									if(currentActivePatternSynthsAtInterpBus != nil, {
 										currentActivePatternSynthsAtInterpBus.do({ | patternParamSynth |
-											patternParamSynth.set(\sampleAndHold, 1, \t_sah, 1);
+											patternParamSynth.set(
+												\sampleAndHold, 1,
+												\t_sah, 1
+											);
 										});
 									});
 								});
@@ -198,7 +205,7 @@ AlgaPatternInterpStreams {
 	//as they are not embedded with the interpolation behaviour itself, but they are external.
 	//This allows to separate the per-tick pattern triggering from the interpolation process.
 	createPatternInterpSynthAndBusAtParam { | paramName, paramRate, paramNumChannels,
-		entry, uniqueID, time = 0 |
+		entry, entryOriginal, uniqueID, time = 0, shape |
 
 		var interpGroup = algaPattern.interpGroup;
 		var interpBus, interpSynth;
@@ -221,20 +228,28 @@ AlgaPatternInterpStreams {
 		//However, pattern synths are created on the fly, so the interpSynths need to be kept alive until
 		//interpolation has finished. In a nutshell, patternSynths and interpSynths are decoupled.
 		if(interpSynthsAtParam == nil, {
-			//If it's the first synth, fadeTime is 0.
+			//If it's the first synth, fadeTime is 0 and envShape is default
 			//This only happens when first creating the AlgaPattern!
 			interpSynth = AlgaSynth(
 				interpSymbol,
-				[\out, interpBus.index, \fadeTime, 0],
+				[
+					\out, interpBus.index,
+					\fadeTime, 0,
+					\envShape, Env([0, 1], 1).algaConvertEnv
+				],
 				interpGroup
 			);
 			interpSynths[paramName] = IdentityDictionary().put(uniqueID, interpSynth);
 			interpBusses[paramName] = IdentityDictionary().put(uniqueID, interpBus);
 		}, {
-			//If it's not the first synth, fadeTime is time
+			//If it's not the first synth, fadeTime is time and envShape is shape
 			interpSynth = AlgaSynth(
 				interpSymbol,
-				[\out, interpBus.index, \fadeTime, time],
+				[
+					\out, interpBus.index,
+					\fadeTime, time,
+					\envShape, shape.algaConvertEnv
+				],
 				interpGroup
 			);
 			interpSynths[paramName].put(uniqueID, interpSynth);
@@ -250,7 +265,7 @@ AlgaPatternInterpStreams {
 		//Also add a "onFree" routine that deletes unused entries from Dictionaries. This function
 		//is called on freeing the interpSynth.
 		//Note: no mixing yet
-		algaPattern.addActiveInterpSynthOnFree(paramName, \default, interpSynth, {
+		algaPattern.addActiveInterpSynthOnFree(paramName, entryOriginal, \default, interpSynth, {
 			var entriesAtParam              = entries[paramName];
 			var interpSynthsAtParam         = interpSynths[paramName];
 			var interpBussesAtParam         = interpBusses[paramName];
@@ -297,14 +312,16 @@ AlgaPatternInterpStreams {
 	}
 
 	//Wrapper around AlgaNode's addInOutNodesDict.
-	//If entry is a ListPattern, loop around it and add each entry that is an AlgaNode.
+	//If entry is a ListPattern / FilterPattern, loop around it and add each entry that is an AlgaNode.
 	addInOutNodesDictAtParam { | sender, param, mix = false |
-		algaPattern.addInOutNodesDict(sender, param, mix)
+		algaPattern.addInOutNodesDict(sender, param, mix);
 	}
 
 	//Wrapper around AlgaNode's removeInOutNodesDict.
-	//If entry is a ListPattern, loop around it and remove each entry that is an AlgaNode.
-	removeAllInOutNodesDictAtParam { | paramName |
+	//If entry is a ListPattern/ FilterPattern, loop around it and remove each entry that is an AlgaNode.
+	removeAllInOutNodesDictAtParam { | sender, paramName |
+		//This is then picked up in addInNode in AlgaPattern. This must come before removeInOutNodesDict
+		algaPattern.connectionAlreadyInPlace = algaPattern.checkConnectionAlreadyInPlace(sender);
 		algaPattern.removeInOutNodesDict(nil, paramName) //nil removes them all
 	}
 
@@ -343,7 +360,7 @@ AlgaPatternInterpStreams {
 	}
 
 	//Add a new sender interpolation to the current param
-	add { | entry, controlName, chans, scale, sampleAndHold, time = 0 |
+	add { | entry, controlName, chans, scale, sampleAndHold, time = 0, shape |
 		var paramName, paramRate, paramNumChannels, paramDefault;
 		var uniqueID;
 
@@ -380,17 +397,21 @@ AlgaPatternInterpStreams {
 		this.addSampleAndHold(paramName, sampleAndHold);
 
 		//Remove all older inNodes / outNodes... Doesn't work with mix yet
-		this.removeAllInOutNodesDictAtParam(paramName);
+		this.removeAllInOutNodesDictAtParam(entryOriginal, paramName);
 
 		//Add proper inNodes / outNodes / connectionTimeOutNodes. Use entryOriginal in order
-		//to retrieve if it is a ListPattern.
+		//to retrieve if it is a ListPattern / FilterPattern.
 		this.addInOutNodesDictAtParam(entryOriginal, paramName, false);
+
+		//Get shape
+		shape = algaPattern.checkValidEnv(shape) ? algaPattern.getInterpShape(paramName);
 
 		//Trigger the interpolation process on all the other active interpSynths.
 		//This must always be before createPatternInterpSynthAndBusAtParam
 		this.freeActiveInterpSynthsAtParam(
-			paramName,
-			time
+			paramName: paramName,
+			time: time,
+			shape: shape
 		);
 
 		//Create the interpSynth and interpBus for the new sender
@@ -399,8 +420,10 @@ AlgaPatternInterpStreams {
 			paramRate: paramRate,
 			paramNumChannels: paramNumChannels,
 			entry: entry,
+			entryOriginal: entryOriginal,
 			uniqueID: uniqueID,
-			time: time
+			time: time,
+			shape: shape
 		);
 
 		//Create a temporary pattern param synth to start the interpolation process with.
@@ -423,6 +446,8 @@ AlgaPatternInterpStreams {
 
 	//Play a pattern as an AlgaReschedulingEventStreamPlayer and return it
 	playAlgaReschedulingEventStreamPlayer { | pattern, clock |
-		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(clock:clock)
+		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
+			clock: clock
+		)
 	}
 }

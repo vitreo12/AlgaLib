@@ -1,5 +1,5 @@
 // AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
-// Copyright (C) 2020-2021 Francesco Cameli.
+// Copyright (C) 2020-2022 Francesco Cameli.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,6 +17,10 @@
 //This class is used to specify individual parameters of a pattern argument.
 //It can be used to dynamically set parameters of a connected Node (like scale and chans).
 AlgaArg {
+	//The streams
+	var <senderStream, <chansStream, <scaleStream;
+
+	//The unpacked entries
 	var <sender, <chans, <scale;
 
 	*new { | node, chans, scale |
@@ -24,17 +28,24 @@ AlgaArg {
 	}
 
 	init { | argSender, argChans, argScale |
-		sender = argSender.algaAsStream; //Pattern support
-		chans  = argChans.algaAsStream;  //Pattern support
-		scale  = argScale.algaAsStream;  //Pattern support
+		senderStream = argSender.algaAsStream; //Pattern support
+		chansStream  = argChans.algaAsStream;  //Pattern support
+		scaleStream  = argScale.algaAsStream;  //Pattern support
 	}
 
-	isAlgaArg { ^true }
+	algaAdvance {
+		sender = senderStream.next;
+		chans  = chansStream.next;
+		scale  = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
+		scale.algaAdvanceArrayScaleValues;
+	}
 
 	algaInstantiatedAsSender {
 		if(sender.isAlgaNode, { ^sender.algaInstantiatedAsSender });
-		^false
+		^true
 	}
+
+	isAlgaArg { ^true }
 
 	//Used in AlgaBlock
 	blockIndex {
@@ -60,6 +71,9 @@ AlgaArg {
 	}
 }
 
+//Alias
+AA : AlgaArg {}
+
 //This class is used for the \out parameter... Should it also store time?
 //Perhaps, the first node -> time pair should be considered if using a ListPattern:
 /*
@@ -73,37 +87,80 @@ a
 )
 */
 AlgaOut {
+	//The streams
+	var <nodeStream, <paramStream, <chansStream, <scaleStream;
+
+	//The unpacked entries
 	var <node, <param, <chans, <scale;
+
+	//The original arg entries
+	var <nodeOrig, <paramOrig;
 
 	*new { | node, param = \in, chans, scale |
 		^super.new.init(node, param, chans, scale)
 	}
 
 	init { | argNode, argParam, argChans, argScale |
-		node   = argNode.algaAsStream;  //Pattern support
-		param  = argParam.algaAsStream; //Pattern support
-		chans  = argChans.algaAsStream; //Pattern support
-		scale  = argScale.algaAsStream; //Pattern support
+		nodeOrig     = argNode;
+		paramOrig    = argParam;
+		nodeStream   = argNode.algaAsStream;  //Pattern support
+		paramStream  = argParam.algaAsStream; //Pattern support
+		chansStream  = argChans.algaAsStream; //Pattern support
+		scaleStream  = argScale.algaAsStream; //Pattern support
+	}
+
+	algaAdvance {
+		node  = nodeStream.next;
+		param = paramStream.next;
+		chans = chansStream.next;
+		scale = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
+		scale.algaAdvanceArrayScaleValues;
 	}
 
 	isAlgaOut { ^true }
 }
 
+//Alias
+AO : AlgaOut {}
+
 //This class is used to create a temporary AlgaNode for a parameter in an AlgaPattern
 AlgaTemp {
-	var <def, <chans, <scale;
+	var <def;
+
+	//The streams (def can't be, use Pseq of AlgaTemps for that)
+	var <chansStream, <scaleStream;
+
+	//The unpacked entries
+	var <chans, <scale;
+
+	var <sampleAccurate = false;
 	var <controlNames;
 	var <numChannels, <rate;
 	var <valid = false;
 
-	*new { | def, chans, scale |
-		^super.new.init(def, chans, scale)
+	var <>algaReaderPfuncParams;
+	var <>algaReaderKeysOrFuncsAtParam;
+
+	*new { | def, chans, scale, sampleAccurate = false |
+		^super.new.init(def, chans, scale, sampleAccurate)
 	}
 
-	init { | argDef, argChans, argScale |
-		def    = argDef;
-		chans  = argChans.algaAsStream;  //Pattern support
-		scale  = argScale.algaAsStream;  //Pattern support
+	init { | argDef, argChans, argScale, argSampleAccurate |
+		if(argDef.isPattern, {
+			"AlgaTemp: no support for Pattern as 'def' yet. Use a Pattern of AlgaTemps to achieve the same result".error;
+			argDef = nil;
+		});
+		def = argDef;
+		chansStream  = argChans.algaAsStream;  //Pattern support
+		scaleStream  = argScale.algaAsStream;  //Pattern support
+		sampleAccurate = argSampleAccurate ? false;
+		algaReaderPfuncParams = Array.newClear();
+	}
+
+	algaAdvance {
+		chans = chansStream.next;
+		scale = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
+		scale.algaAdvanceArrayScaleValues;
 	}
 
 	setDef { | argDef |
@@ -135,4 +192,54 @@ AlgaTemp {
 	}
 
 	isAlgaTemp { ^true }
+}
+
+//Alias
+AT : AlgaTemp {}
+
+//This class is used to schedule actions on steps
+AlgaStep {
+	var <>step = 0;
+	var <>retryOnFailure = true;
+	var <>tries = 2;
+	var <post = false;
+	var <>func;
+	var <>condition;
+
+	*new { | step = 0, retryOnFailure = true, tries = 2, post = false |
+		if(step.isNumber.not, {
+			"AlgaStep: step must be a number. Using 0.".warn;
+			step = 0
+		});
+		if((retryOnFailure != true).and(retryOnFailure != false), {
+			"AlgaStep: retryOnFailure must be a boolean. Using true.".warn;
+			retryOnFailure = true
+		});
+		if(tries.isNumber.not, {
+			"AlgaStep: tries must be a number. Using 2.".warn;
+			tries = 2
+		});
+		if((post != true).and(post != false), {
+			"AlgaStep: post must be a boolean. Using false.".warn;
+			post = false
+		});
+		^super.newCopyArgs(step, retryOnFailure, tries, post)
+	}
+
+	isAlgaStep { ^true }
+}
+
+//Alias
+AS : AlgaStep {}
+
+//Advance Array values for scale (min / max can be Patterns)
++SequenceableCollection {
+	algaAdvanceArrayScaleValues {
+		this.do({ | entry, i |
+			if(entry.isStream, {
+				var entryNext = entry.next;
+				this[i] = entryNext;
+			});
+		});
+	}
 }

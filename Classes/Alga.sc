@@ -1,5 +1,5 @@
 // AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
-// Copyright (C) 2020-2021 Francesco Cameli.
+// Copyright (C) 2020-2022 Francesco Cameli.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -15,12 +15,19 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 Alga {
+	classvar <debug = false;
+
 	classvar <schedulers;
 	classvar <servers;
 	classvar <clocks;
+	classvar <parGroups;
 	classvar <oldSynthDefsDir;
 
-	*initSynthDefs {
+	//Store if server is supernova or not
+	classvar <supernovas;
+
+	*initSynthDefs { | maxIO = 8 |
+		AlgaStartup.algaMaxIO = maxIO;
 		AlgaStartup.initSynthDefs;
 	}
 
@@ -28,9 +35,23 @@ Alga {
 		servers = IdentityDictionary(1);
 		schedulers = IdentityDictionary(1);
 		clocks = IdentityDictionary(1);
+		parGroups = IdentityDictionary(1);
+
+		supernovas = IdentityDictionary(1);
 
 		//Make sure to reset it
 		"SC_SYNTHDEF_PATH".unsetenv;
+	}
+
+	*debug_ { | value |
+		if(value.isKindOf(Boolean), {
+			debug = value
+		});
+	}
+
+	*booted { | server |
+		server = server ? Server.default;
+		^(servers[server] != nil)
 	}
 
 	*maxIO {
@@ -39,6 +60,14 @@ Alga {
 
 	*maxIO_ { | value |
 		AlgaStartup.algaMaxIO = value
+	}
+
+	*maxEnvPoints {
+		^AlgaStartup.maxEnvPoints;
+	}
+
+	*maxEnvPoints_ { | value |
+		AlgaStartup.maxEnvPoints = value
 	}
 
 	*setAlgaSynthDefsDir {
@@ -63,13 +92,17 @@ Alga {
 		if(server != nil, {
 			if(server.serverRunning, {
 				server.quit(onComplete: { prevServerQuit[0] = true });
+				fork {
+					3.wait;
+					if(server.serverRunning.not, { prevServerQuit[0] = true });
+				}
 			}, {
 				prevServerQuit[0] = true;
 			});
-			this.clearServer(server);
 		}, {
 			prevServerQuit[0] = true;
 		});
+		this.clearServer(server);
 	}
 
 	*newScheduler { | server, clock, cascadeMode = false |
@@ -106,25 +139,73 @@ Alga {
 	}
 
 	*clock { | server |
-		if(server.isNil, { server = Server.default });
+		server = server ? Server.default;
 		^clocks[server]
 	}
 
+	*addParGroupOnServerTree { | supernova |
+		//ServerAction passes the server as first arg
+		var serverTreeParGroupFunc = { | server |
+			//If it's an Alga booted server, create the ParGroups / Groups
+			if(servers[server] != nil, {
+				if(supernova, {
+					parGroups[server] = AlgaParGroup(server.defaultGroup);
+				}, {
+					parGroups[server] = AlgaGroup(server.defaultGroup);
+				});
+			});
+		};
+
+		//Add the function to the init of ServerTree
+		ServerTree.add(serverTreeParGroupFunc);
+
+		//On Server quit, remove the func
+		ServerQuit.add({ ServerTree.remove(serverTreeParGroupFunc) });
+	}
+
+	*parGroup { | server |
+		server = server ? Server.default;
+		^parGroups[server]
+	}
+
+	*setSupernova { | server, supernova |
+		server = server ? Server.default;
+		supernovas[server] = supernova;
+	}
+
+	*supernova { | server |
+		server = server ? Server.default;
+		^(supernovas[server] ? false);
+	}
+
 	*checkAlgaUGens {
-		if(\AlgaAudioControl.asClass == nil, {
+		if((\AlgaDynamicIEnvGen.asClass == nil).or(\AlgaAudioControl.asClass == nil), {
 			"\n************************************************\n".postln;
 			"The AlgaUGens plugin extension is not installed. Read the following instructions to install it:".warn;
 			"\n1) Download the AlgaUGens plugin extension from https://github.com/vitreo12/AlgaUGens/releases/tag/v1.0.0".postln;
 			"2) Unzip the file to your 'Platform.userExtensionDir'".postln;
 			"\nAfter the installation, no further action is required: Alga will detect the UGens, use them internally and this message will not be shown again.\n".postln;
 			"************************************************\n".postln;
+			^false;
 		});
+		^true;
+	}
+
+	*addAlgaSilent {
+		AlgaSynthDef.new_inner(\alga_silent, {
+			Silent.ar
+		}, sampleAccurate:false, makeOutDef:false).add
 	}
 
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
+		var envAlgaServerOptions = topEnvironment[\algaServerOptions];
+
+		//Check AlgaUGens
+		if(this.checkAlgaUGens.not, { ^this });
 
 		server = server ? Server.default;
+		algaServerOptions = algaServerOptions ? envAlgaServerOptions;
 		algaServerOptions = algaServerOptions ? AlgaServerOptions();
 
 		if(algaServerOptions.class != AlgaServerOptions, {
@@ -147,7 +228,7 @@ Alga {
 		if(algaServerOptions.supernova, { Server.supernova }, { Server.scsynth });
 		server.options.threads = algaServerOptions.supernovaThreads;
 		server.options.useSystemClock = algaServerOptions.supernovaUseSystemClock;
-		server.options.protocol = algaServerOptions.protocol ? \tcp;
+		server.options.protocol = \tcp; //Always \tcp!
 		server.latency = algaServerOptions.latency;
 
 		//Check AlgaSynthDef/IO folder exists...
@@ -177,23 +258,29 @@ Alga {
 		//Create an AlgaScheduler @ the server
 		this.newScheduler(server, clock);
 
+		//Create ParGroup when the server boots and keep it persistent
+		this.addParGroupOnServerTree(algaServerOptions.supernova);
+
+		//Set if server is supernva or not
+		this.setSupernova(server, algaServerOptions.supernova);
+
 		//Use AlgaSynthDefs as SC_SYNTHDEF_PATH
 		this.setAlgaSynthDefsDir;
 
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
-				//Make sure to init groups
-				server.initTree;
-
 				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
 				this.restoreSynthDefsDir;
 
+				//Add alga_silent
+				this.addAlgaSilent;
+
+				//Sync
+				server.sync;
+
 				//Execute onBoot function
 				onBoot.value;
-
-				//Check AlgaAudioControl so that it's printed after boot
-				this.checkAlgaUGens;
 			});
 		});
 	}

@@ -1,5 +1,5 @@
 // AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
-// Copyright (C) 2020-2021 Francesco Cameli.
+// Copyright (C) 2020-2022 Francesco Cameli.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -16,10 +16,12 @@
 
 AlgaDetectSilence {
 	*ar { arg in = 0.0, amp = 0.0001, time = 0.1, doneAction = 2;
-		^(DetectSilence.ar(Impulse.ar(0) + in, amp, time, doneAction))
+		DetectSilence.ar(Impulse.ar(0) + in, amp, time, doneAction);
+		^in;
 	}
 
-	*kr { arg in = 0.0, amp = 0.0001, time = 0.1, doneAction = 0;
-		^(DetectSilence.kr(Impulse.ar(0) + in, amp, time, doneAction))
+	*kr { arg in = 0.0, amp = 0.0001, time = 0.1, doneAction = 2;
+		DetectSilence.kr(Impulse.kr(0) + in, amp, time, doneAction);
+		^in;
 	}
 }
