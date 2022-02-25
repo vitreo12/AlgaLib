@@ -10,5 +10,4 @@ b = AlgaNode({ SinOsc.ar([1, 2, 3, 4, 5]) })
 //rate conversion ( ar -> kr )
 //channels conversion ( 5 -> 2 )
 //per-channel scaling with arrays
-a.from(b, \freq, scale:[-1, 1, [100, 200], [1000, 2000]], time: 2)
-
+a.from(b, \freq, scale:[-1, 1, [100, 200], [1000, 2000]], time: 3)

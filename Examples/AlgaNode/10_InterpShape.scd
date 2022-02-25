@@ -4,7 +4,7 @@ Alga.boot({
 		{ SinOsc.ar(\freq.kr(440)) },
 		interpTime: 3,
 		interpShape: Env([0, 1, 0.5, 1], [1, 0.5, 1])
-	).play
+	).play(chans: 2)
 })
 )
 

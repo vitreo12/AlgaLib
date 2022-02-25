@@ -3,7 +3,7 @@ Alga.boot({
     a = AlgaPattern((
         def: { SinOsc.ar(\freq.kr(440)) * EnvPerc.ar },
         dur: 1
-    )).play;
+	)).play(chans: 2)
 })
 )
 
