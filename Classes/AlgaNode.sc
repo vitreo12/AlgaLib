@@ -41,7 +41,7 @@ AlgaNode {
 	var <replacePlayTime = true;
 
 	//Function to use in .play to clip
-	var <playSafety = \clip;
+	var <playSafety = \none;
 
 	//On replace, use this scaling if possible.
 	var <prevPlayScale = 1.0;
@@ -147,14 +147,15 @@ AlgaNode {
 	//Debugging tool
 	var <name;
 
-	*new { | def, args, interpTime, interpShape, playTime, sched,
-		schedInSeconds = false, outsMapping,server |
+	*new { | def, args, interpTime, interpShape, playTime, playSafety, sched,
+		schedInSeconds = false, outsMapping, server |
 		^super.new.init(
 			argDef: def,
 			argArgs: args,
 			argConnectionTime: interpTime,
 			argInterpShape: interpShape,
 			argPlayTime: playTime,
+			argPlaySafety: playSafety,
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
 			argOutsMapping: outsMapping,
@@ -162,13 +163,14 @@ AlgaNode {
 		)
 	}
 
-	*new_ap { | def, interpTime, interpShape, playTime, sched = 1,
+	*new_ap { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
 		schedInSeconds = false, sampleAccurateFuncs = true, player, server |
 		^super.new.init(
 			argDef: def,
 			argConnectionTime: interpTime,
 			argInterpShape: interpShape,
 			argPlayTime: playTime,
+			argPlaySafety: playSafety,
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
 			argSampleAccurateFuncs: sampleAccurateFuncs,
@@ -177,7 +179,7 @@ AlgaNode {
 		)
 	}
 
-	*debug { | def, args, interpTime, interpShape, playTime, sched,
+	*debug { | def, args, interpTime, interpShape, playTime, playSafety, sched,
 		schedInSeconds = false, outsMapping, server, name |
 		^super.new.init(
 			argDef: def,
@@ -185,6 +187,7 @@ AlgaNode {
 			argConnectionTime: interpTime,
 			argInterpShape: interpShape,
 			argPlayTime: playTime,
+			argPlaySafety: playSafety,
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
 			argOutsMapping: outsMapping,
@@ -451,7 +454,7 @@ AlgaNode {
 	}
 
 	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
-		argPlayTime = 0, argSched = 0, argOutsMapping,
+		argPlayTime = 0, argPlaySafety, argSched = 0, argOutsMapping,
 		argSampleAccurateFuncs = true, argSchedInSeconds = false, argPlayer, argServer, argName |
 
 		//Check supported classes for argObj, so that things won't even init if wrong.
@@ -478,9 +481,12 @@ AlgaNode {
 		//Init debug name
 		name = argName;
 
-		//starting connectionTime (using the setter so it also sets longestConnectionTime)
+		//Set times
 		this.connectionTime_(argConnectionTime, all:true);
 		this.playTime_(argPlayTime);
+
+		//Set playSafety
+		if(argPlaySafety != nil, { this.playSafety_(argPlaySafety) });
 
 		//Set env shape
 		interpShape = Env([0, 1], 1); //default

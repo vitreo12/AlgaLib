@@ -23,7 +23,7 @@ AlgaProxySpace {
 	var <server;
 	var <sched = 1;
 	var <interpTime = 0, <interpShape, <playTime = 0;
-	var <replacePlayTime = true, <playSafety = \clip;
+	var <replacePlayTime = true, <playSafety = \none;
 
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var newSpace = this.new.init;

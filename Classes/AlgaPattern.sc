@@ -149,13 +149,14 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
-	*new { | def, interpTime, interpShape, playTime, sched = 1,
+	*new { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
 		schedInSeconds = false, sampleAccurateFuncs = true, player, server |
 		^super.new_ap(
 			def: def,
 			interpTime: interpTime,
 			interpShape: interpShape,
 			playTime: playTime,
+			playSafety: playSafety,
 			sched: sched,
 			schedInSeconds: schedInSeconds,
 			sampleAccurateFuncs: sampleAccurateFuncs,
