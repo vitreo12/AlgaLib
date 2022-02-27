@@ -41,7 +41,7 @@ AlgaNode {
 	var <replacePlayTime = true;
 
 	//Function to use in .play to clip
-	var <playSafety = \clip;
+	var <playSafety = \none;
 
 	//On replace, use this scaling if possible.
 	var <prevPlayScale = 1.0;

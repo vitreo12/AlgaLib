@@ -249,7 +249,7 @@ Shortcut for emphasis::replacePlayTime::.
 
 
 METHOD:: playSafety
-Specify a different safety method to use to scale the outut of a node when using the emphasis::play:: method. Accepted values are: code::'clip', 'tanh', 'softclip', 'limiter'::.
+Specify a different safety method to use to scale the outut of a node when using the emphasis::play:: method. Accepted values are: code::'clip', 'tanh', 'softclip', 'limiter', 'none'::.
 
 METHOD:: sched
 Specify a sched value to use for new actions. This will be used if sched is not provided in the arguments of the called function.
