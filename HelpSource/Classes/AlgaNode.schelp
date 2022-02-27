@@ -41,6 +41,8 @@ ARGUMENT:: interpShape
 Specify the interpolation shape that is to be used to perform new connections. This must be defined with an link::Classes/Env:: that always starts at 0 and ends at 1. If not specified, a single ramp code::Env([0, 1], 1):: is used by default.
 ARGUMENT:: playTime
 Specify the fading in / fading out time that it takes for this link::Classes/AlgaNode:: to play through speakers. These values are applied when calling the emphasis::play:: or emphasis::stop:: functions.
+ARGUMENT:: playSafety
+Specify a different safety method to use to scale the output of a node when using the emphasis::play:: method. Accepted values are: code::'clip', 'tanh', 'softclip', 'limiter', 'none'::.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 ARGUMENT:: schedInSeconds
@@ -249,13 +251,16 @@ Shortcut for emphasis::replacePlayTime::.
 
 
 METHOD:: playSafety
-Specify a different safety method to use to scale the outut of a node when using the emphasis::play:: method. Accepted values are: code::'clip', 'tanh', 'softclip', 'limiter', 'none'::.
+Specify a different safety method to use to scale the output of a node when using the emphasis::play:: method. Accepted values are: code::'clip', 'tanh', 'softclip', 'limiter', 'none'::.
+
 
 METHOD:: sched
 Specify a sched value to use for new actions. This will be used if sched is not provided in the arguments of the called function.
 
+
 METHOD:: schedInSeconds
 Specify if all sched actions should be scheduled in seconds, opposing to beats. Default is code::false::.
+
 
 EXAMPLES::
 code::
