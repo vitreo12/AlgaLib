@@ -30,15 +30,14 @@
   `Examples/Extras/Multithreading.scd` below:
 
     ```SuperCollider
-    //Boot Alga with the supernova server
-    //Alga will automatically spread the load across multiple CPU cores.
+    //The code to test
     (
-    Alga.boot({
+    c = {
         var reverb;
 
         //Definition of a bank of 50 sines
         AlgaSynthDef(\sines, {
-            Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.005 }))
+            Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.002 }))
         }).add;
 
         s.sync;
@@ -60,41 +59,16 @@
                 1.wait;
             }
         }
-    }, algaServerOptions: AlgaServerOptions(supernova: true, latency: 1));
+    }
     )
+
+    //Boot Alga with the supernova server
+    //Alga will automatically spread the load across multiple CPU cores.
+    Alga.boot(c, algaServerOptions: AlgaServerOptions(supernova: true, latency: 1));
 
     //Boot Alga with the standard scsynth server.
     //Note the higher CPU usage as the load is only on one CPU core.
-    (
-    Alga.boot({
-        var reverb;
-
-        //Definition of a bank of 50 sines
-        AlgaSynthDef(\sines, {
-            Mix.ar(Array.fill(50, { SinOsc.ar(Rand(200, 1000)) * 0.005 }))
-        }).add;
-
-        s.sync;
-
-        //A reverb effect
-        reverb = AlgaNode({ FreeVerb1.ar(\in.ar) }).play(chans: 2);
-
-        //50 separated banks of 50 sine oscillators.
-        //Their load will be spread across multiple threads.
-        50.do({
-            var bank = AlgaNode(\sines);
-            reverb <<+ bank;
-        });
-
-        //Print CPU usage
-        fork {
-            loop {
-                ("CPU: " ++ s.avgCPU.asStringPrec(4) ++ " %").postln;
-                1.wait;
-            }
-        }
-    }, algaServerOptions: AlgaServerOptions(latency: 1))
-    )
+    Alga.boot(c, algaServerOptions: AlgaServerOptions(latency: 1))
     ```
 
 - Added support for using the same `AlgaSynthDefs` for both `AlgaNodes` and `AlgaPatterns`:
