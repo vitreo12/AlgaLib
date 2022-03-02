@@ -206,6 +206,20 @@ METHOD:: <|
 Shortcut for emphasis::reset::.
 
 
+METHOD:: addAction
+Execute a link::Classes/Function:: on the scheduler of this node.
+ARGUMENT:: condition
+A link::Classes/Function:: that must return code::true:: or code::false::. If not specified, the condition is always considered code::true::.
+ARGUMENT:: func
+The link::Classes/Function:: to execute.
+ARGUMENT:: sched
+When should the function be executed. In the case of link::Classes/AlgaPattern::s, this can also be an link::Classes/AlgaStep::.
+ARGUMENT:: topPriority
+Specify if the function should be put at the top of the prioroty queue.
+ARGUMENT:: preCheck
+Specify if the function should be executed right away in the case of a code::true:: condition.
+
+
 METHOD:: interpTime
 Specify a new time that the connections to any of the parameters will use to perform interpolations.
 
@@ -551,7 +565,6 @@ private:: removeActiveNodesAndRearrangeBlocks
 private:: removeActiveOutNode
 private:: prevPlayScale
 
-private:: addAction
 private:: copyVars
 private:: executeOnArgsInstantiation
 private:: prevPlayOut

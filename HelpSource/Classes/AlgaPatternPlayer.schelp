@@ -60,6 +60,19 @@ Similarly to link::Classes/Pfuncn::, this represents the number of times to perf
 METHOD:: value
 Alias for code::read::.
 
+METHOD:: addAction
+Execute a link::Classes/Function:: on the scheduler of this node.
+ARGUMENT:: condition
+A link::Classes/Function:: that must return code::true:: or code::false::. If not specified, the condition is always considered code::true::.
+ARGUMENT:: func
+The link::Classes/Function:: to execute.
+ARGUMENT:: sched
+When should the function be executed. This can also be an link::Classes/AlgaStep::.
+ARGUMENT:: topPriority
+Specify if the function should be put at the top of the prioroty queue.
+ARGUMENT:: preCheck
+Specify if the function should be executed right away in the case of a code::true:: condition.
+
 METHOD:: sched
 Manually set a code::sched:: value to use when not specified explicitly.
 
@@ -101,7 +114,6 @@ Alga.boot({
 ~pattern.removePlayer;
 ::
 
-private:: addAction
 private:: addAlgaPattern
 private:: addAlgaPatternEntry
 private:: addScheduledStepAction
