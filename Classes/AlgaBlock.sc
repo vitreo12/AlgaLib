@@ -103,16 +103,27 @@ AlgaBlock {
 	//Copy a node from a block to another and reset
 	copyNodeAndReset { | node, senderBlock |
 		if((senderBlock != nil).and(node != nil), {
-			senderBlock.orderedNodes.remove(node);
-			senderBlock.upperMostNodes.remove(node);
-			senderBlock.removeNode(node); //this sets blockIndex to -1
-			this.addNode(node); //this sets blockIndex to the new one
-			senderBlock.feedbackNodes.keysValuesDo({ | sender, receiver |
+			//Copy FBs
+			senderBlock.feedbackNodes.keysValuesDo({ | sender, receiverSet |
 				if(sender == node, {
-					this.addFeedback(sender, receiver);
-					senderBlock.removeFeedback(sender, receiver);
+					receiverSet.do({ | receiver |
+						this.addFeedback(sender, receiver);
+						senderBlock.removeFeedback(sender, receiver);
+					});
 				});
 			});
+
+			//Remove from orderedNodes
+			senderBlock.orderedNodes.remove(node);
+
+			//Remove from upperMostNodes
+			senderBlock.upperMostNodes.remove(node);
+
+			//Remove node: this sets blockIndex to -1 and removes FB
+			senderBlock.removeNode(node);
+
+			//Add node to this block: this sets blockIndex to the new one
+			this.addNode(node);
 		});
 	}
 
@@ -131,6 +142,11 @@ AlgaBlock {
 		if(node.isAlgaArg, {
 			node = node.sender;
 			if(node.isAlgaNode.not, { ^nil });
+		});
+
+		//Debug
+		if(Alga.debug, {
+			("Adding node: " ++ node.asString ++ " to block: " ++ blockIndex).warn
 		});
 
 		//Add to IdentitySet
@@ -161,7 +177,7 @@ AlgaBlock {
 	}
 
 	//Remove a node from the block. If the block is empty, free its group
-	removeNode { | node |
+	removeNode { | node, removeFB = true |
 		if(node.blockIndex != blockIndex, {
 			"Trying to remove a node from a block that did not contain it!".warn;
 			^nil;
@@ -176,7 +192,7 @@ AlgaBlock {
 		nodes.remove(node);
 
 		//Remove from FB connections
-		this.removeFeedbacks(node);
+		if(removeFB, { this.removeFeedbacks(node) });
 
 		//Set node's index to -1
 		node.blockIndex = -1;
@@ -481,8 +497,8 @@ AlgaBlock {
 
 	//Order nodes according to their I/O
 	orderNodes {
-		//Bail after 50k tries
-		var bailLimit = 50000;
+		//Bail after 5k tries
+		var bailLimit = 5000;
 		var bailCounter = 0;
 
 		//Count all nodes down
@@ -507,7 +523,19 @@ AlgaBlock {
 									if(nodes.includes(sender), {
 										var visited = visitedNodes.includes(sender);
 										var isFeedback = this.isFeedback(sender, node);
-										if(visited.not.and(isFeedback.not), {
+										var aboutToBail = bailCounter == (bailLimit - 1);
+
+										//If about to bail, it means that the connection is actually
+										//still present, but perhaps in between being changed.
+										//It should be kept, and dealt with when new connections are introduced.
+										//This is quit an edge case that should be handled better.
+										if(aboutToBail, {
+											activeInNodesDone = true;
+											break.value(nil);
+										});
+
+										//Standard behaviour: if unvisited and not feedback, keep spinning
+										if((visited.not).and(isFeedback.not), {
 											activeInNodesDone = false;
 											break.value(nil);
 										});
