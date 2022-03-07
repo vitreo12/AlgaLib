@@ -249,6 +249,7 @@ AlgaBlock {
 	rearrangeBlock { | sender, receiver |
 		var server, supernova;
 		var ignoreStages;
+		var newConnection = false;
 
 		//Update lastSender
 		lastSender = sender ? lastSender;
@@ -256,6 +257,7 @@ AlgaBlock {
 		//Stage 1: detect feedbacks between sender and receiver (if they're valid)
 		if((sender != nil).and(receiver != nil), {
 			this.stage1(sender, receiver);
+			newConnection = true;
 		});
 
 		//Find upper most nodes. This is done out of stage1 as it must always be executed,
@@ -263,8 +265,10 @@ AlgaBlock {
 		//this needs to happen before the other stages.
 		this.findUpperMostNodes;
 
-		//If upperMostNodes is 0, it's a full FB block. No need to run anything else.
-		ignoreStages = upperMostNodes.size == 0;
+		//Ignore the successive stages IF
+		//NOT a new connection AND
+		//upperMostNodes is 0 (full FB block)
+		ignoreStages = (newConnection.not).and(upperMostNodes.size == 0);
 		if(ignoreStages.not, {
 			//Stage 2: order nodes according to I/O
 			this.stage2;
