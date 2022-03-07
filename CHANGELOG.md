@@ -1,3 +1,7 @@
+# 1.1.1
+
+- Bug fix: `AlgaBlock` now also checks for new connections to trigger a re-order, and not just for `upperMostNodes`.
+
 # 1.1.0
 
 - Added the `interpShape` option. This allows to specify an interpolation shape in the form of an
