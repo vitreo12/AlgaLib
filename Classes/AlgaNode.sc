@@ -1887,16 +1887,14 @@ AlgaNode {
 			//If replace and sendersSet contains inNodes, connect back to the .synthBus of the AlgaNode.
 			//Note that an inNode can also be an AlgaArg, in which case it also gets unpacked accordingly
 			if(replace, {
-				var sendersSet = inNodes[paramName];
-
 				//Restoring a connected parameter, being it normal or mix
+				var sendersSet = inNodes[paramName];
 				if(sendersSet != nil, {
 					if(sendersSet.size > 0, {
-						var onlyEntry = false;
-
 						//if size == 1, index from \default
-						if(sendersSet.size == 1, { onlyEntry = true });
+						var onlyEntry = sendersSet.size == 1;
 
+						//Loop through
 						sendersSet.do({ | prevSender |
 							var interpBus, interpSynth, normSynth;
 							var interpSymbol, normSymbol;
@@ -2007,6 +2005,11 @@ AlgaNode {
 									waitForInst:false
 								);
 
+								//The activeInNode / activeOutNode counter MUST be updated on replace!
+								//AlgaPattern already does this with AlgaPatternInterpStreams.add
+								this.addActiveInOutNodes(prevSender, paramName);
+
+								//Normal param OR mix param
 								if(onlyEntry, {
 									//normal param
 									interpSynths[paramName][\default] = interpSynth;
@@ -3158,6 +3161,19 @@ AlgaNode {
 		});
 	}
 
+	//Add active in nodes connections
+	addActiveInOutNodes { | sender, param = \in |
+		//AlgaPattern handles it in its own addInNode, this would double it!
+		if(this.isAlgaPattern.not, {
+			//Don't add to active if sender == this
+			var connectionToItself = (this == sender);
+			if(connectionToItself.not, {
+				this.addActiveInNode(sender, param);
+				sender.addActiveOutNode(this, param);
+			});
+		});
+	}
+
 	//add entries to the inNodes / outNodes / connectionTimeOutNodes of the two AlgaNodes
 	addInOutNodesDict { | sender, param = \in, mix = false |
 		//This will replace the entries on new connection (when mix == false)
@@ -3175,15 +3191,7 @@ AlgaNode {
 			sender.calculateLongestConnectionTime(this.connectionTime);
 
 			//Like inNodes / outNodes. They get freed on the accoding interpSynth
-			//AlgaPattern handles it in its own addInNode, this would double it!
-			if(this.isAlgaPattern.not, {
-				//Don't add to active if sender == this
-				var connectionToItself = (this == sender);
-				if(connectionToItself.not, {
-					this.addActiveInNode(sender, param);
-					sender.addActiveOutNode(this, param);
-				});
-			});
+			this.addActiveInOutNodes(sender, param);
 		});
 	}
 
