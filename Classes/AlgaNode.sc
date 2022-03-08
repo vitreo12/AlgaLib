@@ -1821,12 +1821,10 @@ AlgaNode {
 			});
 			wasPattern = true;
 		}
-
 		{ sender.isFilterPattern } {
 			this.removeActiveNodesAndRearrangeBlocks(param, sender.pattern);
 			wasPattern = true;
 		}
-
 		{ sender.isPattern } {
 			sender.class.instVarNames.do({ | instVarName |
 				try {
