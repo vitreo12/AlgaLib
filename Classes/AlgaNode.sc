@@ -1812,14 +1812,34 @@ AlgaNode {
 
 	//Remove activeInNodes / outNodes and reorder block
 	removeActiveNodesAndRearrangeBlocks { | param, sender |
-		if(sender.isListPattern, {
-			sender.list.do({ | entry | this.removeActiveNodeAndRearrangeBlock(param, entry) });
-		}, {
-			if(sender.isFilterPattern, {
-				this.removeActiveNodesAndRearrangeBlocks(param, sender.pattern) //NOTE: plural form
-			}, {
-				this.removeActiveNodeAndRearrangeBlock(param, sender)
+		var wasPattern = false;
+
+		case
+		{ sender.isListPattern } {
+			sender.list.do({ | entry |
+				this.removeActiveNodesAndRearrangeBlocks(param, entry)
 			});
+			wasPattern = true;
+		}
+
+		{ sender.isFilterPattern } {
+			this.removeActiveNodesAndRearrangeBlocks(param, sender.pattern);
+			wasPattern = true;
+		}
+
+		{ sender.isPattern } {
+			sender.class.instVarNames.do({ | instVarName |
+				try {
+					var instVar = sender.perform(instVarName);
+					this.removeActiveNodesAndRearrangeBlocks(param, instVar);
+				} { | error | } //Don't catch errors
+			});
+			wasPattern = true;
+		};
+
+		//Bottom search: AlgaNode
+		if(wasPattern.not, {
+			this.removeActiveNodeAndRearrangeBlock(param, sender);
 		});
 	}
 
