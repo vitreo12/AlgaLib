@@ -260,6 +260,9 @@ AlgaBlock {
 			newConnection = true;
 		});
 
+		//Find unused feedback loops (from previous disconnections)
+		this.findAllUnusedFeedbacks;
+
 		//Find upper most nodes. This is done out of stage1 as it must always be executed,
 		//while stage1 might not be (sender == nil and receiver == nil). At the same time,
 		//this needs to happen before the other stages.
@@ -312,9 +315,6 @@ AlgaBlock {
 			blockSender: sender,
 			blockReceiver: receiver
 		);
-
-		//Find unused feedback loops (from previous disconnections)
-		this.findAllUnusedFeedbacks;
 
 		//Debug
 		if(Alga.debug, { this.debugFeedbacks });
@@ -386,8 +386,6 @@ AlgaBlock {
 
 	//Stage 2: order nodes
 	stage2 {
-		var visitedUpperMostNodes;
-
 		//Clear all needed stuff
 		visitedNodes.clear;
 		orderedNodes.clear;
@@ -396,13 +394,15 @@ AlgaBlock {
 		this.orderNodes;
 
 		//Need to know upperMostNodes' size
-		visitedUpperMostNodes = Array.newClear(upperMostNodes.size);
+		if(upperMostNodes.size > 0, {
+			var visitedUpperMostNodes = Array.newClear(upperMostNodes.size);
 
-		//Traverse branches from upperMostNodes
-		this.traverseBranches(visitedUpperMostNodes);
+			//Traverse branches from upperMostNodes
+			this.traverseBranches(visitedUpperMostNodes);
 
-		//Find blocks that should be separated
-		this.findBlocksToSplit(visitedUpperMostNodes);
+			//Find blocks that should be separated
+			this.findBlocksToSplit(visitedUpperMostNodes);
+		});
 
 		//Debug
 		if(Alga.debug, { this.debugOrderedNodes });
@@ -446,7 +446,6 @@ AlgaBlock {
 				//Only consider branches with more than one node
 				if(branch1.size > 1, {
 					var containsAnyOtherNode = false;
-
 					block { | break |
 						visitedUpperMostNodes.do({ | branch2 |
 							if(branch1 != branch2, {
@@ -752,7 +751,7 @@ AlgaBlock {
 		node.activeOutNodes.keys.do({ | receiver |
 			var visited = disconnectVisitedNodes.includes(receiver);
 
-			//Found a FB connection
+			//Found an old FB connection
 			if(this.isFeedback(node, receiver), {
 				//detectFeedback uses Class's visitedNodes and atLeastOneFeedback
 				visitedNodes.clear;
@@ -765,11 +764,7 @@ AlgaBlock {
 					blockReceiver: receiver
 				);
 
-				//atLeastOneFeedback.asString.error;
-
-				//If no feedbacks, the pair can be removed.
-				//Effectively, this means that the disconnection of the node in
-				//rearrangeBlock_disconnect freed this particular feedback loop
+				//If no feedbacks, the pair can be removed
 				if(atLeastOneFeedback.not, {
 					this.removeFeedback(node, receiver);
 				});
@@ -785,7 +780,7 @@ AlgaBlock {
 	//Running this on new connections?
 	findAllUnusedFeedbacks {
 		nodes.do({ | node |
-			disconnectVisitedNodes.clear;
+			disconnectVisitedNodes.clear; //per-node
 			this.findUnusedFeedbacks(node)
 		});
 	}
