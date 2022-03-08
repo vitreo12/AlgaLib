@@ -1,6 +1,12 @@
 # 1.1.1
 
-- Bug fix: `AlgaBlock` now also checks for new connections to trigger a re-order, and not just for `upperMostNodes`.
+## Bug fixes
+
+- `AlgaBlock`: check for new connections to trigger a re-order, and not just for `upperMostNodes`.
+
+- `AlgaBlock`: fix `findAllUnusedFeedback` in order to be used on any new connection.
+
+- `AlgaNode`: trigger `addActiveInOutNodes` on `replace` for old input connections.
 
 # 1.1.0
 
