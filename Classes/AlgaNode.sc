@@ -1812,14 +1812,32 @@ AlgaNode {
 
 	//Remove activeInNodes / outNodes and reorder block
 	removeActiveNodesAndRearrangeBlocks { | param, sender |
-		if(sender.isListPattern, {
-			sender.list.do({ | entry | this.removeActiveNodeAndRearrangeBlock(param, entry) });
-		}, {
-			if(sender.isFilterPattern, {
-				this.removeActiveNodesAndRearrangeBlocks(param, sender.pattern) //NOTE: plural form
-			}, {
-				this.removeActiveNodeAndRearrangeBlock(param, sender)
+		var wasPattern = false;
+
+		case
+		{ sender.isListPattern } {
+			sender.list.do({ | entry |
+				this.removeActiveNodesAndRearrangeBlocks(param, entry)
 			});
+			wasPattern = true;
+		}
+		{ sender.isFilterPattern } {
+			this.removeActiveNodesAndRearrangeBlocks(param, sender.pattern);
+			wasPattern = true;
+		}
+		{ sender.isPattern } {
+			sender.class.instVarNames.do({ | instVarName |
+				try {
+					var instVar = sender.perform(instVarName);
+					this.removeActiveNodesAndRearrangeBlocks(param, instVar);
+				} { | error | } //Don't catch errors
+			});
+			wasPattern = true;
+		};
+
+		//Bottom search: AlgaNode
+		if(wasPattern.not, {
+			this.removeActiveNodeAndRearrangeBlock(param, sender);
 		});
 	}
 
@@ -1887,16 +1905,14 @@ AlgaNode {
 			//If replace and sendersSet contains inNodes, connect back to the .synthBus of the AlgaNode.
 			//Note that an inNode can also be an AlgaArg, in which case it also gets unpacked accordingly
 			if(replace, {
-				var sendersSet = inNodes[paramName];
-
 				//Restoring a connected parameter, being it normal or mix
+				var sendersSet = inNodes[paramName];
 				if(sendersSet != nil, {
 					if(sendersSet.size > 0, {
-						var onlyEntry = false;
-
 						//if size == 1, index from \default
-						if(sendersSet.size == 1, { onlyEntry = true });
+						var onlyEntry = sendersSet.size == 1;
 
+						//Loop through
 						sendersSet.do({ | prevSender |
 							var interpBus, interpSynth, normSynth;
 							var interpSymbol, normSymbol;
@@ -2007,6 +2023,11 @@ AlgaNode {
 									waitForInst:false
 								);
 
+								//The activeInNode / activeOutNode counter MUST be updated on replace!
+								//AlgaPattern already does this with AlgaPatternInterpStreams.add
+								this.addActiveInOutNodes(prevSender, paramName);
+
+								//Normal param OR mix param
 								if(onlyEntry, {
 									//normal param
 									interpSynths[paramName][\default] = interpSynth;
@@ -3158,6 +3179,19 @@ AlgaNode {
 		});
 	}
 
+	//Add active in nodes connections
+	addActiveInOutNodes { | sender, param = \in |
+		//AlgaPattern handles it in its own addInNode, this would double it!
+		if(this.isAlgaPattern.not, {
+			//Don't add to active if sender == this
+			var connectionToItself = (this == sender);
+			if(connectionToItself.not, {
+				this.addActiveInNode(sender, param);
+				sender.addActiveOutNode(this, param);
+			});
+		});
+	}
+
 	//add entries to the inNodes / outNodes / connectionTimeOutNodes of the two AlgaNodes
 	addInOutNodesDict { | sender, param = \in, mix = false |
 		//This will replace the entries on new connection (when mix == false)
@@ -3175,15 +3209,7 @@ AlgaNode {
 			sender.calculateLongestConnectionTime(this.connectionTime);
 
 			//Like inNodes / outNodes. They get freed on the accoding interpSynth
-			//AlgaPattern handles it in its own addInNode, this would double it!
-			if(this.isAlgaPattern.not, {
-				//Don't add to active if sender == this
-				var connectionToItself = (this == sender);
-				if(connectionToItself.not, {
-					this.addActiveInNode(sender, param);
-					sender.addActiveOutNode(this, param);
-				});
-			});
+			this.addActiveInOutNodes(sender, param);
 		});
 	}
 

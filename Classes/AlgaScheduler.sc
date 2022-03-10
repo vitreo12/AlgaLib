@@ -548,7 +548,6 @@ AlgaPatch {
 		}, {
 			("Alga is not booted on server" + server.name).error;
 		});
-		^nil;
 	}
 }
 
