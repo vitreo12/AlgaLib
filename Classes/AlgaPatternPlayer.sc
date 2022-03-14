@@ -34,7 +34,7 @@ AlgaPatternPlayer {
 
 	/*****************************************************************************************/
 	// Utilities copied over from AlgaNode / AlgaPattern. These should really be modularized //
-	//   in their own class and used both here and in AN / AP.                               //
+	// in their own class and used both here and in AN / AP.                                 //
 	/*****************************************************************************************/
 
 	//Add an action to scheduler. This takes into account sched == AlgaStep
