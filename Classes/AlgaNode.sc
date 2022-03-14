@@ -1144,13 +1144,7 @@ AlgaNode {
 
 		synthDescControlNames.do({ | controlName |
 			var paramName = controlName.name;
-			if((controlName.name != \fadeTime).and(
-				controlName.name != \out).and(
-				controlName.name != \gate).and(
-				controlName.name != '?'), {
-
-				var paramName = controlName.name;
-
+			if(this.checkValidControlName(paramName), {
 				var paramNumChannels = controlName.numChannels;
 				if(paramNumChannels > AlgaStartup.algaMaxIO, {
 					("AlgaNode: trying to instantiate the AlgaSynthDef '" ++ synthDef.name ++ "' whose parameter '" ++ paramName ++ "' has more channels(" ++ paramNumChannels ++ ") than 'Alga.maxIO'(" ++ AlgaStartup.algaMaxIO ++ "). Change 'Alga.maxIO' to fit your needs and run 'Alga.boot' again.").error;
@@ -2367,6 +2361,16 @@ AlgaNode {
 		});
 	}
 
+	//Check valid controlName name
+	checkValidControlName { | paramName |
+		^((paramName != '?').and(paramName != \instrument).and(
+			paramName != \def).and(paramName != \out).and(
+			paramName != \gate).and(paramName != \fadeTime).and(
+			paramName != \dur).and(paramName != \sustain).and(
+			paramName != \stetch).and(paramName != \legato)
+		)
+	}
+
 	//Create tempSynth for AlgaTemp
 	createAlgaTempSynth { | algaTemp, tempSynthsAndBusses, topLevelTempGroup |
 		//The bus the tempSynth will write to
@@ -2410,10 +2414,7 @@ AlgaNode {
 			var entry;
 
 			//Ignore static params
-			if((paramName != '?').and(paramName != \instrument).and(
-				paramName != \def).and(paramName != \out).and(
-				paramName != \gate).and(paramName != \fadeTime), {
-
+			if(this.checkValidControlName(paramName), {
 				//Retrieve param if entry is Event
 				if(defIsEvent, { entry = algaTempDef[paramName] });
 

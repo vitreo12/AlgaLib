@@ -240,7 +240,11 @@ AlgaPattern : AlgaNode {
 					algaSynthBus: algaSynthBus,
 					algaPatternInterpStreams: algaPatternInterpStreams,
 					fx: fx,
-					algaOut: algaOut
+					algaOut: algaOut,
+					dur: dur,
+					sustain: sustain,
+					stretch: stretch,
+					legato: legato
 				);
 
 				//Finally, consume scheduledStepActionsPost if there are any
@@ -525,10 +529,7 @@ AlgaPattern : AlgaNode {
 			//If entry is nil, the tempSynth will already use the default value
 			if(entry != nil, {
 				//Ignore static params
-				if((paramName != '?').and(paramName != \instrument).and(
-					paramName != \def).and(paramName != \out).and(
-					paramName != \gate).and(paramName != \fadeTime), {
-
+				if(this.checkValidControlName(paramName), {
 					//Temporary bus that the patternParamSynth for the fx will write to
 					var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
 
@@ -995,12 +996,8 @@ AlgaPattern : AlgaNode {
 
 			//If entry is nil, the tempSynth will already use the default value
 			if(entry != nil, {
-				//Ignore static params
-				if((paramName != '?').and(paramName != \instrument).and(
-					paramName != \def).and(paramName != \out).and(
-					paramName != \gate).and(paramName != \in).and(
-					paramName != \fadeTime), {
-
+				//Ignore static params AND \in
+				if((this.checkValidControlName(paramName)).and(paramName != \in), {
 					//Temporary bus that the patternParamSynth for the fx will write to
 					var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
 
@@ -1236,7 +1233,7 @@ AlgaPattern : AlgaNode {
 	//Create all needed Synths / Busses for an individual patternSynth
 	createPatternSynth { | algaSynthDef, algaSynthDefClean, algaSynthBus,
 		algaPatternInterpStreams, controlNamesToUse, fx, algaOut,
-		mcSynthNum, mcEntries |
+		mcSynthNum, mcEntries, dur, sustain, stretch, legato |
 		//Used to check whether using a ListPattern of \defs
 		var numChannelsToUse  = numChannels;
 		var rateToUse = rate;
@@ -1248,7 +1245,13 @@ AlgaPattern : AlgaNode {
 		var patternBussesAndSynths = IdentitySet(controlNames.size * 2);
 
 		//args to patternSynth
-		var patternSynthArgs = [ \gate, 1 ];
+		var patternSynthArgs = [
+			\gate, 1,
+			\dur, dur,
+			\sustain, sustain,
+			\stretch, stretch,
+			\legato, legato
+		];
 
 		//The actual synth that will be created
 		var patternSynth;
@@ -1630,7 +1633,7 @@ AlgaPattern : AlgaNode {
 
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
 	createEventSynths { | algaSynthDef, algaSynthBus,
-		algaPatternInterpStreams, fx, algaOut |
+		algaPatternInterpStreams, fx, algaOut, dur, sustain, stretch, legato |
 
 		//Keep the def without _algaPattern
 		var algaSynthDefClean = algaSynthDef;
@@ -1691,7 +1694,11 @@ AlgaPattern : AlgaNode {
 						fx: fx,
 						algaOut: algaOut,
 						mcSynthNum: synthNum,
-						mcEntries: entries
+						mcEntries: entries,
+						dur: dur,
+						sustain: sustain,
+						stretch: stretch,
+						legato: legato
 					);
 				});
 
@@ -1707,7 +1714,11 @@ AlgaPattern : AlgaNode {
 					fx: fx,
 					algaOut: algaOut,
 					mcSynthNum: nil,
-					mcEntries: entries
+					mcEntries: entries,
+					dur: dur,
+					sustain: sustain,
+					stretch: stretch,
+					legato: legato
 				);
 			});
 		});
@@ -1720,7 +1731,11 @@ AlgaPattern : AlgaNode {
 			algaPatternInterpStreams: algaPatternInterpStreams,
 			controlNamesToUse: controlNamesToUse,
 			fx: fx,
-			algaOut: algaOut
+			algaOut: algaOut,
+			dur: dur,
+			sustain: sustain,
+			stretch: stretch,
+			legato: legato
 		)
 	}
 
@@ -1919,11 +1934,7 @@ AlgaPattern : AlgaNode {
 					//Check for duplicates and add correct controlName to controlNamesList[entry.asSymbol]
 					controlNamesEntry.do({ | controlName |
 						var name = controlName.name;
-						if((name != \fadeTime).and(
-							name != \out).and(
-							name != \gate).and(
-							name != '?'), {
-
+						if(this.checkValidControlName(name), {
 							//Just check for duplicate names: we only need one entry per param name
 							//for controlNamesSum.
 							if(controlNamesDict[name] == nil, {
