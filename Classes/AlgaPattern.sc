@@ -150,7 +150,8 @@ AlgaPattern : AlgaNode {
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
 	*new { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
-		schedInSeconds = false, sampleAccurateFuncs = true, player, server |
+		schedInSeconds = false, tempoScaling = false,
+		sampleAccurateFuncs = true, player, server |
 		^super.new_ap(
 			def: def,
 			interpTime: interpTime,
@@ -159,6 +160,7 @@ AlgaPattern : AlgaNode {
 			playSafety: playSafety,
 			sched: sched,
 			schedInSeconds: schedInSeconds,
+			tempoScaling: tempoScaling,
 			sampleAccurateFuncs: sampleAccurateFuncs,
 			player: player,
 			server: server
@@ -4019,7 +4021,7 @@ AMP : AlgaMonoPattern {}
 			[
 				\out, interpBus.index,
 				\env_out, envBus.index,
-				\fadeTime, time,
+				\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv
 			],
 			interpGroup,
@@ -4069,7 +4071,7 @@ AMP : AlgaMonoPattern {}
 				//It's still used while fade-out interpolation is happening
 				patternOutEnvSynth.set(
 					\t_release, 1,
-					\fadeTime, time,
+					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				);
 

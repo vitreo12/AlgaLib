@@ -43,6 +43,9 @@ AlgaNode {
 	//Function to use in .play to clip
 	var <playSafety = \none;
 
+	//Scale time with clock's tempo
+	var <tempoScaling = false;
+
 	//On replace, use this scaling if possible.
 	var <prevPlayScale = 1.0;
 
@@ -148,7 +151,7 @@ AlgaNode {
 	var <name;
 
 	*new { | def, args, interpTime, interpShape, playTime, playSafety, sched,
-		schedInSeconds = false, outsMapping, server |
+		schedInSeconds = false, tempoScaling = false, outsMapping, server |
 		^super.new.init(
 			argDef: def,
 			argArgs: args,
@@ -158,13 +161,15 @@ AlgaNode {
 			argPlaySafety: playSafety,
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
+			argTempoScaling: tempoScaling,
 			argOutsMapping: outsMapping,
 			argServer: server,
 		)
 	}
 
 	*new_ap { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
-		schedInSeconds = false, sampleAccurateFuncs = true, player, server |
+		schedInSeconds = false, tempoScaling = false,
+		sampleAccurateFuncs = true,  player, server |
 		^super.new.init(
 			argDef: def,
 			argConnectionTime: interpTime,
@@ -173,6 +178,7 @@ AlgaNode {
 			argPlaySafety: playSafety,
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
+			argTempoScaling: tempoScaling,
 			argSampleAccurateFuncs: sampleAccurateFuncs,
 			argPlayer: player,
 			argServer: server,
@@ -180,7 +186,7 @@ AlgaNode {
 	}
 
 	*debug { | def, args, interpTime, interpShape, playTime, playSafety, sched,
-		schedInSeconds = false, outsMapping, server, name |
+		schedInSeconds = false, tempoScaling = false, outsMapping, server, name |
 		^super.new.init(
 			argDef: def,
 			argArgs: args,
@@ -190,6 +196,7 @@ AlgaNode {
 			argPlaySafety: playSafety,
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
+			argTempoScaling: tempoScaling,
 			argOutsMapping: outsMapping,
 			argServer: server,
 			argName: name
@@ -455,7 +462,8 @@ AlgaNode {
 
 	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
 		argPlayTime = 0, argPlaySafety, argSched = 0, argOutsMapping,
-		argSampleAccurateFuncs = true, argSchedInSeconds = false, argPlayer, argServer, argName |
+		argSampleAccurateFuncs = true, argSchedInSeconds = false,
+		argTempoScaling = false, argPlayer, argServer, argName |
 
 		//Check supported classes for argObj, so that things won't even init if wrong.
 		//Also check for AlgaPattern
@@ -494,6 +502,9 @@ AlgaNode {
 
 		//Set schedInSeconds
 		this.schedInSeconds_(argSchedInSeconds);
+
+		//Set tempoScaling
+		this.tempoScaling_(argTempoScaling);
 
 		//If AlgaPattern, parse the def and then dispatch accordingly (waiting for server if needed)
 		if(this.isAlgaPattern, {
@@ -564,6 +575,14 @@ AlgaNode {
 			value = false;
 		});
 		schedInSeconds = value
+	}
+
+	tempoScaling_ { | value |
+		if(value.isKindOf(Boolean).not, {
+			"AlgaNode: 'tempoScaling' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		tempoScaling = value
 	}
 
 	setParamsConnectionTime { | value, param, all = false |
@@ -1464,7 +1483,7 @@ AlgaNode {
 		//as it will be set eventually in the case of .clear / etc...
 		var synthArgs = [
 			\out, synthBus.index,
-			\fadeTime, longestWaitTime,
+			\fadeTime, if(tempoScaling, { longestWaitTime * this.clock.tempo }, { longestWaitTime }),
 			\gate, 1
 		];
 
@@ -1871,7 +1890,7 @@ AlgaNode {
 		activeInterpSynths[param][sender].do({ | activeInterpSynth |
 			activeInterpSynth.set(
 				\t_release, 1,
-				\fadeTime, time,
+				\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv,
 			);
 		});
@@ -2653,7 +2672,7 @@ AlgaNode {
 				fadeInSymbol,
 				[
 					\out, interpBus.index,
-					\fadeTime, time,
+					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				],
 				interpGroup,
@@ -2696,7 +2715,7 @@ AlgaNode {
 				\in, sender.synthBus.busArg,
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
-				\fadeTime, time,
+				\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv
 			];
 
@@ -2840,7 +2859,7 @@ AlgaNode {
 				\in, paramVal,
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
-				\fadeTime, time,
+				\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv
 			];
 
@@ -2905,7 +2924,9 @@ AlgaNode {
 				//synth's fadeTime is longestWaitTime!
 				synth.set(
 					\gate, 0,
-					\fadeTime, if(useConnectionTime, { longestWaitTime }, { 0 })
+					\fadeTime, if(useConnectionTime, {
+						if(tempoScaling, { longestWaitTime * this.clock.tempo }, { longestWaitTime })
+					}, { 0 })
 				);
 
 				//this.resetSynth;
@@ -3027,7 +3048,7 @@ AlgaNode {
 						fadeOutSymbol,
 						[
 							\out, interpBusAtParam.index,
-							\fadeTime, time,
+							\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 							\envShape, shape.algaConvertEnv
 						],
 						interpGroup,
@@ -3036,14 +3057,17 @@ AlgaNode {
 
 					//Free the normSynth only if not replaceMix. In that case, it must be kept
 					if(replaceMix.not, {
-						normSynthAtParam.set(\gate, 0, \fadeTime, time);
+						normSynthAtParam.set(
+							\gate, 0,
+							\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time })
+						);
 					});
 				});
 
 				//This has to be surely algaInstantiated before being freed
 				interpSynthAtParam.set(
 					\t_release, 1,
-					\fadeTime, time,
+					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				);
 
@@ -3120,7 +3144,7 @@ AlgaNode {
 				interpSynthsAtParam.do({ | interpSynthAtParam |
 					interpSynthAtParam.set(
 						\t_release, 1,
-						\fadeTime, time,
+						\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 						\envShape, shape.algaConvertEnv
 					);
 				});
@@ -4675,7 +4699,7 @@ AlgaNode {
 					\in, synthBus.busArg,
 					\indices, channelsToPlay,
 					\gate, 1,
-					\fadeTime, time,
+					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 					\scale, scale,
 					\out, out
 				],
@@ -4702,7 +4726,7 @@ AlgaNode {
 				[
 					\in, synthBus.busArg,
 					\gate, 1,
-					\fadeTime, time,
+					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
 					\scale, scale,
 					\out, out
 				],
@@ -4762,7 +4786,10 @@ AlgaNode {
 				playSynth.free
 			}, {
 				//Set \fadeTime
-				playSynth.set(\gate, 0, \fadeTime, time)
+				playSynth.set(
+					\gate, 0,
+					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time })
+				)
 			});
 			isPlaying = false;
 			beingStopped = true;

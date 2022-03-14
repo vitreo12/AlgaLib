@@ -309,6 +309,10 @@
 }
 
 +Clock {
+	*tempo { ^(1.0) }
+
+	tempo { ^(1.0) }
+
 	algaSchedAtQuant { | quant, task |
 		if(this.isTempoClock, {
 			this.algaTempoClockSchedAtQuant(quant, task);
