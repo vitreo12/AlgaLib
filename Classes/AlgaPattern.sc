@@ -716,7 +716,8 @@ AlgaPattern : AlgaNode {
 				entry = paramDefault;
 				scale = nil;
 				chansMapping = nil;
-				("AlgaPattern: AlgaNode wasn't algaInstantiated yet. Using default value for " ++ paramName).warn;
+				("AlgaPattern: AlgaNode wasn't algaInstantiated yet. Using the default value " ++
+					entry ++ " for '" ++ paramName ++ "'").warn;
 				validParam = true;
 			});
 		}
