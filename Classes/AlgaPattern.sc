@@ -714,6 +714,8 @@ AlgaPattern : AlgaNode {
 				senderRate = "control";
 				senderNumChannels = paramNumChannels;
 				entry = paramDefault;
+				scale = nil;
+				chansMapping = nil;
 				("AlgaPattern: AlgaNode wasn't algaInstantiated yet. Using default value for " ++ paramName).warn;
 				validParam = true;
 			});
