@@ -2386,7 +2386,8 @@ AlgaNode {
 			paramName != \def).and(paramName != \out).and(
 			paramName != \gate).and(paramName != \fadeTime).and(
 			paramName != \dur).and(paramName != \sustain).and(
-			paramName != \stetch).and(paramName != \legato)
+			paramName != \stetch).and(paramName != \legato).and(
+			paramName != \timingOffset).and(paramName != \lag)
 		)
 	}
 
