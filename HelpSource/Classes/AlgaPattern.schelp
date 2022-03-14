@@ -1,7 +1,7 @@
 TITLE:: AlgaPattern
 summary:: Alga module representing multiple instances of sonic processes
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut, Classes/AlgaStep, Classes/AlgaPatternPlayer, Classes/AlgaProxySpace
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut, Classes/AlgaStep, Classes/AlgaQuant, Classes/AlgaPatternPlayer, Classes/AlgaProxySpace
 
 
 DESCRIPTION::

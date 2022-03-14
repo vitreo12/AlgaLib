@@ -386,12 +386,14 @@ AlgaScheduler : AlgaThread {
 							//In sched time, execute the function
 							if(topPriority, {
 								if(schedInSeconds, {
+									if(sched.isAlgaQuant, { sched = sched.quant + sched.phase });
 									clock.algaSchedInSecondsOnceWithTopPriority(sched, functionOnSched)
 								}, {
 									clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
 								})
 							}, {
 								if(schedInSeconds, {
+									if(sched.isAlgaQuant, { sched = sched.quant + sched.phase });
 									clock.algaSchedInSecondsOnce(sched, functionOnSched)
 								}, {
 									clock.algaSchedAtQuantOnce(sched, functionOnSched)
@@ -422,12 +424,14 @@ AlgaScheduler : AlgaThread {
 							//In sched time, execute the function
 							if(topPriority, {
 								if(schedInSeconds, {
+									if(sched.isAlgaQuant, { sched = sched.quant + sched.phase });
 									clock.algaSchedInSecondsOnceWithTopPriority(sched, functionOnSched)
 								}, {
 									clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
 								});
 							}, {
 								if(schedInSeconds, {
+									if(sched.isAlgaQuant, { sched = sched.quant + sched.phase });
 									clock.algaSchedInSecondsOnce(sched, functionOnSched)
 								}, {
 									clock.algaSchedAtQuantOnce(sched, functionOnSched)

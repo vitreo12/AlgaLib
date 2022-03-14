@@ -8,6 +8,27 @@
 
 - `AlgaNode`: trigger `addActiveInOutNodes` on `replace` for old input connections.
 
+## New features
+
+- Added the `AlgaQuant` class to schedule actions on specific bars:
+
+    ```SuperCollider  
+    (
+    Alga.boot({
+        a = AlgaPattern({ SinOsc.ar * EnvPerc.ar }).play(chans: 2)
+    });
+    )
+
+    //Schedule at the next bar
+    a.from(0.5, \dur, sched: AlgaQuant(1));
+
+    //Schedule in two bars
+    a.from(0.25, \dur, sched: AlgaQuant(2));
+
+    //Schedule at the next bar + 1 beat
+    a.from(0.5, \dur, sched: AlgaQuant(1, 1));
+    ```
+    
 # 1.1.0
 
 - Added the `interpShape` option. This allows to specify an interpolation shape in the form of an

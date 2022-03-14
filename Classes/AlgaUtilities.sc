@@ -232,6 +232,20 @@ AlgaStep {
 //Alias
 AS : AlgaStep {}
 
+//Schedule actios on bars
+AlgaQuant {
+	var <quant, <phase, <wrapPhase = false;
+
+	*new { | quant = 1, phase = 0, wrapPhase = false |
+		^super.newCopyArgs(quant, phase, wrapPhase);
+	}
+
+	isAlgaQuant { ^true }
+}
+
+//Alias
+AQ : AlgaQuant {}
+
 //Advance Array values for scale (min / max can be Patterns)
 +SequenceableCollection {
 	algaAdvanceArrayScaleValues {

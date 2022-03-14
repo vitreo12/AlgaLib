@@ -24,6 +24,7 @@
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
 	isAlgaStep { ^false }
+	isAlgaQuant { ^false }
 	isAlgaPatternPlayer { ^false }
 	isAlgaReader { ^false }
 	isAlgaReaderPfunc { ^false }
@@ -425,24 +426,44 @@
 
 +TempoClock {
 	algaTempoClockSchedAtQuant { | quant = 1, task |
-		// Below one is beat-timing. Sync to the closest one
 		var time;
-		if(quant < 1, {
-			time = this.nextTimeOnGrid(quant)
-		}, {
-			// Above one is bar-timing. Sync to closest one depending on current beat time
-			// quant = 1.25
-			// this.beats = 43.2345
-			// time = 44.25
 
-			// should it be .ceil for this case ?
-			// quant = 1.25
-			// this.beats = 43.62345
-			// time = 44.25
+		case
+		//Beat syncing
+		{ quant.isNumber } {
+			if(quant < 1, {
+				//Sync to next availbale grid time
+				//quant = 1.25
+				//this.beats = 43.2345
+				//time = 44.25
+				time = this.nextTimeOnGrid(quant)
+			}, {
+				//Sync to beats in the future
+				//quant = 1.25
+				//this.beats = 43.62345
+				//time = 44.25
+				time = this.beats.floor + quant;
+			});
+		}
+		//Bar syncing
+		{ quant.isAlgaQuant } {
+			var nextBar = this.nextBar;
+			var beatsPerBar = this.beatsPerBar;
+			var algaQuantQuant = quant.quant;
+			var algaQuantWrapPhase = quant.wrapPhase;
+			var algaQuantPhase = if(algaQuantWrapPhase,
+				{ quant.phase % beatsPerBar },
+				{ quant.phase }
+			);
 
-			time = this.beats.floor + quant;
-		});
-		this.schedAbs(time, task)
+			//0 == 1
+			if(algaQuantQuant < 1, { algaQuantQuant = 1 });
+
+			//Sync to the next available bar, shifting by phase - within the bar if wrapping
+			time = (nextBar + ((algaQuantQuant - 1) * beatsPerBar)) + algaQuantPhase;
+		};
+
+		if(time != nil, { this.schedAbs(time, task) });
 	}
 
 	algaTempoClockSchedAtQuantWithTopPriority { | quant, task |

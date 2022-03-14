@@ -46,7 +46,7 @@ AlgaPatternPlayer {
 				func: func
 			);
 		}, {
-			//Normal scheduling (sched is a number)
+			//Normal scheduling (sched is a number or AlgaQuant)
 			scheduler.addAction(
 				condition: condition,
 				func: func,
