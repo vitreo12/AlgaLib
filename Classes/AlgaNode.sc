@@ -1951,8 +1951,8 @@ AlgaNode {
 
 							//If AlgaArg, unpack
 							if(prevSender.isAlgaArg, {
-								oldParamsChansMapping = prevSender.chans;
-								oldParamScale = prevSender.scale;
+								oldParamsChansMapping = prevSender.chansStream;
+								oldParamScale = prevSender.scaleStream;
 								prevSender = prevSender.sender;
 							});
 
@@ -2146,8 +2146,8 @@ AlgaNode {
 					defaultRate = algaNode.rate;
 
 					//Make sure to use AlgaArgs's scaling if possible (it will be nil otherwise)
-					oldParamsChansMapping = paramDefault.chans;
-					oldParamScale = paramDefault.scale;
+					oldParamsChansMapping = paramDefault.chansStream;
+					oldParamScale = paramDefault.scaleStream;
 
 					//Get the busArg of the synthBus
 					if(algaNode.algaInstantiatedAsSender, {

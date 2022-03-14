@@ -18,7 +18,7 @@
 //It can be used to dynamically set parameters of a connected Node (like scale and chans).
 AlgaArg {
 	//The streams
-	var <senderStream, <chansStream, <scaleStream;
+	var <chansStream, <scaleStream;
 
 	//The unpacked entries
 	var <sender, <chans, <scale;
@@ -28,13 +28,12 @@ AlgaArg {
 	}
 
 	init { | argSender, argChans, argScale |
-		senderStream = argSender.algaAsStream; //Pattern support
+		sender       = argSender;
 		chansStream  = argChans.algaAsStream;  //Pattern support
 		scaleStream  = argScale.algaAsStream;  //Pattern support
 	}
 
 	algaAdvance {
-		sender = senderStream.next;
 		chans  = chansStream.next;
 		scale  = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
 		scale.algaAdvanceArrayScaleValues;
