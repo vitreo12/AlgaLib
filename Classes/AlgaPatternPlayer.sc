@@ -815,7 +815,7 @@ AlgaPatternPlayer {
 		entries[param][\lastID] = uniqueID;
 		entries[param][\entries][uniqueID] = sender.algaAsStream;
 
-		//Re-trigger interpolation on connected AlgaPattern entries. Note the us of sched
+		//Re-trigger interpolation on connected AlgaPattern entries. Note the use of sched
 		algaPatternEntries.keysValuesDo({ | algaPattern, algaPatternParams |
 			var algaPatternPlayers = algaPattern.players;
 			algaPatternParams.do({ | algaPatternParam |

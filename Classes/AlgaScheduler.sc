@@ -306,7 +306,7 @@ AlgaScheduler : AlgaThread {
 				//This will be the core of clock / server syncing of actions
 				//Consume actions (they are ordered thanks to OrderedIdentitySet)
 				while({ actions.size > 0 }, {
-					var action, sched, topPriority, schedInSeconds;
+					var action, sched, topPriority, schedInSeconds, schedIsMoreThanZero = false;
 
 					if(cascadeMode, {
 						//if cascading, pop action from top of the list.
@@ -325,6 +325,7 @@ AlgaScheduler : AlgaThread {
 
 					//Individual sched for the action
 					sched = action[2];
+					if(sched.isNumber, { schedIsMoreThanZero = sched > 0 });
 
 					//Check if the specific action has to be executed with top priority
 					topPriority = action[3];
@@ -333,7 +334,7 @@ AlgaScheduler : AlgaThread {
 					schedInSeconds = action[4];
 
 					//Found a sched value (run in the future on the clock)
-					if(sched > 0, {
+					if(schedIsMoreThanZero.or(sched.isAlgaQuant), {
 						var functionOnSched;
 
 						if(interruptOnSched, {
@@ -439,7 +440,7 @@ AlgaScheduler : AlgaThread {
 							});
 						});
 					}, {
-						//Actual loop function, sched == 0
+						//Actual loop function, sched == 0 and not an AlgaQuant
 						this.loopFunc(action);
 					});
 				});
@@ -474,11 +475,11 @@ AlgaScheduler : AlgaThread {
 	addAction { | condition, func, sched = 0, topPriority = false, schedInSeconds = false, preCheck = false |
 		var action;
 
-		//Only numbers
-		if(sched.isNumber.not, { sched = 0 });
+		//Only numbers or AlgaQuant
+		if((sched.isNumber.not).and(sched.isAlgaQuant.not), { sched = 0 });
 
 		//Only booleans
-		if((topPriority != false).and(topPriority != true), { topPriority = false });
+		if(topPriority.isKindOf(Boolean).not, { topPriority = false });
 
 		//No condition == { true }
 		condition = condition ? { true };
@@ -501,7 +502,7 @@ AlgaScheduler : AlgaThread {
 
 		//Only positive numbers
 		sched = sched ? 0;
-		if(sched < 0, { sched = 0 });
+		if(sched.isNumber, { if(sched < 0, { sched = 0 }) });
 
 		//New action
 		action = [condition, func, sched, topPriority, schedInSeconds];
