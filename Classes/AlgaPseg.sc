@@ -18,13 +18,18 @@
 AlgaPseg : Pstep {
 	var <>curves;
 	var hold = false;
+	var onDone;
 	var time = 0;
 
-	*new { arg levels, durs = 1, curves = \lin,  repeats = 1 ;
-		^super.new(levels, durs, repeats).curves_(curves)
+	*new { arg levels, durs = 1, curves = \lin, repeats = 1, onDone;
+		^super.new(levels, durs, repeats).curves_(curves).onDone_(onDone)
 	}
 
 	stop { hold = true }
+
+	onDone_ { | func |
+		onDone = func;
+	}
 
 	embedInStream { arg inval;
 		var valStream, durStream, curveStream, startVal, val, dur, curve;
@@ -44,6 +49,7 @@ AlgaPseg : Pstep {
 
 				val.notNil and: { dur.notNil and: { curve.notNil } }
 			} {
+				var hasBeenHeld = false;
 				startTime = thisThread.endBeat;
 				thisThread.endBeat = thisThread.endBeat + dur;
 				if (startVal.isArray) {
@@ -51,17 +57,18 @@ AlgaPseg : Pstep {
 						Env([args[0], args[1]], [args[2]], args[3]) };
 					while { thisThread.endBeat > curTime = thisThread.beats } {
 						inval = yield(env.collect{ | e |
-							time = if(hold, { time } , { e.at(curTime - startTime) });
+							time = if(hold, { hasBeenHeld = true; time } , { e.at(curTime - startTime) });
 							e.at(time)
 						})
-					}
+					};
+					if(hasBeenHeld.not, { onDone.value });
 				} {
 					env = Env([startVal, val], [dur], curve);
 					while { thisThread.endBeat > curTime = thisThread.beats } {
-						time = if(hold, { time } , { env.at(curTime - startTime) });
-						time.asString.error;
+						time = if(hold, { hasBeenHeld = true; time } , { env.at(curTime - startTime) });
 						inval = yield(time);
-					}
+					};
+					if(hasBeenHeld.not, { onDone.value });
 				}
 			}
 		};

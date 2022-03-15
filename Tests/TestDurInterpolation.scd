@@ -13,16 +13,6 @@ s.waitForBoot({
 	d = Pbind(
 		\type, \note,
 		\instrument, \imp,
-		\amp,  Pfunc{
-			if(~trig, {
-				fork {
-					~ft.wait;
-					"done".postln;
-				};
-				~trig = false;
-			});
-			1
-		},
 		\dur, Pfunc { var val = ~dur.next; val.postln; val }
 	).play(clock: t)
 })
@@ -32,28 +22,25 @@ s.waitForBoot({
 (
 ~ft = 5 * t.tempo; //tempo agnostic, as Pseg only works with beats
 if(~blend != nil, { ~blend.stop });
-~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin);
+~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: { "0.1 DONE".error });
 ~what = 0.1;
 ~dur = (~dur.blend(~what, ~blend)).asStream;
-~trig = true;
 )
 
 (
 ~ft = 5 * t.tempo; //tempo agnostic, as Pseg only works with beats
 if(~blend != nil, { ~blend.stop });
-~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin);
+~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: { "0.5 DONE".error });
 ~what = 0.5;
 ~dur = (~dur.blend(~what, ~blend)).asStream;
-~trig = true;
 )
 
 (
 ~ft = 5 * t.tempo; //tempo agnostic, as Pseg only works with beats
 if(~blend != nil, { ~blend.stop });
-~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin);
+~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: { "Pseq DONE".error });
 ~what = Pseq([0.1, 0.5, 0.33], inf);
 ~dur = (~dur.blend(~what, ~blend)).asStream;
-~trig = true;
 )
 
 //If changing this, it takes the same amount of time once triggered ..
