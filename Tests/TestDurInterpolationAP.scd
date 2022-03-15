@@ -1,6 +1,6 @@
 (
 Alga.boot({
-	~dur = 1;
+	~dur = 0.5;
 	t = TempoClock.default;
 
 	//Pattern
@@ -21,30 +21,31 @@ Alga.boot({
 (
 ~ft = 5 * t.tempo;
 if(~pseg != nil, { ~pseg.stop });
+~what = 0.1;
 ~pseg = AlgaPseg([0, 1, 0.5, 1, 1], [2, 3, 4, inf], \lin, onDone: {
 	a.from(Pfunc { var val = ~dur.next; val.postln; val }, \dur, sched: 1);
 });
-~what = 0.1;
 ~dur = (~dur.blend(~what, ~pseg)).asStream;
 )
 
 (
 ~ft = 5 * t.tempo;
 if(~pseg != nil, { ~pseg.stop });
-~pseg = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
-	a.from(Pfunc { var val = ~dur.next; val.postln; val }, \dur, sched: 1)
-});
 ~what = 0.5;
+~pseg = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
+	a.from(Pfunc { var val = ~dur.next; val.postln; val }, \dur, sched: 1)
+});
 ~dur = (~dur.blend(~what, ~pseg)).asStream;
 )
 
 (
 ~ft = 5 * t.tempo;
 if(~pseg != nil, { ~pseg.stop });
+~what = Pseq([0.25, 0.25, 0.125], inf);
 ~pseg = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
+	~dur = ~what.asStream; //Reset option
 	a.from(Pfunc { var val = ~dur.next; val.postln; val }, \dur, sched: 1)
 });
-~what = Pseq([0.25, 0.25, 0.125], inf);
 ~dur = (~dur.blend(~what, ~pseg)).asStream;
 )
 
