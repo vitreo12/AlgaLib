@@ -43,8 +43,11 @@ if(~pseg != nil, { ~pseg.stop });
 if(~pseg != nil, { ~pseg.stop });
 ~what = Pseq([0.25, 0.25, 0.125], inf);
 ~pseg = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
-	~dur = ~what.asStream; //Reset option
-	a.from(Pfunc { var val = ~dur.next; val.postln; val }, \dur, sched: 1)
+	a.from(Pfunc { var val = ~dur.next; val.postln; val }, \dur, sched: 1);
+
+	//This will effectively reset the sequence. It is to be executed as same sched as
+	//the re-syncing, but at topPriority in order to be executed beforehand
+	a.addAction(func: { ~dur = ~what.asStream }, sched: 1, topPriority: true);
 });
 ~dur = (~dur.blend(~what, ~pseg)).asStream;
 )
