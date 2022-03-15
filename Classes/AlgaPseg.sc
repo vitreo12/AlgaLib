@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//Like Pseg but stoppable
+//Like Pseg but stoppable, with option for executing a function when done (if it has not been stopped)
 AlgaPseg : Pstep {
 	var <>curves;
 	var hold = false;
@@ -27,9 +27,7 @@ AlgaPseg : Pstep {
 
 	stop { hold = true }
 
-	onDone_ { | func |
-		onDone = func;
-	}
+	onDone_ { | func | onDone = func }
 
 	embedInStream { arg inval;
 		var valStream, durStream, curveStream, startVal, val, dur, curve;
@@ -74,6 +72,7 @@ AlgaPseg : Pstep {
 		};
 		^inval
 	}
+
 	storeArgs {
 		^[list, durs, curves, repeats]
 	}

@@ -7,7 +7,6 @@ s.waitForBoot({
 	s.sync;
 
 	~dur = 1;
-	~trig = false;
 	t = TempoClock.default;
 
 	d = Pbind(
@@ -43,5 +42,5 @@ if(~blend != nil, { ~blend.stop });
 ~dur = (~dur.blend(~what, ~blend)).asStream;
 )
 
-//If changing this, it takes the same amount of time once triggered ..
+//If changing this, it takes the same amount of time once triggered
 TempoClock.default.tempo = 10
