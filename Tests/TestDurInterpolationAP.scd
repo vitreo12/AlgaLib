@@ -6,7 +6,7 @@ Alga.boot({
 	//Pattern
 	a = AP((
 		def: { SinOsc.ar * EnvPerc.ar(release: 0.1) * 0.5 },
-		dur: Pfunc { ~dur.next }
+		dur: Pfunc { var val = ~dur.next; val.postln; val }
 	)).play(chans:2);
 
 	//Click
@@ -20,26 +20,32 @@ Alga.boot({
 //Use AlgaPseg's onDone to resync the pattern
 (
 ~ft = 5 * t.tempo;
-if(~blend != nil, { ~blend.stop });
-~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: { a.from(Pfunc { ~dur.next }, \dur, sched: 1) });
+if(~pseg != nil, { ~pseg.stop });
+~pseg = AlgaPseg([0, 1, 0.5, 1, 1], [2, 3, 4, inf], \lin, onDone: {
+	a.from(Pfunc { var val = ~dur.next; val.postln; val }, \dur, sched: 1);
+});
 ~what = 0.1;
-~dur = (~dur.blend(~what, ~blend)).asStream;
+~dur = (~dur.blend(~what, ~pseg)).asStream;
 )
 
 (
 ~ft = 5 * t.tempo;
-if(~blend != nil, { ~blend.stop });
-~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: { a.from(Pfunc { ~dur.next }, \dur, sched: 1) });
+if(~pseg != nil, { ~pseg.stop });
+~pseg = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
+	a.from(Pfunc { var val = ~dur.next; val.postln; val }, \dur, sched: 1)
+});
 ~what = 0.5;
-~dur = (~dur.blend(~what, ~blend)).asStream;
+~dur = (~dur.blend(~what, ~pseg)).asStream;
 )
 
 (
 ~ft = 5 * t.tempo;
-if(~blend != nil, { ~blend.stop });
-~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: { a.from(Pfunc { ~dur.next }, \dur, sched: 1) });
+if(~pseg != nil, { ~pseg.stop });
+~pseg = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
+	a.from(Pfunc { var val = ~dur.next; val.postln; val }, \dur, sched: 1)
+});
 ~what = Pseq([0.25, 0.25, 0.125], inf);
-~dur = (~dur.blend(~what, ~blend)).asStream;
+~dur = (~dur.blend(~what, ~pseg)).asStream;
 )
 
 //If changing this, it takes the same amount of time once triggered

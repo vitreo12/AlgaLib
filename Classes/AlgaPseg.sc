@@ -34,6 +34,7 @@ AlgaPseg : Pstep {
 		var env;
 		var startTime, curTime;
 		repeats.value(inval).do {
+			var hasBeenHeld = false;
 			valStream = list.asStream;
 			durStream = durs.asStream;
 			curveStream = curves.asStream;
@@ -45,9 +46,12 @@ AlgaPseg : Pstep {
 				dur = durStream.next(inval);
 				curve = curveStream.next(inval);
 
+				//If dur is inf, it's the last entry.
+				//Execute onDone IF there were not .stop calls
+				if((dur == inf).and(hasBeenHeld.not), { onDone.value });
+
 				val.notNil and: { dur.notNil and: { curve.notNil } }
 			} {
-				var hasBeenHeld = false;
 				startTime = thisThread.endBeat;
 				thisThread.endBeat = thisThread.endBeat + dur;
 				if (startVal.isArray) {
@@ -59,16 +63,14 @@ AlgaPseg : Pstep {
 							e.at(time)
 						})
 					};
-					if(hasBeenHeld.not, { onDone.value });
 				} {
 					env = Env([startVal, val], [dur], curve);
 					while { thisThread.endBeat > curTime = thisThread.beats } {
 						time = if(hold, { hasBeenHeld = true; time } , { env.at(curTime - startTime) });
 						inval = yield(time);
 					};
-					if(hasBeenHeld.not, { onDone.value });
 				}
-			}
+			};
 		};
 		^inval
 	}
