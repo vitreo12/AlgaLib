@@ -456,9 +456,6 @@
 				{ quant.phase }
 			);
 
-			//0 == 1
-			if(algaQuantQuant < 1, { algaQuantQuant = 1 });
-
 			//Sync to the next available bar, shifting by phase - within the bar if wrapping
 			time = (nextBar + ((algaQuantQuant - 1) * beatsPerBar)) + algaQuantPhase;
 		};
