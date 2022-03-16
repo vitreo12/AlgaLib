@@ -24,6 +24,7 @@ if(~blend != nil, { ~blend.stop });
 ~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
 	("Drift: " ++ ~blend.drift).warn;
 });
+~blend.start;
 ~what = 0.1;
 ~dur = (~dur.blend(~what, ~blend)).asStream;
 )
@@ -34,6 +35,7 @@ if(~blend != nil, { ~blend.stop });
 ~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
 	("Drift: " ++ ~blend.drift).warn;
 });
+~blend.start;
 ~what = 0.5;
 ~dur = (~dur.blend(~what, ~blend)).asStream;
 )
@@ -44,6 +46,7 @@ if(~blend != nil, { ~blend.stop });
 ~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
 	("Drift: " ++ ~blend.drift).warn;
 });
+~blend.start;
 ~what = Pseq([0.1, 0.5, 0.33], inf);
 ~dur = (~dur.blend(~what, ~blend)).asStream;
 )
