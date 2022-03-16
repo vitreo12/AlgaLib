@@ -22,6 +22,7 @@ AlgaPseg : Pstep {
 	var clock;
 	var time = 0;
 	var trigStartTime;
+	var <drift = 0;
 
 	*new { arg levels, durs = 1, curves = \lin, repeats = 1, clock, onDone;
 		clock = clock ? TempoClock.default;
@@ -47,16 +48,23 @@ AlgaPseg : Pstep {
 			durStream = durs.asStream;
 			curveStream = curves.asStream;
 			val = valStream.next(inval) ?? {^inval};
+
+			//Use trigStartTime if provided
 			thisThread.endBeat = trigStartTime ? (thisThread.endBeat ? thisThread.beats min: thisThread.beats);
+
+			//Loop until valid values
 			while {
 				startVal = val;
 				val = valStream.next(inval);
 				dur = durStream.next(inval);
 				curve = curveStream.next(inval);
 
-				//If dur is inf, it's the last entry.
+				//If dur is inf, everything has already been processed.
 				//Execute onDone IF there were not .stop calls
-				if((dur == inf).and(hasBeenHeld.not), { onDone.value });
+				if((dur == inf).and(hasBeenHeld.not), {
+					drift = clock.nextTimeOnGrid - thisThread.beats;
+					onDone.value;
+				});
 
 				val.notNil and: { dur.notNil and: { curve.notNil } }
 			} {

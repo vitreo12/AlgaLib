@@ -21,7 +21,9 @@ s.waitForBoot({
 (
 ~ft = 5 * t.tempo; //tempo agnostic, as Pseg only works with beats
 if(~blend != nil, { ~blend.stop });
-~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: { "0.1 DONE".error });
+~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
+	("Drift: " ++ ~blend.drift).warn;
+});
 ~what = 0.1;
 ~dur = (~dur.blend(~what, ~blend)).asStream;
 )
@@ -29,7 +31,9 @@ if(~blend != nil, { ~blend.stop });
 (
 ~ft = 5 * t.tempo; //tempo agnostic, as Pseg only works with beats
 if(~blend != nil, { ~blend.stop });
-~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: { "0.5 DONE".error });
+~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
+	("Drift: " ++ ~blend.drift).warn;
+});
 ~what = 0.5;
 ~dur = (~dur.blend(~what, ~blend)).asStream;
 )
@@ -37,7 +41,9 @@ if(~blend != nil, { ~blend.stop });
 (
 ~ft = 5 * t.tempo; //tempo agnostic, as Pseg only works with beats
 if(~blend != nil, { ~blend.stop });
-~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: { "Pseq DONE".error });
+~blend = AlgaPseg([0, 1, 1], [~ft, inf], \lin, onDone: {
+	("Drift: " ++ ~blend.drift).warn;
+});
 ~what = Pseq([0.1, 0.5, 0.33], inf);
 ~dur = (~dur.blend(~what, ~blend)).asStream;
 )
