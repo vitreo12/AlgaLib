@@ -3515,7 +3515,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Resume pattern
-	resumePattern { | sched |
+	resumePattern { | sched = 0 |
 		//Check sched
 		sched = sched ? schedInner;
 		sched = sched ? 0;
