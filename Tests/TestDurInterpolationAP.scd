@@ -67,4 +67,4 @@ if(~pseg != nil, { ~pseg.stop });
 )
 
 //If changing this, it takes the same amount of time once triggered
-a.clock.tempo = 1
+a.clock.tempo = 2

@@ -18,6 +18,7 @@
 AlgaPseg : Pstep {
 	var <>curves;
 	var hold = false;
+	var hasBeenHeld = false;
 	var onDone;
 	var clock;
 	var time = 0;
@@ -36,18 +37,33 @@ AlgaPseg : Pstep {
 	clock_ { | val | clock = val }
 
 	//This allows to start OUTSIDE of the trigger boundaries
-	start { trigStartTime = clock.beats min: clock.beats }
+	start {
+		trigStartTime = clock.beats min: clock.beats;
+		this.startCountdown;
+	}
+
+	startCountdown {
+		var dursSum = durs.list[0..(durs.size - 1)].sum; //get rid of inf
+		clock.algaSchedInSecondsOnceWithTopPriority(dursSum, {
+			if(hasBeenHeld.not, {
+				drift = clock.nextTimeOnGrid - clock.beats;
+				onDone.value;
+			});
+		});
+	}
 
 	embedInStream { arg inval;
 		var valStream, durStream, curveStream, startVal, val, dur, curve;
 		var env;
 		var startTime, curTime;
 		repeats.value(inval).do {
-			var hasBeenHeld = false;
 			valStream = list.asStream;
 			durStream = durs.asStream;
 			curveStream = curves.asStream;
 			val = valStream.next(inval) ?? {^inval};
+
+			//if trigStartTime is nil, need to startCountdown
+			if(trigStartTime == nil, { this.startCountdown });
 
 			//Use trigStartTime if provided
 			thisThread.endBeat = trigStartTime ? (thisThread.endBeat ? thisThread.beats min: thisThread.beats);
@@ -59,12 +75,14 @@ AlgaPseg : Pstep {
 				dur = durStream.next(inval);
 				curve = curveStream.next(inval);
 
+				/*
 				//If dur is inf, everything has already been processed.
 				//Execute onDone IF there were not .stop calls
 				if((dur == inf).and(hasBeenHeld.not), {
 					drift = clock.nextTimeOnGrid - thisThread.beats;
 					onDone.value;
 				});
+				*/
 
 				val.notNil and: { dur.notNil and: { curve.notNil } }
 			} {
