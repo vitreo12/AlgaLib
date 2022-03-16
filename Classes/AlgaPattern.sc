@@ -4024,7 +4024,7 @@ AMP : AlgaMonoPattern {}
 			[
 				\out, interpBus.index,
 				\env_out, envBus.index,
-				\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv
 			],
 			interpGroup,
@@ -4074,7 +4074,7 @@ AMP : AlgaMonoPattern {}
 				//It's still used while fade-out interpolation is happening
 				patternOutEnvSynth.set(
 					\t_release, 1,
-					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				);
 

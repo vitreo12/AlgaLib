@@ -109,7 +109,7 @@ AlgaPatternInterpStreams {
 				//even after the first trigger of \t_release.
 				interpSynth.set(
 					\t_release, 1,
-					\fadeTime, if(algaPattern.tempoScaling, { time * algaPattern.clock.tempo }, { time }),
+					\fadeTime, if(algaPattern.tempoScaling, { time / algaPattern.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				);
 			});
@@ -247,7 +247,7 @@ AlgaPatternInterpStreams {
 				interpSymbol,
 				[
 					\out, interpBus.index,
-					\fadeTime, if(algaPattern.tempoScaling, { time * algaPattern.clock.tempo }, { time }),
+					\fadeTime, if(algaPattern.tempoScaling, { time / algaPattern.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				],
 				interpGroup

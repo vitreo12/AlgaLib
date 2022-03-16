@@ -1483,7 +1483,7 @@ AlgaNode {
 		//as it will be set eventually in the case of .clear / etc...
 		var synthArgs = [
 			\out, synthBus.index,
-			\fadeTime, if(tempoScaling, { longestWaitTime * this.clock.tempo }, { longestWaitTime }),
+			\fadeTime, if(tempoScaling, { longestWaitTime / this.clock.tempo }, { longestWaitTime }),
 			\gate, 1
 		];
 
@@ -1890,7 +1890,7 @@ AlgaNode {
 		activeInterpSynths[param][sender].do({ | activeInterpSynth |
 			activeInterpSynth.set(
 				\t_release, 1,
-				\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv,
 			);
 		});
@@ -2673,7 +2673,7 @@ AlgaNode {
 				fadeInSymbol,
 				[
 					\out, interpBus.index,
-					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				],
 				interpGroup,
@@ -2716,7 +2716,7 @@ AlgaNode {
 				\in, sender.synthBus.busArg,
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
-				\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv
 			];
 
@@ -2860,7 +2860,7 @@ AlgaNode {
 				\in, paramVal,
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
-				\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv
 			];
 
@@ -2926,7 +2926,7 @@ AlgaNode {
 				synth.set(
 					\gate, 0,
 					\fadeTime, if(useConnectionTime, {
-						if(tempoScaling, { longestWaitTime * this.clock.tempo }, { longestWaitTime })
+						if(tempoScaling, { longestWaitTime / this.clock.tempo }, { longestWaitTime })
 					}, { 0 })
 				);
 
@@ -3049,7 +3049,7 @@ AlgaNode {
 						fadeOutSymbol,
 						[
 							\out, interpBusAtParam.index,
-							\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+							\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 							\envShape, shape.algaConvertEnv
 						],
 						interpGroup,
@@ -3060,7 +3060,7 @@ AlgaNode {
 					if(replaceMix.not, {
 						normSynthAtParam.set(
 							\gate, 0,
-							\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time })
+							\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time })
 						);
 					});
 				});
@@ -3068,7 +3068,7 @@ AlgaNode {
 				//This has to be surely algaInstantiated before being freed
 				interpSynthAtParam.set(
 					\t_release, 1,
-					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				);
 
@@ -3145,7 +3145,7 @@ AlgaNode {
 				interpSynthsAtParam.do({ | interpSynthAtParam |
 					interpSynthAtParam.set(
 						\t_release, 1,
-						\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+						\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 						\envShape, shape.algaConvertEnv
 					);
 				});
@@ -4700,7 +4700,7 @@ AlgaNode {
 					\in, synthBus.busArg,
 					\indices, channelsToPlay,
 					\gate, 1,
-					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 					\scale, scale,
 					\out, out
 				],
@@ -4727,7 +4727,7 @@ AlgaNode {
 				[
 					\in, synthBus.busArg,
 					\gate, 1,
-					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time }),
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 					\scale, scale,
 					\out, out
 				],
@@ -4789,7 +4789,7 @@ AlgaNode {
 				//Set \fadeTime
 				playSynth.set(
 					\gate, 0,
-					\fadeTime, if(tempoScaling, { time * this.clock.tempo }, { time })
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time })
 				)
 			});
 			isPlaying = false;
