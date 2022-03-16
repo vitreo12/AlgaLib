@@ -19,15 +19,23 @@ AlgaPseg : Pstep {
 	var <>curves;
 	var hold = false;
 	var onDone;
+	var clock;
 	var time = 0;
+	var trigStartTime;
 
-	*new { arg levels, durs = 1, curves = \lin, repeats = 1, onDone;
-		^super.new(levels, durs, repeats).curves_(curves).onDone_(onDone)
+	*new { arg levels, durs = 1, curves = \lin, repeats = 1, clock, onDone;
+		clock = clock ? TempoClock.default;
+		^super.new(levels, durs, repeats).curves_(curves).clock_(clock).onDone_(onDone)
 	}
 
 	stop { hold = true }
 
-	onDone_ { | func | onDone = func }
+	onDone_ { | val | onDone = val }
+
+	clock_ { | val | clock = val }
+
+	//This allows to start OUTSIDE of the trigger boundaries
+	start { trigStartTime = clock.beats min: clock.beats }
 
 	embedInStream { arg inval;
 		var valStream, durStream, curveStream, startVal, val, dur, curve;
@@ -39,7 +47,7 @@ AlgaPseg : Pstep {
 			durStream = durs.asStream;
 			curveStream = curves.asStream;
 			val = valStream.next(inval) ?? {^inval};
-			thisThread.endBeat = thisThread.endBeat ? thisThread.beats min: thisThread.beats;
+			thisThread.endBeat = trigStartTime ? (thisThread.endBeat ? thisThread.beats min: thisThread.beats);
 			while {
 				startVal = val;
 				val = valStream.next(inval);
