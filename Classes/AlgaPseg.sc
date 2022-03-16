@@ -43,7 +43,7 @@ AlgaPseg : Pstep {
 	}
 
 	startCountdown {
-		var dursSum = durs.list[0..(durs.size - 1)].sum; //get rid of inf
+		var dursSum = durs.list[0..(durs.list.size - 2)].sum; //get rid of inf
 		clock.algaSchedInSecondsOnceWithTopPriority(dursSum, {
 			if(hasBeenHeld.not, {
 				drift = clock.nextTimeOnGrid - clock.beats;
