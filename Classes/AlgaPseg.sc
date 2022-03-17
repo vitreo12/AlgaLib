@@ -25,7 +25,7 @@ AlgaPseg : Pstep {
 	var trigStartTime;
 	var <drift = 0;
 
-	*new { arg levels, durs = 1, curves = \lin, repeats = 1, clock, onDone;
+	*new { | levels, durs = 1, curves = \lin, repeats = 1, clock, onDone |
 		clock = clock ? TempoClock.default;
 		^super.new(levels, durs, repeats).curves_(curves).clock_(clock).onDone_(onDone)
 	}
@@ -42,17 +42,21 @@ AlgaPseg : Pstep {
 		this.startCountdown;
 	}
 
+	//Count in seconds, like all the interpolation stuff on the server
 	startCountdown {
 		var dursSum = durs.list[0..(durs.list.size - 2)].sum; //get rid of inf
 		clock.algaSchedInSecondsOnceWithTopPriority(dursSum, {
 			if(hasBeenHeld.not, {
+				//Difference between the next beat and the end pattern time.
+				//This could be used to smartly shift the pattern back / forward
+				//to re-align. At this moment, this is not used and resync is brutally set.
 				drift = clock.nextTimeOnGrid - clock.beats;
 				onDone.value;
 			});
 		});
 	}
 
-	embedInStream { arg inval;
+	embedInStream { | inval |
 		var valStream, durStream, curveStream, startVal, val, dur, curve;
 		var env;
 		var startTime, curTime;
@@ -62,11 +66,12 @@ AlgaPseg : Pstep {
 			curveStream = curves.asStream;
 			val = valStream.next(inval) ?? {^inval};
 
+			//Use trigStartTime if provided
+			thisThread.endBeat = trigStartTime ?
+			(thisThread.endBeat ? thisThread.beats min: thisThread.beats);
+
 			//if trigStartTime is nil, need to startCountdown
 			if(trigStartTime == nil, { this.startCountdown });
-
-			//Use trigStartTime if provided
-			thisThread.endBeat = trigStartTime ? (thisThread.endBeat ? thisThread.beats min: thisThread.beats);
 
 			//Loop until valid values
 			while {
@@ -110,6 +115,6 @@ AlgaPseg : Pstep {
 	}
 
 	storeArgs {
-		^[list, durs, curves, repeats]
+		^[list, durs, curves, repeats, clock, onDone]
 	}
 }
