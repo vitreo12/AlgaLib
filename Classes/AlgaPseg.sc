@@ -50,10 +50,15 @@ AlgaPseg : Pstep {
 				//Difference between the next beat and the end pattern time.
 				//This could be used to smartly shift the pattern back / forward
 				//to re-align. At this moment, this is not used and resync is brutally set.
-				drift = clock.nextTimeOnGrid - clock.beats;
+				this.updateDrift;
 				onDone.value;
 			});
 		});
+	}
+
+	//Update the drift
+	updateDrift {
+		drift = clock.nextTimeOnGrid - clock.beats;
 	}
 
 	embedInStream { | inval |
