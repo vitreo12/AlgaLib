@@ -18,6 +18,7 @@
 AlgaPseg : Pstep {
 	var <>curves;
 	var hold = false;
+	var externalHold = false;
 	var hasBeenHeld = false;
 	var onDone;
 	var clock;
@@ -31,6 +32,8 @@ AlgaPseg : Pstep {
 	}
 
 	stop { hold = true }
+
+	extStop { externalHold = true }
 
 	onDone_ { | val | onDone = val }
 
@@ -46,7 +49,8 @@ AlgaPseg : Pstep {
 	startCountdown {
 		var dursSum = durs.list[0..(durs.list.size - 2)].sum; //get rid of inf
 		clock.algaSchedInSecondsOnceWithTopPriority(dursSum, {
-			if(hasBeenHeld.not, {
+			//externalHold is used for dur into stretch and viceversa: onDone should not be triggered
+			if((hasBeenHeld.not).and(externalHold.not), {
 				//Difference between the next beat and the end pattern time.
 				//This could be used to smartly shift the pattern back / forward
 				//to re-align. At this moment, this is not used and resync is brutally set.
