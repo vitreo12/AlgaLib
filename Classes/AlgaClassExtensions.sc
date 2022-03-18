@@ -27,6 +27,7 @@
 	isAlgaPatternPlayer { ^false }
 	isAlgaReader { ^false }
 	isAlgaReaderPfunc { ^false }
+	isAlgaPseg { ^false }
 	isBuffer { ^false }
 	isPattern { ^false }
 	isStream { ^false }
@@ -125,6 +126,18 @@
 	//Used on .set to change Env
 	algaConvertEnv {
 		^this.asArrayForInterpolation.collect(_.reference).unbubble;
+	}
+
+	//Used for dur interpolation
+	asAlgaPseg { | time, clock, onDone |
+		var c = if(curves.isSequenceableCollection.not) { curves } { Pseq(curves) };
+		^AlgaPseg(
+			levels: Pseq(levels ++ 1),
+			durs: Pseq((times.normalizeSum * time) ++ [inf]),
+			curves: c,
+			clock: clock,
+			onDone: onDone
+		)
 	}
 }
 

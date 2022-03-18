@@ -22,7 +22,7 @@ AlgaNode {
 	var <scheduler;
 
 	//The sched used internally if set
-	var schedInner;
+	var schedInner = 0;
 
 	//Sched action in seconds instead of beats
 	var <schedInSeconds = false;

@@ -22,7 +22,7 @@ AlgaPatternInterpStreams {
 	var <server;
 
 	//The time entries
-	var <>dur, <>sustain, <>stretch, <>legato;
+	var <>dur, <>durAlgaPseg, <>sustain, <>stretch, <>legato;
 
 	//Store it for .replace
 	var <algaReschedulingEventStreamPlayer;

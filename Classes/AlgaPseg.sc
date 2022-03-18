@@ -103,14 +103,14 @@ AlgaPseg : Pstep {
 						Env([args[0], args[1]], [args[2]], args[3]) };
 					while { thisThread.endBeat > curTime = thisThread.beats } {
 						inval = yield(env.collect{ | e |
-							time = if(hold, { hasBeenHeld = true; time } , { e.at(curTime - startTime) });
+							time = if(hold, { hasBeenHeld = true; time }, { e.at(curTime - startTime) });
 							e.at(time)
 						})
 					};
 				} {
 					env = Env([startVal, val], [dur], curve);
 					while { thisThread.endBeat > curTime = thisThread.beats } {
-						time = if(hold, { hasBeenHeld = true; time } , { env.at(curTime - startTime) });
+						time = if(hold, { hasBeenHeld = true; time }, { env.at(curTime - startTime) });
 						inval = yield(time);
 					};
 				}
@@ -122,4 +122,6 @@ AlgaPseg : Pstep {
 	storeArgs {
 		^[list, durs, curves, repeats, clock, onDone]
 	}
+
+	isAlgaPseg { ^true }
 }
