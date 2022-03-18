@@ -65,6 +65,10 @@ AlgaPattern : AlgaNode {
 	//Keep track of latest clock time
 	var <latestPatternTime;
 
+	//Keep track of latest dur value / stream
+	var <latestDur;
+	var <latestDurStream;
+
 	//Keep track of ALL active patternParamSynths
 	var <>currentActivePatternParamSynths;
 
@@ -1541,9 +1545,6 @@ AlgaPattern : AlgaNode {
 			onPatternSynthFreeFunc.value
 		});
 
-		//Update latest time
-		latestPatternTime = this.clock.seconds;
-
 		//Reset
 		skipIteration = false;
 	}
@@ -2359,9 +2360,9 @@ AlgaPattern : AlgaNode {
 
 		//Add \sustain
 		patternPairs = patternPairs.addAll([
-			\sustain, Pfuncn( { newInterpStreams.sustain.next }, inf),
-			\stretch, Pfuncn( { newInterpStreams.stretch.next }, inf),
-			\legato, Pfuncn( { newInterpStreams.legato.next }, inf)
+			\sustain, Pfunc( { newInterpStreams.sustain.next } ),
+			\stretch, Pfunc( { newInterpStreams.stretch.next } ),
+			\legato, Pfunc( { newInterpStreams.legato.next } )
 		]);
 
 		//If player is AlgaPatternPlayer, dur is ALWAYS manual
@@ -2369,9 +2370,33 @@ AlgaPattern : AlgaNode {
 
 		//Manual or automatic dur management
 		if(manualDur.not, {
-			//Pfuncn allows to modify the value
+			//Pfunc allows to modify the value
 			patternPairs = patternPairs.add(\dur).add(
-				Pfuncn( { newInterpStreams.dur.next }, inf)
+				Pfunc( {
+					//Only advance when there are no concurrent executions.
+					//This allows for .replace to work correctly and not advance twice!
+					var currentTime = this.clock.seconds;
+					var dur = if(currentTime != latestPatternTime, {
+						newInterpStreams.dur.next
+					}, {
+						//If stream changed, run .next anyway
+						if(newInterpStreams.dur != latestDurStream, {
+							newInterpStreams.dur.next
+						}, {
+							//Same time and no stream change: return the
+							//dur that was just triggered at this very time
+							latestDur
+						})
+					});
+
+					//Store values
+					latestDur = dur;
+					latestDurStream = newInterpStreams.dur;
+					latestPatternTime = currentTime;
+
+					//Return correct dur
+					dur;
+				} )
 			);
 		});
 

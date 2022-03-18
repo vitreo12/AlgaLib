@@ -8,6 +8,8 @@
 
 - `AlgaNode`: trigger `addActiveInOutNodes` on `replace` for old input connections.
 
+- `AlgaPattern`: do not run `dur.next` twice on `replace`.
+
 - `AlgaNode` and `AlgaPattern`: only the latest executed `replace` and `from` is executed on scheduled time. This allows the user to correct his/her/thier own mistakes while live coding with only having the latest iteration considered as valid code.
 
 ## New features
