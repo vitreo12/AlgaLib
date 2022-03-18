@@ -3694,8 +3694,17 @@ AlgaPattern : AlgaNode {
 			func: {
 				var newAlgaPseg;
 
-				//Stop previous one
+				//Stop previous one. \dur and \stretch stop each other too
 				if(algaPseg.isAlgaPseg, { algaPseg.stop });
+				case
+				{ param == \dur } {
+					var stretchAlgaPseg = interpStreams.stretchAlgaPseg;
+					if(stretchAlgaPseg.isAlgaPseg, { stretchAlgaPseg.stop });
+				}
+				{ param == \stretch } {
+					var durAlgaPseg = interpStreams.durAlgaPseg;
+					if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.stop });
+				};
 
 				//Create new one
 				newAlgaPseg = shape.asAlgaPseg(
