@@ -3164,20 +3164,31 @@ AlgaPattern : AlgaNode {
 			);
 		});
 
+		//Store latest sender. This is used to only execute the latest .from call.
+		//This allows for a smoother live coding experience: instead of triggering
+		//every .from that was executed (perhaps the user found a mistake), only
+		//the latest one will be considered when sched comes.
+		this.addLatestSenderAtParam(sender, param);
+
 		//All other cases
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			this.addAction(
-				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
+				condition: {
+					(this.algaInstantiatedAsReceiver(param, sender, false)).and(
+						sender.algaInstantiatedAsSender)
+				},
 				func: {
-					this.makeConnectionInner(
-						sender: sender,
-						param: param,
-						senderChansMapping: senderChansMapping,
-						scale: scale,
-						sampleAndHold: sampleAndHold,
-						time: time,
-						shape: shape
-					)
+					if(sender == this.getLatestSenderAtParam(sender, param), {
+						this.makeConnectionInner(
+							sender: sender,
+							param: param,
+							senderChansMapping: senderChansMapping,
+							scale: scale,
+							sampleAndHold: sampleAndHold,
+							time: time,
+							shape: shape
+						)
+					})
 				},
 				sched: sched,
 				topPriority: true //This is essential for scheduled times to work correctly!

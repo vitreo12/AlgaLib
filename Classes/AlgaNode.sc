@@ -147,6 +147,12 @@ AlgaNode {
 	var <algaWasBeingCleared = false;
 	var <algaCleared = false;
 
+	//Only trigger replace when latestReplaceDef is same as def
+	var latestReplaceDef;
+
+	//Only trigger from when sender equals the latest sender used
+	var latestSenders;
+
 	//Debugging tool
 	var <name;
 
@@ -3652,6 +3658,23 @@ AlgaNode {
 		});
 	}
 
+	//Store latest sender. Only works with no mix
+	addLatestSenderAtParam { | sender, param = \in, mix = false |
+		if(mix.not, {
+			latestSenders = latestSenders ? IdentityDictionary(10);
+			latestSenders[param] = sender;
+		})
+	}
+
+	//Get latest sender. Only works with no no mix
+	getLatestSenderAtParam { | sender, param = \in, mix = false |
+		if(mix.not, {
+			var latestSenderAtParam = latestSenders[param];
+			if(latestSenderAtParam != nil, { ^latestSenderAtParam });
+		})
+		^sender; //Just return sender if mix or not found!
+	}
+
 	//<<.param sender
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
@@ -3665,16 +3688,26 @@ AlgaNode {
 			^this.replace(synthDef.name, [param, sender], time: time, sched: sched)
 		});
 
+		//Store latest sender. This is used to only execute the latest .from call.
+		//This allows for a smoother live coding experience: instead of triggering
+		//every .from that was executed (perhaps the user found a mistake), only
+		//the latest one will be considered when sched comes.
+		//Of course, mix is not affected by this mechanism
+		this.addLatestSenderAtParam(sender, param, mix);
+
 		//Actual makeConnection
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			this.addAction(
 				condition: {
-					(this.algaInstantiatedAsReceiver(param, sender, mix)).and(sender.algaInstantiatedAsSender)
+					(this.algaInstantiatedAsReceiver(param, sender, mix)).and(
+						sender.algaInstantiatedAsSender)
 				},
 				func: {
-					this.makeConnectionInner(sender, param, replace, mix,
-						replaceMix, senderChansMapping, scale, time:time, shape:shape
-					)
+					if(sender == this.getLatestSenderAtParam(sender, param, mix), {
+						this.makeConnectionInner(sender, param, replace, mix,
+							replaceMix, senderChansMapping, scale, time:time, shape:shape
+						)
+					});
 				},
 				sched: sched
 			);
@@ -4394,18 +4427,26 @@ AlgaNode {
 		//Check sched
 		sched = sched ? schedInner;
 
+		//This makes sure that only the latest executed code will go through,
+		//allowing for a smoother live coding experience. This way, instead of
+		//going through each iteration (perhaps there were mistakes), only
+		//the latest executed code will be considered at the moment of .replace
+		latestReplaceDef = def;
+
 		//Check global algaInstantiated
 		this.addAction(
 			condition: { this.algaInstantiated },
 			func: {
-				this.replaceInner(
-					def:def, args:args, time:time,
-					outsMapping:outsMapping,
-					reset:reset,
-					keepOutsMappingIn:keepOutsMappingIn,
-					keepOutsMappingOut:keepOutsMappingOut,
-					keepScalesIn:keepScalesIn, keepScalesOut:keepScalesOut
-				);
+				if(def == latestReplaceDef, {
+					this.replaceInner(
+						def:def, args:args, time:time,
+						outsMapping:outsMapping,
+						reset:reset,
+						keepOutsMappingIn:keepOutsMappingIn,
+						keepOutsMappingOut:keepOutsMappingOut,
+						keepScalesIn:keepScalesIn, keepScalesOut:keepScalesOut
+					);
+				});
 			},
 			sched: sched,
 			topPriority: true //always top priority
