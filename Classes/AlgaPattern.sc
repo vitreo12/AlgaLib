@@ -2986,8 +2986,8 @@ AlgaPattern : AlgaNode {
 		this.interpolateDur(value, time, shape, resync, reset, sched)
 	}
 
-	//Interpolate sustain (uses replaceDur)
-	interpolateSustain { | value, time, shape, resync, reset, sched = 0 |
+	//Interpolate sustain
+	interpolateSustain { | value, time, shape, resync = false, reset = false, sched = 0 |
 		if(replaceDur, {
 			this.replace(
 				def: (def: this.getSynthDef, sustain: value),
@@ -3005,7 +3005,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Alias
-	interpSus { | value, time, shape, resync, reset, sched = 0 |
+	interpSus { | value, time, shape, resync = false, reset = false, sched = 0 |
 		this.interpolateSustain(value, time, shape, resync, reset, sched)
 	}
 
