@@ -73,6 +73,10 @@ AlgaPattern : AlgaNode {
 	//Keep track of latest clock time
 	var <latestPatternTime;
 
+	//Keep track of latest dur value / stream
+	var <latestDur;
+	var <latestDurStream;
+
 	//Keep track of ALL active patternParamSynths
 	var <>currentActivePatternParamSynths;
 
@@ -2401,7 +2405,31 @@ AlgaPattern : AlgaNode {
 		if(manualDur.not, {
 			//Pfunc allows to modify the value
 			patternPairs = patternPairs.add(\dur).add(
-				Pfunc( { newInterpStreams.dur.next } )
+				Pfunc( {
+					//Only advance when there are no concurrent executions.
+					//This allows for .replace to work correctly and not advance twice!
+					var currentTime = this.clock.seconds;
+					var dur = if(currentTime != latestPatternTime, {
+						newInterpStreams.dur.next
+					}, {
+						//If stream changed, run .next anyway
+						if(newInterpStreams.dur != latestDurStream, {
+							newInterpStreams.dur.next
+						}, {
+							//Same time and no stream change: return the
+							//dur that was just triggered at this very time
+							latestDur
+						})
+					});
+
+					//Store values
+					latestDur = dur;
+					latestDurStream = newInterpStreams.dur;
+					latestPatternTime = currentTime;
+
+					//Return correct dur
+					dur;
+				} )
 			);
 		});
 
