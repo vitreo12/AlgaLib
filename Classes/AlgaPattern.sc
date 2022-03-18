@@ -19,7 +19,6 @@ AlgaPattern : AlgaNode {
 	TODOs:
 
 	1) mixFrom()
-	2) \dur - \sustain - \stretch - \legato interpolations
 	*/
 
 	//Special groups used in AlgaPattern
