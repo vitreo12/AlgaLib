@@ -2976,7 +2976,7 @@ AlgaPattern : AlgaNode {
 			if(time == 0, {
 				this.setDurAtSched(value, sched)
 			}, {
-				this.interpolateDurAtSched(value, time, shape, resync, reset, sched)
+				this.interpolateDurParamAtSched(\dur, value, time, shape, resync, reset, sched)
 			})
 		});
 	}
@@ -2987,48 +2987,72 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Interpolate sustain (uses replaceDur)
-	interpolateSustain { | value, time, sched |
+	interpolateSustain { | value, time, shape, resync, reset, sched = 0 |
 		if(replaceDur, {
-			("AlgaPattern: 'sustain' interpolation is not supported yet. Running 'replace' instead.").warn;
 			this.replace(
 				def: (def: this.getSynthDef, sustain: value),
 				time: time,
 				sched: sched
 			);
 		}, {
-			("AlgaPattern: 'sustain' interpolation is not supported yet. Rescheduling 'sustain' at the " ++ sched ++ " quantization.").warn;
-			this.setSustainAtSched(value, sched);
+			//time == 0: just reschedule at sched
+			if(time == 0, {
+				this.setSustainAtSched(value, sched)
+			}, {
+				this.interpolateDurParamAtSched(\sustain, value, time, shape, resync, reset, sched)
+			})
 		});
 	}
 
+	//Alias
+	interpSus { | value, time, shape, resync, reset, sched = 0 |
+		this.interpolateSustain(value, time, shape, resync, reset, sched)
+	}
+
 	//Interpolate stretch (uses replaceDur)
-	interpolateStretch { | value, time, sched |
+	interpolateStretch { | value, time, shape, resync, reset, sched = 0 |
 		if(replaceDur, {
-			("AlgaPattern: 'stretch' interpolation is not supported yet. Running 'replace' instead.").warn;
 			this.replace(
 				def: (def: this.getSynthDef, stretch: value),
 				time: time,
 				sched: sched
 			);
 		}, {
-			("AlgaPattern: 'stretch' interpolation is not supported yet. Rescheduling 'stretch' at the " ++ sched ++ " quantization.").warn;
-			this.setStretchAtSched(value, sched);
+			//time == 0: just reschedule at sched
+			if(time == 0, {
+				this.setStretchAtSched(value, sched)
+			}, {
+				this.interpolateDurParamAtSched(\stretch, value, time, shape, resync, reset, sched)
+			})
 		});
 	}
 
-	//Interpolate legato (uses replaceDur)
-	interpolateLegato { | value, time, sched |
+	//Alias
+	interpStretch { | value, time, shape, resync, reset, sched = 0 |
+		this.interpolateStretch(value, time, shape, resync, reset, sched)
+	}
+
+	//Interpolate legato
+	interpolateLegato { | value, time, shape, resync, reset, sched = 0 |
 		if(replaceDur, {
-			("AlgaPattern: 'legato' interpolation is not supported yet. Running 'replace' instead.").warn;
 			this.replace(
 				def: (def: this.getSynthDef, legato: value),
 				time: time,
 				sched: sched
 			);
 		}, {
-			("AlgaPattern: 'legato' interpolation is not supported yet. Rescheduling 'legato' at the " ++ sched ++ " quantization.").warn;
-			this.setLegatoAtSched(value, sched);
+			//time == 0: just reschedule at sched
+			if(time == 0, {
+				this.setLegatoAtSched(value, sched)
+			}, {
+				this.interpolateDurParamAtSched(\legato, value, time, shape, resync, reset, sched)
+			})
 		});
+	}
+
+	//Alias
+	interpLegato { | value, time, shape, resync, reset, sched = 0 |
+		this.interpolateLegato(value, time, shape, resync, reset, sched)
 	}
 
 	//Interpolate def == replace
@@ -3625,10 +3649,11 @@ AlgaPattern : AlgaNode {
 		})
 	}
 
-	//Interpolate dur at sched using AlgaPseg
-	interpolateDurAtSched { | value, time, shape, resync, reset, sched |
-		//Locked on function call, not on addAction
-		var durAlgaPseg = interpStreams.durAlgaPseg;
+	//Interpolate a dur param
+	interpolateDurParamAtSched { | param, value, time, shape, resync, reset, sched |
+		var algaPseg;
+		var paramInterpShape = this.getInterpShape(param);
+		var paramConnectionTime = paramsConnectionTime[param];
 
 		//Check validity of value
 		if((value.isNumberOrArray.not).and(value.isPattern.not), {
@@ -3636,9 +3661,16 @@ AlgaPattern : AlgaNode {
 			^this
 		});
 
+		//Dispatch: locked on function call, not on addAction
+		case
+		{ param == \dur }     { algaPseg = interpStreams.durAlgaPseg }
+		{ param == \sustain } { algaPseg = interpStreams.sustainAlgaPseg }
+		{ param == \stretch } { algaPseg = interpStreams.stretchAlgaPseg }
+		{ param == \legato }  { algaPseg = interpStreams.legatoAlgaPseg };
+
 		//Check time
-		time = time ?
-		((paramsConnectionTime[\dur] ? paramsConnectionTime[\delta]) ? connectionTime);
+		if(param == \dur, { paramConnectionTime = paramConnectionTime ? paramsConnectionTime[\delta] });
+		time = time ? (paramConnectionTime ? connectionTime);
 
 		//Time in AlgaPseg is in beats: it needs to be scaled to seconds
 		time = time * this.clock.tempo;
@@ -3654,31 +3686,58 @@ AlgaPattern : AlgaNode {
 		reset = reset ? durInterpReset;
 
 		//Get shape
-		shape = this.checkValidEnv(shape) ?
-		(this.getInterpShape(\dur) ? this.getInterpShape(\delta));
+		if(param == \dur, { paramInterpShape = paramInterpShape ? this.getInterpShape(\delta) });
+		shape = this.checkValidEnv(shape) ? paramInterpShape;
 
 		//Add to scheduler
 		this.addAction(
 			condition: { this.algaInstantiated },
 			func: {
+				var newAlgaPseg;
+
 				//Stop previous one
-				if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.stop });
+				if(algaPseg.isAlgaPseg, { algaPseg.stop });
 
 				//Create new one
-				interpStreams.durAlgaPseg = shape.asAlgaPseg(
+				newAlgaPseg = shape.asAlgaPseg(
 					time: time,
 					clock: this.clock,
 					onDone: { if(resync, { this.resync(value, reset) }) }
 				);
 
 				//Start the new one
-				interpStreams.durAlgaPseg.start;
+				newAlgaPseg.start;
 
 				//Perform interpolation
-				interpStreams.dur = interpStreams.dur.blend(
-					value,
-					interpStreams.durAlgaPseg
-				).algaAsStream;
+				case
+				{ param == \dur } {
+					interpStreams.durAlgaPseg = newAlgaPseg;
+					interpStreams.dur = interpStreams.dur.blend(
+						value,
+						interpStreams.durAlgaPseg
+					).algaAsStream;
+				}
+				{ param == \sustain } {
+					interpStreams.sustainAlgaPseg = newAlgaPseg;
+					interpStreams.sustain = interpStreams.sustain.blend(
+						value,
+						interpStreams.sustainAlgaPseg
+					).algaAsStream;
+				}
+				{ param == \stretch } {
+					interpStreams.stretchAlgaPseg = newAlgaPseg;
+					interpStreams.stretch = interpStreams.stretch.blend(
+						value,
+						interpStreams.stretchAlgaPseg
+					).algaAsStream;
+				}
+				{ param == \legato } {
+					interpStreams.legatoAlgaPseg = newAlgaPseg;
+					interpStreams.legato = interpStreams.legato.blend(
+						value,
+						interpStreams.legatoAlgaPseg
+					).algaAsStream;
+				};
 			},
 			sched: sched,
 			topPriority: true
