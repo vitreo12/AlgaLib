@@ -3595,7 +3595,6 @@ AlgaPattern : AlgaNode {
 		//Check sched
 		sched = sched ? schedInner;
 		sched = sched ? 0;
-		interpStreams.hash.asString.warn;
 		if(sched.isAlgaStep, {
 			if(interpStreams != nil, {
 				var interpStreamsLock = interpStreams;
