@@ -18,6 +18,10 @@
 AlgaPatternPlayer {
 	var <pattern, <patternAsStream, <algaReschedulingEventStreamPlayer;
 	var <timeInner = 0, <schedInner = 1;
+	var <schedResync = 1;
+	var <durInterpResync = true;
+	var <durInterpReset = false;
+
 	var <entries;
 	var <results;
 	var <algaPatterns;
@@ -29,7 +33,8 @@ AlgaPatternPlayer {
 	var <schedInSeconds = false;
 	var <scheduledStepActionsPre, <scheduledStepActionsPost;
 
-	var <dur = 1;
+	var <dur = 1, <durAlgaPseg;
+	var <stretch = 1, <stretchAlgaPseg;
 	var <manualDur = false;
 
 	/*****************************************************************************************/
@@ -348,6 +353,46 @@ AlgaPatternPlayer {
 		^func.value;
 	}
 
+	//Check env
+	checkValidEnv { | value |
+		var levels, times;
+
+		if(value == nil, { ^nil });
+
+		if(value.isKindOf(Env).not, {
+			("AlgaNode: invalid interpShape: " ++ value.class).error;
+			^nil
+		});
+
+		levels = value.levels;
+		if(levels.size > AlgaStartup.maxEnvPoints, {
+			("AlgaNode: interpShape's Env can only have up to " ++ AlgaStartup.maxEnvPoints ++ " points.").error;
+			^nil
+		});
+		if(levels.first != 0, {
+			("AlgaNode: interpShape's Env must always start from 0").error;
+			^nil
+		});
+		if(levels.last != 1, {
+			("AlgaNode: interpShape's Env must always end at 1").error;
+			^nil
+		});
+		levels.do({ | level |
+			if(((level >= 0.0).and(level <= 1.0)).not, {
+				("AlgaNode: interpShape's Env can only contain values between 0 and 1").error;
+				^nil
+			});
+		});
+
+		times = value.times;
+		if(times.sum == 0, {
+			("AlgaNode: interpShape's Env cannot have its times sum up to 0").error;
+			^nil
+		});
+
+		^value
+	}
+
 	/*****************************************************************************************/
 	/*****************************************************************************************/
 	/*****************************************************************************************/
@@ -421,16 +466,26 @@ AlgaPatternPlayer {
 
 		//1) Add support for arrays to keep ordering of execution of params!
 
+		//Event handling
 		if(argDef.isEvent, {
 			patternPairs = patternPairs.add(\type).add(\algaPatternPlayer);
 			patternPairs = patternPairs.add(\algaPatternPlayer).add(this);
 			argDef.keysValuesDo({ | key, entry |
-				//Found \dur or \delta
-				if((key == \dur).or(key == \delta), {
+				var isDurOrStretch = false;
+				case
+				{ (key == \dur).or(key == \delta) } {
 					if((entry.isSymbol).or(entry.isNil), { manualDur = true });
 					foundDurOrDelta = true;
+					isDurOrStretch  = true;
 					dur = entry.algaAsStream;
-				}, {
+				}
+				{ key == \stretch } {
+					isDurOrStretch = true;
+					stretch = entry.algaAsStream;
+				};
+
+				//All other cases
+				if(isDurOrStretch.not, {
 					var uniqueID = UniqueID.next;
 					//Parse entry for AlgaTemps
 					entry = this.parseParam(entry, functionSynthDefDict);
@@ -447,11 +502,16 @@ AlgaPatternPlayer {
 			^nil;
 		});
 
+		//Ass reschedulable \stretch
+		patternPairs = patternPairs.add(\stretch).add(
+			Pfunc { stretch.next }
+		);
+
 		//Add reschedulable \dur
 		if(foundDurOrDelta, {
 			if(manualDur.not, {
 				patternPairs = patternPairs.add(\dur).add(
-					Pfuncn( { dur.next }, inf)
+					Pfunc { dur.next }
 				);
 			});
 		});
@@ -494,6 +554,33 @@ AlgaPatternPlayer {
 		schedInSeconds = value
 	}
 
+	//Set schedResync
+	schedResync_ { | value = 1 |
+		if(value.isNumber.not, {
+			"AlgaPattern: 'schedResync' only supports numbers. Setting it to 1".error;
+			value = 1;
+		});
+		schedResync = value
+	}
+
+	//Set durInterpResync
+	durInterpResync_ { | value = true |
+		if(value.isKindOf(Boolean).not, {
+			"AlgaPatternPlayer: 'durInterpResync' only supports boolean values. Setting it to true".error;
+			value = true;
+		});
+		durInterpResync = value
+	}
+
+	//Set durInterpReset
+	durInterpReset_ { | value = false |
+		if(value.isKindOf(Boolean).not, {
+			"AlgaPatternPlayer: 'durInterpReset' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		durInterpReset = value
+	}
+
 	//Run the pattern
 	play { | sched = 1 |
 		if(manualDur.not, {
@@ -504,7 +591,7 @@ AlgaPatternPlayer {
 				func: {
 					beingStopped = false;
 					algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
-						clock: scheduler.clock
+						clock: this.clock
 					);
 				},
 				sched: sched
@@ -665,26 +752,182 @@ AlgaPatternPlayer {
 	//Alias of read
 	value { | func | ^this.read(func) }
 
+	//Set dur at specified sched, rescheduling the player
+	setDurAtSched { | value, sched, isReset = false, isStretch = false |
+		//Check sched
+		sched = sched ? schedInner;
+		algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, {
+			if(isStretch.not, {
+				// \dur
+				if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.stop });
+				if(stretchAlgaPseg.isAlgaPseg, { stretchAlgaPseg.extStop });
+			}, {
+				// \stretch
+				if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.extStop });
+				if(stretchAlgaPseg.isAlgaPseg, { stretchAlgaPseg.stop });
+			});
+			if(isReset, { this.setDur(value) });
+		});
+	}
+
+	//Set stretch at specified sched, rescheduling the player
+	setStretchAtSched { | value, sched, isReset = false |
+		//Check sched
+		sched = sched ? schedInner;
+		algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, {
+			if(isReset, { stretch = value.algaAsStream })
+		});
+	}
+
 	//Like AlgaPattern: retriggers at specific sched
-	interpolateDur { | sender, sched |
+	interpolateDur { | value, time, shape, resync, reset, sched |
 		if(sched.isAlgaStep, {
 			//sched == AlgaStep
 			this.addAction(
 				func: {
 					beingStopped = true;
 					algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
-						dur = sender.algaAsStream;
+						dur = value.algaAsStream;
 						beingStopped = false;
 					});
 				},
 				sched: sched
 			)
 		}, {
-			//sched == number
-			algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, {
-				dur = sender.algaAsStream;
+			//time == 0: just reschedule at sched
+			if(time == 0, {
+				this.setDurAtSched(value, sched)
+			}, {
+				this.interpolateDurParamAtSched(\dur, value, time, shape, resync, reset, sched)
 			});
 		});
+	}
+
+	//Alias
+	interpDur { | value, time, shape, resync, reset, sched |
+		this.interpolateDur(value, time, shape, resync, reset, sched)
+	}
+
+	//Like AlgaPattern: retriggers at specific sched
+	interpolateStretch { | value, time, shape, resync, reset, sched |
+		if(sched.isAlgaStep, {
+			//sched == AlgaStep
+			this.addAction(
+				func: {
+					beingStopped = true;
+					algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
+						stretch = value.algaAsStream;
+						beingStopped = false;
+					});
+				},
+				sched: sched
+			)
+		}, {
+			//time == 0: just reschedule at sched
+			if(time == 0, {
+				this.setStretchAtSched(value, sched)
+			}, {
+				this.interpolateDurParamAtSched(\stretch, value, time, shape, resync, reset, sched)
+			});
+		});
+	}
+
+	//Alias
+	interpStretch { | value, time, shape, resync, reset, sched |
+		this.interpolateStretch(value, time, shape, resync, reset, sched)
+	}
+
+	//Interpolate a dur param
+	interpolateDurParamAtSched { | param, value, time, shape, resync, reset, sched |
+		var algaPseg;
+
+		//Check validity of value
+		if((value.isNumberOrArray.not).and(value.isPattern.not), {
+			"AlgaPatternPlayer: only Numbers, Arrays and Patterns are supported for 'dur' interpolation".error;
+			^this
+		});
+
+		//Dispatch: locked on function call, not on addAction
+		case
+		{ param == \dur }     { algaPseg = durAlgaPseg }
+		{ param == \stretch } { algaPseg = stretchAlgaPseg };
+
+		//Check time
+		time = time ? timeInner;
+
+		//Time in AlgaPseg is in beats: it needs to be scaled to seconds
+		time = time * this.clock.tempo;
+		//time = if(tempoScaling.not, { time * this.clock.tempo });
+
+		//Check sched
+		sched = sched ? schedInner;
+
+		//Check resync
+		resync = resync ? durInterpResync;
+
+		//Check reset
+		reset = reset ? durInterpReset;
+
+		//Get shape
+		shape = this.checkValidEnv(shape) ? Env([0, 1], 1);
+
+		//Add to scheduler
+		this.addAction(
+			condition: { this.algaInstantiated },
+			func: {
+				var newAlgaPseg;
+
+				//Stop previous one. \dur and \stretch stop each other too
+				if(algaPseg.isAlgaPseg, { algaPseg.stop });
+				case
+				{ param == \dur } {
+					if(stretchAlgaPseg.isAlgaPseg, { stretchAlgaPseg.extStop });
+				}
+				{ param == \stretch } {
+					if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.extStop });
+				};
+
+				//Create new one
+				newAlgaPseg = shape.asAlgaPseg(
+					time: time,
+					clock: this.clock,
+					onDone: {
+						if(resync, {
+							this.resync(value, reset, if(param == \stretch, { true }, { false }))
+						})
+					}
+				);
+
+				//Start the new one
+				newAlgaPseg.start;
+
+				//Perform interpolation
+				case
+				{ param == \dur } {
+					durAlgaPseg = newAlgaPseg;
+					dur = dur.blend(
+						value,
+						durAlgaPseg
+					).algaAsStream;
+				}
+				{ param == \stretch } {
+					stretchAlgaPseg = newAlgaPseg;
+					stretch = stretch.blend(
+						value,
+						stretchAlgaPseg
+					).algaAsStream;
+				};
+			},
+			sched: sched,
+			topPriority: true
+		)
+	}
+
+	//Resync pattern to sched
+	resync { | value, reset, resetStretch, sched |
+		sched = sched ? schedResync; //Check for schedResync
+		resetStretch = resetStretch ? false;
+		this.setDurAtSched(value, sched, reset, resetStretch);
 	}
 
 	//Re-assign correctly
@@ -872,6 +1115,7 @@ AlgaPatternPlayer {
 	//This will also trigger interpolation on all registered AlgaPatterns
 	from { | sender, param = \in, time, sched |
 		//Parse the sender looking for AlgaTemps
+		var isDurOrStretch = false;
 		var senderAndFunctionSynthDefDict = this.parseParam(sender);
 		var functionSynthDefDict;
 
@@ -885,10 +1129,19 @@ AlgaPatternPlayer {
 		sched = sched ? schedInner;
 		sched = sched ? 0;
 
-		// \dur or other params
-		if((param == \dur).or(param == \delta), {
-			this.interpolateDur(sender, sched);
-		}, {
+		// \dur / \stretch
+		case
+		{ (param == \dur).or(param == \delta) } {
+			this.interpolateDur(value: sender, time: time, sched: sched);
+			isDurOrStretch = true;
+		}
+		{ param == \stretch } {
+			this.interpolateStretch(value: sender, time: time, sched: sched);
+			isDurOrStretch = true;
+		};
+
+		//Other params
+		if(isDurOrStretch.not, {
 			//If needed, it will compile the AlgaSynthDefs of AlgaTemps.
 			//Otherwise, it will just execute func
 			this.compileFunctionSynthDefDictIfNeeded(
@@ -908,6 +1161,8 @@ AlgaPatternPlayer {
 	<< { | sender, param = \in |
 		this.from(sender, param)
 	}
+
+	clock { ^(scheduler.clock) }
 
 	isAlgaPatternPlayer { ^true }
 }
