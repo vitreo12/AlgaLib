@@ -3014,7 +3014,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Interpolate sustain
-	interpolateSustain { | value, time, shape, resync = false, reset = false, sched = 0 |
+	interpolateSustain { | value, time, shape, resync = false, sched = 0 |
 		if(replaceDur, {
 			this.replace(
 				def: (def: this.getSynthDef, sustain: value),
@@ -3026,14 +3026,14 @@ AlgaPattern : AlgaNode {
 			if(time == 0, {
 				this.setSustainAtSched(value, sched)
 			}, {
-				this.interpolateDurParamAtSched(\sustain, value, time, shape, resync, reset, sched)
+				this.interpolateDurParamAtSched(\sustain, value, time, shape, resync, false, sched)
 			})
 		});
 	}
 
 	//Alias
-	interpSus { | value, time, shape, resync = false, reset = false, sched = 0 |
-		this.interpolateSustain(value, time, shape, resync, reset, sched)
+	interpSus { | value, time, shape, resync = false, sched = 0 |
+		this.interpolateSustain(value, time, shape, resync, sched)
 	}
 
 	//Interpolate stretch (uses replaceDur)
@@ -3060,7 +3060,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Interpolate legato
-	interpolateLegato { | value, time, shape, resync, reset, sched = 0 |
+	interpolateLegato { | value, time, shape, resync, sched = 0 |
 		if(replaceDur, {
 			this.replace(
 				def: (def: this.getSynthDef, legato: value),
@@ -3072,14 +3072,14 @@ AlgaPattern : AlgaNode {
 			if(time == 0, {
 				this.setLegatoAtSched(value, sched)
 			}, {
-				this.interpolateDurParamAtSched(\legato, value, time, shape, resync, reset, sched)
+				this.interpolateDurParamAtSched(\legato, value, time, shape, resync, false, sched)
 			})
 		});
 	}
 
 	//Alias
-	interpLegato { | value, time, shape, resync, reset, sched = 0 |
-		this.interpolateLegato(value, time, shape, resync, reset, sched)
+	interpLegato { | value, time, shape, resync, sched = 0 |
+		this.interpolateLegato(value, time, shape, resync, sched)
 	}
 
 	//Interpolate def == replace
