@@ -3724,8 +3724,7 @@ AlgaPattern : AlgaNode {
 		time = time ? (paramConnectionTime ? connectionTime);
 
 		//Time in AlgaPseg is in beats: it needs to be scaled to seconds
-		time = time * this.clock.tempo;
-		//time = if(tempoScaling.not, { time * this.clock.tempo });
+		time = if(tempoScaling.not, { time * this.clock.tempo });
 
 		//Check sched
 		sched = sched ? schedInner;

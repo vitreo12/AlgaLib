@@ -21,6 +21,7 @@ AlgaPatternPlayer {
 	var <schedResync = 1;
 	var <durInterpResync = true;
 	var <durInterpReset = false;
+	var <tempoScaling = false;
 
 	var <entries;
 	var <results;
@@ -581,6 +582,15 @@ AlgaPatternPlayer {
 		durInterpReset = value
 	}
 
+	//Set tempoScaling
+	tempoScaling_ { | value |
+		if(value.isKindOf(Boolean).not, {
+			"AlgaPatternPlayer: 'tempoScaling' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		tempoScaling = value
+	}
+
 	//Run the pattern
 	play { | sched = 1 |
 		if(manualDur.not, {
@@ -856,8 +866,7 @@ AlgaPatternPlayer {
 		time = time ? timeInner;
 
 		//Time in AlgaPseg is in beats: it needs to be scaled to seconds
-		time = time * this.clock.tempo;
-		//time = if(tempoScaling.not, { time * this.clock.tempo });
+		time = if(tempoScaling.not, { time * this.clock.tempo });
 
 		//Check sched
 		sched = sched ? schedInner;
