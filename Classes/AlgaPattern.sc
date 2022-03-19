@@ -162,7 +162,8 @@ AlgaPattern : AlgaNode {
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
 	*new { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
-		schedInSeconds = false, sampleAccurateFuncs = true, player, server |
+		schedInSeconds = false, tempoScaling = false,
+		sampleAccurateFuncs = true, player, server |
 		^super.new_ap(
 			def: def,
 			interpTime: interpTime,
@@ -171,6 +172,7 @@ AlgaPattern : AlgaNode {
 			playSafety: playSafety,
 			sched: sched,
 			schedInSeconds: schedInSeconds,
+			tempoScaling: tempoScaling,
 			sampleAccurateFuncs: sampleAccurateFuncs,
 			player: player,
 			server: server
@@ -751,7 +753,10 @@ AlgaPattern : AlgaNode {
 				senderRate = "control";
 				senderNumChannels = paramNumChannels;
 				entry = paramDefault;
-				("AlgaPattern: AlgaNode wasn't algaInstantiated yet. Using default value for " ++ paramName).warn;
+				scale = nil;
+				chansMapping = nil;
+				("AlgaPattern: AlgaNode wasn't algaInstantiated yet. Using the default value " ++
+					entry ++ " for '" ++ paramName ++ "'").warn;
 				validParam = true;
 			});
 		}
@@ -1574,9 +1579,6 @@ AlgaPattern : AlgaNode {
 		}, {
 			onPatternSynthFreeFunc.value
 		});
-
-		//Update latest time
-		latestPatternTime = this.clock.seconds;
 
 		//Reset
 		skipIteration = false;
@@ -3250,20 +3252,31 @@ AlgaPattern : AlgaNode {
 			);
 		});
 
+		//Store latest sender. This is used to only execute the latest .from call.
+		//This allows for a smoother live coding experience: instead of triggering
+		//every .from that was executed (perhaps the user found a mistake), only
+		//the latest one will be considered when sched comes.
+		this.addLatestSenderAtParam(sender, param);
+
 		//All other cases
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			this.addAction(
-				condition: { (this.algaInstantiatedAsReceiver(param, sender, false)).and(sender.algaInstantiatedAsSender) },
+				condition: {
+					(this.algaInstantiatedAsReceiver(param, sender, false)).and(
+						sender.algaInstantiatedAsSender)
+				},
 				func: {
-					this.makeConnectionInner(
-						sender: sender,
-						param: param,
-						senderChansMapping: senderChansMapping,
-						scale: scale,
-						sampleAndHold: sampleAndHold,
-						time: time,
-						shape: shape
-					)
+					if(sender == this.getLatestSenderAtParam(sender, param), {
+						this.makeConnectionInner(
+							sender: sender,
+							param: param,
+							senderChansMapping: senderChansMapping,
+							scale: scale,
+							sampleAndHold: sampleAndHold,
+							time: time,
+							shape: shape
+						)
+					})
 				},
 				sched: sched,
 				topPriority: true //This is essential for scheduled times to work correctly!
@@ -4249,7 +4262,7 @@ AMP : AlgaMonoPattern {}
 			[
 				\out, interpBus.index,
 				\env_out, envBus.index,
-				\fadeTime, time,
+				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv
 			],
 			interpGroup,
@@ -4299,7 +4312,7 @@ AMP : AlgaMonoPattern {}
 				//It's still used while fade-out interpolation is happening
 				patternOutEnvSynth.set(
 					\t_release, 1,
-					\fadeTime, time,
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				);
 

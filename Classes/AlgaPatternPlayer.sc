@@ -51,7 +51,7 @@ AlgaPatternPlayer {
 				func: func
 			);
 		}, {
-			//Normal scheduling (sched is a number)
+			//Normal scheduling (sched is a number or AlgaQuant)
 			scheduler.addAction(
 				condition: condition,
 				func: func,
@@ -1058,7 +1058,7 @@ AlgaPatternPlayer {
 		entries[param][\lastID] = uniqueID;
 		entries[param][\entries][uniqueID] = sender.algaAsStream;
 
-		//Re-trigger interpolation on connected AlgaPattern entries. Note the us of sched
+		//Re-trigger interpolation on connected AlgaPattern entries. Note the use of sched
 		algaPatternEntries.keysValuesDo({ | algaPattern, algaPatternParams |
 			var algaPatternPlayers = algaPattern.players;
 			algaPatternParams.do({ | algaPatternParam |

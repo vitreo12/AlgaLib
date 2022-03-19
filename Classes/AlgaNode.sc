@@ -43,6 +43,9 @@ AlgaNode {
 	//Function to use in .play to clip
 	var <playSafety = \none;
 
+	//Scale time with clock's tempo
+	var <tempoScaling = false;
+
 	//On replace, use this scaling if possible.
 	var <prevPlayScale = 1.0;
 
@@ -144,11 +147,17 @@ AlgaNode {
 	var <algaWasBeingCleared = false;
 	var <algaCleared = false;
 
+	//Only trigger replace when latestReplaceDef is same as def
+	var latestReplaceDef;
+
+	//Only trigger from when sender equals the latest sender used
+	var latestSenders;
+
 	//Debugging tool
 	var <name;
 
 	*new { | def, args, interpTime, interpShape, playTime, playSafety, sched,
-		schedInSeconds = false, outsMapping, server |
+		schedInSeconds = false, tempoScaling = false, outsMapping, server |
 		^super.new.init(
 			argDef: def,
 			argArgs: args,
@@ -158,13 +167,15 @@ AlgaNode {
 			argPlaySafety: playSafety,
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
+			argTempoScaling: tempoScaling,
 			argOutsMapping: outsMapping,
 			argServer: server,
 		)
 	}
 
 	*new_ap { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
-		schedInSeconds = false, sampleAccurateFuncs = true, player, server |
+		schedInSeconds = false, tempoScaling = false,
+		sampleAccurateFuncs = true,  player, server |
 		^super.new.init(
 			argDef: def,
 			argConnectionTime: interpTime,
@@ -173,6 +184,7 @@ AlgaNode {
 			argPlaySafety: playSafety,
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
+			argTempoScaling: tempoScaling,
 			argSampleAccurateFuncs: sampleAccurateFuncs,
 			argPlayer: player,
 			argServer: server,
@@ -180,7 +192,7 @@ AlgaNode {
 	}
 
 	*debug { | def, args, interpTime, interpShape, playTime, playSafety, sched,
-		schedInSeconds = false, outsMapping, server, name |
+		schedInSeconds = false, tempoScaling = false, outsMapping, server, name |
 		^super.new.init(
 			argDef: def,
 			argArgs: args,
@@ -190,6 +202,7 @@ AlgaNode {
 			argPlaySafety: playSafety,
 			argSched: sched,
 			argSchedInSeconds: schedInSeconds,
+			argTempoScaling: tempoScaling,
 			argOutsMapping: outsMapping,
 			argServer: server,
 			argName: name
@@ -328,7 +341,7 @@ AlgaNode {
 				)
 			});
 		}, {
-			//Normal scheduling (sched is a number)
+			//Normal scheduling (sched is a number or AlgaQuant)
 			scheduler.addAction(
 				condition: condition,
 				func: func,
@@ -455,7 +468,8 @@ AlgaNode {
 
 	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
 		argPlayTime = 0, argPlaySafety, argSched = 0, argOutsMapping,
-		argSampleAccurateFuncs = true, argSchedInSeconds = false, argPlayer, argServer, argName |
+		argSampleAccurateFuncs = true, argSchedInSeconds = false,
+		argTempoScaling = false, argPlayer, argServer, argName |
 
 		//Check supported classes for argObj, so that things won't even init if wrong.
 		//Also check for AlgaPattern
@@ -494,6 +508,9 @@ AlgaNode {
 
 		//Set schedInSeconds
 		this.schedInSeconds_(argSchedInSeconds);
+
+		//Set tempoScaling
+		this.tempoScaling_(argTempoScaling);
 
 		//If AlgaPattern, parse the def and then dispatch accordingly (waiting for server if needed)
 		if(this.isAlgaPattern, {
@@ -564,6 +581,14 @@ AlgaNode {
 			value = false;
 		});
 		schedInSeconds = value
+	}
+
+	tempoScaling_ { | value |
+		if(value.isKindOf(Boolean).not, {
+			"AlgaNode: 'tempoScaling' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		tempoScaling = value
 	}
 
 	setParamsConnectionTime { | value, param, all = false |
@@ -1464,7 +1489,7 @@ AlgaNode {
 		//as it will be set eventually in the case of .clear / etc...
 		var synthArgs = [
 			\out, synthBus.index,
-			\fadeTime, longestWaitTime,
+			\fadeTime, if(tempoScaling, { longestWaitTime / this.clock.tempo }, { longestWaitTime }),
 			\gate, 1
 		];
 
@@ -1871,7 +1896,7 @@ AlgaNode {
 		activeInterpSynths[param][sender].do({ | activeInterpSynth |
 			activeInterpSynth.set(
 				\t_release, 1,
-				\fadeTime, time,
+				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv,
 			);
 		});
@@ -1932,8 +1957,8 @@ AlgaNode {
 
 							//If AlgaArg, unpack
 							if(prevSender.isAlgaArg, {
-								oldParamsChansMapping = prevSender.chans;
-								oldParamScale = prevSender.scale;
+								oldParamsChansMapping = prevSender.chansStream;
+								oldParamScale = prevSender.scaleStream;
 								prevSender = prevSender.sender;
 							});
 
@@ -2127,8 +2152,8 @@ AlgaNode {
 					defaultRate = algaNode.rate;
 
 					//Make sure to use AlgaArgs's scaling if possible (it will be nil otherwise)
-					oldParamsChansMapping = paramDefault.chans;
-					oldParamScale = paramDefault.scale;
+					oldParamsChansMapping = paramDefault.chansStream;
+					oldParamScale = paramDefault.scaleStream;
 
 					//Get the busArg of the synthBus
 					if(algaNode.algaInstantiatedAsSender, {
@@ -2367,7 +2392,8 @@ AlgaNode {
 			paramName != \def).and(paramName != \out).and(
 			paramName != \gate).and(paramName != \fadeTime).and(
 			paramName != \dur).and(paramName != \sustain).and(
-			paramName != \stetch).and(paramName != \legato)
+			paramName != \stetch).and(paramName != \legato).and(
+			paramName != \timingOffset).and(paramName != \lag)
 		)
 	}
 
@@ -2653,7 +2679,7 @@ AlgaNode {
 				fadeInSymbol,
 				[
 					\out, interpBus.index,
-					\fadeTime, time,
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				],
 				interpGroup,
@@ -2696,7 +2722,7 @@ AlgaNode {
 				\in, sender.synthBus.busArg,
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
-				\fadeTime, time,
+				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv
 			];
 
@@ -2840,7 +2866,7 @@ AlgaNode {
 				\in, paramVal,
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
-				\fadeTime, time,
+				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 				\envShape, shape.algaConvertEnv
 			];
 
@@ -2905,7 +2931,9 @@ AlgaNode {
 				//synth's fadeTime is longestWaitTime!
 				synth.set(
 					\gate, 0,
-					\fadeTime, if(useConnectionTime, { longestWaitTime }, { 0 })
+					\fadeTime, if(useConnectionTime, {
+						if(tempoScaling, { longestWaitTime / this.clock.tempo }, { longestWaitTime })
+					}, { 0 })
 				);
 
 				//this.resetSynth;
@@ -3027,7 +3055,7 @@ AlgaNode {
 						fadeOutSymbol,
 						[
 							\out, interpBusAtParam.index,
-							\fadeTime, time,
+							\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 							\envShape, shape.algaConvertEnv
 						],
 						interpGroup,
@@ -3036,14 +3064,17 @@ AlgaNode {
 
 					//Free the normSynth only if not replaceMix. In that case, it must be kept
 					if(replaceMix.not, {
-						normSynthAtParam.set(\gate, 0, \fadeTime, time);
+						normSynthAtParam.set(
+							\gate, 0,
+							\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time })
+						);
 					});
 				});
 
 				//This has to be surely algaInstantiated before being freed
 				interpSynthAtParam.set(
 					\t_release, 1,
-					\fadeTime, time,
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				);
 
@@ -3120,7 +3151,7 @@ AlgaNode {
 				interpSynthsAtParam.do({ | interpSynthAtParam |
 					interpSynthAtParam.set(
 						\t_release, 1,
-						\fadeTime, time,
+						\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 						\envShape, shape.algaConvertEnv
 					);
 				});
@@ -3627,6 +3658,23 @@ AlgaNode {
 		});
 	}
 
+	//Store latest sender. Only works with no mix
+	addLatestSenderAtParam { | sender, param = \in, mix = false |
+		if(mix.not, {
+			latestSenders = latestSenders ? IdentityDictionary(10);
+			latestSenders[param] = sender;
+		})
+	}
+
+	//Get latest sender. Only works with no no mix
+	getLatestSenderAtParam { | sender, param = \in, mix = false |
+		if(mix.not, {
+			var latestSenderAtParam = latestSenders[param];
+			if(latestSenderAtParam != nil, { ^latestSenderAtParam });
+		})
+		^sender; //Just return sender if mix or not found!
+	}
+
 	//<<.param sender
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
@@ -3640,16 +3688,26 @@ AlgaNode {
 			^this.replace(synthDef.name, [param, sender], time: time, sched: sched)
 		});
 
+		//Store latest sender. This is used to only execute the latest .from call.
+		//This allows for a smoother live coding experience: instead of triggering
+		//every .from that was executed (perhaps the user found a mistake), only
+		//the latest one will be considered when sched comes.
+		//Of course, mix is not affected by this mechanism
+		this.addLatestSenderAtParam(sender, param, mix);
+
 		//Actual makeConnection
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
 			this.addAction(
 				condition: {
-					(this.algaInstantiatedAsReceiver(param, sender, mix)).and(sender.algaInstantiatedAsSender)
+					(this.algaInstantiatedAsReceiver(param, sender, mix)).and(
+						sender.algaInstantiatedAsSender)
 				},
 				func: {
-					this.makeConnectionInner(sender, param, replace, mix,
-						replaceMix, senderChansMapping, scale, time:time, shape:shape
-					)
+					if(sender == this.getLatestSenderAtParam(sender, param, mix), {
+						this.makeConnectionInner(sender, param, replace, mix,
+							replaceMix, senderChansMapping, scale, time:time, shape:shape
+						)
+					});
 				},
 				sched: sched
 			);
@@ -4369,18 +4427,26 @@ AlgaNode {
 		//Check sched
 		sched = sched ? schedInner;
 
+		//This makes sure that only the latest executed code will go through,
+		//allowing for a smoother live coding experience. This way, instead of
+		//going through each iteration (perhaps there were mistakes), only
+		//the latest executed code will be considered at the moment of .replace
+		latestReplaceDef = def;
+
 		//Check global algaInstantiated
 		this.addAction(
 			condition: { this.algaInstantiated },
 			func: {
-				this.replaceInner(
-					def:def, args:args, time:time,
-					outsMapping:outsMapping,
-					reset:reset,
-					keepOutsMappingIn:keepOutsMappingIn,
-					keepOutsMappingOut:keepOutsMappingOut,
-					keepScalesIn:keepScalesIn, keepScalesOut:keepScalesOut
-				);
+				if(def == latestReplaceDef, {
+					this.replaceInner(
+						def:def, args:args, time:time,
+						outsMapping:outsMapping,
+						reset:reset,
+						keepOutsMappingIn:keepOutsMappingIn,
+						keepOutsMappingOut:keepOutsMappingOut,
+						keepScalesIn:keepScalesIn, keepScalesOut:keepScalesOut
+					);
+				});
 			},
 			sched: sched,
 			topPriority: true //always top priority
@@ -4675,7 +4741,7 @@ AlgaNode {
 					\in, synthBus.busArg,
 					\indices, channelsToPlay,
 					\gate, 1,
-					\fadeTime, time,
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 					\scale, scale,
 					\out, out
 				],
@@ -4702,7 +4768,7 @@ AlgaNode {
 				[
 					\in, synthBus.busArg,
 					\gate, 1,
-					\fadeTime, time,
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 					\scale, scale,
 					\out, out
 				],
@@ -4762,7 +4828,10 @@ AlgaNode {
 				playSynth.free
 			}, {
 				//Set \fadeTime
-				playSynth.set(\gate, 0, \fadeTime, time)
+				playSynth.set(
+					\gate, 0,
+					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time })
+				)
 			});
 			isPlaying = false;
 			beingStopped = true;

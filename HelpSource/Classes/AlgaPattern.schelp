@@ -1,7 +1,7 @@
 TITLE:: AlgaPattern
 summary:: Alga module representing multiple instances of sonic processes
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut, Classes/AlgaStep, Classes/AlgaPatternPlayer, Classes/AlgaProxySpace
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaArg, Classes/AlgaTemp, Classes/AlgaOut, Classes/AlgaStep, Classes/AlgaQuant, Classes/AlgaPatternPlayer, Classes/AlgaProxySpace
 
 
 DESCRIPTION::
@@ -29,6 +29,8 @@ ARGUMENT:: sched
 Just like any other link::Classes/AlgaPattern:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 ARGUMENT:: schedInSeconds
 Specify if all sched actions should be scheduled in seconds, opposing to beats. Default is code::false::.
+ARGUMENT:: tempoScaling
+Specify if all timed actions should be scaled by the clock's tempo. Default is code::false::.
 ARGUMENT:: sampleAccurateFuncs
 Set if the link::Classes/Function::s used in the code::'def':: parameter should be sample accurate or not. Defaults to true.
 ARGUMENT:: player

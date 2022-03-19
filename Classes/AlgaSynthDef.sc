@@ -232,13 +232,14 @@ AlgaSynthDef : SynthDef {
 				});
 
 				//Check for invalid names
-				if((controlNameName == \out).or(controlNameName == \patternTempOut), {
+				if((controlNameName == \out).or(controlNameName == \patternTempOut).or(
+					controlNameName == \timingOffset).or(controlNameName == \lag), {
 					Error("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally. Choose another name.").algaThrow;
 				});
 
 				//Finally, print user for certainety when using any dur key
-				if(((controlNameName == \dur).or(controlNameName == \sustain).or(
-					controlNameName == \stretch).or(controlNameName == \legato)), {
+				if((controlNameName == \dur).or(controlNameName == \sustain).or(
+					controlNameName == \stretch).or(controlNameName == \legato), {
 					("AlgaSynthDef: Note that the '" ++ controlNameName ++ "' parameter is a
 reserved name used in AlgaPatterns. If using this def for an AlgaNode, consider changing the name to activate the interpolation features").warn
 				});

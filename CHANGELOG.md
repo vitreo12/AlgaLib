@@ -44,6 +44,31 @@
 
 - `AlgaNode`: trigger `addActiveInOutNodes` on `replace` for old input connections.
 
+- `AlgaPattern`: do not run `dur.next` twice on `replace`.
+
+- `AlgaNode` and `AlgaPattern`: only the latest executed `replace` and `from` is executed on scheduled time. This allows the user to correct his/her/thier own mistakes while live coding with only having the latest iteration considered as valid code.
+
+## New features
+
+- Added the `AlgaQuant` class to schedule actions on specific bars:
+
+    ```SuperCollider  
+    (
+    Alga.boot({
+        a = AlgaPattern({ SinOsc.ar * EnvPerc.ar }).play(chans: 2)
+    });
+    )
+
+    //Schedule at the next bar
+    a.from(0.5, \dur, sched: AlgaQuant(1));
+
+    //Schedule in two bars
+    a.from(0.25, \dur, sched: AlgaQuant(2));
+
+    //Schedule at the next bar + 1 beat
+    a.from(0.5, \dur, sched: AlgaQuant(1, 1));
+    ```
+    
 # 1.1.0
 
 ## Features
