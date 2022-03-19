@@ -3631,9 +3631,22 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Set dur at sched
-	setDurAtSched { | value, sched, isResync = false, isReset = false |
-		//Check if interpolation was going on
+	setDurAtSched { | value, sched, isResync = false, isReset = false, isStretch = false |
+		//Stop interpolations if happening
 		var durAlgaPseg = interpStreams.durAlgaPseg;
+		var stretchAlgaPseg = interpStreams.stretchAlgaPseg;
+		var stopInterpAndSetDur = {
+			if(isStretch.not, {
+				// \dur
+				if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.stop });
+				if(stretchAlgaPseg.isAlgaPseg, { stretchAlgaPseg.extStop });
+			}, {
+				// \stretch
+				if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.extStop });
+				if(stretchAlgaPseg.isAlgaPseg, { stretchAlgaPseg.stop });
+			});
+			if((isResync.not).or(isReset), { this.setDur(value) });
+		};
 
 		//Check sched
 		sched = sched ? schedInner;
@@ -3650,8 +3663,7 @@ AlgaPattern : AlgaNode {
 					if(algaReschedulingEventStreamPlayer != nil, {
 						interpStreamsLock.beingStopped = true;
 						algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
-							if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.stop }); //stop interpolation if happening!
-							if((isResync.not).or(isReset), { this.setDur(value) });
+							stopInterpAndSetDur.value;
 							interpStreamsLock.beingStopped = false;
 						})
 					})
@@ -3667,8 +3679,7 @@ AlgaPattern : AlgaNode {
 					var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
 					if(algaReschedulingEventStreamPlayer != nil, {
 						algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, {
-							if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.stop }); //stop interpolation if happening!
-							if((isResync.not).or(isReset), { this.setDur(value) });
+							stopInterpAndSetDur.value;
 						});
 					})
 				}
@@ -3738,7 +3749,11 @@ AlgaPattern : AlgaNode {
 				newAlgaPseg = shape.asAlgaPseg(
 					time: time,
 					clock: this.clock,
-					onDone: { if(resync, { this.resync(value, reset) }) }
+					onDone: {
+						if(resync, {
+							this.resync(value, reset, if(param == \stretch, { true }, { false }))
+						})
+					}
 				);
 
 				//Start the new one
@@ -3781,9 +3796,13 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Resync pattern to sched
-	resync { | value, reset, sched |
+	resync { | value, reset, resetStretch, sched |
 		sched = sched ? schedResync; //Check for schedResync
-		this.setDurAtSched(value: value, sched: sched, isResync: true, isReset: reset)
+		resetStretch = resetStretch ? false;
+		this.setDurAtSched(
+			value: value, sched: sched, isResync: true,
+			isReset: reset, isStretch: resetStretch
+		)
 	}
 
 	//Set sustain at sched
