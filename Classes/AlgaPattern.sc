@@ -2395,9 +2395,9 @@ AlgaPattern : AlgaNode {
 
 		//Add \sustain
 		patternPairs = patternPairs.addAll([
-			\sustain, Pfunc( { newInterpStreams.sustain.next } ),
-			\stretch, Pfunc( { newInterpStreams.stretch.next } ),
-			\legato,  Pfunc( { newInterpStreams.legato.next })
+			\sustain, Pfunc({ newInterpStreams.sustain.next }),
+			\stretch, Pfunc({ newInterpStreams.stretch.next }),
+			\legato,  Pfunc({ newInterpStreams.legato.next })
 		]);
 
 		//If player is AlgaPatternPlayer, dur is ALWAYS manual
@@ -2407,7 +2407,7 @@ AlgaPattern : AlgaNode {
 		if(manualDur.not, {
 			//Pfunc allows to modify the value
 			patternPairs = patternPairs.add(\dur).add(
-				Pfunc( {
+				Pfunc({
 					//Only advance when there are no concurrent executions.
 					//This allows for .replace to work correctly and not advance twice!
 					var currentTime = this.clock.seconds;
@@ -2431,7 +2431,7 @@ AlgaPattern : AlgaNode {
 
 					//Return correct dur
 					dur;
-				} )
+				})
 			);
 		});
 

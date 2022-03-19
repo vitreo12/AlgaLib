@@ -504,14 +504,14 @@ AlgaPatternPlayer {
 
 		//Ass reschedulable \stretch
 		patternPairs = patternPairs.add(\stretch).add(
-			Pfunc { stretch.next }
+			Pfunc({ stretch.next })
 		);
 
 		//Add reschedulable \dur
 		if(foundDurOrDelta, {
 			if(manualDur.not, {
 				patternPairs = patternPairs.add(\dur).add(
-					Pfunc { dur.next }
+					Pfunc({ dur.next })
 				);
 			});
 		});
