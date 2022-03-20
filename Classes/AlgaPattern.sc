@@ -154,6 +154,9 @@ AlgaPattern : AlgaNode {
 	//Used for parsing Patterns
 	var <recursivePatternList;
 
+	//Check for manualDur
+	var manualDur = false;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -2109,7 +2112,6 @@ AlgaPattern : AlgaNode {
 		var foundSustain = false, resetSustain = false;
 		var foundStretch = false, resetStretch = false;
 		var foundLegato = false, resetLegato = false;
-		var manualDur = false;
 		var foundFX = false;
 		var parsedFX;
 		var parsedOut;
@@ -2121,6 +2123,9 @@ AlgaPattern : AlgaNode {
 		//will be overwritten when using replace. This allows to separate the "global" one
 		//from the one that's being created here.
 		var newInterpStreams = AlgaPatternInterpStreams(this);
+
+		//Reset manualDur
+		manualDur = false;
 
 		//Check sched
 		if(replace.not, { sched = sched ? schedInner });
@@ -2994,7 +2999,9 @@ AlgaPattern : AlgaNode {
 
 	//Interpolate dur, either replace OR substitute at sched
 	interpolateDur { | value, time, shape, resync, reset, sched = 0 |
-		if(replaceDur, {
+		//Replace also if value is a Symbol (manual dur).
+		//Also replace if currently dur was manual
+		if((replaceDur).or(value.isSymbol).or(manualDur), {
 			this.replace(
 				def: (def: this.getSynthDef, dur: value),
 				time: time,
@@ -3302,22 +3309,30 @@ AlgaPattern : AlgaNode {
 
 		//Special case, \dur
 		if(param == \dur, {
-			^this.interpolateDur(sender, time, shape, sched);
+			^this.interpolateDur(
+				value: sender, time: time, shape: shape, sched: sched
+			);
 		});
 
 		//Special case, \sustain
 		if(param == \sustain, {
-			^this.interpolateSustain(sender, time, sched);
+			^this.interpolateSustain(
+				value: sender, time: time, shape: shape, sched: sched
+			);
 		});
 
 		//Special case, \stretch
 		if(param == \stretch, {
-			^this.interpolateStretch(sender, time, sched);
+			^this.interpolateStretch(
+				value: sender, time: time, shape: shape, sched: sched
+			);
 		});
 
 		//Special case, \legato
 		if(param == \legato, {
-			^this.interpolateLegato(sender, time, sched);
+			^this.interpolateLegato(
+				value: sender, time: time, shape: shape, sched: sched
+			);
 		});
 
 		//Special case, \def
@@ -3706,8 +3721,8 @@ AlgaPattern : AlgaNode {
 		var paramConnectionTime = paramsConnectionTime[param];
 
 		//Check validity of value
-		if((value.isNumberOrArray.not).and(value.isPattern.not), {
-			"AlgaPattern: only Numbers, Arrays and Patterns are supported for 'dur' interpolation".error;
+		if((value.isNumber.not).and(value.isPattern.not), {
+			"AlgaPattern: only Numbers and Patterns are supported for 'dur' interpolation".error;
 			^this
 		});
 
@@ -3728,17 +3743,17 @@ AlgaPattern : AlgaNode {
 		//If time is still 0, go back to setAtSched so it is picked up
 		if(time == 0, {
 			case
-			{ param == \dur }     {
-				this.setDurAtSched(value, sched)
+			{ param == \dur } {
+				^this.setDurAtSched(value, sched);
 			}
 			{ param == \sustain } {
-				this.setSustainAtSched(value, sched)
+				^this.setSustainAtSched(value, sched)
 			}
 			{ param == \stretch } {
-				this.setStretchAtSched(value, sched)
+				^this.setStretchAtSched(value, sched)
 			}
 			{ param == \legato }  {
-				this.setLegatoAtSched(value, sched)
+				^this.setLegatoAtSched(value, sched)
 			};
 		});
 

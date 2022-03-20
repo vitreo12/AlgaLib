@@ -872,10 +872,10 @@ AlgaPatternPlayer {
 		if(time == 0, {
 			case
 			{ param == \dur }     {
-				this.setDurAtSched(value, sched)
+				^this.setDurAtSched(value, sched)
 			}
 			{ param == \stretch } {
-				this.setStretchAtSched(value, sched)
+				^this.setStretchAtSched(value, sched)
 			};
 		});
 
@@ -1062,7 +1062,7 @@ AlgaPatternPlayer {
 	}
 
 	//Implement from {}
-	fromInner { | sender, param = \in, time, sched |
+	fromInner { | sender, param = \in, time, shape, sched |
 		//New ID
 		var uniqueID = UniqueID.next;
 		var lastID = entries[param][\lastID];
@@ -1077,6 +1077,9 @@ AlgaPatternPlayer {
 		//New ID - sender
 		entries[param][\lastID] = uniqueID;
 		entries[param][\entries][uniqueID] = sender.algaAsStream;
+
+		//Get shape
+		shape = this.checkValidEnv(shape) ? Env([0, 1], 1);
 
 		//Re-trigger interpolation on connected AlgaPattern entries. Note the use of sched
 		algaPatternEntries.keysValuesDo({ | algaPattern, algaPatternParams |
@@ -1109,6 +1112,7 @@ AlgaPatternPlayer {
 								sender: reassignedEntry,
 								param: algaPatternParam,
 								time: time,
+								shape: shape,
 								sched: sched
 							)
 						});
@@ -1133,7 +1137,7 @@ AlgaPatternPlayer {
 	}
 
 	//This will also trigger interpolation on all registered AlgaPatterns
-	from { | sender, param = \in, time, sched |
+	from { | sender, param = \in, time, shape, sched |
 		//Parse the sender looking for AlgaTemps
 		var isDurOrStretch = false;
 		var senderAndFunctionSynthDefDict = this.parseParam(sender);
@@ -1152,11 +1156,15 @@ AlgaPatternPlayer {
 		// \dur / \stretch
 		case
 		{ (param == \dur).or(param == \delta) } {
-			this.interpolateDur(value: sender, time: time, sched: sched);
+			this.interpolateDur(
+				value: sender, time: time, shape: shape, sched: sched
+			);
 			isDurOrStretch = true;
 		}
 		{ param == \stretch } {
-			this.interpolateStretch(value: sender, time: time, sched: sched);
+			this.interpolateStretch(
+				value: sender, time: time, shape: shape, sched: sched
+			);
 			isDurOrStretch = true;
 		};
 
@@ -1170,6 +1178,7 @@ AlgaPatternPlayer {
 						sender: sender,
 						param: param,
 						time: time,
+						shape: shape,
 						sched: sched
 					)
 				},
