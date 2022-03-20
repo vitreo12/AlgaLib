@@ -868,6 +868,17 @@ AlgaPatternPlayer {
 		//Time in AlgaPseg is in beats: it needs to be scaled to seconds
 		time = if(tempoScaling.not, { time * this.clock.tempo });
 
+		//If time is still 0, go to setAtSched
+		if(time == 0, {
+			case
+			{ param == \dur }     {
+				this.setDurAtSched(value, sched)
+			}
+			{ param == \stretch } {
+				this.setStretchAtSched(value, sched)
+			};
+		});
+
 		//Check sched
 		sched = sched ? schedInner;
 
