@@ -1434,7 +1434,7 @@ AlgaNode {
 			synthDef = AlgaSynthDef(
 				("alga_" ++ UniqueID.next).asSymbol,
 				def,
-				outsMapping:outsMapping,
+				outsMapping:outsMapping
 			).sendAndAddToGlobalDescLib(server);
 
 			//Just get standard SynthDef
