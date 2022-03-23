@@ -4337,7 +4337,7 @@ AMP : AlgaMonoPattern {}
 		time = time ? 0;
 
 		//Get shape
-		shape = shape.checkValidEnv ? this.getInterpShape(param);
+		shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
 
 		if(patternOutEnvSynthsAtParamAlgaPattern != nil, {
 			patternOutEnvSynthsAtParamAlgaPattern.keysValuesDo({ | uniqueIDAlgaSynthBus, patternOutEnvSynth |

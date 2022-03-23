@@ -616,7 +616,7 @@ AlgaNode {
 
 	//Set interp shape
 	interpShape_ { | value, param, all = false |
-		value = this.checkValidEnv(value);
+		value = value.algaCheckValidEnv;
 		if(value != nil, {
 			//Set the global one if param is nil
 			if(param == nil, { interpShape = value });

@@ -407,7 +407,7 @@ AlgaPatternInterpStreams {
 		this.addInOutNodesDictAtParam(entryOriginal, paramName, false);
 
 		//Get shape
-		shape = algaPattern.checkValidEnv(shape) ? algaPattern.getInterpShape(paramName);
+		shape = shape.algaCheckValidEnv ? algaPattern.getInterpShape(paramName);
 
 		//Trigger the interpolation process on all the other active interpSynths.
 		//This must always be before createPatternInterpSynthAndBusAtParam
