@@ -384,7 +384,7 @@
 		var previousRoutine;
 		var algaTempoRoutines = Alga.interpTempoRoutines;
 		if(algaTempoRoutines == nil, {
-			"Alga: Clock has not been used by Alga. Cannot run 'interpTempo' on it".error;
+			"Alga: Clock is not being used by Alga. Cannot run 'interpTempo' on it".error;
 			^this
 		});
 		previousRoutine = algaTempoRoutines[this];
