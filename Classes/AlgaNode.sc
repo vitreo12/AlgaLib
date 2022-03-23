@@ -653,46 +653,6 @@ AlgaNode {
 
 	pis { | param | ^paramsInterpShapes[param] }
 
-	//Check env
-	checkValidEnv { | value |
-		var levels, times;
-
-		if(value == nil, { ^nil });
-
-		if(value.isKindOf(Env).not, {
-			("AlgaNode: invalid interpShape: " ++ value.class).error;
-			^nil
-		});
-
-		levels = value.levels;
-		if(levels.size > AlgaStartup.maxEnvPoints, {
-			("AlgaNode: interpShape's Env can only have up to " ++ AlgaStartup.maxEnvPoints ++ " points.").error;
-			^nil
-		});
-		if(levels.first != 0, {
-			("AlgaNode: interpShape's Env must always start from 0").error;
-			^nil
-		});
-		if(levels.last != 1, {
-			("AlgaNode: interpShape's Env must always end at 1").error;
-			^nil
-		});
-		levels.do({ | level |
-			if(((level >= 0.0).and(level <= 1.0)).not, {
-				("AlgaNode: interpShape's Env can only contain values between 0 and 1").error;
-				^nil
-			});
-		});
-
-		times = value.times;
-		if(times.sum == 0, {
-			("AlgaNode: interpShape's Env cannot have its times sum up to 0").error;
-			^nil
-		});
-
-		^value
-	}
-
 	//get interp shape at param
 	getInterpShape { | param |
 		var interpShapeAtParam = paramsInterpShapes[param];
@@ -2639,7 +2599,7 @@ AlgaNode {
 		time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
 		//Get shape
-		shape = this.checkValidEnv(shape) ? this.getInterpShape(param);
+		shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
 
 		//Get param's numChannels / rate
 		paramNumChannels = controlName.numChannels;
@@ -3040,7 +3000,7 @@ AlgaNode {
 				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
 				//Get shape
-				shape = this.checkValidEnv(shape) ? this.getInterpShape(param);
+				shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
 
 				//Only create fadeOut and free normSynth on .disconnect! (not .replace / .replaceMix).
 				//Also, don't create it for the default node, as that needs to be kept alive at all times!
@@ -3145,7 +3105,7 @@ AlgaNode {
 				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
 				//Get shape
-				shape = this.checkValidEnv(shape) ? this.getInterpShape(param);
+				shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
 
 				//Start the free on the previous individual interp synth (size is ALWAYS 1 here)
 				interpSynthsAtParam.do({ | interpSynthAtParam |

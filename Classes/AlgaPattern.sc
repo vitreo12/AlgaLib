@@ -3022,6 +3022,16 @@ AlgaPattern : AlgaNode {
 		this.interpolateDur(value, time, shape, resync, reset, sched)
 	}
 
+	//Alias
+	interpolateDelta { | value, time, shape, resync, reset, sched = 0 |
+		this.interpolateDur(value, time, shape, resync, reset, sched)
+	}
+
+	//Alias
+	interpDelta { | value, time, shape, resync, reset, sched = 0 |
+		this.interpolateDur(value, time, shape, resync, reset, sched)
+	}
+
 	//Interpolate sustain
 	interpolateSustain { | value, time, shape, resync = false, sched = 0 |
 		if(replaceDur, {
@@ -3768,7 +3778,7 @@ AlgaPattern : AlgaNode {
 
 		//Get shape
 		if(param == \dur, { paramInterpShape = paramInterpShape ? this.getInterpShape(\delta) });
-		shape = this.checkValidEnv(shape) ? paramInterpShape;
+		shape = shape.algaCheckValidEnv ? paramInterpShape;
 
 		//Add to scheduler
 		this.addAction(
@@ -4264,7 +4274,7 @@ AMP : AlgaMonoPattern {}
 		paramRate = controlNamesAtParam.rate;
 
 		//Get shape
-		shape = this.checkValidEnv(shape) ? this.getInterpShape(param);
+		shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
 
 		//Lock interpBus with uniqueID
 		this.lockInterpBus(uniqueID, interpBus);
@@ -4327,7 +4337,7 @@ AMP : AlgaMonoPattern {}
 		time = time ? 0;
 
 		//Get shape
-		shape = this.checkValidEnv(shape) ? this.getInterpShape(param);
+		shape = shape.checkValidEnv ? this.getInterpShape(param);
 
 		if(patternOutEnvSynthsAtParamAlgaPattern != nil, {
 			patternOutEnvSynthsAtParamAlgaPattern.keysValuesDo({ | uniqueIDAlgaSynthBus, patternOutEnvSynth |

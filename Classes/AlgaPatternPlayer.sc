@@ -354,46 +354,6 @@ AlgaPatternPlayer {
 		^func.value;
 	}
 
-	//Check env
-	checkValidEnv { | value |
-		var levels, times;
-
-		if(value == nil, { ^nil });
-
-		if(value.isKindOf(Env).not, {
-			("AlgaNode: invalid interpShape: " ++ value.class).error;
-			^nil
-		});
-
-		levels = value.levels;
-		if(levels.size > AlgaStartup.maxEnvPoints, {
-			("AlgaNode: interpShape's Env can only have up to " ++ AlgaStartup.maxEnvPoints ++ " points.").error;
-			^nil
-		});
-		if(levels.first != 0, {
-			("AlgaNode: interpShape's Env must always start from 0").error;
-			^nil
-		});
-		if(levels.last != 1, {
-			("AlgaNode: interpShape's Env must always end at 1").error;
-			^nil
-		});
-		levels.do({ | level |
-			if(((level >= 0.0).and(level <= 1.0)).not, {
-				("AlgaNode: interpShape's Env can only contain values between 0 and 1").error;
-				^nil
-			});
-		});
-
-		times = value.times;
-		if(times.sum == 0, {
-			("AlgaNode: interpShape's Env cannot have its times sum up to 0").error;
-			^nil
-		});
-
-		^value
-	}
-
 	/*****************************************************************************************/
 	/*****************************************************************************************/
 	/*****************************************************************************************/
@@ -889,7 +849,7 @@ AlgaPatternPlayer {
 		reset = reset ? durInterpReset;
 
 		//Get shape
-		shape = this.checkValidEnv(shape) ? Env([0, 1], 1);
+		shape = shape.algaCheckValidEnv ? Env([0, 1], 1);
 
 		//Add to scheduler
 		this.addAction(
@@ -1079,7 +1039,7 @@ AlgaPatternPlayer {
 		entries[param][\entries][uniqueID] = sender.algaAsStream;
 
 		//Get shape
-		shape = this.checkValidEnv(shape) ? Env([0, 1], 1);
+		shape = shape.algaCheckValidEnv ? Env([0, 1], 1);
 
 		//Re-trigger interpolation on connected AlgaPattern entries. Note the use of sched
 		algaPatternEntries.keysValuesDo({ | algaPattern, algaPatternParams |

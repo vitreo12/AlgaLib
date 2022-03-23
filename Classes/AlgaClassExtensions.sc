@@ -74,6 +74,46 @@
 		};
 		thisThread.algaHandleError(this);
 	}
+
+	//Check env
+	algaCheckValidEnv {
+		var levels, times;
+
+		if(this == nil, { ^nil });
+
+		if(this.isKindOf(Env).not, {
+			("Alga: invalid interpShape: " ++ this.class).error;
+			^nil
+		});
+
+		levels = this.levels;
+		if(levels.size > AlgaStartup.maxEnvPoints, {
+			("Alga: interpShape's Env can only have up to " ++ AlgaStartup.maxEnvPoints ++ " points.").error;
+			^nil
+		});
+		if(levels.first != 0, {
+			("Alga: interpShape's Env must always start from 0").error;
+			^nil
+		});
+		if(levels.last != 1, {
+			("Alga: interpShape's Env must always end at 1").error;
+			^nil
+		});
+		levels.do({ | level |
+			if(((level >= 0.0).and(level <= 1.0)).not, {
+				("Alga: interpShape's Env can only contain values between 0 and 1").error;
+				^nil
+			});
+		});
+
+		times = this.times;
+		if(times.sum == 0, {
+			("Alga: interpShape's Env cannot have its times sum up to 0").error;
+			^nil
+		});
+
+		^this
+	}
 }
 
 //Like handleError without stacktrace
