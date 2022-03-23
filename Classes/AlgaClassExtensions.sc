@@ -365,7 +365,106 @@
 +Clock {
 	*tempo { ^(1.0) }
 
+	*tempo_ { }
+
 	tempo { ^(1.0) }
+
+	tempo_ { }
+
+	//SystemClock, just do no error out
+	*interpolateTempo { }
+	*interpTempo { }
+
+	//Only works for TempoClock / LinkClock
+	interpolateTempo { | tempo = 1, time = 0, shape,
+		delta = 0.1, schedInSeconds = false, sched = 1 |
+
+		//Stop previous routine
+		var newRoutine;
+		var previousRoutine;
+		var algaTempoRoutines = Alga.interpTempoRoutines;
+		if(algaTempoRoutines == nil, {
+			"Alga: Clock has not been used by Alga. Cannot run 'interpTempo' on it".error;
+			^this
+		});
+		previousRoutine = algaTempoRoutines[this];
+		if(previousRoutine != nil, { previousRoutine.stop });
+
+		//Check tempo
+		if(tempo.isNumber.not, {
+			"Alga: 'tempo' must be a number".error;
+			^this
+		});
+
+		//Check shape
+		shape = shape.algaCheckValidEnv ? Env([0, 1], 1);
+
+		//If time is 0 or less than delta, just set tempo on sched
+		if((time == 0).or(time <= delta), {
+			if(schedInSeconds, {
+				if(sched.isAlgaQuant, { sched = sched.quant + sched.phase });
+				this.algaSchedInSecondsOnceWithTopPriority(sched, {
+					this.tempo = tempo
+				});
+			}, {
+				this.algaSchedAtQuantOnceWithTopPriority(sched, {
+					this.tempo = tempo
+				});
+			});
+		});
+
+		//Finally, define the new routine
+		newRoutine = Routine({
+			var counter = 0;
+			var done = false;
+			var timesSum = shape.times.sum;
+			var startTempo = this.tempo; //Needs to be locked on Routine start
+			var timeInv = time.reciprocal; //1 / time
+
+			//Advance time and retrieve values from the Env
+			while { done.not } {
+				var envVal = shape[counter * timesSum];
+				this.tempo = startTempo.blend(tempo, envVal);
+				counter = counter + (delta * timeInv);
+				if(counter >= (1.0 + (delta * timeInv)), { done = true });
+				delta.wait;
+			}
+		});
+
+		//Assign the routine to Alga's dict
+		Alga.interpTempoRoutines[this] = newRoutine;
+
+		//If sched is 0, just start right now
+		if(sched == 0, {
+			newRoutine.play(clock: SystemClock);
+			^this;
+		});
+
+		//Schedule the playing for the right sched value
+		if(schedInSeconds, {
+			if(sched.isAlgaQuant, { sched = sched.quant + sched.phase });
+			this.algaSchedInSecondsOnceWithTopPriority(sched, {
+				newRoutine.play(clock: SystemClock)
+			});
+		}, {
+			this.algaSchedAtQuantOnceWithTopPriority(sched, {
+				newRoutine.play(clock: SystemClock)
+			});
+		});
+	}
+
+	//Alias
+	interpTempo { | tempo = 1, time = 0, shape,
+		delta = 0.1, schedInSeconds = false, sched = 1 |
+		^this.interpolateTempo(
+			tempo: tempo,
+			time: time,
+			shape: shape,
+			delta: delta,
+			schedInSeconds: schedInSeconds,
+			sched: sched
+		)
+	}
 
 	algaSchedAtQuant { | quant, task |
 		if(this.isTempoClock, {

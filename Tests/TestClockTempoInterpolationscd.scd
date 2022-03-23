@@ -1,11 +1,17 @@
 (
 Alga.boot({
 	a = AP({ FreeSelf.kr(Impulse.ar(0)) }).play(chans:2);
-	~tempo = 1;
 });
 )
 
+Alga.interpTempo(tempo: 10, time: 5)
+
+Alga.interpTempo(tempo: 5, time: 3, sched: 1)
+
+Alga.interpTempo(tempo: 10, time: 5, shape: Env([0, 1, 0, 1], [1, 2, 3]))
+
 (
+~tempo = 1;
 ~target = 5;
 //~wasDone = true;
 
@@ -42,17 +48,9 @@ r = Routine.run({
 		var envVal = env[counter * timesSum];
 		~tempo = start.blend(~target, envVal);
 		~tempo.postln;
-		if(a != nil, { a.clock.tempo = ~tempo });
 		counter = counter + (delta * time);
 		if(counter >= (1.0 + (delta * time)), { done = true });
 		delta.wait;
 	}
 }, clock: SystemClock)
 )
-
-Routine
-Alga.interpTempo
-
-sched
-
-schedInSeconds
