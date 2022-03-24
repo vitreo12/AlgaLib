@@ -76,7 +76,7 @@
 	}
 
 	//Check env
-	algaCheckValidEnv {
+	algaCheckValidEnv { | algaIEnvGen = true |
 		var levels, times;
 
 		if(this == nil, { ^nil });
@@ -87,9 +87,11 @@
 		});
 
 		levels = this.levels;
-		if(levels.size > AlgaStartup.maxEnvPoints, {
-			("Alga: interpShape's Env can only have up to " ++ AlgaStartup.maxEnvPoints ++ " points.").error;
-			^nil
+		if(algaIEnvGen, {
+			if(levels.size > AlgaStartup.maxEnvPoints, {
+				("Alga: interpShape's Env can only have up to " ++ AlgaStartup.maxEnvPoints ++ " points.").error;
+				^nil
+			});
 		});
 		if(levels.first != 0, {
 			("Alga: interpShape's Env must always start from 0").error;
@@ -397,7 +399,7 @@
 		});
 
 		//Check shape
-		shape = shape.algaCheckValidEnv ? Env([0, 1], 1);
+		shape = shape.algaCheckValidEnv(false) ? Env([0, 1], 1);
 
 		//If time is 0 or less than delta, just set tempo on sched
 		if((time == 0).or(time <= delta), {

@@ -3778,7 +3778,7 @@ AlgaPattern : AlgaNode {
 
 		//Get shape
 		if(param == \dur, { paramInterpShape = paramInterpShape ? this.getInterpShape(\delta) });
-		shape = shape.algaCheckValidEnv ? paramInterpShape;
+		shape = shape.algaCheckValidEnv(false) ? paramInterpShape;
 
 		//Add to scheduler
 		this.addAction(

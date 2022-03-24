@@ -849,7 +849,7 @@ AlgaPatternPlayer {
 		reset = reset ? durInterpReset;
 
 		//Get shape
-		shape = shape.algaCheckValidEnv ? Env([0, 1], 1);
+		shape = shape.algaCheckValidEnv(false) ? Env([0, 1], 1);
 
 		//Add to scheduler
 		this.addAction(
