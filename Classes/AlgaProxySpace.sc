@@ -143,6 +143,47 @@ AlgaProxySpace {
 		^node
 	}
 
+	//////////////////////
+	// From Environment //
+	//////////////////////
+	*make { arg function;
+		^this.new.make(function)
+	}
+	*use { arg function;
+		^this.new.use(function)
+	}
+
+	make { arg function;
+		// pushes the Envir, executes function, returns the Envir
+		// usually used to create an environment by adding new variables to it.
+		var result, saveEnvir;
+
+		saveEnvir = currentEnvironment;
+		currentEnvironment = this;
+		protect {
+			function.value(this);
+		}{
+			currentEnvironment = saveEnvir;
+		};
+	}
+	use { arg function;
+		// temporarily replaces the currentEnvironment with this,
+		// executes function, returns the result of the function
+		var result, saveEnvir;
+
+		saveEnvir = currentEnvironment;
+		currentEnvironment = this;
+		protect {
+			result = function.value(this);
+		}{
+			currentEnvironment = saveEnvir;
+		};
+		^result
+	}
+	//////////////////////
+	//////////////////////
+	//////////////////////
+
 	newNode {
 		var node = AlgaNode(\alga_silent, server: server);
 		this.copyAllProxySpaceParams(node);
