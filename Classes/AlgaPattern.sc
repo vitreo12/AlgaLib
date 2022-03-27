@@ -2138,15 +2138,11 @@ AlgaPattern : AlgaNode {
 			var defaultValue = controlName.defaultValue;
 			var explicitParam = paramValue != nil;
 			var chansMapping, scale;
-			var addToPatternPairs = true;
 
 			//if not set explicitly yet
 			if(explicitParam.not, {
 				//When replace, getDefaultOrArg will return LATEST set parameter, via replaceArgs
 				paramValue = this.getDefaultOrArg(controlName, paramName, replace);
-
-				//Don't add to patternPairs: it's not set by user
-				addToPatternPairs = false;
 			});
 
 			//If replace, check if keeping chans / scale mappings
@@ -2166,11 +2162,6 @@ AlgaPattern : AlgaNode {
 				sampleAndHold: false,
 				time: 0
 			);
-
-			//Add to patternPairs so that it's available for Pfunc { | event | }
-			if(addToPatternPairs, {
-				patternPairs = patternPairs.add(paramName).add(paramValue);
-			});
 
 			//Remove param entry from eventPairs
 			eventPairs[paramName] = nil;
