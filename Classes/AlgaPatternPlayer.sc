@@ -778,6 +778,16 @@ AlgaPatternPlayer {
 		this.interpolateDur(value, time, shape, resync, reset, sched)
 	}
 
+	//Alias
+	interpolateDelta { | value, time, shape, resync, reset, sched |
+		this.interpolateDur(value, time, shape, resync, reset, sched)
+	}
+
+	//Alias
+	interpDelta { | value, time, shape, resync, reset, sched |
+		this.interpolateDur(value, time, shape, resync, reset, sched)
+	}
+
 	//Like AlgaPattern: retriggers at specific sched
 	interpolateStretch { | value, time, shape, resync, reset, sched |
 		if(sched.isAlgaStep, {

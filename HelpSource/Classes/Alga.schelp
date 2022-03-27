@@ -1,7 +1,7 @@
 TITLE:: Alga
 summary:: live coding environment focused on the interpolation between sonic nodes
 categories:: Alga
-related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaServerOptions, Clasess/AlgaProxySpace
+related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaServerOptions, Classes/AlgaProxySpace
 
 
 DESCRIPTION::
@@ -50,6 +50,43 @@ The new value. Must be an link::Classes/Integer::.
 METHOD:: initSynthDefs
 Force the recompilation of all link::Classes/AlgaSynthDef::s necessary for link::Classes/Alga::'s runtime. This needs to be executed only once anytime the value of emphasis::maxIO:: changes. Before emphasis::boot::, link::Classes/Alga:: already checks that everything is correct.
 
+METHOD:: interpolateTempo
+Interpolate the code::tempo:: of the link::Classes/Clock:: that emphasis::Alga:: is using over to a new value. This will affect all the nodes on the emphasis::Alga:: instance.
+ARGUMENT:: tempo
+The new tempo
+ARGUMENT:: time
+The time in seconds that the interpolation process will take
+ARGUMENT:: shape
+An optional link::Classes/Env:: to determine the shape of the interpolation.
+ARGUMENT:: delta
+Specify the resolution of the tempo change: how often should the tempo value be updated?
+ARGUMENT:: schedInSeconds
+Specify if the code::sched:: argument should be considered in seconds instead of beats / bars.
+ARGUMENT:: sched
+When the interpolation should be triggered
+
+discussion::
+code::
+(
+Alga.boot({
+	a = AP((
+		def: { SinOsc.ar * EnvPerc.ar(release: 0.1 * \tempo.kr(1)) },
+		tempo: Pfunc { Alga.clocks[Server.default].tempo.reciprocal }
+	)).play(chans: 2)
+})
+)
+
+//10 times faster
+Alga.interpTempo(tempo: 10, time: 5)
+
+//Using a shape
+Alga.interpTempo(tempo: 3, time: 8, shape: Env([0, 1, 0, 1], [1, 2, 3]))
+::
+
+METHOD:: interpTempo
+Alias for code::interpolateTempo::
+
+
 private:: clearAllSchedulers
 private:: clearScheduler
 private:: clearServer
@@ -74,6 +111,6 @@ private:: quitServerAndClear
 private:: setSupernova
 private:: supernova
 private:: supernovas
-
+private:: interpTempoRoutines
 private:: addAlgaSilent
 private:: booted
