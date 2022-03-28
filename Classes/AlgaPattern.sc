@@ -3104,7 +3104,7 @@ AlgaPattern : AlgaNode {
 
 	//Buffer == replace
 	interpolateBuffer { | sender, param, time, sched |
-		("AlgaPattern: changing a Buffer parameter: '" + param.asString ++ ". This will trigger 'replace'.").warn;
+		("AlgaPattern: changing a Buffer parameter: '" ++ param.asString ++ "'. This will trigger 'replace'.").warn;
 		this.replace(
 			def: (def: this.getSynthDef, (param): sender), //escape param with ()
 			time: time,
