@@ -235,6 +235,10 @@
 	//When APP is invalid
 	run { }
 
+	//When group is invalid
+	moveToHead { }
+	moveToTail { }
+
 	//Like handleError without stacktrace
 	algaHandleError { | error |
 		error.errorString.postln;
