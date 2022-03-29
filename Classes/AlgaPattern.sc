@@ -3136,10 +3136,11 @@ AlgaPattern : AlgaNode {
 	//Interpolate a parameter that is not in controlNames (like \lag)
 	interpolateGenericParam { | sender, param, time, sched |
 		var paramConnectionTime = paramsConnectionTime[param];
+		var latestScalarUniqueID = latestScalarUniqueIDs[param];
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
-		if(time == 0, {
+		if((time == 0).and(latestScalarUniqueID != nil), {
 			this.addAction(
 				func: {
 					this.addScalarAndGenericParams(param, sender);
@@ -3311,16 +3312,14 @@ AlgaPattern : AlgaNode {
 	connectionTriggersReplace { | param = \in |
 		if((((param == \delta).or(param == \dur)).and(replaceDur)).or(
 			param == \def).or(param == \fx).or(param == \out).or(
-			this.scalarParam(param)), {
-			if(controlNames[param] == nil, {
-				^true
-			});
+			this.isScalarParam(param)), {
+			if(controlNames[param] == nil, { ^true });
 		});
 		^false
 	}
 
 	//Check if a param is scalar
-	scalarParam { | paramName |
+	isScalarParam { | paramName |
 		var controlName = controlNames[paramName];
 		if(controlName != nil, {
 			^(controlName.rate == \scalar)
@@ -3371,7 +3370,7 @@ AlgaPattern : AlgaNode {
 
 		//Scalar param OR
 		//aram is not in controlNames. Probably setting another kind of parameter (like \lag)
-		if((this.scalarParam(param)).or(controlNames[param] == nil), {
+		if((this.isScalarParam(param)).or(controlNames[param] == nil), {
 			^this.interpolateGenericParam(sender, param, time, sched);
 		});
 
