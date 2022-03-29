@@ -101,7 +101,10 @@ AlgaPattern : AlgaNode {
 	var <currentReset;
 
 	//Needed to store current generic params
-	var <currentGenericParams;
+	var <scalarAndGenericParams;
+	var <scalarAndGenericParamsStreams;
+	var <latestScalarUniqueIDs;
+	var <scalarsInAlgaStep;
 
 	//This is used for nested AlgaTemps
 	var <currentAlgaTempGroup;
@@ -255,6 +258,9 @@ AlgaPattern : AlgaNode {
 
 				//Finally, consume scheduledStepActionsPost if there are any
 				~algaPattern.advanceAndConsumeScheduledStepActions(true);
+
+				//Reset scalarsInAlgaStep
+				~algaPattern.scalarsInAlgaStep.clear;
 			});
 
 			//Send bundle to server using the same server / clock as the AlgaPattern
@@ -1289,95 +1295,121 @@ AlgaPattern : AlgaNode {
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
 
-			//This is the interpBus for this param that all patternParamSynths will write to.
-			//This will then be used for the actual normalization that happens in the normSynth
-			//As with AlgaNode's, it needs one extra channel for the separate env.
-			var patternInterpSumBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+			//
+			if((paramRate == \control).or(paramRate == \audio), {
+				//This is the interpBus for this param that all patternParamSynths will write to.
+				//This will then be used for the actual normalization that happens in the normSynth
+				//As with AlgaNode's, it needs one extra channel for the separate env.
+				var patternInterpSumBus = AlgaBus(server, paramNumChannels + 1, paramRate);
 
-			//This is the normBus that the normSynth will write to, and patternSynth will read from
-			var patternParamNormBus = AlgaBus(server, paramNumChannels, paramRate);
+				//This is the normBus that the normSynth will write to, and patternSynth will read from
+				var patternParamNormBus = AlgaBus(server, paramNumChannels, paramRate);
 
-			//Symbol for normSynth
-			var patternParamNormSynthSymbol = (
-				"alga_norm_" ++
-				paramRate ++
-				paramNumChannels
-			).asSymbol;
+				//Symbol for normSynth
+				var patternParamNormSynthSymbol = (
+					"alga_norm_" ++
+					paramRate ++
+					paramNumChannels
+				).asSymbol;
 
-			//Args for normSynth
-			var patternParamNormSynthArgs = [
-				\args, patternInterpSumBus.busArg,
-				\out, patternParamNormBus.index,
-				\fadeTime, 0
-			];
+				//Args for normSynth
+				var patternParamNormSynthArgs = [
+					\args, patternInterpSumBus.busArg,
+					\out, patternParamNormBus.index,
+					\fadeTime, 0
+				];
 
-			//The actual normSynth for this specific param.
-			//The patternSynth will read from its output.
-			var patternParamNormSynth = AlgaSynth(
-				patternParamNormSynthSymbol,
-				patternParamNormSynthArgs,
-				normGroup,
-				waitForInst: false
-			);
+				//The actual normSynth for this specific param.
+				//The patternSynth will read from its output.
+				var patternParamNormSynth = AlgaSynth(
+					patternParamNormSynthSymbol,
+					patternParamNormSynthArgs,
+					normGroup,
+					waitForInst: false
+				);
 
-			//All the current interpStreams for this param. Retrieve the entries,
-			//which store all the senders to this param for the interpStream.
-			var interpStreamsEntriesAtParam = algaPatternInterpStreams.entries[paramName];
+				//All the current interpStreams for this param. Retrieve the entries,
+				//which store all the senders to this param for the interpStream.
+				var interpStreamsEntriesAtParam = algaPatternInterpStreams.entries[paramName];
 
-			//Used in MC
-			var mcEntriesAtParam;
+				//Used in MC
+				var mcEntriesAtParam;
 
-			//scaleArray and chans
-			var scaleArraysAndChansAtParam = algaPatternInterpStreams.scaleArraysAndChans[paramName];
+				//scaleArray and chans
+				var scaleArraysAndChansAtParam = algaPatternInterpStreams.scaleArraysAndChans[paramName];
 
-			//sampleAndHold
-			var sampleAndHold = algaPatternInterpStreams.sampleAndHolds[paramName];
-			sampleAndHold = sampleAndHold ? false;
+				//sampleAndHold
+				var sampleAndHold = algaPatternInterpStreams.sampleAndHolds[paramName];
+				sampleAndHold = sampleAndHold ? false;
 
-			//MultiChannel: extract from mcEntries
-			if(useMultiChannelExpansion, {
-				mcEntriesAtParam = mcEntries[paramName]
+				//MultiChannel: extract from mcEntries
+				if(useMultiChannelExpansion, {
+					mcEntriesAtParam = mcEntries[paramName]
+				});
+
+				//Create all interp synths for current param
+				this.createPatternParamSynths(
+					paramName: paramName,
+					paramNumChannels: paramNumChannels,
+					paramRate: paramRate,
+					paramDefault: paramDefault,
+					patternInterpSumBus: patternInterpSumBus,
+					patternBussesAndSynths: patternBussesAndSynths,
+					interpStreamsEntriesAtParam: interpStreamsEntriesAtParam,
+					scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
+					sampleAndHold: sampleAndHold,
+					algaPatternInterpStreams: algaPatternInterpStreams,
+					mcSynthNum: mcSynthNum,
+					mcEntriesAtParam: mcEntriesAtParam
+				);
+
+				//Read from patternParamNormBus
+				patternSynthArgs = patternSynthArgs.add(paramName).add(patternParamNormBus.busArg);
+
+				//Register normBus, normSynth, interSumBus to be freed
+				patternBussesAndSynths.add(patternParamNormBus);
+				patternBussesAndSynths.add(patternParamNormSynth);
+				patternBussesAndSynths.add(patternInterpSumBus);
+
+				//Latest patternInterpSumBus
+				latestPatternInterpSumBusses[paramName] = patternInterpSumBus;
+
+				//Add to currentPatternBussesAndSynths.
+				//These are indexed with patternInterpSumBus in order to be retrieved for temporary synths
+				currentPatternBussesAndSynths[patternInterpSumBus] = patternBussesAndSynths;
+
+				//This is used for removal later on
+				patternInterpSumBussesForThisPatternSynth[paramName] = patternInterpSumBus;
+
+				//Current active patternInterpSumBusses at paramName
+				this.addCurrentActivePatternInterpSumBussesForThisPatternSynth(
+					paramName,
+					patternInterpSumBus
+				);
+			}, {
+				//Scalar values
+				var paramValue, scalarInAlgaStep = false;
+
+				//If active AlgaSched, get value DIRECTLY from scalarAndGenericParamsStreams
+				if(scalarsInAlgaStep != nil, {
+					if(scalarsInAlgaStep.includes(paramName), {
+						paramValue = scalarAndGenericParamsStreams[paramName][
+							latestScalarUniqueIDs[paramName]
+						].next; //Manual advance !
+						scalarInAlgaStep = true
+					});
+				});
+
+				//Standard case: get value from currentEnvironment (patternPairs)
+				if(scalarInAlgaStep.not, {
+					paramValue = currentEnvironment[paramName];
+				});
+
+				//Add to synth's args
+				if(paramValue != nil, {
+					patternSynthArgs = patternSynthArgs.add(paramName).add(paramValue)
+				});
 			});
-
-			//Create all interp synths for current param
-			this.createPatternParamSynths(
-				paramName: paramName,
-				paramNumChannels: paramNumChannels,
-				paramRate: paramRate,
-				paramDefault: paramDefault,
-				patternInterpSumBus: patternInterpSumBus,
-				patternBussesAndSynths: patternBussesAndSynths,
-				interpStreamsEntriesAtParam: interpStreamsEntriesAtParam,
-				scaleArraysAndChansAtParam: scaleArraysAndChansAtParam,
-				sampleAndHold: sampleAndHold,
-				algaPatternInterpStreams: algaPatternInterpStreams,
-				mcSynthNum: mcSynthNum,
-				mcEntriesAtParam: mcEntriesAtParam
-			);
-
-			//Read from patternParamNormBus
-			patternSynthArgs = patternSynthArgs.add(paramName).add(patternParamNormBus.busArg);
-
-			//Register normBus, normSynth, interSumBus to be freed
-			patternBussesAndSynths.add(patternParamNormBus);
-			patternBussesAndSynths.add(patternParamNormSynth);
-			patternBussesAndSynths.add(patternInterpSumBus);
-
-			//Latest patternInterpSumBus
-			latestPatternInterpSumBusses[paramName] = patternInterpSumBus;
-
-			//Add to currentPatternBussesAndSynths.
-			//These are indexed with patternInterpSumBus in order to be retrieved for temporary synths
-			currentPatternBussesAndSynths[patternInterpSumBus] = patternBussesAndSynths;
-
-			//This is used for removal later on
-			patternInterpSumBussesForThisPatternSynth[paramName] = patternInterpSumBus;
-
-			//Current active patternInterpSumBusses at paramName
-			this.addCurrentActivePatternInterpSumBussesForThisPatternSynth(
-				paramName,
-				patternInterpSumBus
-			);
 		});
 
 		//If ListPattern, retrieve correct numChannels
@@ -1559,26 +1591,29 @@ AlgaPattern : AlgaNode {
 		controlNamesToUse.do({ | controlName |
 			var paramName = controlName.name;
 			var paramNumChannels = controlName.numChannels;
-			var interpStreamsEntriesAtParam = algaPatternInterpStreams.entries[paramName];
-			if(interpStreamsEntriesAtParam != nil, {
-				interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry |
-					//Unpack Pattern value
-					if(entry.isStream, { entry = entry.next });
+			var paramRate = controlName.rate;
+			if((paramRate == \control).or(paramRate == \audio), {
+				var interpStreamsEntriesAtParam = algaPatternInterpStreams.entries[paramName];
+				if(interpStreamsEntriesAtParam != nil, {
+					interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry |
+						//Unpack Pattern value
+						if(entry.isStream, { entry = entry.next });
 
-					//Set entries at paramName
-					entries[paramName] = entries[paramName] ? IdentityDictionary();
+						//Set entries at paramName
+						entries[paramName] = entries[paramName] ? IdentityDictionary();
 
-					//Use uniqueID
-					entries[paramName][uniqueID] = [entry, paramNumChannels];
+						//Use uniqueID
+						entries[paramName][uniqueID] = [entry, paramNumChannels];
 
-					//Retrieve the highest numOfSynths to spawn
-					if(entry.isArray, {
-						var arraySize = entry.size;
-						if(arraySize > paramNumChannels, {
-							numOfSynths = max(
-								arraySize - (paramNumChannels - 1),
-								numOfSynths
-							)
+						//Retrieve the highest numOfSynths to spawn
+						if(entry.isArray, {
+							var arraySize = entry.size;
+							if(arraySize > paramNumChannels, {
+								numOfSynths = max(
+									arraySize - (paramNumChannels - 1),
+									numOfSynths
+								)
+							});
 						});
 					});
 				});
@@ -2063,9 +2098,21 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Store generic params for replaces
-	storeCurrentGenericParams { | key, value |
-		currentGenericParams = currentGenericParams ? IdentityDictionary();
-		currentGenericParams[key] = value;
+	addScalarAndGenericParams { | key, value, uniqueID |
+		var latestScalarUniqueID;
+		latestScalarUniqueIDs = latestScalarUniqueIDs ? IdentityDictionary();
+		latestScalarUniqueID  = latestScalarUniqueIDs[key];
+
+		scalarAndGenericParams = scalarAndGenericParams ? IdentityDictionary();
+		scalarAndGenericParams[key] = scalarAndGenericParams[key] ? IdentityDictionary();
+		scalarAndGenericParams[key][uniqueID ? latestScalarUniqueID] = value;
+
+		scalarAndGenericParamsStreams = scalarAndGenericParamsStreams ? IdentityDictionary();
+		scalarAndGenericParamsStreams[key] = scalarAndGenericParamsStreams[key] ? IdentityDictionary();
+		scalarAndGenericParamsStreams[key][uniqueID ? latestScalarUniqueID] = value.algaAsStream;
+
+		//Update latest one
+		if(uniqueID != nil, { latestScalarUniqueIDs[key] = uniqueID });
 	}
 
 	//Build the actual pattern
@@ -2096,6 +2143,7 @@ AlgaPattern : AlgaNode {
 			var paramName = controlName.name;
 			var paramValue = eventPairs[paramName]; //Retrieve it directly from eventPairs
 			var defaultValue = controlName.defaultValue;
+			var rate = controlName.rate;
 			var explicitParam = paramValue != nil;
 			var chansMapping, scale;
 
@@ -2114,17 +2162,19 @@ AlgaPattern : AlgaNode {
 			//Add to interpStream (which also creates interpBus / interpSynth).
 			//These are unscheduled, as it's best to just create them asap.
 			//Only the pattern synths need to be scheduled
-			newInterpStreams.add(
-				entry: paramValue,
-				controlName: controlName,
-				chans: chansMapping,
-				scale: scale,
-				sampleAndHold: false,
-				time: 0
-			);
+			if((rate == \control).or(rate == \audio), {
+				newInterpStreams.add(
+					entry: paramValue,
+					controlName: controlName,
+					chans: chansMapping,
+					scale: scale,
+					sampleAndHold: false,
+					time: 0
+				);
 
-			//Remove param entry from eventPairs
-			eventPairs[paramName] = nil;
+				//Remove param entry from eventPairs
+				eventPairs[paramName] = nil;
+			});
 
 			//Add the entry to defaults ONLY if explicit
 			if(explicitParam, { defArgs[paramName] = paramValue });
@@ -2194,11 +2244,15 @@ AlgaPattern : AlgaNode {
 				isAlgaParam = true;
 			});
 
-			//All other entries that user wants to set and retrieve from within the pattern.
-			//This includes things like \lag and \timingOffset
+			//Scalar parameters OR all other values
 			if(isAlgaParam.not, {
-				patternPairs = patternPairs.add(paramName).add(value);
-				this.storeCurrentGenericParams(paramName, value); //Store it for replaces
+				var uniqueID = UniqueID.next;
+				this.addScalarAndGenericParams(paramName, value, uniqueID);
+				patternPairs = patternPairs.add(paramName).add(
+					Pfunc {
+						scalarAndGenericParamsStreams[paramName][uniqueID].next;
+					}
+				);
 				foundGenericParams.add(paramName);
 			});
 		});
@@ -2248,7 +2302,10 @@ AlgaPattern : AlgaNode {
 					});
 
 					//reset generic params
-					resetSet.do({ | entry | currentGenericParams.removeAt(entry) });
+					resetSet.do({ | entry |
+						scalarAndGenericParams.removeAt(entry);
+						scalarAndGenericParamsStreams.removeAt(entry)
+					});
 				}
 				{ resetSet == true } {
 					parsedFX = nil; currentFX = nil; //reset \fx
@@ -2259,7 +2316,10 @@ AlgaPattern : AlgaNode {
 					resetLegato = true;  //reset \legato
 
 					//reset all generic params
-					if(currentGenericParams != nil, { currentGenericParams.clear });
+					if(scalarAndGenericParams != nil, {
+						scalarAndGenericParams.clear;
+						scalarAndGenericParamsStreams.clear
+					});
 				};
 			});
 
@@ -2313,14 +2373,28 @@ AlgaPattern : AlgaNode {
 				});
 			});
 
-			//Add old genericParams
-			if(currentGenericParams != nil, {
-				if(currentGenericParams.size > 0, {
-					currentGenericParams.keysValuesDo({ | key, value |
+			//Add old scalarAndGenericParamsStreams
+			if(scalarAndGenericParams != nil, {
+				if(scalarAndGenericParams.size > 0, {
+					scalarAndGenericParams.keysValuesDo({ | key, value |
 						//If that specific generic param hasn't been set from user,
-						//use the one from currentGenericParams if available
+						//use the one from addScalarAndGenericParams if available
 						if(foundGenericParams.findMatch(key) == nil, {
-							patternPairs = patternPairs.add(key).add(value)
+							//Needs to be copied in order to make a "fresh" one
+							var latestValue = scalarAndGenericParams[key][
+								latestScalarUniqueIDs[key]
+							].copy;
+
+							//This code should be abstracted: it's the same behaviour
+							if(latestValue != nil, {
+								var uniqueID = UniqueID.next;
+								this.addScalarAndGenericParams(key, latestValue, uniqueID);
+								patternPairs = patternPairs.add(key).add(
+									Pfunc {
+										scalarAndGenericParamsStreams[key][uniqueID].next;
+									}
+								);
+							});
 						})
 					})
 				})
@@ -3022,16 +3096,6 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Buffer == replace
-	interpolateBuffer { | sender, param, time, sched |
-		("AlgaPattern: changing a Buffer parameter: '" + param.asString ++ ". This will trigger 'replace'.").warn;
-		^this.replace(
-			def: (def: this.getSynthDef, (param): sender), //escape param with ()
-			time: time,
-			sched: sched
-		);
-	}
-
 	//Interpolate fx == replace
 	interpolateFX { | value, time, sched |
 		"AlgaPattern: changing the 'fx' key. This will trigger 'replace'.".warn;
@@ -3053,45 +3117,36 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Interpolate a parameter that is not in controlNames (like \lag)
-	interpolateGenericParam { | sender, param, time, sched |
-		("AlgaPattern: changing the '" ++ param.asString ++ "' key, which is not present in the AlgaSynthDef. This will trigger 'replace'.").warn;
-		^this.replace(
-			def: (def: this.getSynthDef, (param): sender), //escape param with ()
-			time: time,
-			sched: sched
-		);
+	//Used for AlgaStep + modifying a scalar value with no replace
+	addScalarInAlgaStep { | param |
+		scalarsInAlgaStep = scalarsInAlgaStep ? IdentitySet();
+		scalarsInAlgaStep.add(param);
 	}
 
-	//ListPattern that contains Buffers
-	patternOrAlgaPatternArgContainsBuffers { | pattern |
-		case
-		{ pattern.isBuffer } { ^true }
-		{ pattern.isAlgaArg } { if(pattern.sender.isBuffer, { ^true }) }
-		{ pattern.isListPattern } {
-			pattern.list.do({ | entry |
-				var result = this.patternOrAlgaPatternArgContainsBuffers(entry);
-				if(result, { ^true });
-			});
-		}
-		{ pattern.isFilterPattern } {
-			var result = this.patternOrAlgaPatternArgContainsBuffers(pattern.pattern);
-			if(result, { ^true });
-		}
-		{ pattern.isPattern } {
-			//Protect from recursiveness
-			recursivePatternList.add(pattern);
-			pattern.class.instVarNames.do({ | instVarName |
-				try {
-					var instVar = pattern.perform(instVarName);
-					if(recursivePatternList.includes(instVar).not, {
-						var result = patternOrAlgaPatternArgContainsBuffers(instVar);
-						if(result, { ^true });
-					});
-				} { | error | } //Don't catch errors
-			});
-		};
-		^false
+	//Interpolate a parameter that is not in controlNames (like \lag)
+	interpolateGenericParam { | sender, param, time, sched |
+		var paramConnectionTime = paramsConnectionTime[param];
+		var latestScalarUniqueID = latestScalarUniqueIDs[param];
+		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
+		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
+		time = time ? paramConnectionTime;
+		if((time == 0).and(latestScalarUniqueID != nil), {
+			this.addAction(
+				func: {
+					this.addScalarAndGenericParams(param, sender);
+					if(sched.isAlgaStep, { this.addScalarInAlgaStep(param) });
+				},
+				sched: sched,
+				topPriority: true
+			)
+		}, {
+			("AlgaPattern: changing the '" ++ param.asString ++ "' key, which is either scalar or not present in the AlgaSynthDef. This will trigger 'replace'.").warn;
+			this.replace(
+				def: (def: this.getSynthDef, (param): sender), //escape param with ()
+				time: time,
+				sched: sched
+			);
+		});
 	}
 
 	//<<, <<+ and <|
@@ -3156,12 +3211,6 @@ AlgaPattern : AlgaNode {
 			^this
 		});
 
-		//Special case: Patterns with Buffers
-		recursivePatternList = IdentitySet(10); //reset before patternOrAlgaPatternArgContainsBuffers
-		if(this.patternOrAlgaPatternArgContainsBuffers(sender), {
-			^this.interpolateBuffer(sender, param, time, sched)
-		});
-
 		//Check parameter in controlNames
 		if(this.checkParamExists(param).not, {
 			("AlgaPattern: '" ++ param ++ "' is not a valid parameter, it is not defined in the AlgaSynthDef.").error;
@@ -3214,10 +3263,19 @@ AlgaPattern : AlgaNode {
 
 	//Used in AlgaProxySpace
 	connectionTriggersReplace { | param = \in |
-		if((((param == \delta).or(param == \dur)).and(replaceDur)).or(param == \def).or(param == \fx).or(param == \out), {
-			if(controlNames[param] == nil, {
-				^true
-			});
+		if((((param == \delta).or(param == \dur)).and(replaceDur)).or(
+			param == \def).or(param == \fx).or(param == \out).or(
+			this.isScalarParam(param)), {
+			if(controlNames[param] == nil, { ^true });
+		});
+		^false
+	}
+
+	//Check if a param is scalar
+	isScalarParam { | paramName |
+		var controlName = controlNames[paramName];
+		if(controlName != nil, {
+			^(controlName.rate == \scalar)
 		});
 		^false
 	}
@@ -3263,13 +3321,9 @@ AlgaPattern : AlgaNode {
 			^this.interpolateOut(sender, time, shape, sched);
 		});
 
-		//Entry is a Buffer == replace
-		if(sender.isBuffer, {
-			^this.interpolateBuffer(sender, param, time, sched);
-		});
-
-		//Param is not in controlNames. Probably setting another kind of parameter (like \lag)
-		if(controlNames[param] == nil, {
+		//Scalar param OR
+		//aram is not in controlNames. Probably setting another kind of parameter (like \lag)
+		if((this.isScalarParam(param)).or(controlNames[param] == nil), {
 			^this.interpolateGenericParam(sender, param, time, sched);
 		});
 
