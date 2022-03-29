@@ -3096,16 +3096,6 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Buffer == replace
-	interpolateBuffer { | sender, param, time, sched |
-		("AlgaPattern: changing a Buffer parameter: '" + param.asString ++ ". This will trigger 'replace'.").warn;
-		^this.replace(
-			def: (def: this.getSynthDef, (param): sender), //escape param with ()
-			time: time,
-			sched: sched
-		);
-	}
-
 	//Interpolate fx == replace
 	interpolateFX { | value, time, sched |
 		"AlgaPattern: changing the 'fx' key. This will trigger 'replace'.".warn;
@@ -3127,7 +3117,7 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//
+	//Used for AlgaStep + modifying a scalar value with no replace
 	addScalarInAlgaStep { | param |
 		scalarsInAlgaStep = scalarsInAlgaStep ? IdentitySet();
 		scalarsInAlgaStep.add(param);
@@ -3157,37 +3147,6 @@ AlgaPattern : AlgaNode {
 				sched: sched
 			);
 		});
-	}
-
-	//ListPattern that contains Buffers
-	patternOrAlgaPatternArgContainsBuffers { | pattern |
-		case
-		{ pattern.isBuffer } { ^true }
-		{ pattern.isAlgaArg } { if(pattern.sender.isBuffer, { ^true }) }
-		{ pattern.isListPattern } {
-			pattern.list.do({ | entry |
-				var result = this.patternOrAlgaPatternArgContainsBuffers(entry);
-				if(result, { ^true });
-			});
-		}
-		{ pattern.isFilterPattern } {
-			var result = this.patternOrAlgaPatternArgContainsBuffers(pattern.pattern);
-			if(result, { ^true });
-		}
-		{ pattern.isPattern } {
-			//Protect from recursiveness
-			recursivePatternList.add(pattern);
-			pattern.class.instVarNames.do({ | instVarName |
-				try {
-					var instVar = pattern.perform(instVarName);
-					if(recursivePatternList.includes(instVar).not, {
-						var result = patternOrAlgaPatternArgContainsBuffers(instVar);
-						if(result, { ^true });
-					});
-				} { | error | } //Don't catch errors
-			});
-		};
-		^false
 	}
 
 	//<<, <<+ and <|
@@ -3250,12 +3209,6 @@ AlgaPattern : AlgaNode {
 		if(sampleAndHold.isKindOf(Boolean).not, {
 			"AlgaPattern: sampleAndHold must be a boolean value".error;
 			^this
-		});
-
-		//Special case: Patterns with Buffers
-		recursivePatternList = IdentitySet(10); //reset before patternOrAlgaPatternArgContainsBuffers
-		if(this.patternOrAlgaPatternArgContainsBuffers(sender), {
-			^this.interpolateBuffer(sender, param, time, sched)
 		});
 
 		//Check parameter in controlNames
@@ -3372,11 +3325,6 @@ AlgaPattern : AlgaNode {
 		//aram is not in controlNames. Probably setting another kind of parameter (like \lag)
 		if((this.isScalarParam(param)).or(controlNames[param] == nil), {
 			^this.interpolateGenericParam(sender, param, time, sched);
-		});
-
-		//Entry is a Buffer == replace
-		if(sender.isBuffer, {
-			^this.interpolateBuffer(sender, param, time, sched);
 		});
 
 		//Force Pattern / AlgaArg / AlgaTemp dispatch
