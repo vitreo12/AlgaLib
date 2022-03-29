@@ -1,3 +1,9 @@
+# 1.2
+
+## New features
+
+- `AlgaPattern` now supports scalar parameters. This is now the preferred way of interfacing with `Buffer` parameters. Also, scalar parameters can be used for optimization reasons for parameters that need to be set only once at the trigger of the `Synth` instance, without the overhead of the interpolator.
+
 # 1.1.1
 
 ## Bug fixes
