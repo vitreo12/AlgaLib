@@ -931,9 +931,11 @@ AlgaNode {
 			var paramRate = controlName.rate;
 			var paramNumChannels = controlName.numChannels;
 
-			//This is crucial: interpBusses have 1 more channel for the interp envelope!
-			interpBusses[paramName][\default] = AlgaBus(server, paramNumChannels + 1, paramRate);
-			normBusses[paramName] = AlgaBus(server, paramNumChannels, paramRate);
+			if((paramRate == \control).or(paramRate == \audio), {
+				//This is crucial: interpBusses have 1 more channel for the interp envelope!
+				interpBusses[paramName][\default] = AlgaBus(server, paramNumChannels + 1, paramRate);
+				normBusses[paramName] = AlgaBus(server, paramNumChannels, paramRate);
+			});
 		});
 	}
 
@@ -1877,7 +1879,7 @@ AlgaNode {
 
 			normBus = normBusses[paramName];
 			if(normBus == nil, {
-				"AlgaNode: invalid normBus".error;
+				("AlgaNode: invalid normBus for param: '" ++ paramName ++ "'. Unlike AlgaPatterns, 'scalar' parameters are not supported in AlgaNodes. Use a 'control' parameter instead.").error;
 				^this
 			});
 

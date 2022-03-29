@@ -207,8 +207,8 @@ AlgaScheduler : AlgaThread {
 		currentExecAction = action;
 		currentExecActionOffset = 0; //reset it here, so that nested calls have proper index offset
 
-		//execute and remove action
-		server.bind({ func.value });
+		//Execute and remove action
+		server.makeBundle(server.latency, func);
 		this.removeAction(action);
 
 		//Reset currentExecAction (so it's reset for new stage)

@@ -1,6 +1,6 @@
 # 1.2
 
-## Features
+## New features
 
 - `AlgaPattern`: it is now possible to interpolate the `'dur'` parameter!
 
@@ -33,6 +33,8 @@
     //Other time params work too!
     a.interpStretch(0.5, time: 3, shape: Env([0, 1, 0.5, 1], [2, 3, 4]))
     ```
+
+- `AlgaPattern` now supports scalar parameters. This is now the preferred way of interfacing with `Buffer` parameters. Also, scalar parameters can be used for optimization reasons for parameters that need to be set only once at the trigger of the `Synth` instance, without the overhead of the interpolator.
 
 # 1.1.1
 

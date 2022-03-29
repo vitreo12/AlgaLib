@@ -357,6 +357,16 @@ private:: parseGenericPatternParam
 private:: recursivePatternList
 private:: resetPatternParsingVars
 
+private:: addScalarAndGenericParams
+private:: addScalarInAlgaStep
+private:: latestDur
+private:: latestDurStream
+private:: latestScalarUniqueIDs
+private:: scalarAndGenericParams
+private:: scalarAndGenericParamsStreams
+private:: isScalarParam
+private:: scalarsInAlgaStep
+
 private:: interpolateDurParamAtSched
 private:: latestDur
 private:: latestDurStream

@@ -2,7 +2,7 @@
 Alga.boot({
 	//Simple Buffer player
 	AlgaSynthDef(\playBuf, {
-		PlayBuf.ar(2, \buf.kr(0), BufRateScale.kr(\buf.kr), doneAction:2)
+		PlayBuf.ar(2, \buf.ir(0), BufRateScale.kr(\buf.ir), doneAction:2)
 	}, sampleAccurate: true).add;
 
 	//Read a kick and a snare
@@ -17,7 +17,7 @@ Alga.boot({
 		def: \playBuf,
 		dur: 0.5,
 		buf: b
-	)).play(chans: 2).stopPatternBeforeReplace_(false);
+	)).play(chans: 2).stopPatternBeforeReplace_(false).replaceDur_(true);
 });
 )
 
