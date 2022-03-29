@@ -279,6 +279,11 @@ Alga {
 				//Sync
 				server.sync;
 
+				//Turn off all error messages (like nfree) from the server.
+				//Check http://doc.sccode.org/Reference/Server-Command-Reference.html#/error
+				//for more information. 0 turns them all off
+				server.makeBundle(server.latency, nil, [[ "/error", 0 ]]);
+
 				//Execute onBoot function
 				onBoot.value;
 			});
