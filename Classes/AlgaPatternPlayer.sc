@@ -379,8 +379,8 @@ AlgaPatternPlayer {
 					if(key != \dur, {
 						value[\entries].keysValuesDo({ | uniqueID, entry |
 							//Advance patterns
-							entry = entry.next;
-							entry.algaAdvance;
+							entry = entry.next(currentEnvironment);
+							entry.algaAdvance(currentEnvironment);
 
 							//Assign results
 							results[key][uniqueID] = entry;
@@ -403,6 +403,7 @@ AlgaPatternPlayer {
 
 	init { | argDef, argServer |
 		var patternPairs = Array.newClear;
+		var patternPairsDict = IdentityDictionary();
 		var foundDurOrDelta = false;
 		var functionSynthDefDict = IdentityDictionary(); //AlgaTemp parser needs this
 		manualDur = false;
@@ -455,7 +456,7 @@ AlgaPatternPlayer {
 					entries[key][\lastID] = uniqueID;
 					entries[key][\entries] = IdentityDictionary();
 					entries[key][\entries][uniqueID] = entry.algaAsStream; //.next support
-					patternPairs = patternPairs.add(key).add(entry);
+					patternPairsDict[key] = entry;
 				});
 			});
 		}, {
@@ -463,18 +464,24 @@ AlgaPatternPlayer {
 			^nil;
 		});
 
-		//Ass reschedulable \stretch
-		patternPairs = patternPairs.add(\stretch).add(
-			Pfunc({ stretch.next })
-		);
-
 		//Add reschedulable \dur
 		if(foundDurOrDelta, {
 			if(manualDur.not, {
-				patternPairs = patternPairs.add(\dur).add(
-					Pfunc({ dur.next })
-				);
+				patternPairsDict[\dur] = Pfunc { | e | dur.next(e) }
 			});
+		});
+
+		//Add reschedulable \stretch
+		patternPairsDict[\stretch] = Pfunc { | e | stretch.next(e) };
+
+		//Order pattern pairs dict alphabetically and convert to array.
+		//This allows the user to use Pfunc { | e | } functions with any
+		//scalar OR generic parameter, as long as they're ordered alphabetically
+		if(patternPairsDict.size > 0, {
+			var order = patternPairsDict.order;
+			var entries = patternPairsDict.atAll(order);
+			var array = ([order] ++ [entries]).lace(order.size * 2);
+			patternPairs = patternPairs ++ array;
 		});
 
 		//Finally, only activate the pattern if all AlgaTemps are compiled
@@ -931,7 +938,7 @@ AlgaPatternPlayer {
 			//Should this be done without copy?
 			var lastID = entries[algaPatternPlayerParam][\lastID];
 			var tempEntryStream = entries[algaPatternPlayerParam][\entries][lastID].deepCopy;
-			results[algaPatternPlayerParam][lastID] = tempEntryStream.next;
+			results[algaPatternPlayerParam][lastID] = tempEntryStream.next(currentEnvironment);
 
 			//Re-build the AlgaReaderPfunc
 			case

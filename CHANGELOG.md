@@ -36,6 +36,40 @@
 
 - `AlgaPattern` now supports scalar parameters. This is now the preferred way of interfacing with `Buffer` parameters. Also, scalar parameters can be used for optimization reasons for parameters that need to be set only once at the trigger of the `Synth` instance, without the overhead of the interpolator.
 
+    ```SuperCollider
+    (
+    Alga.boot({
+        a = AP((
+            def: { SinOsc.ar(\f.ir) * EnvPerc.ar },
+            f: Pseq([440, 880], inf)
+        )).play(chans: 2)
+    })
+    )
+
+    //These can be changed anytime
+    a.from(Pseq([330, 660], inf), \f, sched: AlgaStep())
+    ```
+
+- `AlgaPattern` and `AlgaPatternPlayer` now support `Pfunc` and `Pkey`. All scalar and non-SynthDef parameters are now retrievable from any parameter. These are ordered alphabetically:
+
+    ```SuperCollider
+    (
+    Alga.boot({
+        a = AP((
+            def: { SinOsc.ar(\f.kr) * EnvPerc.ar },
+            _f: 440, 
+            f: Pfunc { | e | e[\_f] }
+        )).play(chans: 2)
+    })
+    )
+
+    //Interpolation still works
+    a.from(Pfunc { | e | e[\_f] * 2 }, \f, time: 3)
+
+    //These can be changed anytime
+    a.from(880, \_f, sched: AlgaStep())
+    ```
+
 # 1.1.1
 
 ## Bug fixes

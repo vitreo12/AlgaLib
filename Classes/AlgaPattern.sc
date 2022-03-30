@@ -112,7 +112,9 @@ AlgaPattern : AlgaNode {
 	var <scalarAndGenericParams;
 	var <scalarAndGenericParamsStreams;
 	var <latestScalarUniqueIDs;
-	var <scalarsInAlgaStep;
+
+	//Store the latest currentEnvironment. This is used for mid-pattern interpolation
+	var <>latestCurrentEnvironment;
 
 	//This is used for nested AlgaTemps
 	var <currentAlgaTempGroup;
@@ -269,9 +271,6 @@ AlgaPattern : AlgaNode {
 
 				//Finally, consume scheduledStepActionsPost if there are any
 				~algaPattern.advanceAndConsumeScheduledStepActions(true);
-
-				//Reset scalarsInAlgaStep
-				~algaPattern.scalarsInAlgaStep.clear;
 			});
 
 			//Send bundle to server using the same server / clock as the AlgaPattern
@@ -297,6 +296,9 @@ AlgaPattern : AlgaNode {
 
 			//Always reset isSustainTrig
 			~algaPattern.isSustainTrig = false;
+
+			//Set latestCurrentEnvironment
+			~algaPattern.latestCurrentEnvironment = currentEnvironment;
 		});
 	}
 
@@ -425,6 +427,12 @@ AlgaPattern : AlgaNode {
 			value = true;
 		});
 		sampleAccurateFuncs = value
+	}
+
+	//Used for mid-pattern interpolation
+	getCurrentEnvironment {
+		if(currentEnvironment.size > 0, { ^currentEnvironment });
+		^(latestCurrentEnvironment ? currentEnvironment) //if undefined
 	}
 
 	//Free all unused busses from interpStreams
@@ -671,13 +679,13 @@ AlgaPattern : AlgaNode {
 		//Only if not using MC (it's already been unpacked) OR
 		//is FX / AlgaTemp / Temporary (the mid-interpolation ones)
 		if((useMultiChannelExpansion.not).or(isFX).or(isAlgaTemp).or(isTemporary), {
-			if(entry.isStream, { entry = entry.next });
+			if(entry.isStream, { entry = entry.next(this.getCurrentEnvironment) });
 		});
 
 		//Unpack Pattern values for AA, AT and AO
 		//Only if not AlgaReader (coming from an AlgaPatternPlayer, which already unpacks)
 		if(entry.isAlgaReader.not, {
-			entry.algaAdvance
+			entry.algaAdvance(this.getCurrentEnvironment);
 		}, {
 			entry = entry.entry //Unpack AlgaReader
 		});
@@ -837,7 +845,7 @@ AlgaPattern : AlgaNode {
 					if(scale == nil, {
 						if(scaleArrayAndChansAtParam != nil, {
 							scale = scaleArrayAndChansAtParam[0]; //0 == scaleArray
-							scale = scale.next; //This has not been advanced yet
+							scale = scale.next(this.getCurrentEnvironment); //This has not been advanced yet
 						});
 					});
 				}, {
@@ -868,7 +876,7 @@ AlgaPattern : AlgaNode {
 					if(chansMapping == nil, {
 						if(scaleArrayAndChansAtParam != nil, {
 							chansMapping = scaleArrayAndChansAtParam[1]; //1 == chans
-							chansMapping = chansMapping.next; //This has not been advanced yet
+							chansMapping = chansMapping.next(this.getCurrentEnvironment); //This has not been advanced yet
 						});
 					});
 				});
@@ -1235,7 +1243,7 @@ AlgaPattern : AlgaNode {
 			var node, param, scale, chans;
 
 			//Advance
-			algaOut.algaAdvance;
+			algaOut.algaAdvance(this.getCurrentEnvironment);
 
 			//Unpack
 			node  = algaOut.node;
@@ -1425,23 +1433,8 @@ AlgaPattern : AlgaNode {
 					patternInterpSumBus
 				);
 			}, {
-				//Scalar values
-				var paramValue, scalarInAlgaStep = false;
-
-				//If active AlgaSched, get value DIRECTLY from scalarAndGenericParamsStreams
-				if(scalarsInAlgaStep != nil, {
-					if(scalarsInAlgaStep.includes(paramName), {
-						paramValue = scalarAndGenericParamsStreams[paramName][
-							latestScalarUniqueIDs[paramName]
-						].next; //Manual advance !
-						scalarInAlgaStep = true
-					});
-				});
-
-				//Standard case: get value from currentEnvironment (patternPairs)
-				if(scalarInAlgaStep.not, {
-					paramValue = currentEnvironment[paramName];
-				});
+				//Get value from currentEnvironment (patternPairs)
+				var paramValue = currentEnvironment[paramName];
 
 				//Add to synth's args
 				if(paramValue != nil, {
@@ -1635,7 +1628,7 @@ AlgaPattern : AlgaNode {
 				if(interpStreamsEntriesAtParam != nil, {
 					interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry |
 						//Unpack Pattern value
-						if(entry.isStream, { entry = entry.next });
+						if(entry.isStream, { entry = entry.next(this.getCurrentEnvironment) });
 
 						//Set entries at paramName
 						entries[paramName] = entries[paramName] ? IdentityDictionary();
@@ -2165,6 +2158,7 @@ AlgaPattern : AlgaNode {
 		var foundOut = false;
 		var foundGenericParams = IdentitySet();
 		var patternPairs = Array.newClear;
+		var patternPairsDict = IdentityDictionary();
 
 		//Create new interpStreams. NOTE that the Pfunc in dur uses this, as interpStreams
 		//will be overwritten when using replace. This allows to separate the "global" one
@@ -2288,11 +2282,10 @@ AlgaPattern : AlgaNode {
 			if(isAlgaParam.not, {
 				var uniqueID = UniqueID.next;
 				this.addScalarAndGenericParams(paramName, value, uniqueID);
-				patternPairs = patternPairs.add(paramName).add(
-					Pfunc {
-						scalarAndGenericParamsStreams[paramName][uniqueID].next;
-					}
-				);
+				patternPairsDict[paramName] = Pfunc { | e |
+					var val = scalarAndGenericParamsStreams[paramName][uniqueID].next(e);
+					val ? 0
+				};
 				foundGenericParams.add(paramName);
 			});
 		});
@@ -2416,24 +2409,23 @@ AlgaPattern : AlgaNode {
 			//Add old scalarAndGenericParamsStreams
 			if(scalarAndGenericParams != nil, {
 				if(scalarAndGenericParams.size > 0, {
-					scalarAndGenericParams.keysValuesDo({ | key, value |
+					scalarAndGenericParams.keysValuesDo({ | paramName, value |
 						//If that specific generic param hasn't been set from user,
 						//use the one from addScalarAndGenericParams if available
-						if(foundGenericParams.findMatch(key) == nil, {
+						if(foundGenericParams.findMatch(paramName) == nil, {
 							//Needs to be copied in order to make a "fresh" one
-							var latestValue = scalarAndGenericParams[key][
-								latestScalarUniqueIDs[key]
+							var latestValue = scalarAndGenericParams[paramName][
+								latestScalarUniqueIDs[paramName]
 							].copy;
 
 							//This code should be abstracted: it's the same behaviour
 							if(latestValue != nil, {
 								var uniqueID = UniqueID.next;
-								this.addScalarAndGenericParams(key, latestValue, uniqueID);
-								patternPairs = patternPairs.add(key).add(
-									Pfunc {
-										scalarAndGenericParamsStreams[key][uniqueID].next;
-									}
-								);
+								this.addScalarAndGenericParams(paramName, latestValue, uniqueID);
+								patternPairsDict[paramName] = Pfunc { | e |
+									var val = scalarAndGenericParamsStreams[paramName][uniqueID].next(e);
+									val ? 0
+								}
 							});
 						})
 					})
@@ -2452,6 +2444,54 @@ AlgaPattern : AlgaNode {
 		//with the freeAllSynthsAndBussesOnReplace function call
 		newInterpStreams.algaSynthBus = this.synthBus;
 
+		//If player is AlgaPatternPlayer, dur is ALWAYS manual
+		if(player.isAlgaPatternPlayer, { manualDur = true });
+
+		//Manual or automatic dur management
+		if(manualDur.not, {
+			//Pfunc allows to modify the value
+			patternPairsDict[\dur] = Pfunc { | e |
+				//Only advance when there are no concurrent executions.
+				//This allows for .replace to work correctly and not advance twice!
+				var currentTime = this.clock.seconds;
+				var dur = if(currentTime != latestPatternTime, {
+					newInterpStreams.dur.next(e)
+				}, {
+					//If stream changed, run .next anyway
+					if(newInterpStreams.dur != latestDurStream, {
+						newInterpStreams.dur.next(e)
+					}, {
+						//Same time and no stream change: return the
+						//dur that was just triggered at this very time
+						latestDur
+					})
+				});
+
+				//Store values
+				latestDur = dur;
+				latestDurStream = newInterpStreams.dur;
+				latestPatternTime = currentTime;
+
+				//Return correct dur
+				dur;
+			}
+		});
+
+		//Add time parameters
+		patternPairsDict[\legato]  = Pfunc { | e | newInterpStreams.legato.next(e) };
+		patternPairsDict[\stretch] = Pfunc { | e | newInterpStreams.stretch.next(e) };
+		patternPairsDict[\sustain] = Pfunc { | e | newInterpStreams.sustain.next(e) };
+
+		//Order pattern pairs dict alphabetically and convert to array.
+		//This allows the user to use Pfunc { | e | } functions with any
+		//scalar OR generic parameter, as long as they're ordered alphabetically
+		if(patternPairsDict.size > 0, {
+			var order = patternPairsDict.order;
+			var entries = patternPairsDict.atAll(order);
+			var array = ([order] ++ [entries]).lace(order.size * 2);
+			patternPairs = patternPairs ++ array;
+		});
+
 		//Add \type, \algaNode, and all things related to
 		//the context of this AlgaPattern
 		patternPairs = patternPairs.addAll([
@@ -2462,48 +2502,6 @@ AlgaPattern : AlgaNode {
 			\algaPatternClock, this.clock,
 			\algaPatternInterpStreams, newInterpStreams //Lock current one: will work on .replace
 		]);
-
-		//Add \sustain
-		patternPairs = patternPairs.addAll([
-			\sustain, Pfunc({ newInterpStreams.sustain.next }),
-			\stretch, Pfunc({ newInterpStreams.stretch.next }),
-			\legato,  Pfunc({ newInterpStreams.legato.next })
-		]);
-
-		//If player is AlgaPatternPlayer, dur is ALWAYS manual
-		if(player.isAlgaPatternPlayer, { manualDur = true });
-
-		//Manual or automatic dur management
-		if(manualDur.not, {
-			//Pfunc allows to modify the value
-			patternPairs = patternPairs.add(\dur).add(
-				Pfunc({
-					//Only advance when there are no concurrent executions.
-					//This allows for .replace to work correctly and not advance twice!
-					var currentTime = this.clock.seconds;
-					var dur = if(currentTime != latestPatternTime, {
-						newInterpStreams.dur.next
-					}, {
-						//If stream changed, run .next anyway
-						if(newInterpStreams.dur != latestDurStream, {
-							newInterpStreams.dur.next
-						}, {
-							//Same time and no stream change: return the
-							//dur that was just triggered at this very time
-							latestDur
-						})
-					});
-
-					//Store values
-					latestDur = dur;
-					latestDurStream = newInterpStreams.dur;
-					latestPatternTime = currentTime;
-
-					//Return correct dur
-					dur;
-				})
-			);
-		});
 
 		//Create the Pattern
 		pattern = Pbind(*patternPairs);
@@ -3197,12 +3195,6 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Used for AlgaStep + modifying a scalar value with no replace
-	addScalarInAlgaStep { | param |
-		scalarsInAlgaStep = scalarsInAlgaStep ? IdentitySet();
-		scalarsInAlgaStep.add(param);
-	}
-
 	//Interpolate a parameter that is not in controlNames (like \lag)
 	interpolateGenericParam { | sender, param, time, sched |
 		var paramConnectionTime = paramsConnectionTime[param];
@@ -3210,11 +3202,22 @@ AlgaPattern : AlgaNode {
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
+
 		if((time == 0).and(latestScalarUniqueID != nil), {
 			this.addAction(
 				func: {
+					//Add the new stream
 					this.addScalarAndGenericParams(param, sender);
-					if(sched.isAlgaStep, { this.addScalarInAlgaStep(param) });
+
+					//If AlgaStep, ALSO advance the value manually
+					if(sched.isAlgaStep, {
+						var value = scalarAndGenericParamsStreams[param][
+							latestScalarUniqueIDs[param]
+						].next(this.getCurrentEnvironment);
+
+						//Substitute in currentEnvironment so it's picked up
+						if(value != nil, { currentEnvironment[param] = value });
+					});
 				},
 				sched: sched,
 				topPriority: true

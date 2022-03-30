@@ -370,3 +370,5 @@ private:: scalarsInAlgaStep
 private:: interpolateDurParamAtSched
 private:: latestDur
 private:: latestDurStream
+private:: getCurrentEnvironment
+private:: latestCurrentEnvironment
