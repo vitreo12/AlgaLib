@@ -14,29 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//All parsing functions in one place. These are used in AlgaNode, AlgaPattern and AlgaPatternPlayer
+//All parsing functions in one place. These are used in AlgaNode, AlgaPattern and AlgaPatternPlayer.
+//The idea is that Classes that want to use this parser must have it as a member variable.
+//The instance of the Class is passed as 'obj' and accessed / manipulated in the parsing functions here
 AlgaParser {
 	var obj;
-	var paramContainsAlgaReaderPfunc = false;
 	var recursiveObjectList;
-	var latestPlayersAtParam;
-
 
 	/*
 	Required vars:
 
 	outsMapping, sampleAccurateFuncs, defPreParsing,
 	currentPatternOutNodes, prevPatternOutNodes,
-
+	latestPlayersAtParam, paramContainsAlgaReaderPfunc, players
 	*/
 
 	*new { | obj |
-		^super.new.init(obj)
-	}
-
-	init { | argObj |
-		obj = argObj;
-		recursiveObjectList = IdentitySet();
+		^super.newCopyArgs(obj)
 	}
 
 	//Parse an AlgaTemp
@@ -214,9 +208,9 @@ AlgaParser {
 
 	//Reset vars used in parsing
 	resetPatternParsingVars {
-		paramContainsAlgaReaderPfunc = false;
-		latestPlayersAtParam = IdentityDictionary();
-		recursiveObjectList = IdentitySet(10);
+		obj.paramContainsAlgaReaderPfunc = false;
+		obj.latestPlayersAtParam         = IdentityDictionary();
+		recursiveObjectList              = IdentitySet(10);
 	}
 
 	//Parse a Function \def entry
@@ -542,10 +536,45 @@ AlgaParser {
 		var latestPlayer = algaReaderPfunc.patternPlayer;
 		var params = algaReaderPfunc.params;
 		if(latestPlayer != nil, {
-			paramContainsAlgaReaderPfunc = true;
-			latestPlayersAtParam[latestPlayer] = latestPlayersAtParam[latestPlayer] ? Array.newClear;
-			latestPlayersAtParam[latestPlayer] = latestPlayersAtParam[latestPlayer].add(params).flatten;
+			obj.paramContainsAlgaReaderPfunc = true;
+			obj.latestPlayersAtParam[latestPlayer] = obj.latestPlayersAtParam[latestPlayer] ? Array.newClear;
+			obj.latestPlayersAtParam[latestPlayer] = obj.latestPlayersAtParam[latestPlayer].add(params).flatten;
 		});
 		^algaReaderPfunc;
+	}
+
+	//Remove an AlgaPatternPlayer connection
+	removeAlgaPatternPlayerConnectionIfNeeded { | param |
+		if(obj.players != nil, {
+			var playersAtParam = obj.players[param];
+			if(playersAtParam != nil, {
+				playersAtParam.keysValuesDo({ | latestPlayer, latestPlayerParams |
+					latestPlayer.removeAlgaPatternEntry(this, param)
+				});
+				obj.players.removeAt(param);
+			});
+		});
+	}
+
+	//Add an AlgaPatternPlayer connection
+	addAlgaPatternPlayerConnectionIfNeeded { | param |
+		//Add an AlgaPatternPlayer connection
+		if((obj.paramContainsAlgaReaderPfunc).and(obj.latestPlayersAtParam.size > 0), {
+			obj.latestPlayersAtParam.keysValuesDo({ | latestPlayer, params |
+				latestPlayer.addAlgaPatternEntry(this, param);
+			});
+			obj.players = obj.players ? IdentityDictionary();
+			obj.players[param] = obj.latestPlayersAtParam.copy;
+		});
+	}
+
+	//Remove AlgaPatternPlayers' connections if there were any.
+	//They will be re-assigned if parsing allows it.
+	calculatePlayersConnections { | param |
+		//Remove old connections at param if needed
+		this.removeAlgaPatternPlayerConnectionIfNeeded(param);
+
+		//Enstablish new ones if needed
+		this.addAlgaPatternPlayerConnectionIfNeeded(param);
 	}
 }
