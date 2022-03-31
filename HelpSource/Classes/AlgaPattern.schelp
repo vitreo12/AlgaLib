@@ -267,7 +267,7 @@ private:: removePlayer
 private:: addInNodeGenericPatternParam
 private:: parseGenericPatternDefEntry
 private:: parseGenericPatternParam
-private:: recursivePatternList
+private:: recursiveObjectList
 private:: resetPatternParsingVars
 
 private:: addScalarAndGenericParams

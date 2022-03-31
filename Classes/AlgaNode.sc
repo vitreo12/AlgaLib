@@ -1833,32 +1833,17 @@ AlgaNode {
 
 	//Remove activeInNodes / outNodes and reorder block
 	removeActiveNodesAndRearrangeBlocks { | param, sender |
-		var wasPattern = false;
-
-		case
-		{ sender.isListPattern } {
-			sender.list.do({ | entry |
-				this.removeActiveNodesAndRearrangeBlocks(param, entry)
-			});
-			wasPattern = true;
-		}
-		{ sender.isFilterPattern } {
-			this.removeActiveNodesAndRearrangeBlocks(param, sender.pattern);
-			wasPattern = true;
-		}
-		{ sender.isPattern } {
-			sender.class.instVarNames.do({ | instVarName |
-				try {
-					var instVar = sender.perform(instVarName);
-					this.removeActiveNodesAndRearrangeBlocks(param, instVar);
-				} { | error | } //Don't catch errors
-			});
-			wasPattern = true;
-		};
-
-		//Bottom search: AlgaNode
-		if(wasPattern.not, {
+		//AlgaNode or AlgaArg
+		if(param.isAlgaNodeOrAlgaArg, {
 			this.removeActiveNodeAndRearrangeBlock(param, sender);
+		}, {
+			//Generic object
+			sender.algaParseObject(
+				func: { | val |
+					this.removeActiveNodesAndRearrangeBlocks(param, val);
+				},
+				replace: false
+			)
 		});
 	}
 
@@ -3887,48 +3872,25 @@ AlgaNode {
 		^algaTemp;
 	}
 
-	//Overload so that it errors out
-	parseListPatternParam { | listPattern, functionSynthDefDict |
-		"AlgaNode: no support for ListPatterns".error;
-		^nil
-	}
-
-	//Overload so that it errors out
-	parseFilterPatternParam { | value, functionSynthDefDict |
-		"AlgaNode: no support for FilterPatterns".error;
-		^nil
-	}
-
-	//Overload so that it errors out
-	parseGenericPatternParam { | value, functionSynthDefDict |
-		"AlgaNode: no support for Patterns".error;
-		^nil
-	}
-
 	//Parse a param looking for AlgaTemps and ListPatterns
 	parseParam_inner { | value, functionSynthDefDict |
-		//Dispatch
+		var genericObject = true;
+
+		//Look for AlgaTemp / AlgaReaderPfunc
 		case
 		{ value.isAlgaTemp } {
 			value = this.parseAlgaTempParam(value, functionSynthDefDict);
-			if(value == nil, { ^nil });
-		}
-		{ value.isListPattern } {
-			value = this.parseListPatternParam(value, functionSynthDefDict);
-			if(value == nil, { ^nil });
-		}
-		{ value.isFilterPattern } {
-			value = this.parseFilterPatternParam(value, functionSynthDefDict);
-			if(value == nil, { ^nil });
+			genericObject = false;
 		}
 		{ value.isAlgaReaderPfunc } {
 			if(this.isAlgaPattern, { this.assignAlgaReaderPfunc(value) });
-		}
-		{ value.isPattern } {
-			//Fallback: generic Pattern
-			value = this.parseGenericPatternParam(value, functionSynthDefDict);
-			if(value == nil, { ^nil });
+			genericObject = false;
 		};
+
+		//Any other object: run parsing
+		if(genericObject, {
+			value = this.parseGenericObjectParam(value, functionSynthDefDict);
+		});
 
 		//Returned parsed element
 		^value;
@@ -3943,7 +3905,7 @@ AlgaNode {
 			functionSynthDefDict = IdentityDictionary();
 		});
 
-		//Reset paramContainsAlgaReaderPfunc, and latestPlayers recursivePatternList
+		//Reset paramContainsAlgaReaderPfunc, and latestPlayers recursiveObjectList
 		if(this.isAlgaPattern, { this.resetPatternParsingVars });
 
 		//Actual parsing

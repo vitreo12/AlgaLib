@@ -147,7 +147,7 @@ AlgaPattern : AlgaNode {
 	var <>paramContainsAlgaReaderPfunc = false;
 
 	//Used for parsing Patterns
-	var <recursivePatternList;
+	var <recursiveObjectList;
 
 	//Add the \algaNote event to Event
 	*initClass {
@@ -2493,7 +2493,7 @@ AlgaPattern : AlgaNode {
 		patternsAsStreams[interpStreams] = pattern.algaAsStream;
 	}
 
-	//Parse a single \fx event
+	//Parse a single Event
 	parseFXEvent { | value, functionSynthDefDict |
 		var foundInParam = false;
 		var synthDescFx, synthDefFx, controlNamesFx;
@@ -2586,7 +2586,7 @@ AlgaPattern : AlgaNode {
 		//Pass explicitFree to Event
 		value[\explicitFree] = synthDefFx.explicitFree;
 
-		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursivePatternList
+		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursiveObjectList
 		this.resetPatternParsingVars;
 
 		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
@@ -2598,7 +2598,7 @@ AlgaPattern : AlgaNode {
 		//Check support for AlgaPatternPlayers on \fx
 		this.calculatePlayersConnections(\fx);
 
-		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursivePatternList again
+		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursiveObjectList again
 		this.resetPatternParsingVars;
 
 		^value
@@ -2613,7 +2613,8 @@ AlgaPattern : AlgaNode {
 			^this.parseFXEvent(value, functionSynthDefDict);
 		}
 
-		//If individual Symbol, if it's in DescLib, use it as Event. Otherwise, passthrough (like, \none, \dry)
+		//If individual Symbol, if it's in SynthDescLib, use it as Event.
+		//Otherwise, passthrough (like, \none, \dry)
 		{ value.isSymbol } {
 			if(SynthDescLib.global.at(value) != nil, {
 				^this.parseFXEvent((def: value), functionSynthDefDict)
@@ -2624,72 +2625,25 @@ AlgaPattern : AlgaNode {
 		//If individual Function, wrap in Event
 		{ value.isFunction } {
 			^this.parseFXEvent((def: value), functionSynthDefDict)
-		}
-
-		//ListPattern of any of the above
-		{ value.isListPattern } {
-			value.list.do({ | listEntry, i |
-				var result = this.parseFX(listEntry, functionSynthDefDict); //recursive
-				if(result == nil, { ^nil });
-				value.list[i] = result;
-			});
-			^value;
-		}
-
-		//FilterPattern
-		{ value.isFilterPattern } {
-			var result = this.parseFX(value.pattern, functionSynthDefDict);
-			if(result == nil, { ^nil });
-			value.pattern = result;
-			^value
-		}
-
-		//Generic Pattern
-		{ value.isPattern } {
-			//Protect from recursiveness
-			recursivePatternList.add(value);
-			value.class.instVarNames.do({ | instVarName |
-				try {
-					var instVar = value.perform(instVarName);
-					if(recursivePatternList.includes(instVar).not, {
-						var result = this.parseFX(instVar, functionSynthDefDict);
-						if(result == nil, { ^nil });
-						//ListPatterns and FilterPatterns are already handled
-						if((result.isListPattern.not).and(result.isFilterPattern.not), {
-							value.perform((instVarName ++ "_").asSymbol, result);
-						});
-					});
-				} { | error |
-					//Catch setter errors
-					if(error.isKindOf(DoesNotUnderstandError), {
-						if(error.selector.asString.endsWith("_"), {
-							("AlgaPattern: could not reassign '" ++
-								value.class ++ "." ++ error.selector ++
-								"' for the \fx key. The Class does implement its setter method."
-							).error
-						});
-					})
-				}
-			});
-			^value;
-		}
-
-		//Array
-		{ value.isArray } {
-			value.do({ | entry, i |
-				var result = this.parseFX(entry, functionSynthDefDict);
-				if(result == nil, { ^nil });
-				value[i] = result;
-			});
-			^value;
 		};
 
-		//Fallback
-		("AlgaPattern: invalid Class for the 'fx' entry: '" ++ value.class.asString ++ "'").error;
-		^nil;
+		//Patterns
+		if(value != nil, {
+			recursiveObjectList.add(value);
+			value.algaParseObject(
+				func: { | val |
+					if((val != nil).and(recursiveObjectList.includes(val).not), {
+						this.parseFX(val, functionSynthDefDict)
+					});
+				},
+				replace: false
+			)
+		});
+
+		^value
 	}
 
-	//Parse a single \out event
+	//Parse a single AlgaOut
 	parseOutAlgaOut { | value, alreadyParsed |
 		var node = value.nodeOrig;
 		var param = value.paramOrig;
@@ -2700,8 +2654,8 @@ AlgaPattern : AlgaNode {
 			param = \in
 		});
 
-		case
-		{ node.isAlgaNode } {
+		//AlgaNode
+		if(node.isAlgaNode, {
 			if(alreadyParsed[node] == nil, {
 				if(node.isAlgaPattern, {
 					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
@@ -2710,42 +2664,20 @@ AlgaPattern : AlgaNode {
 				alreadyParsed[node] = true;
 				currentPatternOutNodes.add([node, param]);
 			});
-		}
-		{ node.isListPattern } {
-			node.list.do({ | listEntry, i |
-				node.list[i] = this.parseOut(listEntry, alreadyParsed)
-			});
-		}
-		{ node.isFilterPattern } {
-			node.pattern = this.parseOut(node.pattern, alreadyParsed)
-		}
-		{ node.isPattern } {
-			//Protect from recursiveness
-			recursivePatternList.add(value);
-			node.class.instVarNames.do({ | instVarName |
-				try {
-					var instVar = node.perform(instVarName);
-					if(recursivePatternList.includes(instVar).not, {
-						var result = this.parseOut(instVar, alreadyParsed);
-						if(result == nil, { ^nil });
-						//ListPatterns and FilterPatterns are already handled
-						if((result.isListPattern.not).and(result.isFilterPattern.not), {
-							node.perform((instVarName ++ "_").asSymbol, result);
+		}, {
+			//Patterns
+			if(value != nil, {
+				recursiveObjectList.add(value);
+				value.algaParseObject(
+					func: { | val |
+						if((val != nil).and(recursiveObjectList.includes(val).not), {
+							this.parseOut(val, alreadyParsed)
 						});
-					});
-				} { | error |
-					//Catch setter errors
-					if(error.isKindOf(DoesNotUnderstandError), {
-						if(error.selector.asString.endsWith("_"), {
-							("AlgaPattern: could not reassign '" ++
-								node.class ++ "." ++ error.selector ++
-								"' for the \out key. The Class does implement its setter method."
-							).error
-						});
-					})
-				}
+					},
+					replace: false
+				)
 			});
-		};
+		});
 
 		^value.algaAsStream;
 	}
@@ -2768,65 +2700,22 @@ AlgaPattern : AlgaNode {
 		}
 		{ value.isAlgaOut } {
 			^this.parseOutAlgaOut(value, alreadyParsed);
-		}
-		{ value.isListPattern } {
-			value.list.do({ | listEntry, i |
-				var result = this.parseOut(listEntry, alreadyParsed); //recursive, so it picks up other ListPatterns if needed
-				if(result == nil, { ^nil });
-				value.list[i] = result;
-			});
-			^value.algaAsStream; //return the Stream
-		}
-		{ value.isFilterPattern } {
-			var result = this.parseOut(value.pattern, alreadyParsed);
-			if(result == nil, { ^nil });
-			value.pattern = result;
-			^value.algaAsStream; //return the Stream
-		}
-		{ value.isPattern } {
-			//Protect from recursiveness
-			recursivePatternList.add(value);
-			value.class.instVarNames.do({ | instVarName |
-				try {
-					var instVar = value.perform(instVarName);
-					if(recursivePatternList.includes(instVar).not, {
-						var result = this.parseOut(instVar, alreadyParsed);
-						if(result == nil, { ^nil });
-						//ListPatterns and FilterPatterns are already handled
-						if((result.isListPattern.not).and(result.isFilterPattern.not), {
-							value.perform((instVarName ++ "_").asSymbol, result);
-						});
-					});
-				} { | error |
-					//Catch setter errors
-					if(error.isKindOf(DoesNotUnderstandError), {
-						if(error.selector.asString.endsWith("_"), {
-							("AlgaPattern: could not reassign '" ++
-								value.class ++ "." ++ error.selector ++
-								"' for the \out key. The Class does implement its setter method."
-							).error
-						});
-					})
-				}
-			});
-			^value.algaAsStream; //return the Stream
-		}
-		{ value.isArray } {
-			value.do({ | entry, i |
-				var result = this.parseOut(entry, alreadyParsed);
-				if(result == nil, { ^nil });
-				value[i] = result;
-			});
-			^value;
-		}
-		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
-		{ value.isSymbol } {
-			^value
 		};
 
-		//Fallback
-		("AlgaPattern: invalid Class for the 'out' entry: '" ++ value.class.asString ++ "'").error;
-		^nil;
+		//Patterns
+		if(value != nil, {
+			recursiveObjectList.add(value);
+			value.algaParseObject(
+				func: { | val |
+					if((val != nil).and(recursiveObjectList.includes(val).not), {
+						this.parseOut(val, alreadyParsed);
+					});
+				},
+				replace: false
+			);
+		});
+
+		^value.algaAsStream;
 	}
 
 	//Found an AlgaReaderPfunc
@@ -2841,41 +2730,28 @@ AlgaPattern : AlgaNode {
 		^algaReaderPfunc;
 	}
 
-	//Parse a ListPattern
-	parseListPatternParam { | listPattern, functionSynthDefDict |
-		listPattern.list.do({ | listEntry, i |
-			listPattern.list[i] = this.parseParam_inner(listEntry, functionSynthDefDict);
+	//Parse an object
+	parseGenericObjectParam { | object, functionSynthDefDict, validClasses |
+		if(object != nil, {
+			recursiveObjectList.add(object);
+			object.algaParseObject(
+				func: { | val |
+					if((val != nil).and(recursiveObjectList.includes(val).not), {
+						this.parseParam_inner(val, functionSynthDefDict);
+					});
+				},
+				replace: true,
+				validClasses: validClasses
+			);
 		});
-		^listPattern;
-	}
-
-	//Parse a FilterPattern
-	parseFilterPatternParam { | filterPattern, functionSynthDefDict |
-		var pattern = filterPattern.pattern;
-		filterPattern.pattern = this.parseParam_inner(pattern, functionSynthDefDict);
-		^filterPattern;
-	}
-
-	//Parse a Pattern looking for AlgaTemp / ListPattern / FilterPattern
-	parseGenericPatternParam { | value, functionSynthDefDict |
-		//Protect from recursiveness
-		recursivePatternList.add(value);
-		value.class.instVarNames.do({ | instVarName |
-			try {
-				var instVar = value.perform(instVarName);
-				if(recursivePatternList.includes(instVar).not, {
-					this.parseParam_inner(instVar, functionSynthDefDict);
-				});
-			} { | error | } //Don't catch errors
-		});
-		^value;
+		^object;
 	}
 
 	//Reset vars used in parsing
 	resetPatternParsingVars {
 		paramContainsAlgaReaderPfunc = false;
 		latestPlayersAtParam = IdentityDictionary();
-		recursivePatternList = IdentitySet(10);
+		recursiveObjectList = IdentitySet(10);
 	}
 
 	//Parse a Function \def entry
@@ -2913,11 +2789,11 @@ AlgaPattern : AlgaNode {
 	//Parse a generic Pattern \def entry
 	parseGenericPatternDefEntry { | def, functionSynthDefDict |
 		//Protect from recursiveness
-		recursivePatternList.add(def);
+		recursiveObjectList.add(def);
 		def.class.instVarNames.do({ | instVarName |
 			try {
 				var instVar = def.perform(instVarName);
-				if(recursivePatternList.includes(instVar).not, {
+				if(recursiveObjectList.includes(instVar).not, {
 					var result = this.parseDefEntry(instVar, functionSynthDefDict);
 					//ListPatterns / FilterPatterns are already handled
 					if(result.isSymbol, {
@@ -2984,18 +2860,18 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Parse and replace \def
-		recursivePatternList = IdentitySet(10); //reset for parseDefEntry
+		recursiveObjectList = IdentitySet(10); //reset for parseDefEntry
 		def[\def] = this.parseDefEntry(defDef, functionSynthDefDict);
 
 		//Parse \fx
-		recursivePatternList.clear; //reset for parseFX
+		recursiveObjectList.clear; //reset for parseFX
 		if(defFX != nil, { def[\fx] = this.parseFX(defFX, functionSynthDefDict) });
 
 		//Parse \out (reset currentPatternOutNodes too)
 		if(defOut != nil, {
 			prevPatternOutNodes = currentPatternOutNodes.copy;
 			currentPatternOutNodes = IdentitySet();
-			recursivePatternList.clear; //reset for parseOut
+			recursiveObjectList.clear; //reset for parseOut
 			def[\out] = this.parseOut(defOut)
 		});
 
@@ -3809,11 +3685,11 @@ AlgaPattern : AlgaNode {
 	//Add entries to inNodes
 	addInNodeGenericPatternParam { | sender, param = \in |
 		//Protect from recursiveness
-		recursivePatternList.add(sender);
+		recursiveObjectList.add(sender);
 		sender.class.instVarNames.do({ | instVarName |
 			try {
 				var entry = sender.perform(instVarName);
-				if(recursivePatternList.includes(entry).not, {
+				if(recursiveObjectList.includes(entry).not, {
 					if(entry.isAlgaArg, { entry = entry.sender });
 					case
 					{ entry.isAlgaNode } {
@@ -3854,8 +3730,8 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
-		//Reset recursivePatternList
-		recursivePatternList = IdentitySet(10);
+		//Reset recursiveObjectList
+		recursiveObjectList = IdentitySet(10);
 
 		//If AlgaArg or ListPattern, loop around entries and add each of them
 		case

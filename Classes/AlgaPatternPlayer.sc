@@ -293,7 +293,7 @@ AlgaPatternPlayer {
 			functionSynthDefDict = IdentityDictionary();
 		});
 
-		//Reset paramContainsAlgaReaderPfunc, and latestPlayers recursivePatternList
+		//Reset paramContainsAlgaReaderPfunc, and latestPlayers recursiveObjectList
 		//if(this.isAlgaPattern, { this.resetPatternParsingVars });
 
 		//Actual parsing

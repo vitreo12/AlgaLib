@@ -20,6 +20,7 @@
 	isAlgaEffect { ^false }
 	isAlgaMod { ^false }
 	isAlgaArg { ^false }
+	isAlgaNodeOrAlgaArg { ^((this.isAlgaNode).or(this.isAlgaArg)) }
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
 	isAlgaStep { ^false }
@@ -71,6 +72,39 @@
 			^this
 		};
 		thisThread.algaHandleError(this);
+	}
+
+	//Parser valid classes to inspect.
+	//These can be passed as an Array of Classes.
+	algaValidParserClass { | validClasses |
+		validClasses = validClasses ? [
+			Array,
+			Pattern
+		];
+
+		^(
+			validClasses.collect({ | class |
+				this.isKindOf(class)
+			}).includes(true)
+		);
+	}
+
+	//Loop through every instance variable of an Object and execute func, reassigning the entry
+	algaParseObject { | func, validClasses, replace = true |
+		if(this.isKindOf(Nil).not, {
+			if(this.algaValidParserClass(validClasses), {
+				this.slotsDo { | slot |
+					var val = this.slotAt(slot);
+					var return = if(func.isFunction, { func.(val) }) ? nil;
+					if((replace).and(return != nil), {
+						try {
+							this.slotPut(slot, return)
+						}
+						{ | error | } //Might return error: ignore such cases
+					});
+				}
+			});
+		});
 	}
 }
 
