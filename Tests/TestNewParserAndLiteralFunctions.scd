@@ -48,7 +48,8 @@ Alga.boot({
 	AlgaSynthDef(\test2, { Saw.ar(\freq.kr(440).poll(1)) * EnvPerc.ar * 0.5 }).add;
 	s.sync;
 	a = AP((
-		//Trick to force the parameters of another function (\test in this case)!
+		//Trick to force the parameters / rate / num channels of another function (\test in this case),
+		//even if it's not going to actually be used. This is quite an ugly workaround, but effective!
 		def: Pfunc( { \test2 }.lf ) <> \test,
 		freq: Pif( Pfunc { 0.5.coin },
 			AT({ LFNoise0.kr(10) }, scale: [440, 880]),
