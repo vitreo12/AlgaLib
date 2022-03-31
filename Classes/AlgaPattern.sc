@@ -37,7 +37,7 @@ AlgaPattern : AlgaNode {
 	var <eventPairs;
 
 	//The Event input not manipulated
-	var <defPreParsing;
+	var <>defPreParsing;
 
 	//Use MC expansion or not
 	var <useMultiChannelExpansion = true;
@@ -88,8 +88,8 @@ AlgaPattern : AlgaNode {
 	var <currentOut;
 
 	//Current nodes of used in currentOut
-	var <currentPatternOutNodes;
-	var <prevPatternOutNodes;
+	var <>currentPatternOutNodes;
+	var <>prevPatternOutNodes;
 
 	//Current time used for \out replacement
 	var <currentPatternOutTime;
