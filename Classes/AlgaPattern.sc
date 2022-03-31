@@ -1813,6 +1813,7 @@ AlgaPattern : AlgaNode {
 		rateList = nil;
 		controlNamesList = nil;
 
+		//Symbol / Function (already parsed)
 		case
 		{ defEntry.isSymbol } {
 			^this.dispatchSynthDef(
@@ -1824,8 +1825,10 @@ AlgaPattern : AlgaNode {
 				sched:sched
 			)
 		}
-		{ (defEntry.isListPattern).or(defEntry.isFilterPattern) } {
-			^this.dispatchListPatternOrFilterPattern(
+
+		//Patterns
+		{ defEntry.isPattern } {
+			^this.dispatchPattern(
 				def: defEntry,
 				initGroups: initGroups,
 				replace: replace,
@@ -1874,8 +1877,8 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Build spec from ListPattern
-	buildFromListPattern { | initGroups = false, replace = false,
+	//Build spec Pattern
+	buildFromPattern { | initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
 		//Generate outsMapping (for outsMapping connectinons)
@@ -1898,98 +1901,92 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Check rates, numChannels, Symbols and controlNames
-	checkListPatternOrFilterPatternValidityAndReturnControlNames { | pattern |
+	checkPatternValidityAndReturnControlNames { | object, controlNamesDict |
 		var numChannelsCount, rateCount;
-		var controlNamesDict = IdentityDictionary();
 		var controlNamesSum = Array.newClear;
+		controlNamesDict = controlNamesDict ? IdentityDictionary();
 
-		//Unpack FilterPattern
-		case
-		{ pattern.isFilterPattern } {
-			controlNamesSum = controlNamesSum.addAll(
-				this.checkListPatternOrFilterPatternValidityAndReturnControlNames(pattern.pattern)
-			);
-		}
-		//Process ListPattern
-		{ pattern.isListPattern } {
-			pattern.list.do({ | entry, i |
-				var synthDescEntry, synthDefEntry;
-				var controlNamesEntry;
-				var controlNamesListPatternDefaultsEntry;
+		//Found a Symbol
+		if(object.isSymbol, {
+			var synthDescEntry, synthDefEntry;
+			var controlNamesEntry;
+			var controlNamesListPatternDefaultsEntry;
 
-				//If another ListPattern / FilterPattern, recursively add stuff
-				if((entry.isListPattern).or(entry.isFilterPattern), {
-					controlNamesSum = controlNamesSum.addAll(
-						this.checkListPatternOrFilterPatternValidityAndReturnControlNames(entry)
-					);
-				}, {
-					if(entry.isSymbol.not, {
-						"AlgaPattern: the ListPattern defining 'def' can only contain Symbols pointing to valid AlgaSynthDefs".error;
-						^nil;
+			synthDescEntry = SynthDescLib.global.at(object);
+
+			if(synthDescEntry == nil, {
+				("AlgaPattern: Invalid AlgaSynthDef: '" ++ object.asString ++ "'").error;
+				^nil;
+			});
+
+			synthDefEntry = synthDescEntry.def;
+
+			if(synthDefEntry.class != AlgaSynthDef, {
+				("AlgaPattern: Invalid AlgaSynthDef: '" ++ object.asString ++"'").error;
+				^nil;
+			});
+
+			if(numChannelsCount == nil, {
+				numChannelsCount = synthDefEntry.numChannels;
+				numChannels = numChannelsCount
+			});
+
+			if(rateCount == nil, {
+				rateCount = synthDefEntry.rate;
+				rate = rateCount
+			});
+
+			//Use the highest count of numChannels as "main" one, using that one entry's rate
+			if(synthDefEntry.numChannels > numChannelsCount, {
+				numChannels = synthDefEntry.numChannels;
+				rate = synthDefEntry.rate
+			});
+
+			//Store for next iteration
+			numChannelsCount = synthDefEntry.numChannels;
+			rateCount = synthDefEntry.rate;
+
+			//Add numChannels and rate to numChannelsList and rateList
+			numChannelsList[object] = numChannelsCount;
+			rateList[object] = rateCount;
+
+			//Retrieve controlNames
+			controlNamesEntry = synthDescEntry.controls;
+
+			//Create entry for controlNamesList
+			controlNamesList[object] = IdentityDictionary();
+
+			//Check for duplicates and add correct controlName to controlNamesList[entry.asSymbol]
+			controlNamesEntry.do({ | controlName |
+				var name = controlName.name;
+				if(this.checkValidControlName(name), {
+					//Just check for duplicate names: we only need one entry per param name
+					//for controlNamesSum.
+					if(controlNamesDict[name] == nil, {
+						controlNamesDict[name] = controlName;
+						controlNamesSum = controlNamesSum.add(controlName);
 					});
 
-					synthDescEntry = SynthDescLib.global.at(entry);
-
-					if(synthDescEntry == nil, {
-						("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++ "'").error;
-						^nil;
-					});
-
-					synthDefEntry = synthDescEntry.def;
-
-					if(synthDefEntry.class != AlgaSynthDef, {
-						("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++"'").error;
-						^nil;
-					});
-
-					if(numChannelsCount == nil, {
-						numChannelsCount = synthDefEntry.numChannels;
-						numChannels = numChannelsCount
-					});
-
-					if(rateCount == nil, {
-						rateCount = synthDefEntry.rate;
-						rate = rateCount
-					});
-
-					//Use the highest count of numChannels as "main" one, using that one entry's rate
-					if(synthDefEntry.numChannels > numChannelsCount, {
-						numChannels = synthDefEntry.numChannels;
-						rate = synthDefEntry.rate
-					});
-
-					//Store for next iteration
-					numChannelsCount = synthDefEntry.numChannels;
-					rateCount = synthDefEntry.rate;
-
-					//Add numChannels and rate to numChannelsList and rateList
-					numChannelsList[entry.asSymbol] = numChannelsCount;
-					rateList[entry.asSymbol] = rateCount;
-
-					//Retrieve controlNames
-					controlNamesEntry = synthDescEntry.controls;
-
-					//Create entry for controlNamesList
-					controlNamesList[entry.asSymbol] = IdentityDictionary();
-
-					//Check for duplicates and add correct controlName to controlNamesList[entry.asSymbol]
-					controlNamesEntry.do({ | controlName |
-						var name = controlName.name;
-						if(this.checkValidControlName(name), {
-							//Just check for duplicate names: we only need one entry per param name
-							//for controlNamesSum.
-							if(controlNamesDict[name] == nil, {
-								controlNamesDict[name] = controlName;
-								controlNamesSum = controlNamesSum.add(controlName);
-							});
-
-							//Add to IdentityDict for specific def / name combination
-							controlNamesList[entry.asSymbol][name] = controlName;
-						});
-					});
+					//Add to IdentityDict for specific def / name combination
+					controlNamesList[object][name] = controlName;
 				});
 			});
-		};
+		}, {
+			//Pattern
+			if(object != nil, {
+				recursiveObjectList.add(object);
+				object.algaParseObject(
+					func: { | val |
+						if((val != nil).and(recursiveObjectList.includes(val).not), {
+							controlNamesSum = controlNamesSum.addAll(
+								this.checkPatternValidityAndReturnControlNames(val, controlNamesDict)
+							);
+						});
+					},
+					replace: false
+				);
+			});
+		});
 
 		//Sanity checks
 		if(controlNamesSum.size == 0, { ^nil });
@@ -1998,8 +1995,8 @@ AlgaPattern : AlgaNode {
 		^controlNamesSum;
 	}
 
-	//Multiple Symbols over a ListPattern / FilterPattern
-	dispatchListPatternOrFilterPattern { | def, initGroups = false, replace = false,
+	//Multiple Symbols over a Pattern
+	dispatchPattern { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 		var controlNamesSum;
 		var functionsAndListPattern;
@@ -2011,7 +2008,8 @@ AlgaPattern : AlgaNode {
 		controlNamesList = IdentityDictionary();
 
 		//Check rates, numChannels, Symbols and controlNames
-		controlNamesSum = this.checkListPatternOrFilterPatternValidityAndReturnControlNames(def);
+		recursiveObjectList.clear;
+		controlNamesSum = this.checkPatternValidityAndReturnControlNames(def);
 		if(controlNamesSum != nil, {
 			//Create controlNames from controlNamesSum
 			this.createControlNamesAndParamsConnectionTime(controlNamesSum);
@@ -2022,8 +2020,8 @@ AlgaPattern : AlgaNode {
 			//Substitute the eventPairs entry with the new ListPattern
 			eventPairs[\def] = def;
 
-			//Build pattern from ListPattern
-			this.buildFromListPattern(
+			//Build pattern from Pattern
+			this.buildFromPattern(
 				initGroups: initGroups,
 				replace: replace,
 				keepChannelsMapping: keepChannelsMapping,
@@ -2493,7 +2491,7 @@ AlgaPattern : AlgaNode {
 		patternsAsStreams[interpStreams] = pattern.algaAsStream;
 	}
 
-	//Parse a single Event
+	//Parse a single \fx Event entry
 	parseFXEvent { | value, functionSynthDefDict |
 		var foundInParam = false;
 		var synthDescFx, synthDefFx, controlNamesFx;
@@ -2643,7 +2641,7 @@ AlgaPattern : AlgaNode {
 		^value
 	}
 
-	//Parse a single AlgaOut
+	//Parse a single \out AlgaOut entry
 	parseOutAlgaOut { | value, alreadyParsed |
 		var node = value.nodeOrig;
 		var param = value.paramOrig;
@@ -2765,71 +2763,30 @@ AlgaPattern : AlgaNode {
 			def,
 			outsMapping: outsMapping,
 			sampleAccurate: sampleAccurateFuncs
-		); //Important: it returns AlgaSynthDefSpec (for _algaPattern and _algaPatternTempOut)
+		); //This returns an AlgaSynthDefSpec (for _algaPattern and _algaPatternTempOut)
 
 		//Return the Symbol
 		^defName
 	}
 
-	//Parse a ListPattern \def entry
-	parseListPatternDefEntry { | def, functionSynthDefDict |
-		def.list.do({ | entry, i |
-			def.list[i] = this.parseDefEntry(entry, functionSynthDefDict)
-		});
-		^def
-	}
-
-	//Parse a FilterParam \def entry
-	parseFilterPatternDefEntry { | def, functionSynthDefDict |
-		var pattern = def.pattern;
-		def.pattern = this.parseDefEntry(pattern, functionSynthDefDict)
-		^def
-	}
-
-	//Parse a generic Pattern \def entry
-	parseGenericPatternDefEntry { | def, functionSynthDefDict |
-		//Protect from recursiveness
-		recursiveObjectList.add(def);
-		def.class.instVarNames.do({ | instVarName |
-			try {
-				var instVar = def.perform(instVarName);
-				if(recursiveObjectList.includes(instVar).not, {
-					var result = this.parseDefEntry(instVar, functionSynthDefDict);
-					//ListPatterns / FilterPatterns are already handled
-					if(result.isSymbol, {
-						def.perform((instVarName ++ "_").asSymbol, result);
-					});
-				});
-			} { | error |
-				//Catch setter errors
-				if(error.isKindOf(DoesNotUnderstandError), {
-					if(error.selector.asString.endsWith("_"), {
-						("AlgaPattern: could not reassign '" ++
-							def.class ++ "." ++ error.selector ++
-							"' for the \def key. The Class does implement its setter method."
-						).error
-					});
-				})
-			}
-		});
-		^def
-	}
-
 	//Parse the \def entry
 	parseDefEntry { | def, functionSynthDefDict |
-		case
-		{ def.isFunction } {
+		if(def.isFunction, {
 			^this.parseFunctionDefEntry(def, functionSynthDefDict)
-		}
-		{ def.isListPattern } {
-			^this.parseListPatternDefEntry(def, functionSynthDefDict)
-		}
-		{ def.isFilterPattern } {
-			^this.parseFilterPatternDefEntry(def, functionSynthDefDict)
-		}
-		{ def.isPattern } {
-			^this.parseGenericPatternDefEntry(def, functionSynthDefDict)
-		};
+		}, {
+			//Pattern
+			if(def != nil, {
+				recursiveObjectList.add(def);
+				def.algaParseObject(
+					func: { | val |
+						if((val != nil).and(recursiveObjectList.includes(val).not), {
+							this.parseDefEntry(val, functionSynthDefDict);
+						});
+					},
+					replace: true
+				);
+			});
+		});
 		^def
 	}
 
@@ -3612,10 +3569,15 @@ AlgaPattern : AlgaNode {
 
 	//Add entry to inNodes. Unlike AlgaNodes, inNodes can here contain AlgaArgs, as the .replace
 	//mechanism is difference. For AlgaNodes, AlgaArgs can only be used in the args initialization
-	addInNodeAlgaNode { | sender, param = \in, mix = false |
-		var connectionToItself = (this == sender);
+	addInNodeAlgaNodeAlgaArg { | sender, param = \in, mix = false |
+		var connectionToItself;
+		if(sender.isAlgaArg, { sender = sender.sender });
 
-		//Empty entry OR not doing mixing, create new OrderedIdentitySet. Otherwise, add to existing
+		//Detect self connections
+		connectionToItself = (this == sender);
+
+		//Empty entry OR not doing mixing, create new OrderedIdentitySet.
+		//Otherwise, add to existing
 		if((inNodes[param] == nil).or(mix.not), {
 			inNodes[param] = OrderedIdentitySet[sender];
 		}, {
@@ -3635,92 +3597,14 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Add entries to inNodes
-	addInNodeListPattern { | sender, param = \in |
-		sender.list.do({ | listEntry |
-			if(listEntry.isAlgaArg, { listEntry = listEntry.sender });
-			case
-			{ listEntry.isAlgaNode } {
-				if(inNodes.size == 0, {
-					this.addInNodeAlgaNode(listEntry, param, mix:false);
-				}, {
-					this.addInNodeAlgaNode(listEntry, param, mix:true);
-				});
-			}
-			{ listEntry.isListPattern } {
-				this.addInNodeListPattern(listEntry, param)
-			}
-			{ listEntry.isFilterPattern } {
-				this.addInNodeFilterPattern(listEntry, param);
-			}
-			{ listEntry.isPattern } {
-				this.addInNodeGenericPatternParam(listEntry, param);
-			};
-		});
-	}
-
-	//Add entries to inNodes
-	addInNodeFilterPattern { | sender, param = \in |
-		var entry = sender.pattern;
-		if(entry.isAlgaArg, { entry = entry.sender });
-		case
-		{ entry.isAlgaNode } {
-			if(inNodes.size == 0, {
-				this.addInNodeAlgaNode(entry, param, mix:false);
-			}, {
-				this.addInNodeAlgaNode(entry, param, mix:true);
-			});
-		}
-		{ entry.isListPattern } {
-			this.addInNodeListPattern(entry, param);
-		}
-		{ entry.isFilterPattern } {
-			this.addInNodeFilterPattern(entry, param);
-		}
-		{ entry.isPattern } {
-			this.addInNodeGenericPatternParam(entry, param);
-		};
-	}
-
-	//Add entries to inNodes
-	addInNodeGenericPatternParam { | sender, param = \in |
-		//Protect from recursiveness
-		recursiveObjectList.add(sender);
-		sender.class.instVarNames.do({ | instVarName |
-			try {
-				var entry = sender.perform(instVarName);
-				if(recursiveObjectList.includes(entry).not, {
-					if(entry.isAlgaArg, { entry = entry.sender });
-					case
-					{ entry.isAlgaNode } {
-						if(inNodes.size == 0, {
-							this.addInNodeAlgaNode(entry, param, mix:false);
-						}, {
-							this.addInNodeAlgaNode(entry, param, mix:true);
-						});
-					}
-					{ entry.isListPattern } {
-						this.addInNodeListPattern(entry, param);
-					}
-					{ entry.isFilterPattern } {
-						this.addInNodeFilterPattern(entry, param);
-					}
-					{ entry.isPattern } {
-						this.addInNodeGenericPatternParam(entry, param);
-					};
-				});
-			} { | error | } //Don't catch errors
-		});
-	}
-
 	//Wrapper for addInNode
-	addInNode { | sender, param = \in, mix = false |
+	addInNode { | sender, param = \in, mix = false, forceMix = false |
 		var controlNameAtParam = controlNames[param];
 		var defaultValue;
 		if(controlNameAtParam != nil, { defaultValue = controlNameAtParam.defaultValue });
 
 		//First of all, remove the outNodes that the previous sender had with the
-		//param of this node, if there was any. Only apply if mix==false (no <<+ / >>+)
+		//param of this node, if there was any. Only apply if mix == false (no <<+ / >>+)
 		if(mix == false, {
 			var oldSenderSet = inNodes[param];
 			if(oldSenderSet != nil, {
@@ -3733,23 +3617,25 @@ AlgaPattern : AlgaNode {
 		//Reset recursiveObjectList
 		recursiveObjectList = IdentitySet(10);
 
-		//If AlgaArg or ListPattern, loop around entries and add each of them
-		case
-		{ sender.isAlgaNode } {
-			this.addInNodeAlgaNode(sender, param, mix);
-		}
-		{ sender.isAlgaArg } {
-			this.addInNode(sender.sender, param, mix);
-		}
-		{ sender.isListPattern } {
-			this.addInNodeListPattern(sender, param);
-		}
-		{ sender.isFilterPattern } {
-			this.addInNodeFilterPattern(sender, param);
-		}
-		{ sender.isPattern } {
-			this.addInNodeGenericPatternParam(sender, param);
-		};
+		//AlgaNode or AlgaArg: go through
+		if(sender.isAlgaNodeOrAlgaArg, {
+			if(forceMix, { mix = true });
+			this.addInNodeAlgaNodeAlgaArg(sender, param, mix);
+		}, {
+			//Pattern
+			if(sender != nil, {
+				recursiveObjectList.add(sender);
+				sender.algaParseObject(
+					func: { | val |
+						if((val != nil).and(recursiveObjectList.includes(val).not), {
+
+							this.addInNode(val, param, mix, forceMix: true)
+						});
+					},
+					replace: false
+				);
+			});
+		});
 
 		//Use replaceArgs to set LATEST parameter, for retrieval after .replace ...
 		//AlgaNode only uses this for number parameters, but AlgaPattern uses it for any

@@ -1228,83 +1228,22 @@ AlgaNode {
 		});
 	}
 
-	//This if for AlgaPattern + ListPattern
-	unpackListPatternRecursive { | listPattern |
-		var outsMappingListPattern = IdentityDictionary();
-		listPattern.list.do({ | listEntry |
-			case
-			{ listEntry.isListPattern } {
-				var outsMappingListPatternRecursive = this.unpackListPatternRecursive(listEntry);
-				outsMappingListPatternRecursive.keysValuesDo({ | key, outMapping |
-					outsMappingListPattern[key] = outMapping
-				});
-			}
-			{ listEntry.isFilterPattern } {
-				var outsMappingFilterPatternRecursive = this.unpackFilterPatternRecursive(listEntry);
-				outsMappingFilterPatternRecursive.keysValuesDo({ | key, outMapping |
-					outsMappingListPattern[key] = outMapping
-				});
-			}
-			{ listEntry.isSymbol } {
-				if(this.unpackSynthDefSymbol(listEntry, outsMappingListPattern) == nil, { ^nil });
-			};
+	//This is for AlgaPattern + Pattern
+	unpackPatternOutsMapping { | pattern, outsMappingSum |
+		outsMappingSum = outsMappingSum ? IdentityDictionary();
+
+		if(pattern.isSymbol, {
+			if(this.unpackSynthDefSymbol(pattern, outsMappingSum) == nil, { ^nil });
+		}, {
+			//Pattern
+			pattern.algaParseObject(
+				func: { | val |
+					this.unpackPatternOutsMapping(val, outsMappingSum);
+				},
+				replace: false
+			);
 		});
-		^outsMappingListPattern;
-	}
 
-	//This if for AlgaPattern + FilterPattern
-	unpackFilterPatternRecursive { | filterPattern |
-		var outsMappingFilterPattern = IdentityDictionary();
-		var entry = filterPattern.pattern;
-		case
-		{ entry.isListPattern } {
-			var outsMappingListPatternRecursive = this.unpackListPatternRecursive(entry);
-			outsMappingListPatternRecursive.keysValuesDo({ | key, outMapping |
-				outsMappingFilterPattern[key] = outMapping
-			});
-		}
-		{ entry.isFilterPattern } {
-			var outsMappingFilterPatternRecursive = this.unpackFilterPatternRecursive(entry);
-			outsMappingFilterPatternRecursive.keysValuesDo({ | key, outMapping |
-				outsMappingFilterPattern[key] = outMapping
-			});
-		}
-		{ entry.isSymbol } {
-			if(this.unpackSynthDefSymbol(entry, outsMappingFilterPattern) == nil, { ^nil });
-		};
-		^outsMappingFilterPattern;
-	}
-
-	//This is for AlgaPattern + ListPattern / FilterPattern
-	unpackListPatternOrFilterPatternOutsMapping {
-		var outsMappingSum = IdentityDictionary();
-		case
-		{ synthDef.isListPattern } {
-			synthDef.list.do({ | synthDefSymbol |
-				case
-				{ synthDefSymbol.isListPattern } {
-					var outsMappingListPattern = this.unpackListPatternRecursive(synthDefSymbol);
-					outsMappingListPattern.keysValuesDo({ | key, outMapping |
-						outsMappingSum[key] = outMapping
-					});
-				}
-				{ synthDefSymbol.isFilterPattern } {
-					var outsMappingFilterPattern = this.unpackFilterPatternRecursive(synthDefSymbol);
-					outsMappingFilterPattern.keysValuesDo({ | key, outMapping |
-						outsMappingSum[key] = outMapping
-					});
-				}
-				{ synthDefSymbol.isSymbol } {
-					if(this.unpackSynthDefSymbol(synthDefSymbol, outsMappingSum) == nil, { ^nil });
-				};
-			});
-		}
-		{ synthDef.isFilterPattern } {
-			var outsMappingFilterPattern = this.unpackFilterPatternRecursive(synthDef);
-			outsMappingFilterPattern.keysValuesDo({ | key, outMapping |
-				outsMappingSum[key] = outMapping
-			});
-		};
 		^outsMappingSum;
 	}
 
@@ -1313,8 +1252,8 @@ AlgaNode {
 		var outsMappingSynthDef;
 
 		//For AlgaPattern: synthDef can be a ListPattern / FilterPatterm. In that case, sum all outsMappings
-		if((this.isAlgaPattern).and((synthDef.isListPattern).or(synthDef.isFilterPattern)), {
-			outsMappingSynthDef = this.unpackListPatternOrFilterPatternOutsMapping;
+		if((this.isAlgaPattern).and(synthDef.isPattern), {
+			outsMappingSynthDef = this.unpackPatternOutsMapping(synthDef);
 			if(outsMappingSynthDef == nil, { ^nil });
 		}, {
 			//Normal case (no ListPattern): synthDef is an actual synthDef
