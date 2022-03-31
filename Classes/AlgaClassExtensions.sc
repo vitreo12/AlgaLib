@@ -78,7 +78,7 @@
 	//These can be passed as an Array of Classes.
 	algaValidParserClass { | validClasses |
 		validClasses = validClasses ? [
-			Array,
+			Collection,
 			Pattern
 		];
 
