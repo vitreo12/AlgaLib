@@ -2021,7 +2021,7 @@ AlgaPattern : AlgaNode {
 			eventPairs[\def] = def;
 
 			//Build pattern from Pattern
-			this.buildFromPattern(
+			^this.buildFromPattern(
 				initGroups: initGroups,
 				replace: replace,
 				keepChannelsMapping: keepChannelsMapping,
@@ -2029,6 +2029,10 @@ AlgaPattern : AlgaNode {
 				sched: sched
 			);
 		});
+
+		//Error
+		("AlgaPattern: could not retrieve any parameters from the provided 'def'").error;
+		^this;
 	}
 
 	//Create out: receivers
