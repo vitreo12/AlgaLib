@@ -37,6 +37,7 @@
 	isFilterPattern { ^false }
 	isTempoClock { ^false }
 	isSet { ^false }
+	isLiteralFunction { ^false }
 	def { ^nil }
 	isNumberOrArray { ^((this.isNumber).or(this.isArray)) }
 

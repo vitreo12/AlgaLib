@@ -2505,7 +2505,7 @@ AlgaPattern : AlgaNode {
 			^nil
 		});
 
-		//If it's a Function, send def to server and replace entries
+		//If it's a Function, send def to server and replace entries.
 		if(def.isFunction, {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
@@ -2531,7 +2531,7 @@ AlgaPattern : AlgaNode {
 			isFunction = true;
 		});
 
-		//Don't support ListPatterns for now
+		//Don't support other classes for now
 		if(def.isSymbol.not, {
 			("AlgaPattern: 'fx' only supports Symbols and Functions as 'def'").error;
 			^nil
@@ -2621,7 +2621,7 @@ AlgaPattern : AlgaNode {
 		}
 
 		//If individual Function, wrap in Event
-		{ value.isFunction } {
+		{ (value.isFunction).and(value.isLiteralFunction.not) } {
 			^this.parseFXEvent((def: value), functionSynthDefDict)
 		};
 
@@ -2771,7 +2771,8 @@ AlgaPattern : AlgaNode {
 
 	//Parse the \def entry
 	parseDefEntry { | def, functionSynthDefDict |
-		if(def.isFunction, {
+		//Literal functions are non-UGen graph functins!
+		if((def.isFunction).and(def.isLiteralFunction.not), {
 			^this.parseFunctionDefEntry(def, functionSynthDefDict)
 		}, {
 			//Pattern
