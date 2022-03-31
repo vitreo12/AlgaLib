@@ -21,6 +21,12 @@ AlgaNode {
 	//The AlgaScheduler @ this server
 	var <scheduler;
 
+	//The AlgaActionScheduler
+	var <actionScheduler;
+
+	//The AlgaParser
+	var <parser;
+
 	//The sched used internally if set
 	var schedInner;
 
@@ -224,6 +230,12 @@ AlgaNode {
 			^false;
 		});
 
+		//AlgaActionScheduler
+		actionScheduler = AlgaActionScheduler(this);
+
+		//AlgaParser
+		parser = AlgaParser(this);
+
 		//param -> ControlName
 		controlNames = IdentityDictionary(10);
 
@@ -315,42 +327,13 @@ AlgaNode {
 
 	//Add an action to scheduler. This takes into account sched == AlgaStep
 	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
-		//AlgaStep scheduling.
-		//I reverted the support for topPriority for one simple reason: it would only be used for replace.
-		//As such, the problem is that any connection that was scheduled at the same time won't happen anyways,
-		//cause the .replaced node won't be algaInstatiated, and the connection would not be made until the next round.
-		//It's probably better to just keep the user's declaration order.
-		if(sched.isAlgaStep, {
-			if(this.isAlgaPattern, {
-				this.addScheduledStepAction(
-					step: sched,
-					condition: condition,
-					func: func
-				);
-			}, {
-				//AlgaNodes don't support AlgaStep
-				sched = sched.step;
-				("AlgaNode: only AlgaPatterns support AlgaStep actions. Scheduling action at " ++ sched).error;
-				scheduler.addAction(
-					condition: condition,
-					func: func,
-					sched: sched,
-					topPriority: topPriority,
-					preCheck: preCheck,
-					schedInSeconds: schedInSeconds
-				)
-			});
-		}, {
-			//Normal scheduling (sched is a number or AlgaQuant)
-			scheduler.addAction(
-				condition: condition,
-				func: func,
-				sched: sched,
-				topPriority: topPriority,
-				preCheck: preCheck,
-				schedInSeconds: schedInSeconds
-			)
-		});
+		actionScheduler.addAction(
+			condition: condition,
+			func: func,
+			sched: sched,
+			topPriority: topPriority,
+			preCheck: preCheck
+		)
 	}
 
 	//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.

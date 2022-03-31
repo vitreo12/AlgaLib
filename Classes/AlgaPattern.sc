@@ -121,7 +121,7 @@ AlgaPattern : AlgaNode {
 	var <stopPatternBeforeReplace = true;
 
 	//Actions scheduled on a step
-	var <scheduledStepActionsPre, <scheduledStepActionsPost;
+	var <>scheduledStepActionsPre, <>scheduledStepActionsPost;
 
 	//Used to set sustain's gate
 	var <>isSustainTrig = false;
@@ -419,77 +419,9 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Iterate through all scheduledStepActions and execute them accordingly
+	//Advance scheduled actions
 	advanceAndConsumeScheduledStepActions { | post = false |
-		var stepsToRemove = IdentitySet();
-
-		//Pre or post
-		var scheduledStepActions;
-		if(post.not, {
-			scheduledStepActions = scheduledStepActionsPre;
-		}, {
-			scheduledStepActions = scheduledStepActionsPost;
-		});
-
-		//Go ahead with the advancing + removal
-		if(scheduledStepActions.size > 0, {
-			scheduledStepActions.do({ | step |
-				var condition = step.condition;
-				var func = step.func;
-				var retryOnFailure = step.retryOnFailure;
-				var tries = step.tries;
-				var stepCount = step.step;
-
-				if(stepCount <= 0, {
-					if(condition.value, {
-						func.value;
-						stepsToRemove.add(step);
-					}, {
-						if(retryOnFailure.not, {
-							stepsToRemove.add(step);
-						}, {
-							if(tries <= 0, {
-								stepsToRemove.add(step);
-							}, {
-								step.tries = tries - 1;
-							});
-						});
-					});
-				});
-
-				step.step = stepCount - 1;
-			});
-		});
-
-		//stepsToRemove is needed or it won't execute two consecutive true
-		//functions if remove was inserted directly in the call earlier
-		if(stepsToRemove.size > 0, {
-			stepsToRemove.do({ | step | scheduledStepActions.remove(step) })
-		});
-	}
-
-	//Creates a new AlgaStep with set condition and func
-	addScheduledStepAction { | step, condition, func |
-		//A new action must be created, otherwise, if two addActions are being pushed
-		//with the same AlgaStep, only one of the action would be executed (the last one),
-		//as the entry would be overwritten in the OrderedIdentitySet
-		var newStep = step.copy;
-		var post = step.post;
-		var scheduledStepActions;
-		newStep.condition = condition ? { true };
-		newStep.func = func;
-
-		//Create if needed
-		if(post.not, {
-			scheduledStepActionsPre = scheduledStepActionsPre ? OrderedIdentitySet(10);
-			scheduledStepActions = scheduledStepActionsPre;
-		}, {
-			scheduledStepActionsPost = scheduledStepActionsPost ? OrderedIdentitySet(10);
-			scheduledStepActions = scheduledStepActionsPost;
-		});
-
-		//Add
-		scheduledStepActions.add(newStep)
+		actionScheduler.advanceAndConsumeScheduledStepActions(post)
 	}
 
 	//Create a temporary synth according to the specs of the AlgaTemp
