@@ -60,6 +60,85 @@ Stop the link::Classes/AlgaPattern::.
 ARGUMENT:: sched
 Schedule the stop at a specific time.
 
+METHOD:: interpolateDur
+Manually trigger the interpolation of the code::'dur':: parameter. This can also be achieved with the standard code::from:: method, but code::interpolateDur:: also accepts a different set of arguments that are specific to this kind of interpolation.
+ARGUMENT:: value
+The new value to use.
+ARGUMENT:: time
+The time that it takes for the interpolation to complete.
+ARGUMENT:: shape
+An link::Classes/Env:: that optionally allows you to define a specific shape for the interpolation.
+ARGUMENT:: resync
+Specify if the pattern should be re-synced to the clock after the interpolation is completed. This option can also be permanently turned on with the code::durInterpResync:: method.
+ARGUMENT:: reset
+Specify if the pattern entry should be reset (restart) from the first value. This option can also be permanently turned on with the code::durInterpReset:: method.
+ARGUMENT:: sched
+Specify when the interpolation process should start. This can also be set with the code::schedResync:: method.
+discussion::
+code::
+(
+Alga.boot({
+	//Pattern to modify
+	a = AP((
+		def: {
+			SinOsc.ar * EnvPerc.ar(release: 0.1) * 0.5
+		},
+		dur: 0.5
+	)).play(chans:2);
+
+	//Metronome
+	b = AP((
+		def: {
+			EnvPerc.ar(release: SampleDur.ir); Impulse.ar(0)
+		},
+		dur: 1
+	)).play(chans:2);
+})
+)
+
+//Using Env and resync
+a.interpolateDur(0.1, time: 5, shape: Env([0, 1, 0.5, 1], [2, 3, 4]))
+
+//No resync
+a.interpolateDur(0.5, time: 3, resync: false)
+
+//With resync + reset
+a.interpolateDur(Pseq([0.25, 0.25, 0.125], inf), time: 5, reset: true)
+
+//Other time params work too!
+a.interpolateStretch(0.5, time: 3, shape: Env([0, 1, 0.5, 1], [2, 3, 4]))
+::
+
+METHOD:: interpDur
+Alias for code::interpolateDur::.
+
+METHOD:: interpolateDelta
+Alias for code::interpolateDur::.
+
+METHOD:: interpDelta
+Alias for code::interpolateDur::.
+
+METHOD:: interpolateStretch
+Like code::interpolateDur::, but setting the code::'stretch':: parameter.
+
+METHOD:: interpStretch
+Alias for code::interpolateStretch::.
+
+METHOD:: interpolateSustain
+Like code::interpolateDur::, but setting the code::'sustain':: parameter.
+
+METHOD:: interpSus
+Alias for code::interpolateSustain::.
+
+METHOD:: interpolateLegato
+Like code::interpolateDur::, but setting the code::'legato':: parameter.
+
+METHOD:: interpLegato
+Alias for code::interpolateLegato::.
+
+METHOD:: resync
+Resync the pattern to its clock.
+
 METHOD:: useMultiChannelExpansion
 Set if the link::Classes/AlgaPattern:: should treat multi channel expansion like an link::Classes/AlgaNode:: or not.
 
@@ -80,6 +159,15 @@ Set if the code::'dur':: parameter should be added to the code::'sustain':: one.
 
 METHOD:: sampleAccurateFuncs
 Set if the link::Classes/Function::s used in the code::'def':: parameter should be sample accurate or not. Defaults to true.
+
+METHOD:: schedResync
+Set the default code::sched:: value for code::interpolateDur:: (and accompanying functions).
+
+METHOD:: durInterpResync
+Set if code::interpolateDur:: (and accompanying functions) should resync by default.
+
+METHOD:: durInterpReset
+Set if code::interpolateDur:: (and accompanying functions) should reset by default.
 
 EXAMPLES::
 code::
@@ -182,7 +270,6 @@ private:: getSynthDef
 private:: interpStreams
 private:: interpolateBuffer
 private:: interpolateDef
-private:: interpolateDur
 private:: interpolateFX
 private:: interpolateGenericParam
 private:: interpolateOut
@@ -279,3 +366,9 @@ private:: scalarAndGenericParams
 private:: scalarAndGenericParamsStreams
 private:: isScalarParam
 private:: scalarsInAlgaStep
+
+private:: interpolateDurParamAtSched
+private:: latestDur
+private:: latestDurStream
+private:: getCurrentEnvironment
+private:: latestCurrentEnvironment

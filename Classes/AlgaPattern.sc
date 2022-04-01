@@ -19,7 +19,6 @@ AlgaPattern : AlgaNode {
 	TODOs:
 
 	1) mixFrom()
-	2) \dur - \sustain - \stretch - \legato interpolations
 	*/
 
 	//Special groups used in AlgaPattern
@@ -56,6 +55,15 @@ AlgaPattern : AlgaNode {
 
 	//Set \dur interpolation behaviour. Either run .replace or change at sched.
 	var <replaceDur = false;
+
+	//Sched for resync after \dur interpolation
+	var <schedResync = 1;
+
+	//Set if resync should be called after dur interpolation
+	var <durInterpResync = true;
+
+	//Set if dur entry should be reset after dur interpolation
+	var <durInterpReset = false;
 
 	//Keep track of the CURRENT patternInterpSumBus AlgaBus per-param. This is updated every pattern trigger.
 	//It is fundamental to have the current one in order to add do it a mid-pattern synth when user
@@ -104,7 +112,9 @@ AlgaPattern : AlgaNode {
 	var <scalarAndGenericParams;
 	var <scalarAndGenericParamsStreams;
 	var <latestScalarUniqueIDs;
-	var <scalarsInAlgaStep;
+
+	//Store the latest currentEnvironment. This is used for mid-pattern interpolation
+	var <>latestCurrentEnvironment;
 
 	//This is used for nested AlgaTemps
 	var <currentAlgaTempGroup;
@@ -148,6 +158,9 @@ AlgaPattern : AlgaNode {
 
 	//Used for parsing Patterns
 	var <recursivePatternList;
+
+	//Check for manualDur
+	var manualDur = false;
 
 	//Add the \algaNote event to Event
 	*initClass {
@@ -258,9 +271,6 @@ AlgaPattern : AlgaNode {
 
 				//Finally, consume scheduledStepActionsPost if there are any
 				~algaPattern.advanceAndConsumeScheduledStepActions(true);
-
-				//Reset scalarsInAlgaStep
-				~algaPattern.scalarsInAlgaStep.clear;
 			});
 
 			//Send bundle to server using the same server / clock as the AlgaPattern
@@ -286,10 +296,13 @@ AlgaPattern : AlgaNode {
 
 			//Always reset isSustainTrig
 			~algaPattern.isSustainTrig = false;
+
+			//Set latestCurrentEnvironment
+			~algaPattern.latestCurrentEnvironment = currentEnvironment;
 		});
 	}
 
-	//Set dur asStream for it to work within Pfuncn
+	//Set dur asStream for it to work within Pfunc
 	setDur { | value, newInterpStreams |
 		if(newInterpStreams == nil, {
 			interpStreams.dur = value.algaAsStream
@@ -298,7 +311,7 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Set sustain asStream for it to work within Pfuncn
+	//Set sustain asStream for it to work within Pfunc
 	setSustain { | value, newInterpStreams |
 		if(newInterpStreams == nil, {
 			interpStreams.sustain = value.algaAsStream
@@ -307,7 +320,7 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Set stretch asStream for it to work within Pfuncn
+	//Set stretch asStream for it to work within Pfunc
 	setStretch { | value, newInterpStreams |
 		if(newInterpStreams == nil, {
 			interpStreams.stretch = value.algaAsStream
@@ -316,7 +329,7 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Set stretch asStream for it to work within Pfuncn
+	//Set stretch asStream for it to work within Pfunc
 	setLegato { | value, newInterpStreams |
 		if(newInterpStreams == nil, {
 			interpStreams.legato = value.algaAsStream
@@ -332,6 +345,33 @@ AlgaPattern : AlgaNode {
 			value = false;
 		});
 		replaceDur = value
+	}
+
+	//Set schedResync
+	schedResync_ { | value = 1 |
+		if(value.isNumber.not, {
+			"AlgaPattern: 'schedResync' only supports numbers. Setting it to 1".error;
+			value = 1;
+		});
+		schedResync = value
+	}
+
+	//Set durInterpResync
+	durInterpResync_ { | value = true |
+		if(value.isKindOf(Boolean).not, {
+			"AlgaPattern: 'durInterpResync' only supports boolean values. Setting it to true".error;
+			value = true;
+		});
+		durInterpResync = value
+	}
+
+	//Set durInterpReset
+	durInterpReset_ { | value = false |
+		if(value.isKindOf(Boolean).not, {
+			"AlgaPattern: 'durInterpReset' only supports boolean values. Setting it to false".error;
+			value = false;
+		});
+		durInterpReset = value
 	}
 
 	//Set useMultiChannelExpansion
@@ -387,6 +427,12 @@ AlgaPattern : AlgaNode {
 			value = true;
 		});
 		sampleAccurateFuncs = value
+	}
+
+	//Used for mid-pattern interpolation
+	getCurrentEnvironment {
+		if(currentEnvironment.size > 0, { ^currentEnvironment });
+		^(latestCurrentEnvironment ? currentEnvironment) //if undefined
 	}
 
 	//Free all unused busses from interpStreams
@@ -633,13 +679,13 @@ AlgaPattern : AlgaNode {
 		//Only if not using MC (it's already been unpacked) OR
 		//is FX / AlgaTemp / Temporary (the mid-interpolation ones)
 		if((useMultiChannelExpansion.not).or(isFX).or(isAlgaTemp).or(isTemporary), {
-			if(entry.isStream, { entry = entry.next });
+			if(entry.isStream, { entry = entry.next(this.getCurrentEnvironment) });
 		});
 
 		//Unpack Pattern values for AA, AT and AO
 		//Only if not AlgaReader (coming from an AlgaPatternPlayer, which already unpacks)
 		if(entry.isAlgaReader.not, {
-			entry.algaAdvance
+			entry.algaAdvance(this.getCurrentEnvironment);
 		}, {
 			entry = entry.entry //Unpack AlgaReader
 		});
@@ -799,7 +845,7 @@ AlgaPattern : AlgaNode {
 					if(scale == nil, {
 						if(scaleArrayAndChansAtParam != nil, {
 							scale = scaleArrayAndChansAtParam[0]; //0 == scaleArray
-							scale = scale.next; //This has not been advanced yet
+							scale = scale.next(this.getCurrentEnvironment); //This has not been advanced yet
 						});
 					});
 				}, {
@@ -830,7 +876,7 @@ AlgaPattern : AlgaNode {
 					if(chansMapping == nil, {
 						if(scaleArrayAndChansAtParam != nil, {
 							chansMapping = scaleArrayAndChansAtParam[1]; //1 == chans
-							chansMapping = chansMapping.next; //This has not been advanced yet
+							chansMapping = chansMapping.next(this.getCurrentEnvironment); //This has not been advanced yet
 						});
 					});
 				});
@@ -1197,7 +1243,7 @@ AlgaPattern : AlgaNode {
 			var node, param, scale, chans;
 
 			//Advance
-			algaOut.algaAdvance;
+			algaOut.algaAdvance(this.getCurrentEnvironment);
 
 			//Unpack
 			node  = algaOut.node;
@@ -1387,23 +1433,8 @@ AlgaPattern : AlgaNode {
 					patternInterpSumBus
 				);
 			}, {
-				//Scalar values
-				var paramValue, scalarInAlgaStep = false;
-
-				//If active AlgaSched, get value DIRECTLY from scalarAndGenericParamsStreams
-				if(scalarsInAlgaStep != nil, {
-					if(scalarsInAlgaStep.includes(paramName), {
-						paramValue = scalarAndGenericParamsStreams[paramName][
-							latestScalarUniqueIDs[paramName]
-						].next; //Manual advance !
-						scalarInAlgaStep = true
-					});
-				});
-
-				//Standard case: get value from currentEnvironment (patternPairs)
-				if(scalarInAlgaStep.not, {
-					paramValue = currentEnvironment[paramName];
-				});
+				//Get value from currentEnvironment (patternPairs)
+				var paramValue = currentEnvironment[paramName];
 
 				//Add to synth's args
 				if(paramValue != nil, {
@@ -1597,7 +1628,7 @@ AlgaPattern : AlgaNode {
 				if(interpStreamsEntriesAtParam != nil, {
 					interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry |
 						//Unpack Pattern value
-						if(entry.isStream, { entry = entry.next });
+						if(entry.isStream, { entry = entry.next(this.getCurrentEnvironment) });
 
 						//Set entries at paramName
 						entries[paramName] = entries[paramName] ? IdentityDictionary();
@@ -2121,18 +2152,21 @@ AlgaPattern : AlgaNode {
 		var foundSustain = false, resetSustain = false;
 		var foundStretch = false, resetStretch = false;
 		var foundLegato = false, resetLegato = false;
-		var manualDur = false;
 		var foundFX = false;
 		var parsedFX;
 		var parsedOut;
 		var foundOut = false;
 		var foundGenericParams = IdentitySet();
 		var patternPairs = Array.newClear;
+		var patternPairsDict = IdentityDictionary();
 
 		//Create new interpStreams. NOTE that the Pfunc in dur uses this, as interpStreams
 		//will be overwritten when using replace. This allows to separate the "global" one
 		//from the one that's being created here.
 		var newInterpStreams = AlgaPatternInterpStreams(this);
+
+		//Reset manualDur
+		manualDur = false;
 
 		//Check sched
 		if(replace.not, { sched = sched ? schedInner });
@@ -2248,11 +2282,10 @@ AlgaPattern : AlgaNode {
 			if(isAlgaParam.not, {
 				var uniqueID = UniqueID.next;
 				this.addScalarAndGenericParams(paramName, value, uniqueID);
-				patternPairs = patternPairs.add(paramName).add(
-					Pfunc {
-						scalarAndGenericParamsStreams[paramName][uniqueID].next;
-					}
-				);
+				patternPairsDict[paramName] = Pfunc { | e |
+					var val = scalarAndGenericParamsStreams[paramName][uniqueID].next(e);
+					val ? 0
+				};
 				foundGenericParams.add(paramName);
 			});
 		});
@@ -2376,24 +2409,23 @@ AlgaPattern : AlgaNode {
 			//Add old scalarAndGenericParamsStreams
 			if(scalarAndGenericParams != nil, {
 				if(scalarAndGenericParams.size > 0, {
-					scalarAndGenericParams.keysValuesDo({ | key, value |
+					scalarAndGenericParams.keysValuesDo({ | paramName, value |
 						//If that specific generic param hasn't been set from user,
 						//use the one from addScalarAndGenericParams if available
-						if(foundGenericParams.findMatch(key) == nil, {
+						if(foundGenericParams.findMatch(paramName) == nil, {
 							//Needs to be copied in order to make a "fresh" one
-							var latestValue = scalarAndGenericParams[key][
-								latestScalarUniqueIDs[key]
+							var latestValue = scalarAndGenericParams[paramName][
+								latestScalarUniqueIDs[paramName]
 							].copy;
 
 							//This code should be abstracted: it's the same behaviour
 							if(latestValue != nil, {
 								var uniqueID = UniqueID.next;
-								this.addScalarAndGenericParams(key, latestValue, uniqueID);
-								patternPairs = patternPairs.add(key).add(
-									Pfunc {
-										scalarAndGenericParamsStreams[key][uniqueID].next;
-									}
-								);
+								this.addScalarAndGenericParams(paramName, latestValue, uniqueID);
+								patternPairsDict[paramName] = Pfunc { | e |
+									var val = scalarAndGenericParamsStreams[paramName][uniqueID].next(e);
+									val ? 0
+								}
 							});
 						})
 					})
@@ -2412,6 +2444,54 @@ AlgaPattern : AlgaNode {
 		//with the freeAllSynthsAndBussesOnReplace function call
 		newInterpStreams.algaSynthBus = this.synthBus;
 
+		//If player is AlgaPatternPlayer, dur is ALWAYS manual
+		if(player.isAlgaPatternPlayer, { manualDur = true });
+
+		//Manual or automatic dur management
+		if(manualDur.not, {
+			//Pfunc allows to modify the value
+			patternPairsDict[\dur] = Pfunc { | e |
+				//Only advance when there are no concurrent executions.
+				//This allows for .replace to work correctly and not advance twice!
+				var currentTime = this.clock.seconds;
+				var dur = if(currentTime != latestPatternTime, {
+					newInterpStreams.dur.next(e)
+				}, {
+					//If stream changed, run .next anyway
+					if(newInterpStreams.dur != latestDurStream, {
+						newInterpStreams.dur.next(e)
+					}, {
+						//Same time and no stream change: return the
+						//dur that was just triggered at this very time
+						latestDur
+					})
+				});
+
+				//Store values
+				latestDur = dur;
+				latestDurStream = newInterpStreams.dur;
+				latestPatternTime = currentTime;
+
+				//Return correct dur
+				dur;
+			}
+		});
+
+		//Add time parameters
+		patternPairsDict[\legato]  = Pfunc { | e | newInterpStreams.legato.next(e) };
+		patternPairsDict[\stretch] = Pfunc { | e | newInterpStreams.stretch.next(e) };
+		patternPairsDict[\sustain] = Pfunc { | e | newInterpStreams.sustain.next(e) };
+
+		//Order pattern pairs dict alphabetically and convert to array.
+		//This allows the user to use Pfunc { | e | } functions with any
+		//scalar OR generic parameter, as long as they're ordered alphabetically
+		if(patternPairsDict.size > 0, {
+			var order = patternPairsDict.order;
+			var entries = patternPairsDict.atAll(order);
+			var array = ([order] ++ [entries]).lace(order.size * 2);
+			patternPairs = patternPairs ++ array;
+		});
+
 		//Add \type, \algaNode, and all things related to
 		//the context of this AlgaPattern
 		patternPairs = patternPairs.addAll([
@@ -2422,48 +2502,6 @@ AlgaPattern : AlgaNode {
 			\algaPatternClock, this.clock,
 			\algaPatternInterpStreams, newInterpStreams //Lock current one: will work on .replace
 		]);
-
-		//Add \sustain
-		patternPairs = patternPairs.addAll([
-			\sustain, Pfunc( { newInterpStreams.sustain.next } ),
-			\stretch, Pfunc( { newInterpStreams.stretch.next } ),
-			\legato, Pfunc( { newInterpStreams.legato.next } )
-		]);
-
-		//If player is AlgaPatternPlayer, dur is ALWAYS manual
-		if(player.isAlgaPatternPlayer, { manualDur = true });
-
-		//Manual or automatic dur management
-		if(manualDur.not, {
-			//Pfunc allows to modify the value
-			patternPairs = patternPairs.add(\dur).add(
-				Pfunc( {
-					//Only advance when there are no concurrent executions.
-					//This allows for .replace to work correctly and not advance twice!
-					var currentTime = this.clock.seconds;
-					var dur = if(currentTime != latestPatternTime, {
-						newInterpStreams.dur.next
-					}, {
-						//If stream changed, run .next anyway
-						if(newInterpStreams.dur != latestDurStream, {
-							newInterpStreams.dur.next
-						}, {
-							//Same time and no stream change: return the
-							//dur that was just triggered at this very time
-							latestDur
-						})
-					});
-
-					//Store values
-					latestDur = dur;
-					latestDurStream = newInterpStreams.dur;
-					latestPatternTime = currentTime;
-
-					//Return correct dur
-					dur;
-				} )
-			);
-		});
 
 		//Create the Pattern
 		pattern = Pbind(*patternPairs);
@@ -3023,73 +3061,113 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Interpolate dur, either replace OR substitute at sched
-	interpolateDur { | value, time, sched |
-		if(replaceDur, {
-			("AlgaPattern: 'dur' interpolation is not supported yet. Running 'replace' instead.").warn;
-			^this.replace(
+	interpolateDur { | value, time, shape, resync, reset, sched = 0 |
+		//Replace also if value is a Symbol (manual dur).
+		//Also replace if currently dur was manual
+		if((replaceDur).or(value.isSymbol).or(manualDur), {
+			this.replace(
 				def: (def: this.getSynthDef, dur: value),
 				time: time,
 				sched: sched
 			);
 		}, {
-			sched = sched ? schedInner;
-			("AlgaPattern: 'dur' interpolation is not supported yet. Rescheduling 'dur' at the " ++ sched ++ " quantization.").warn;
-			^this.setDurAtSched(value, sched);
+			//time == 0: just reschedule at sched
+			if(time == 0, {
+				this.setDurAtSched(value, sched)
+			}, {
+				this.interpolateDurParamAtSched(\dur, value, time, shape, resync, reset, sched)
+			})
 		});
 	}
 
-	//Interpolate sustain (uses replaceDur)
-	interpolateSustain { | value, time, sched |
+	//Alias
+	interpDur { | value, time, shape, resync, reset, sched = 0 |
+		this.interpolateDur(value, time, shape, resync, reset, sched)
+	}
+
+	//Alias
+	interpolateDelta { | value, time, shape, resync, reset, sched = 0 |
+		this.interpolateDur(value, time, shape, resync, reset, sched)
+	}
+
+	//Alias
+	interpDelta { | value, time, shape, resync, reset, sched = 0 |
+		this.interpolateDur(value, time, shape, resync, reset, sched)
+	}
+
+	//Interpolate sustain
+	interpolateSustain { | value, time, shape, resync = false, sched = 0 |
 		if(replaceDur, {
-			("AlgaPattern: 'sustain' interpolation is not supported yet. Running 'replace' instead.").warn;
-			^this.replace(
+			this.replace(
 				def: (def: this.getSynthDef, sustain: value),
 				time: time,
 				sched: sched
 			);
 		}, {
-			sched = sched ? schedInner;
-			("AlgaPattern: 'sustain' interpolation is not supported yet. Rescheduling 'sustain' at the " ++ sched ++ " quantization.").warn;
-			^this.setSustainAtSched(value, sched);
+			//time == 0: just reschedule at sched
+			if(time == 0, {
+				this.setSustainAtSched(value, sched)
+			}, {
+				this.interpolateDurParamAtSched(\sustain, value, time, shape, resync, false, sched)
+			})
 		});
 	}
 
+	//Alias
+	interpSus { | value, time, shape, resync = false, sched = 0 |
+		this.interpolateSustain(value, time, shape, resync, sched)
+	}
+
 	//Interpolate stretch (uses replaceDur)
-	interpolateStretch { | value, time, sched |
+	interpolateStretch { | value, time, shape, resync, reset, sched = 0 |
 		if(replaceDur, {
-			("AlgaPattern: 'stretch' interpolation is not supported yet. Running 'replace' instead.").warn;
-			^this.replace(
+			this.replace(
 				def: (def: this.getSynthDef, stretch: value),
 				time: time,
 				sched: sched
 			);
 		}, {
-			sched = sched ? schedInner;
-			("AlgaPattern: 'stretch' interpolation is not supported yet. Rescheduling 'stretch' at the " ++ sched ++ " quantization.").warn;
-			^this.setStretchAtSched(value, sched);
+			//time == 0: just reschedule at sched
+			if(time == 0, {
+				this.setStretchAtSched(value, sched)
+			}, {
+				this.interpolateDurParamAtSched(\stretch, value, time, shape, resync, reset, sched)
+			})
 		});
 	}
 
-	//Interpolate legato (uses replaceDur)
-	interpolateLegato { | value, time, sched |
+	//Alias
+	interpStretch { | value, time, shape, resync, reset, sched = 0 |
+		this.interpolateStretch(value, time, shape, resync, reset, sched)
+	}
+
+	//Interpolate legato
+	interpolateLegato { | value, time, shape, resync, sched = 0 |
 		if(replaceDur, {
-			("AlgaPattern: 'legato' interpolation is not supported yet. Running 'replace' instead.").warn;
-			^this.replace(
+			this.replace(
 				def: (def: this.getSynthDef, legato: value),
 				time: time,
 				sched: sched
 			);
 		}, {
-			sched = sched ? schedInner;
-			("AlgaPattern: 'legato' interpolation is not supported yet. Rescheduling 'legato' at the " ++ sched ++ " quantization.").warn;
-			^this.setLegatoAtSched(value, sched);
+			//time == 0: just reschedule at sched
+			if(time == 0, {
+				this.setLegatoAtSched(value, sched)
+			}, {
+				this.interpolateDurParamAtSched(\legato, value, time, shape, resync, false, sched)
+			})
 		});
+	}
+
+	//Alias
+	interpLegato { | value, time, shape, resync, sched = 0 |
+		this.interpolateLegato(value, time, shape, resync, sched)
 	}
 
 	//Interpolate def == replace
 	interpolateDef { | def, time, sched |
 		"AlgaPattern: changing the 'def' key. This will trigger 'replace'.".warn;
-		^this.replace(
+		this.replace(
 			def: (def: def),
 			time: time,
 			sched: sched
@@ -3099,7 +3177,7 @@ AlgaPattern : AlgaNode {
 	//Interpolate fx == replace
 	interpolateFX { | value, time, sched |
 		"AlgaPattern: changing the 'fx' key. This will trigger 'replace'.".warn;
-		^this.replace(
+		this.replace(
 			def: (def: this.getSynthDef, fx: value),
 			time: time,
 			sched: sched
@@ -3110,17 +3188,11 @@ AlgaPattern : AlgaNode {
 	interpolateOut { | value, time, shape, sched |
 		"AlgaPattern: changing the 'out' key. This will trigger 'replace'.".warn;
 		currentPatternOutShape = shape; //set shape!
-		^this.replace(
+		this.replace(
 			def: (def: this.getSynthDef, out: value),
 			time: time,
 			sched: sched
 		);
-	}
-
-	//Used for AlgaStep + modifying a scalar value with no replace
-	addScalarInAlgaStep { | param |
-		scalarsInAlgaStep = scalarsInAlgaStep ? IdentitySet();
-		scalarsInAlgaStep.add(param);
 	}
 
 	//Interpolate a parameter that is not in controlNames (like \lag)
@@ -3130,11 +3202,22 @@ AlgaPattern : AlgaNode {
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
+
 		if((time == 0).and(latestScalarUniqueID != nil), {
 			this.addAction(
 				func: {
+					//Add the new stream
 					this.addScalarAndGenericParams(param, sender);
-					if(sched.isAlgaStep, { this.addScalarInAlgaStep(param) });
+
+					//If AlgaStep, ALSO advance the value manually
+					if(sched.isAlgaStep, {
+						var value = scalarAndGenericParamsStreams[param][
+							latestScalarUniqueIDs[param]
+						].next(this.getCurrentEnvironment);
+
+						//Substitute in currentEnvironment so it's picked up
+						if(value != nil, { currentEnvironment[param] = value });
+					});
 				},
 				sched: sched,
 				topPriority: true
@@ -3288,22 +3371,30 @@ AlgaPattern : AlgaNode {
 
 		//Special case, \dur
 		if(param == \dur, {
-			^this.interpolateDur(sender, time, sched);
+			^this.interpolateDur(
+				value: sender, time: time, shape: shape, sched: sched
+			);
 		});
 
 		//Special case, \sustain
 		if(param == \sustain, {
-			^this.interpolateSustain(sender, time, sched);
+			^this.interpolateSustain(
+				value: sender, time: time, shape: shape, sched: sched
+			);
 		});
 
 		//Special case, \stretch
 		if(param == \stretch, {
-			^this.interpolateStretch(sender, time, sched);
+			^this.interpolateStretch(
+				value: sender, time: time, shape: shape, sched: sched
+			);
 		});
 
 		//Special case, \legato
 		if(param == \legato, {
-			^this.interpolateLegato(sender, time, sched);
+			^this.interpolateLegato(
+				value: sender, time: time, shape: shape, sched: sched
+			);
 		});
 
 		//Special case, \def
@@ -3583,7 +3674,9 @@ AlgaPattern : AlgaNode {
 				this.addAction(
 					func: {
 						//This will be then checked against in createEventSynths!
-						if(stopPatternBeforeReplace.and(sched.post.not), { interpStreamsLock.beingStopped = true });
+						if(stopPatternBeforeReplace.and(sched.post.not), {
+							interpStreamsLock.beingStopped = true
+						});
 						interpStreamsLock.algaReschedulingEventStreamPlayer.stop;
 						patternsAsStreams.removeAt(interpStreamsLock);
 					},
@@ -3601,7 +3694,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Resume pattern
-	resumePattern { | sched |
+	resumePattern { | sched = 0 |
 		//Check sched
 		sched = sched ? schedInner;
 		sched = sched ? 0;
@@ -3623,7 +3716,23 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Set dur at sched
-	setDurAtSched { | value, sched |
+	setDurAtSched { | value, sched, isResync = false, isReset = false, isStretch = false |
+		//Stop interpolations if happening
+		var durAlgaPseg = interpStreams.durAlgaPseg;
+		var stretchAlgaPseg = interpStreams.stretchAlgaPseg;
+		var stopInterpAndSetDur = {
+			if(isStretch.not, {
+				// \dur
+				if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.stop });
+				if(stretchAlgaPseg.isAlgaPseg, { stretchAlgaPseg.extStop });
+			}, {
+				// \stretch
+				if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.extStop });
+				if(stretchAlgaPseg.isAlgaPseg, { stretchAlgaPseg.stop });
+			});
+			if((isResync.not).or(isReset), { this.setDur(value) });
+		};
+
 		//Check sched
 		sched = sched ? schedInner;
 
@@ -3639,7 +3748,7 @@ AlgaPattern : AlgaNode {
 					if(algaReschedulingEventStreamPlayer != nil, {
 						interpStreamsLock.beingStopped = true;
 						algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
-							this.setDur(value);
+							stopInterpAndSetDur.value;
 							interpStreamsLock.beingStopped = false;
 						})
 					})
@@ -3654,11 +3763,147 @@ AlgaPattern : AlgaNode {
 				func: {
 					var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
 					if(algaReschedulingEventStreamPlayer != nil, {
-						algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, { this.setDur(value) });
+						algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, {
+							stopInterpAndSetDur.value;
+						});
 					})
 				}
 			);
 		})
+	}
+
+	//Interpolate a dur param
+	interpolateDurParamAtSched { | param, value, time, shape, resync, reset, sched |
+		var algaPseg;
+		var paramInterpShape = this.getInterpShape(param);
+		var paramConnectionTime = paramsConnectionTime[param];
+
+		//Check validity of value
+		if((value.isNumber.not).and(value.isPattern.not), {
+			"AlgaPattern: only Numbers and Patterns are supported for 'dur' interpolation".error;
+			^this
+		});
+
+		//Dispatch: locked on function call, not on addAction
+		case
+		{ param == \dur }     { algaPseg = interpStreams.durAlgaPseg }
+		{ param == \sustain } { algaPseg = interpStreams.sustainAlgaPseg }
+		{ param == \stretch } { algaPseg = interpStreams.stretchAlgaPseg }
+		{ param == \legato }  { algaPseg = interpStreams.legatoAlgaPseg };
+
+		//Check time
+		if(param == \dur, { paramConnectionTime = paramConnectionTime ? paramsConnectionTime[\delta] });
+		time = time ? (paramConnectionTime ? connectionTime);
+
+		//Time in AlgaPseg is in beats: it needs to be scaled to seconds
+		time = if(tempoScaling.not, { time * this.clock.tempo });
+
+		//If time is still 0, go back to setAtSched so it is picked up
+		if(time == 0, {
+			case
+			{ param == \dur } {
+				^this.setDurAtSched(value, sched);
+			}
+			{ param == \sustain } {
+				^this.setSustainAtSched(value, sched)
+			}
+			{ param == \stretch } {
+				^this.setStretchAtSched(value, sched)
+			}
+			{ param == \legato }  {
+				^this.setLegatoAtSched(value, sched)
+			};
+		});
+
+		//Check sched
+		sched = sched ? schedInner;
+
+		//Check resync
+		resync = resync ? durInterpResync;
+
+		//Check reset
+		reset = reset ? durInterpReset;
+
+		//Get shape
+		if(param == \dur, { paramInterpShape = paramInterpShape ? this.getInterpShape(\delta) });
+		shape = shape.algaCheckValidEnv(false) ? paramInterpShape;
+
+		//Add to scheduler
+		this.addAction(
+			condition: { this.algaInstantiated },
+			func: {
+				var newAlgaPseg;
+
+				//Stop previous one. \dur and \stretch stop each other too
+				if(algaPseg.isAlgaPseg, { algaPseg.stop });
+				case
+				{ param == \dur } {
+					var stretchAlgaPseg = interpStreams.stretchAlgaPseg;
+					if(stretchAlgaPseg.isAlgaPseg, { stretchAlgaPseg.extStop });
+				}
+				{ param == \stretch } {
+					var durAlgaPseg = interpStreams.durAlgaPseg;
+					if(durAlgaPseg.isAlgaPseg, { durAlgaPseg.extStop });
+				};
+
+				//Create new one
+				newAlgaPseg = shape.asAlgaPseg(
+					time: time,
+					clock: this.clock,
+					onDone: {
+						if(resync, {
+							this.resync(value, reset, if(param == \stretch, { true }, { false }))
+						})
+					}
+				);
+
+				//Start the new one
+				newAlgaPseg.start;
+
+				//Perform interpolation
+				case
+				{ param == \dur } {
+					interpStreams.durAlgaPseg = newAlgaPseg;
+					interpStreams.dur = interpStreams.dur.blend(
+						value,
+						interpStreams.durAlgaPseg
+					).algaAsStream;
+				}
+				{ param == \sustain } {
+					interpStreams.sustainAlgaPseg = newAlgaPseg;
+					interpStreams.sustain = interpStreams.sustain.blend(
+						value,
+						interpStreams.sustainAlgaPseg
+					).algaAsStream;
+				}
+				{ param == \stretch } {
+					interpStreams.stretchAlgaPseg = newAlgaPseg;
+					interpStreams.stretch = interpStreams.stretch.blend(
+						value,
+						interpStreams.stretchAlgaPseg
+					).algaAsStream;
+				}
+				{ param == \legato } {
+					interpStreams.legatoAlgaPseg = newAlgaPseg;
+					interpStreams.legato = interpStreams.legato.blend(
+						value,
+						interpStreams.legatoAlgaPseg
+					).algaAsStream;
+				};
+			},
+			sched: sched,
+			topPriority: true
+		)
+	}
+
+	//Resync pattern to sched
+	resync { | value, reset, resetStretch, sched |
+		sched = sched ? schedResync; //Check for schedResync
+		resetStretch = resetStretch ? false;
+		this.setDurAtSched(
+			value: value, sched: sched, isResync: true,
+			isReset: reset, isStretch: resetStretch
+		)
 	}
 
 	//Set sustain at sched
@@ -4077,7 +4322,7 @@ AMP : AlgaMonoPattern {}
 		paramRate = controlNamesAtParam.rate;
 
 		//Get shape
-		shape = this.checkValidEnv(shape) ? this.getInterpShape(param);
+		shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
 
 		//Lock interpBus with uniqueID
 		this.lockInterpBus(uniqueID, interpBus);
@@ -4140,7 +4385,7 @@ AMP : AlgaMonoPattern {}
 		time = time ? 0;
 
 		//Get shape
-		shape = this.checkValidEnv(shape) ? this.getInterpShape(param);
+		shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
 
 		if(patternOutEnvSynthsAtParamAlgaPattern != nil, {
 			patternOutEnvSynthsAtParamAlgaPattern.keysValuesDo({ | uniqueIDAlgaSynthBus, patternOutEnvSynth |

@@ -74,6 +74,8 @@ ARGUMENT:: out
 Specify a link::Classes/Bus:: index to play the node to.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+
+discussion::
 code::
 AlgaNode.ar({ SinOsc.ar([440, 450]) }).play //Play both channels
 
@@ -586,3 +588,5 @@ private:: parseParam
 private:: parseParam_inner
 private:: addActiveInOutNodes
 private:: checkValidControlName
+private:: addLatestSenderAtParam
+private:: getLatestSenderAtParam

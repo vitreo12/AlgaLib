@@ -15,10 +15,12 @@ Shift the trigger by a set number of beats.
 ARGUMENT:: wrapPhase
 Wrap the phase around the length of the bar.
 
+INSTANCEMETHODS::
 private:: isAlgaQuant
 private:: phase
 private:: quant
 private:: wrapPhase
+
 
 EXAMPLES::
 code::
