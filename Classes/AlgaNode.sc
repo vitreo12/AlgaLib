@@ -3287,32 +3287,35 @@ AlgaNode {
 		});
 	}
 
-	//Check if connection was already in place at any param
-	checkConnectionAlreadyInPlace { | sender |
+	//Implementation of checkConnectionAlreadyInPlace
+	checkConnectionAlreadyInPlaceInner { | sendersSet, sender |
 		case
-		{ sender.isAlgaTemp } { sender = sender.def }
-		{ sender.isAlgaArg } { sender = sender.sender };
+		{ sender.isAlgaTemp } { sender = sender.def } //Useless?
+		{ sender.isAlgaArg }  { sender = sender.sender };
 
-		inNodes.do({ | sendersSet |
-			case
-			{ sender.isListPattern } {
-				sender.do({ | entry |
-					case
-					{ entry.isAlgaTemp } { entry = entry.def }
-					{ entry.isAlgaArg } { entry = entry.sender };
-					if(blockIndex != entry.blockIndex, { ^false });
-					if(sendersSet.includes(entry), { ^true })
-				})
-			}
-			{ sender.isFilterPattern } {
-				if(this.checkConnectionAlreadyInPlace(sender.pattern), { ^true });
-			}
-			{ sender.isAlgaNode } {
-				if(blockIndex != sender.blockIndex, { ^false });
-				if(sendersSet.includes(sender), { ^true })
-			};
+		//AlgaNode
+		if(sender.isAlgaNode, {
+			if(blockIndex != sender.blockIndex, { ^false }); //Different block, always false
+			if(sendersSet.includes(sender), { ^true }); //Connection is in place
+		}, {
+			//Pattern: keep looking
+			sender.algaParseObject(
+				func: { | val |
+					if(this.checkConnectionAlreadyInPlaceInner(sendersSet, val), { ^true });
+				},
+				replace: false
+			)
 		});
 
+		//Fallback
+		^false;
+	}
+
+	//Check if connection was already in place at any param
+	checkConnectionAlreadyInPlace { | sender |
+		inNodes.do({ | sendersSet |
+			if(this.checkConnectionAlreadyInPlaceInner(sendersSet, sender), { ^true });
+		});
 		^false;
 	}
 
