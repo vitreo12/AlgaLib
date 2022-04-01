@@ -94,7 +94,7 @@ AlgaParser {
 			//Loop around the event entries and use as Stream, substituting entries
 			def.keysValuesDo({ | key, entry |
 				if(key != \def, {
-					var parsedEntry = this.parseParam_inner(entry, functionSynthDefDict);
+					var parsedEntry = this.parseParamInner(entry, functionSynthDefDict);
 					if(parsedEntry == nil, { ^nil });
 					//Finally, replace in place
 					def[key] = parsedEntry.algaAsStream;
@@ -143,7 +143,7 @@ AlgaParser {
 	}
 
 	//Parse a param looking for AlgaTemps and ListPatterns
-	parseParam_inner { | value, functionSynthDefDict |
+	parseParamInner { | value, functionSynthDefDict |
 		var genericObject = true;
 
 		//Look for AlgaTemp / AlgaReaderPfunc
@@ -175,11 +175,13 @@ AlgaParser {
 			functionSynthDefDict = IdentityDictionary();
 		});
 
-		//Reset paramContainsAlgaReaderPfunc, and latestPlayers recursiveObjectList
-		if(this.isAlgaPattern, { this.resetPatternParsingVars });
+		//Reset the vars for parsing a pattern parameter
+		if((obj.isAlgaPattern).or(obj.isAlgaPatternPlayer), {
+			this.resetPatternParsingVars
+		});
 
 		//Actual parsing
-		value = this.parseParam_inner(value, functionSynthDefDict);
+		value = this.parseParamInner(value, functionSynthDefDict);
 
 		//Used in from {}
 		if(returnBoth, {
@@ -196,7 +198,7 @@ AlgaParser {
 			object.algaParseObject(
 				func: { | val |
 					if((val != nil).and(recursiveObjectList.includes(val).not), {
-						this.parseParam_inner(val, functionSynthDefDict);
+						this.parseParamInner(val, functionSynthDefDict);
 					});
 				},
 				replace: true,
@@ -206,11 +208,13 @@ AlgaParser {
 		^object;
 	}
 
-	//Reset vars used in parsing
-	resetPatternParsingVars {
-		obj.paramContainsAlgaReaderPfunc = false;
-		obj.latestPlayersAtParam         = IdentityDictionary();
-		recursiveObjectList              = IdentitySet(10);
+	//Reset vars used in parsing AlgaPattern and AlgaPatternPlayer
+	resetPatternParsingVars { | recursiveObjectListOnly = false |
+		if((recursiveObjectListOnly.not).and(obj.isAlgaPattern), {
+			obj.paramContainsAlgaReaderPfunc = false;
+			obj.latestPlayersAtParam         = IdentityDictionary();
+		});
+		recursiveObjectList                  = IdentitySet(10);
 	}
 
 	//Parse a Function \def entry
@@ -404,7 +408,7 @@ AlgaParser {
 
 		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
 		value.keysValuesDo({ | key, entry |
-			var parsedEntry = this.parseParam_inner(entry, functionSynthDefDict);
+			var parsedEntry = this.parseParamInner(entry, functionSynthDefDict);
 			value[key] = parsedEntry.algaAsStream;
 		});
 
