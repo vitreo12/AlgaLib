@@ -23,6 +23,9 @@ Alga {
 	classvar <parGroups;
 	classvar <oldSynthDefsDir;
 
+	//These are used since I can't add vars to the Clock class
+	classvar <interpTempoRoutines;
+
 	//Store if server is supernova or not
 	classvar <supernovas;
 
@@ -38,6 +41,8 @@ Alga {
 		parGroups = IdentityDictionary(1);
 
 		supernovas = IdentityDictionary(1);
+
+		interpTempoRoutines = IdentityDictionary(1);
 
 		//Make sure to reset it
 		"SC_SYNTHDEF_PATH".unsetenv;
@@ -299,5 +304,36 @@ Alga {
 				onQuit.value;
 			});
 		});
+	}
+
+	*interpolateTempo {| tempo = 1, time = 0, shape,
+		delta = 0.1, schedInSeconds = false, sched = 1, server |
+		var clock;
+		server = server ? Server.default;
+		clock = clocks[server];
+		if(clock != nil, {
+			clock.interpolateTempo(
+				tempo: tempo,
+				time: time,
+				shape: shape,
+				delta: delta,
+				schedInSeconds: schedInSeconds,
+				sched: sched
+			)
+		});
+	}
+
+	//Alias
+	*interpTempo { | tempo = 1, time = 0, shape,
+		delta = 0.1, schedInSeconds = false, sched = 1, server |
+		this.interpolateTempo(
+			tempo: tempo,
+			time: time,
+			shape: shape,
+			delta: delta,
+			schedInSeconds: schedInSeconds,
+			sched: sched,
+			server: server
+		)
 	}
 }

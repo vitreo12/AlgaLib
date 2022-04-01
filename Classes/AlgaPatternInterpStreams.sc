@@ -22,7 +22,10 @@ AlgaPatternInterpStreams {
 	var <server;
 
 	//The time entries
-	var <>dur, <>sustain, <>stretch, <>legato;
+	var <>dur, <>durAlgaPseg;
+	var <>sustain, <>sustainAlgaPseg;
+	var <>stretch, <>stretchAlgaPseg;
+	var <>legato, <>legatoAlgaPseg;
 
 	//Store it for .replace
 	var <algaReschedulingEventStreamPlayer;
@@ -404,7 +407,7 @@ AlgaPatternInterpStreams {
 		this.addInOutNodesDictAtParam(entryOriginal, paramName, false);
 
 		//Get shape
-		shape = algaPattern.checkValidEnv(shape) ? algaPattern.getInterpShape(paramName);
+		shape = shape.algaCheckValidEnv ? algaPattern.getInterpShape(paramName);
 
 		//Trigger the interpolation process on all the other active interpSynths.
 		//This must always be before createPatternInterpSynthAndBusAtParam

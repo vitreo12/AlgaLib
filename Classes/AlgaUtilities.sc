@@ -33,9 +33,9 @@ AlgaArg {
 		scaleStream  = argScale.algaAsStream;  //Pattern support
 	}
 
-	algaAdvance {
-		chans  = chansStream.next;
-		scale  = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
+	algaAdvance { | e |
+		chans  = chansStream.next(e);
+		scale  = scaleStream.next(e).copy; //.copy is necessary not to replace entry in scaleStream
 		scale.algaAdvanceArrayScaleValues;
 	}
 
@@ -108,12 +108,12 @@ AlgaOut {
 		scaleStream  = argScale.algaAsStream; //Pattern support
 	}
 
-	algaAdvance {
-		node  = nodeStream.next;
-		param = paramStream.next;
-		chans = chansStream.next;
-		scale = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
-		scale.algaAdvanceArrayScaleValues;
+	algaAdvance { | e |
+		node  = nodeStream.next(e);
+		param = paramStream.next(e);
+		chans = chansStream.next(e);
+		scale = scaleStream.next(e).copy; //.copy is necessary not to replace entry in scaleStream
+		scale.algaAdvanceArrayScaleValues(e);
 	}
 
 	isAlgaOut { ^true }
@@ -156,10 +156,10 @@ AlgaTemp {
 		algaReaderPfuncParams = Array.newClear();
 	}
 
-	algaAdvance {
-		chans = chansStream.next;
-		scale = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
-		scale.algaAdvanceArrayScaleValues;
+	algaAdvance { | e |
+		chans = chansStream.next(e);
+		scale = scaleStream.next(e).copy; //.copy is necessary not to replace entry in scaleStream
+		scale.algaAdvanceArrayScaleValues(e);
 	}
 
 	setDef { | argDef |
@@ -251,10 +251,10 @@ AQ : AlgaQuant {}
 
 //Advance Array values for scale (min / max can be Patterns)
 +SequenceableCollection {
-	algaAdvanceArrayScaleValues {
+	algaAdvanceArrayScaleValues { | e |
 		this.do({ | entry, i |
 			if(entry.isStream, {
-				var entryNext = entry.next;
+				var entryNext = entry.next(e);
 				this[i] = entryNext;
 			});
 		});

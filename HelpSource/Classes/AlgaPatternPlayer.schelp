@@ -39,6 +39,8 @@ ARGUMENT:: param
 The parameter to modify.
 ARGUMENT:: time
 The time it will take to perform the changes. Note that this will be transferred to every link::Classes/AlgaPattern::s that are using the link::Classes/AlgaPatternPlayer::.
+ARGUMENT:: shape
+An link::Classes/Env:: that optionally allows you to define a specific shape for the interpolation.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
@@ -78,6 +80,40 @@ Manually set a code::sched:: value to use when not specified explicitly.
 
 METHOD:: time
 Manually set a code::time:: value to use when not specified explicitly.
+
+METHOD:: tempoScaling
+Specify if all timed actions should be scaled by the clock's tempo. Default is code::false::.
+
+METHOD:: interpolateDur
+Check link::Classes/AlgaPattern::.
+
+METHOD:: interpDur
+Check link::Classes/AlgaPattern::.
+
+METHOD:: interpDelta
+Check link::Classes/AlgaPattern::.
+
+METHOD:: interpolateDelta
+Check link::Classes/AlgaPattern::.
+
+METHOD:: interpStretch
+Check link::Classes/AlgaPattern::.
+
+METHOD:: interpolateStretch
+Check link::Classes/AlgaPattern::.
+
+METHOD:: resync
+Check link::Classes/AlgaPattern::.
+
+METHOD:: schedResync
+Check link::Classes/AlgaPattern::.
+
+METHOD:: durInterpReset
+Check link::Classes/AlgaPattern::.
+
+METHOD:: durInterpResync
+Check link::Classes/AlgaPattern::.
+
 
 EXAMPLES::
 code::
@@ -128,7 +164,6 @@ private:: compileFunctionSynthDefDictIfNeeded
 private:: dur
 private:: entries
 private:: fromInner
-private:: interpolateDur
 private:: isAlgaPatternPlayer
 private:: manualDur
 private:: parseAlgaTempParam
@@ -155,3 +190,10 @@ private:: scheduledStepActionsPre
 private:: scheduler
 private:: server
 private:: timeInner
+private:: clock
+private:: durAlgaPseg
+private:: interpolateDurParamAtSched
+private:: setDurAtSched
+private:: setStretchAtSched
+private:: stretch
+private:: stretchAlgaPseg
