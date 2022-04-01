@@ -93,7 +93,7 @@
     )
     ```
 
-# Bug fixes
+## Bug fixes
 
 - Major parser rewrite that leads to more predictable results and a larger amount of patterns supported.
 
