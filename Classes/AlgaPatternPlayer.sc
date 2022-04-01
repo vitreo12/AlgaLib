@@ -530,12 +530,12 @@ AlgaPatternPlayer {
 			});
 		});
 
-		//Free old lastID stuff after time + 2 (for certainty)
+		//Free old lastID stuff after time + 1 (for certainty)
 		this.addAction(
 			func: {
 				if(lastID != nil, {
 					fork {
-						(time + 2).wait;
+						(time + 1).wait;
 						entries[param].removeAt(lastID);
 						entries[param][\entries].removeAt(lastID);
 					}
