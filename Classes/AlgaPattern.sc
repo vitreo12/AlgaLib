@@ -172,7 +172,7 @@ AlgaPattern : AlgaNode {
 	*new { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
 		schedInSeconds = false, tempoScaling = false,
 		sampleAccurateFuncs = true, player, server |
-		^super.new_ap(
+		^super.newAP(
 			def: def,
 			interpTime: interpTime,
 			interpShape: interpShape,

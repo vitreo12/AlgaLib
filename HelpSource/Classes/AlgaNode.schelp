@@ -56,6 +56,7 @@ Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaNode:: on
 
 
 private:: new_ap
+private:: newAP
 private:: debug
 
 
