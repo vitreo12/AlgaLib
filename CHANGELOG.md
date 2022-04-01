@@ -29,7 +29,7 @@
 
 # Bug fixes
 
-- Major parser rewrite that leads to more predictable results and a larger amount of patterns supported
+- Major parser rewrite that leads to more predictable results and a larger amount of patterns supported.
 
 # 1.1.1
 
