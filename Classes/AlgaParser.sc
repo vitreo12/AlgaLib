@@ -19,7 +19,6 @@
 //The instance of the Class is passed as 'obj' and accessed / manipulated in the parsing functions here
 AlgaParser {
 	var obj;
-	var recursiveObjectList;
 
 	/*
 	Required vars:

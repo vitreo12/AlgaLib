@@ -1326,7 +1326,7 @@ AlgaPattern : AlgaNode {
 					});
 				});
 
-				//Standard case: get value from currentEnvironment (patternPairs)
+				//Standard case: get value from currentEnvironment (coming from patternPairs)
 				if(scalarInAlgaStep.not, {
 					paramValue = currentEnvironment[paramName];
 				});
