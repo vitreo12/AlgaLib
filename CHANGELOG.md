@@ -4,6 +4,33 @@
 
 - `AlgaPattern` now supports scalar parameters. This is now the preferred way of interfacing with `Buffer` parameters. Also, scalar parameters can be used for optimization reasons for parameters that need to be set only once at the trigger of the `Synth` instance, without the overhead of the interpolator.
 
+- `AlgaPattern`: added the `lf` annotator for functions in order for them to be declared as `LiteralFunctions`. These are used for `keys` that would interpret all `Functions` as `UGen Functions`, while they however could represent a `Pfunc` or `Pif` entry:
+
+    ```SuperCollider
+    (
+    Alga.boot({
+        a = AP((
+            //.lf is needed or it's interpreted as a UGen func
+            def: Pif(Pfunc( { 0.5.coin }.lf ), 
+                { SinOsc.ar(\freq.kr(440)) * EnvPerc.ar },
+                { Saw.ar(\freq.kr(440)) * EnvPerc.ar * 0.5 }
+            ),
+
+            //No need to .lf here as 'freq' does not expect UGen functions
+            //like 'def' does
+            freq: Pif( Pfunc { 0.5.coin },
+                AT({ LFNoise0.kr(10) }, scale: [440, 880]),
+                Pseq([ AT { DC.kr(220) }, AT { DC.kr(440) }], inf)
+            )
+        )).play(chans:2)
+    })
+    )
+    ```
+
+# Bug fixes
+
+- Major parser rewrite that leads to more predictable results and a larger amount of patterns supported
+
 # 1.1.1
 
 ## Bug fixes
