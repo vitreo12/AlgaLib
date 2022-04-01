@@ -434,68 +434,30 @@ AlgaPatternPlayer {
 		^algaTemp;
 	}
 
-	//Loop through ListPattern (looking for AlgaTemps)
-	reassignListPattern { | listPattern, algaPatternPlayerParam |
-		listPattern.list.do({ | listEntry, i |
-			listPattern.list[i] = this.reassignAlgaReaderPfuncs(listEntry, algaPatternPlayerParam)
-		});
-		^listPattern;
-	}
-
-	//Loop through ListPattern (looking for AlgaTemps)
-	reassignFilterPattern { | filterPattern, algaPatternPlayerParam |
-		filterPattern.pattern = this.reassignAlgaReaderPfuncs(filterPattern.pattern, algaPatternPlayerParam);
-		^filterPattern;
-	}
-
-	//Try to reassign a class entry (if possible)
-	reassignGenericPattern { | classInst, algaPatternPlayerParam |
-		classInst.class.instVarNames.do({ | instVarName |
-			try {
-				var getter = classInst.perform(instVarName);
-				var value = this.reassignAlgaReaderPfuncs(getter, algaPatternPlayerParam);
-				//Set the newly calculated AlgaReaderPfunc.
-				//Honestly, this "setter" method is not that safe, as it assumes that the
-				//Class implements a setter for the specific instance variable.
-				//The AlgaReaderPfunc should instead be modified in place
-				if(value.isAlgaReaderPfunc, {
-					classInst.perform((instVarName ++ "_").asSymbol, value);
-				});
-			} { | error |
-				//Catch setter errors
-				if(error.isKindOf(DoesNotUnderstandError), {
-					if(error.selector.asString.endsWith("_"), {
-						("AlgaPatternPlayer: could not reassign the AlgaReaderPfunc for '" ++
-							classInst.class ++ "." ++ error.selector ++
-							"'. The Class does implement its setter method."
-						).error
-					});
-				})
-			}
-		});
-		^classInst;
-	}
-
 	//Go through AlgaTemp / ListPattern / FilterPattern looking for things
 	//to re-assing to let AlgaReaderPfunc work correctly
 	reassignAlgaReaderPfuncs { | value, algaPatternPlayerParam |
+		var isAlgaReaderPfuncOrAlgaTemp = false;
+
 		case
-		{ value.isAlgaTemp } {
-			value = this.reassignAlgaTemp(value, algaPatternPlayerParam);
-		}
-		{ value.isListPattern } {
-			value = this.reassignListPattern(value, algaPatternPlayerParam);
-		}
-		{ value.isFilterPattern } {
-			value = this.reassignFilterPattern(value, algaPatternPlayerParam);
-		}
 		{ value.isAlgaReaderPfunc } {
 			value = this.reassignAlgaReaderPfunc(value, algaPatternPlayerParam);
+			isAlgaReaderPfuncOrAlgaTemp = true;
 		}
-		{ value.isPattern } {
-			//Fallback
-			this.reassignGenericPattern(value, algaPatternPlayerParam);
+		{ value.isAlgaTemp } {
+			value = this.reassignAlgaTemp(value, algaPatternPlayerParam);
+			isAlgaReaderPfuncOrAlgaTemp = true;
 		};
+
+		//Pattern
+		if(isAlgaReaderPfuncOrAlgaTemp.not, {
+			value.algaParseObject(
+				func: { | val |
+					this.reassignAlgaReaderPfuncs(val, algaPatternPlayerParam)
+				},
+				replace: false
+			)
+		});
 
 		^value;
 	}

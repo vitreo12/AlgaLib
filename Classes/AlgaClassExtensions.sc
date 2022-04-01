@@ -91,7 +91,7 @@
 	}
 
 	//Loop through every instance variable of an Object and execute func, reassigning the entry
-	algaParseObject { | func, validClasses, replace = true |
+	algaParseObject { | func, validClasses, replace = false |
 		if(this.isKindOf(Nil).not, {
 			if(this.algaValidParserClass(validClasses), {
 				this.slotsDo { | slot |
