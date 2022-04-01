@@ -431,8 +431,14 @@ AlgaPattern : AlgaNode {
 
 	//Used for mid-pattern interpolation
 	getCurrentEnvironment {
-		if(currentEnvironment.size > 0, { ^currentEnvironment });
-		^(latestCurrentEnvironment ? currentEnvironment) //if undefined
+		//If it includes \algaPatternInterpStreams (other Alga keys used in createPattern
+		//could be used instead), then currentEnvironment is an AlgaPattern triggered Event
+		if(currentEnvironment.keys.includes(\algaPatternInterpStreams), {
+			^currentEnvironment
+		});
+
+		//This would then be returned in any other case, including mid-pattern interpolation
+		^(latestCurrentEnvironment ? currentEnvironment)
 	}
 
 	//Free all unused busses from interpStreams
@@ -3196,7 +3202,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Interpolate a parameter that is not in controlNames (like \lag)
-	interpolateGenericParam { | sender, param, time, sched |
+	interpolateScalarOrGenericParam { | sender, param, time, sched |
 		var paramConnectionTime = paramsConnectionTime[param];
 		var latestScalarUniqueID = latestScalarUniqueIDs[param];
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
@@ -3415,7 +3421,7 @@ AlgaPattern : AlgaNode {
 		//Scalar param OR
 		//aram is not in controlNames. Probably setting another kind of parameter (like \lag)
 		if((this.isScalarParam(param)).or(controlNames[param] == nil), {
-			^this.interpolateGenericParam(sender, param, time, sched);
+			^this.interpolateScalarOrGenericParam(sender, param, time, sched);
 		});
 
 		//Force Pattern / AlgaArg / AlgaTemp dispatch
