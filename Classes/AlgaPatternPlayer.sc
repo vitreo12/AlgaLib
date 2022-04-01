@@ -24,7 +24,7 @@ AlgaPatternPlayer {
 	var <algaPatterns;
 	var <algaPatternEntries;
 	var <algaPatternsPrevFunc;
-	var <server, <scheduler;
+	var <server;
 
 	var <beingStopped = false;
 	var <schedInSeconds = false;
@@ -48,15 +48,15 @@ AlgaPatternPlayer {
 		actionScheduler.advanceAndConsumeScheduledStepActions(post)
 	}
 
-	//Parse an entry
-	parseParam { | value, functionSynthDefDict |
-		^parser.parseParam(value, functionSynthDefDict)
-	}
-
 	//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
 	//Otherwise, it will just execute func
 	compileFunctionSynthDefDictIfNeeded { | func, functionSynthDefDict |
 		^actionScheduler.compileFunctionSynthDefDictIfNeeded(func, functionSynthDefDict)
+	}
+
+	//Parse an entry
+	parseParam { | value, functionSynthDefDict |
+		^parser.parseParam(value, functionSynthDefDict)
 	}
 
 	/*****************************************************************************************/
@@ -107,6 +107,7 @@ AlgaPatternPlayer {
 	}
 
 	init { | argDef, argServer |
+		var scheduler;
 		var patternPairs = Array.newClear;
 		var foundDurOrDelta = false;
 		var functionSynthDefDict = IdentityDictionary(); //AlgaTemp parser needs this
@@ -125,7 +126,7 @@ AlgaPatternPlayer {
 		});
 
 		//Create AlgaActionScheduler
-		actionScheduler = AlgaActionScheduler(this);
+		actionScheduler = AlgaActionScheduler(this, scheduler);
 
 		//Create AlgaParser
 		parser = AlgaParser(this);
@@ -221,7 +222,7 @@ AlgaPatternPlayer {
 				func: {
 					beingStopped = false;
 					algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
-						clock: scheduler.clock
+						clock: this.clock
 					);
 				},
 				sched: sched
@@ -624,6 +625,14 @@ AlgaPatternPlayer {
 
 	<< { | sender, param = \in |
 		this.from(sender, param)
+	}
+
+	clock {
+		^(actionScheduler.scheduler.clock)
+	}
+
+	scheduler {
+		^(actionScheduler.scheduler)
 	}
 
 	isAlgaPatternPlayer { ^true }
