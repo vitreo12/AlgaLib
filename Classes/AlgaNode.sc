@@ -18,9 +18,6 @@ AlgaNode {
 	//Server where this node lives
 	var <server;
 
-	//The AlgaScheduler @ this server
-	var <scheduler;
-
 	//The AlgaActionScheduler
 	var <actionScheduler;
 
@@ -216,6 +213,8 @@ AlgaNode {
 	}
 
 	initAllVariables { | argServer |
+		var scheduler;
+
 		//Default server if not specified otherwise
 		server = argServer ? Server.default;
 
@@ -231,7 +230,7 @@ AlgaNode {
 		});
 
 		//AlgaActionScheduler
-		actionScheduler = AlgaActionScheduler(this);
+		actionScheduler = AlgaActionScheduler(this, scheduler);
 
 		//AlgaParser
 		parser = AlgaParser(this);
@@ -339,42 +338,7 @@ AlgaNode {
 	//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
 	//Otherwise, it will just execute func
 	compileFunctionSynthDefDictIfNeeded { | func, functionSynthDefDict |
-		//If functionSynthDefDict has elements, it means that there are AlgaSynthDefs with Functions to be waited for
-		if(functionSynthDefDict != nil, {
-			if(functionSynthDefDict.size > 0, {
-				var wait = Condition();
-
-				fork {
-					//Loop over and compile Functions and AlgaTemps
-					functionSynthDefDict.keysValuesDo({ | name, sdef |
-						//AlgaTemp
-						if(sdef.isArray, {
-							var algaTemp = sdef[1];
-							sdef = sdef[0];
-							sdef.sendAndAddToGlobalDescLib(server);
-							algaTemp.checkValidSynthDef(name);
-						}, {
-							//Just AlgaSynthDef
-							sdef.sendAndAddToGlobalDescLib(server);
-						})
-					});
-
-					//Unlock condition
-					server.sync(wait);
-				};
-
-				this.addAction(
-					condition: { wait.test == true },
-					func: { func.value },
-					preCheck: true //execute right away if possible (most unlikely)
-				);
-
-				^this
-			});
-		});
-
-		//No Functions to consume
-		^func.value;
+		^actionScheduler.compileFunctionSynthDefDictIfNeeded(func, functionSynthDefDict);
 	}
 
 	//Wait for all args to be instantiated before going forward
@@ -4832,7 +4796,9 @@ AlgaNode {
 		group.moveToTail(argGroup);
 	}
 
-	clock { ^(scheduler.clock) }
+	clock { ^(actionScheduler.scheduler.clock) }
+
+	scheduler { ^(actionScheduler.scheduler) }
 
 	//asString: use name or group's ID
 	asString {

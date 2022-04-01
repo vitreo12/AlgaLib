@@ -120,9 +120,6 @@ AlgaPattern : AlgaNode {
 	//If false: normal play fadeIn / fadeOut mechanism
 	var <stopPatternBeforeReplace = true;
 
-	//Actions scheduled on a step
-	var <>scheduledStepActionsPre, <>scheduledStepActionsPost;
-
 	//Used to set sustain's gate
 	var <>isSustainTrig = false;
 

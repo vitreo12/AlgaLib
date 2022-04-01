@@ -14,20 +14,66 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//All functions related to addAction
+//All functions related to adding actions to the AlgaScheduler
 AlgaActionScheduler {
-	var obj;
+	var <obj;
+	var <scheduler;
+	var <scheduledStepActionsPre, <scheduledStepActionsPost;
 
 	/*
 	Required vars:
 
-	<>scheduledStepActionsPre, <>scheduledStepActionsPost;
-
-	<schedInSeconds;
+	server, schedInSeconds
 	*/
 
-	*new { | obj |
-		^super.newCopyArgs(obj)
+	*new { | obj, scheduler |
+		^super.new.init(obj, scheduler)
+	}
+
+	init { | argObj, argScheduler |
+		obj = argObj;
+		scheduler = argScheduler;
+	}
+
+	//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
+	//Otherwise, it will just execute func
+	compileFunctionSynthDefDictIfNeeded { | func, functionSynthDefDict |
+		//If functionSynthDefDict has elements, it means that there are AlgaSynthDefs with Functions to be waited for
+		if(functionSynthDefDict != nil, {
+			if(functionSynthDefDict.size > 0, {
+				var wait = Condition();
+
+				fork {
+					//Loop over and compile Functions and AlgaTemps
+					functionSynthDefDict.keysValuesDo({ | name, sdef |
+						//AlgaTemp
+						if(sdef.isArray, {
+							var algaTemp = sdef[1];
+							sdef = sdef[0];
+							sdef.sendAndAddToGlobalDescLib(obj.server);
+							algaTemp.checkValidSynthDef(name);
+						}, {
+							//Just AlgaSynthDef
+							sdef.sendAndAddToGlobalDescLib(obj.server);
+						})
+					});
+
+					//Unlock condition
+					obj.server.sync(wait);
+				};
+
+				this.addAction(
+					condition: { wait.test == true },
+					func: { func.value },
+					preCheck: true //execute right away if possible (most unlikely)
+				);
+
+				^this
+			});
+		});
+
+		//No Functions to consume
+		^func.value;
 	}
 
 	//Add an action to scheduler. This takes into account sched == AlgaStep
@@ -48,7 +94,7 @@ AlgaActionScheduler {
 				//AlgaNodes don't support AlgaStep
 				sched = sched.step;
 				("AlgaNode: only AlgaPatterns support AlgaStep actions. Scheduling action at " ++ sched).error;
-				obj.scheduler.addAction(
+				scheduler.addAction(
 					condition: condition,
 					func: func,
 					sched: sched,
@@ -59,7 +105,7 @@ AlgaActionScheduler {
 			});
 		}, {
 			//Normal scheduling (sched is a number or AlgaQuant)
-			obj.scheduler.addAction(
+			scheduler.addAction(
 				condition: condition,
 				func: func,
 				sched: sched,
@@ -77,9 +123,9 @@ AlgaActionScheduler {
 		//Pre or post
 		var scheduledStepActions;
 		if(post.not, {
-			scheduledStepActions = obj.scheduledStepActionsPre;
+			scheduledStepActions = scheduledStepActionsPre;
 		}, {
-			scheduledStepActions = obj.scheduledStepActionsPost;
+			scheduledStepActions = scheduledStepActionsPost;
 		});
 
 		//Go ahead with the advancing + removal
@@ -132,11 +178,11 @@ AlgaActionScheduler {
 
 		//Create if needed
 		if(post.not, {
-			obj.scheduledStepActionsPre = obj.scheduledStepActionsPre ? OrderedIdentitySet(10);
-			obj.scheduledStepActions = obj.scheduledStepActionsPre;
+			scheduledStepActionsPre = scheduledStepActionsPre ? OrderedIdentitySet(10);
+			scheduledStepActions = scheduledStepActionsPre;
 		}, {
-			obj.scheduledStepActionsPost = obj.scheduledStepActionsPost ? OrderedIdentitySet(10);
-			obj.scheduledStepActions = obj.scheduledStepActionsPost;
+			scheduledStepActionsPost = scheduledStepActionsPost ? OrderedIdentitySet(10);
+			scheduledStepActions = scheduledStepActionsPost;
 		});
 
 		//Add
