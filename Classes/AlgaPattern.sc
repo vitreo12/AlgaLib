@@ -15,12 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 AlgaPattern : AlgaNode {
-	/*
-	TODOs:
-
-	1) mixFrom()
-	*/
-
 	//Special groups used in AlgaPattern
 	var <>fxGroup;
 	var <>fxConvGroup;
