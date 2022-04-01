@@ -75,6 +75,9 @@
 		thisThread.algaHandleError(this);
 	}
 
+	//To be overloaded
+	algaResetParsingVars { }
+
 	//Parser valid classes to inspect.
 	//These can be passed as an Array of Classes.
 	algaValidParserClass { | validClasses |

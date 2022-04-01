@@ -1183,12 +1183,12 @@ AlgaNode {
 			if(this.unpackSynthDefSymbol(pattern, outsMappingSum) == nil, { ^nil });
 		}, {
 			//Pattern
-			pattern.algaParseObject(
+			parser.parseGenericObject(pattern,
 				func: { | val |
 					this.unpackPatternOutsMapping(val, outsMappingSum);
 				},
 				replace: false
-			);
+			)
 		});
 
 		^outsMappingSum;
@@ -1724,7 +1724,7 @@ AlgaNode {
 			this.removeActiveNodeAndRearrangeBlock(param, sender);
 		}, {
 			//Generic object
-			sender.algaParseObject(
+			parser.parseGenericObject(sender,
 				func: { | val |
 					this.removeActiveNodesAndRearrangeBlocks(param, val);
 				},
@@ -3263,7 +3263,7 @@ AlgaNode {
 			if(sendersSet.includes(sender), { ^true }); //Connection is in place
 		}, {
 			//Pattern: keep looking
-			sender.algaParseObject(
+			parser.parseGenericObject(sender,
 				func: { | val |
 					if(this.checkConnectionAlreadyInPlaceInner(sendersSet, val), { ^true });
 				},
@@ -3654,158 +3654,12 @@ AlgaNode {
 
 	//Parse an AlgaTemp
 	parseAlgaTempParam { | algaTemp, functionSynthDefDict, topAlgaTemp |
-		var validAlgaTemp = false;
-		var def = algaTemp.def;
-		var defDef;
-
-		if(def == nil, {
-			"AlgaPattern: AlgaTemp has a nil 'def' argument".error;
-			^nil;
-		});
-
-		case
-
-		//Symbol
-		{ def.isSymbol } {
-			defDef = def;
-			algaTemp.checkValidSynthDef(defDef); //check \def right away
-			if(algaTemp.valid.not, { defDef = nil });
-			validAlgaTemp = true;
-		}
-
-		//Event
-		{ def.isEvent } {
-			defDef = def[\def];
-			if(defDef == nil, {
-				"AlgaPattern: AlgaTemp's 'def' Event does not provide a 'def' entry".error;
-				^nil
-			});
-
-			case
-
-			//Symbol: check \def right away
-			{ defDef.isSymbol } {
-				algaTemp.checkValidSynthDef(defDef); //check \def right away
-				if(algaTemp.valid.not, { defDef = nil });
-			}
-
-			//Substitute \def with the new symbol
-			{ defDef.isFunction } {
-				var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-				//AlgaTemp can be sampleAccurate in AlgaPatterns!
-				functionSynthDefDict[defName] = [
-					AlgaSynthDef.new_inner(
-						defName,
-						defDef,
-						sampleAccurate: algaTemp.sampleAccurate,
-						makeFadeEnv: false,
-						makePatternDef: false,
-						makeOutDef: false
-					),
-					algaTemp
-				];
-
-				defDef = defName;
-				def[\def] = defName;
-			};
-
-			//Loop around the event entries and use as Stream, substituting entries
-			def.keysValuesDo({ | key, entry |
-				if(key != \def, {
-					var parsedEntry = this.parseParam_inner(entry, functionSynthDefDict);
-					if(parsedEntry == nil, { ^nil });
-					//Finally, replace in place
-					def[key] = parsedEntry.algaAsStream;
-				});
-			});
-
-			validAlgaTemp = true;
-		}
-
-		//Function: subsitute \def with the new symbol
-		{ def.isFunction } {
-			var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-			//AlgaTemp can be sampleAccurate in AlgaPatterns!
-			functionSynthDefDict[defName] = [
-				AlgaSynthDef.new_inner(
-					defName,
-					def,
-					sampleAccurate: algaTemp.sampleAccurate,
-					makeFadeEnv: false,
-					makePatternDef: false,
-					makeOutDef: false
-				),
-				algaTemp
-			];
-
-			defDef = defName;
-			algaTemp.setDef(defName); //Substitute .def with the Symbol
-			validAlgaTemp = true;
-		};
-
-		//Check validity
-		if(validAlgaTemp.not, {
-			("AlgaPattern: AlgaTemp's 'def' argument must either be a Symbol, Event or Function").error;
-			^nil
-		});
-
-		//Check if actually a symbol now
-		if(defDef.class != Symbol, {
-			("AlgaPattern: Invalid AlgaTemp's definition: '" ++ defDef.asString ++ "'").error;
-			^nil
-		});
-
-		//Return the modified algaTemp (in case of Event / Function)
-		^algaTemp;
-	}
-
-	//Parse a param looking for AlgaTemps and ListPatterns
-	parseParam_inner { | value, functionSynthDefDict |
-		var genericObject = true;
-
-		//Look for AlgaTemp / AlgaReaderPfunc
-		case
-		{ value.isAlgaTemp } {
-			value = this.parseAlgaTempParam(value, functionSynthDefDict);
-			genericObject = false;
-		}
-		{ value.isAlgaReaderPfunc } {
-			if(this.isAlgaPattern, { this.assignAlgaReaderPfunc(value) });
-			genericObject = false;
-		};
-
-		//Any other object: run parsing
-		if(genericObject, {
-			value = this.parseGenericObjectParam(value, functionSynthDefDict);
-		});
-
-		//Returned parsed element
-		^value;
+		^(parser.parseAlgaTempParam(algaTemp,functionSynthDefDict, topAlgaTemp))
 	}
 
 	//Parse an entry
 	parseParam { | value, functionSynthDefDict |
-		//Used in from {}
-		var returnBoth = false;
-		if(functionSynthDefDict == nil, {
-			returnBoth = true;
-			functionSynthDefDict = IdentityDictionary();
-		});
-
-		//Reset paramContainsAlgaReaderPfunc, and latestPlayers recursiveObjectList
-		if(this.isAlgaPattern, { this.resetPatternParsingVars });
-
-		//Actual parsing
-		value = this.parseParam_inner(value, functionSynthDefDict);
-
-		//Used in from {}
-		if(returnBoth, {
-			^[value, functionSynthDefDict]
-		}, {
-			^value
-		})
+		^(parser.parseParam(value, functionSynthDefDict))
 	}
 
 	//<<.param AlgaTemp

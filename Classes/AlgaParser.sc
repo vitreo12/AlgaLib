@@ -24,13 +24,56 @@ AlgaParser {
 	/*
 	Required vars:
 
-	outsMapping, sampleAccurateFuncs, defPreParsing,
-	currentPatternOutNodes, prevPatternOutNodes,
-	latestPlayersAtParam, paramContainsAlgaReaderPfunc, players
+	outsMapping, sampleAccurateFuncs,
+	defPreParsing, currentPatternOutNodes, prevPatternOutNodes
 	*/
 
 	*new { | obj |
 		^super.newCopyArgs(obj)
+	}
+
+	//Parsing implementation
+	parseGenericObjectInner { | genericObject, func, replace = false, validClasses |
+		if(genericObject.isKindOf(Nil).not, {
+			var recursiveObjectList = currentEnvironment[\algaParserRecursiveObjectList] ? IdentitySet();
+			recursiveObjectList.add(genericObject);
+			genericObject.algaParseObject(
+				func: { | val |
+					if((val != nil).and(recursiveObjectList.includes(val).not), {
+						//Re-use the recursiveObjectList
+						currentEnvironment[\algaParserUpdateRecursiveObjectList] = false;
+						func.value(val);
+					});
+				},
+				replace: replace,
+				validClasses: validClasses
+			);
+		});
+	}
+
+	//Parse
+	parseGenericObject { | genericObject, func, replace = false, validClasses |
+		//Functions are most likely recursive
+		//We only need 1 re-usable IdentitySet per function stack.
+		//currentEnvironment is here used to create a stack emulation
+		var algaParserUpdateRecursiveObjectList = currentEnvironment[\algaParserUpdateRecursiveObjectList];
+		if(algaParserUpdateRecursiveObjectList != false, { //false is set in parseGenericObjectInner
+			currentEnvironment[\algaParserRecursiveObjectList] = IdentitySet(10);
+		});
+
+		//Run parsing
+		this.parseGenericObjectInner(
+			genericObject: genericObject,
+			func: func,
+			replace: replace,
+			validClasses: validClasses
+		);
+
+		//Reset the stack
+		currentEnvironment[\algaParserUpdateRecursiveObjectList] = nil;
+
+		//Return the object. This got modified in place
+		^genericObject;
 	}
 
 	//Parse an AlgaTemp
@@ -153,13 +196,18 @@ AlgaParser {
 			genericObject = false;
 		}
 		{ value.isAlgaReaderPfunc } {
-			if(this.isAlgaPattern, { this.assignAlgaReaderPfunc(value) });
+			if(obj.isAlgaPattern, { obj.assignAlgaReaderPfunc(value) });
 			genericObject = false;
 		};
 
 		//Any other object: run parsing
 		if(genericObject, {
-			value = this.parseGenericObjectParam(value, functionSynthDefDict);
+			value = this.parseGenericObject(value,
+				func: { | val |
+					this.parseParamInner(val, functionSynthDefDict);
+				},
+				replace: true
+			);
 		});
 
 		//Returned parsed element
@@ -191,30 +239,9 @@ AlgaParser {
 		})
 	}
 
-	//Parse an object
-	parseGenericObjectParam { | object, functionSynthDefDict, validClasses |
-		if(object != nil, {
-			recursiveObjectList.add(object);
-			object.algaParseObject(
-				func: { | val |
-					if((val != nil).and(recursiveObjectList.includes(val).not), {
-						this.parseParamInner(val, functionSynthDefDict);
-					});
-				},
-				replace: true,
-				validClasses: validClasses
-			);
-		});
-		^object;
-	}
-
-	//Reset vars used in parsing AlgaPattern and AlgaPatternPlayer
-	resetPatternParsingVars { | recursiveObjectListOnly = false |
-		if((recursiveObjectListOnly.not).and(obj.isAlgaPattern), {
-			obj.paramContainsAlgaReaderPfunc = false;
-			obj.latestPlayersAtParam         = IdentityDictionary();
-		});
-		recursiveObjectList                  = IdentitySet(10);
+	//Reset vars used in parsing
+	resetPatternParsingVars {
+		obj.algaResetParsingVars;
 	}
 
 	//Parse a Function \def entry
@@ -240,18 +267,12 @@ AlgaParser {
 		if((def.isFunction).and(def.isLiteralFunction.not), {
 			^this.parseFunctionDefEntry(def, functionSynthDefDict)
 		}, {
-			//Pattern
-			if(def != nil, {
-				recursiveObjectList.add(def);
-				def.algaParseObject(
-					func: { | val |
-						if((val != nil).and(recursiveObjectList.includes(val).not), {
-							this.parseDefEntry(val, functionSynthDefDict);
-						});
-					},
-					replace: true
-				);
-			});
+			this.parseGenericObject(def,
+				func: { | val |
+					this.parseDefEntry(val, functionSynthDefDict);
+				},
+				replace: true
+			)
 		});
 		^def
 	}
@@ -283,18 +304,15 @@ AlgaParser {
 		});
 
 		//Parse and replace \def
-		recursiveObjectList = IdentitySet(10); //reset for parseDefEntry
 		def[\def] = this.parseDefEntry(defDef, functionSynthDefDict);
 
 		//Parse \fx
-		recursiveObjectList.clear; //reset for parseFX
 		if(defFX != nil, { def[\fx] = this.parseFX(defFX, functionSynthDefDict) });
 
 		//Parse \out (reset currentPatternOutNodes too)
 		if(defOut != nil, {
 			obj.prevPatternOutNodes = obj.currentPatternOutNodes.copy;
 			obj.currentPatternOutNodes = IdentitySet();
-			recursiveObjectList.clear; //reset for parseOut
 			def[\out] = this.parseOut(defOut)
 		});
 
@@ -302,7 +320,8 @@ AlgaParser {
 		def.keysValuesDo({ | key, value |
 			if((key != \fx).and(key != \out), {
 				value = this.parseParam(value, functionSynthDefDict);
-				this.calculatePlayersConnections(key); //Also removes old ones if needed
+				//Register AlgaPatternPlayers' connections
+				if(obj.isAlgaPattern, { obj.calculatePlayersConnections(key) });
 				def[key] = value;
 			});
 		});
@@ -403,7 +422,7 @@ AlgaParser {
 		//Pass explicitFree to Event
 		value[\explicitFree] = synthDefFx.explicitFree;
 
-		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursiveObjectList
+		//Reset parsing variables
 		this.resetPatternParsingVars;
 
 		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
@@ -413,9 +432,9 @@ AlgaParser {
 		});
 
 		//Check support for AlgaPatternPlayers on \fx
-		this.calculatePlayersConnections(\fx);
+		if(obj.isAlgaPattern, { obj.calculatePlayersConnections(\fx) });
 
-		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursiveObjectList again
+		//Reset parsing variables
 		this.resetPatternParsingVars;
 
 		^value
@@ -445,17 +464,12 @@ AlgaParser {
 		};
 
 		//Patterns
-		if(value != nil, {
-			recursiveObjectList.add(value);
-			value.algaParseObject(
-				func: { | val |
-					if((val != nil).and(recursiveObjectList.includes(val).not), {
-						this.parseFX(val, functionSynthDefDict)
-					});
-				},
-				replace: false
-			)
-		});
+		this.parseGenericObject(value,
+			func: { | val |
+				this.parseFX(val, functionSynthDefDict)
+			},
+			replace: false
+		);
 
 		^value
 	}
@@ -483,17 +497,12 @@ AlgaParser {
 			});
 		}, {
 			//Patterns
-			if(value != nil, {
-				recursiveObjectList.add(value);
-				value.algaParseObject(
-					func: { | val |
-						if((val != nil).and(recursiveObjectList.includes(val).not), {
-							this.parseOut(val, alreadyParsed)
-						});
-					},
-					replace: false
-				)
-			});
+			this.parseGenericObject(value,
+				func: { | val |
+					this.parseOut(val, alreadyParsed)
+				},
+				replace: false
+			);
 		});
 
 		^value.algaAsStream;
@@ -520,65 +529,13 @@ AlgaParser {
 		};
 
 		//Patterns
-		if(value != nil, {
-			recursiveObjectList.add(value);
-			value.algaParseObject(
-				func: { | val |
-					if((val != nil).and(recursiveObjectList.includes(val).not), {
-						this.parseOut(val, alreadyParsed);
-					});
-				},
-				replace: false
-			);
-		});
+		this.parseGenericObject(value,
+			func: { | val |
+				this.parseOut(val, alreadyParsed);
+			},
+			replace: false
+		);
 
 		^value.algaAsStream;
-	}
-
-	//Found an AlgaReaderPfunc
-	assignAlgaReaderPfunc { | algaReaderPfunc |
-		var latestPlayer = algaReaderPfunc.patternPlayer;
-		var params = algaReaderPfunc.params;
-		if(latestPlayer != nil, {
-			obj.paramContainsAlgaReaderPfunc = true;
-			obj.latestPlayersAtParam[latestPlayer] = obj.latestPlayersAtParam[latestPlayer] ? Array.newClear;
-			obj.latestPlayersAtParam[latestPlayer] = obj.latestPlayersAtParam[latestPlayer].add(params).flatten;
-		});
-		^algaReaderPfunc;
-	}
-
-	//Remove an AlgaPatternPlayer connection
-	removeAlgaPatternPlayerConnectionIfNeeded { | param |
-		if(obj.players != nil, {
-			var playersAtParam = obj.players[param];
-			if(playersAtParam != nil, {
-				playersAtParam.keysValuesDo({ | latestPlayer, latestPlayerParams |
-					latestPlayer.removeAlgaPatternEntry(this, param)
-				});
-				obj.players.removeAt(param);
-			});
-		});
-	}
-
-	//Add an AlgaPatternPlayer connection
-	addAlgaPatternPlayerConnectionIfNeeded { | param |
-		//Add an AlgaPatternPlayer connection
-		if((obj.paramContainsAlgaReaderPfunc).and(obj.latestPlayersAtParam.size > 0), {
-			obj.latestPlayersAtParam.keysValuesDo({ | latestPlayer, params |
-				latestPlayer.addAlgaPatternEntry(this, param);
-			});
-			obj.players = obj.players ? IdentityDictionary();
-			obj.players[param] = obj.latestPlayersAtParam.copy;
-		});
-	}
-
-	//Remove AlgaPatternPlayers' connections if there were any.
-	//They will be re-assigned if parsing allows it.
-	calculatePlayersConnections { | param |
-		//Remove old connections at param if needed
-		this.removeAlgaPatternPlayerConnectionIfNeeded(param);
-
-		//Enstablish new ones if needed
-		this.addAlgaPatternPlayerConnectionIfNeeded(param);
 	}
 }

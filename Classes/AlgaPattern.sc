@@ -143,9 +143,6 @@ AlgaPattern : AlgaNode {
 	var <>latestPlayersAtParam;
 	var <>paramContainsAlgaReaderPfunc = false;
 
-	//Used for parsing Patterns
-	var <recursiveObjectList;
-
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -1902,19 +1899,14 @@ AlgaPattern : AlgaNode {
 			});
 		}, {
 			//Pattern
-			if(object != nil, {
-				recursiveObjectList.add(object);
-				object.algaParseObject(
-					func: { | val |
-						if((val != nil).and(recursiveObjectList.includes(val).not), {
-							controlNamesSum = controlNamesSum.addAll(
-								this.checkPatternValidityAndReturnControlNames(val, controlNamesDict)
-							);
-						});
-					},
-					replace: false
-				);
-			});
+			parser.parseGenericObject(object,
+				func: { | val |
+					controlNamesSum = controlNamesSum.addAll(
+						this.checkPatternValidityAndReturnControlNames(val, controlNamesDict)
+					);
+				},
+				replace: false
+			)
 		});
 
 		//Sanity checks
@@ -1937,7 +1929,6 @@ AlgaPattern : AlgaNode {
 		controlNamesList = IdentityDictionary();
 
 		//Check rates, numChannels, Symbols and controlNames
-		recursiveObjectList.clear;
 		controlNamesSum = this.checkPatternValidityAndReturnControlNames(def);
 		if(controlNamesSum != nil, {
 			//Create controlNames from controlNamesSum
@@ -2424,358 +2415,19 @@ AlgaPattern : AlgaNode {
 		patternsAsStreams[interpStreams] = pattern.algaAsStream;
 	}
 
-	//Parse a single \fx Event entry
-	parseFXEvent { | value, functionSynthDefDict |
-		var foundInParam = false;
-		var synthDescFx, synthDefFx, controlNamesFx;
-		var isFunction = false;
-		var def;
-
-		//Find \def
-		def = value[\def];
-		if(def == nil, {
-			("AlgaPattern: no 'def' entry in 'fx': '" ++ value.asString ++ "'").error;
-			^nil
-		});
-
-		//If it's a Function, send def to server and replace entries.
-		if(def.isFunction, {
-			var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-			//The synthDef will be sent later! just use the def and the desc for now
-			synthDefFx = AlgaSynthDef.new_inner(
-				defName,
-				def,
-				makeFadeEnv: false,
-				makePatternDef: false,
-				makeOutDef: false
-			);
-
-			//Get the desc
-			synthDescFx = synthDefFx.asSynthDesc;
-
-			//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
-			functionSynthDefDict[defName] = synthDefFx;
-
-			//Replace the def: with the symbol
-			def = defName;
-			value[\def] = defName;
-
-			isFunction = true;
-		});
-
-		//Don't support other classes for now
-		if(def.isSymbol.not, {
-			("AlgaPattern: 'fx' only supports Symbols and Functions as 'def'").error;
-			^nil
-		});
-
-		//Check that \def is valid
-		if(isFunction.not, {
-			synthDescFx = SynthDescLib.global.at(def);
-		});
-
-		if(synthDescFx == nil, {
-			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "'").error;
-			^nil;
-		});
-
-		if(isFunction.not, {
-			synthDefFx = synthDescFx.def;
-		});
-
-		if(synthDefFx.class != AlgaSynthDef, {
-			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++"'").error;
-			^nil;
-		});
-
-		if(synthDefFx.sampleAccurate, {
-			("AlgaPattern: AlgaSynthDef in 'fx': '" ++ def.asString ++"' has 'sampleAccurate' on. This causes synchronization errors").warn;
-		});
-
-		controlNamesFx = synthDescFx.controls;
-		controlNamesFx.do({ | controlName |
-			if(controlName.name == \in, {
-				foundInParam = true;
-				//Pass numChannels / rate of in param to Event
-				value[\inNumChannels] = controlName.numChannels;
-				value[\inRate] = controlName.rate;
-			})
-		});
-
-		//Not found the \in parameter
-		if(foundInParam.not, {
-			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "': It does not provide an 'in' parameter").error;
-			^nil;
-		});
-
-		//Pass controlNames / numChannels / rate to Event
-		value[\controlNames] = controlNamesFx;
-		value[\numChannels] = synthDefFx.numChannels;
-		value[\rate] = synthDefFx.rate;
-
-		//Pass explicitFree to Event
-		value[\explicitFree] = synthDefFx.explicitFree;
-
-		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursiveObjectList
-		this.resetPatternParsingVars;
-
-		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
-		value.keysValuesDo({ | key, entry |
-			var parsedEntry = this.parseParam_inner(entry, functionSynthDefDict);
-			value[key] = parsedEntry.algaAsStream;
-		});
-
-		//Check support for AlgaPatternPlayers on \fx
-		this.calculatePlayersConnections(\fx);
-
-		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursiveObjectList again
-		this.resetPatternParsingVars;
-
-		^value
-	}
-
 	//Parse the \fx key
 	parseFX { | value, functionSynthDefDict |
-		case
-
-		//Single Event
-		{ value.isEvent } {
-			^this.parseFXEvent(value, functionSynthDefDict);
-		}
-
-		//If individual Symbol, if it's in SynthDescLib, use it as Event.
-		//Otherwise, passthrough (like, \none, \dry)
-		{ value.isSymbol } {
-			if(SynthDescLib.global.at(value) != nil, {
-				^this.parseFXEvent((def: value), functionSynthDefDict)
-			});
-			^value
-		}
-
-		//If individual Function, wrap in Event
-		{ (value.isFunction).and(value.isLiteralFunction.not) } {
-			^this.parseFXEvent((def: value), functionSynthDefDict)
-		};
-
-		//Patterns
-		if(value != nil, {
-			recursiveObjectList.add(value);
-			value.algaParseObject(
-				func: { | val |
-					if((val != nil).and(recursiveObjectList.includes(val).not), {
-						this.parseFX(val, functionSynthDefDict)
-					});
-				},
-				replace: false
-			)
-		});
-
-		^value
-	}
-
-	//Parse a single \out AlgaOut entry
-	parseOutAlgaOut { | value, alreadyParsed |
-		var node = value.nodeOrig;
-		var param = value.paramOrig;
-
-		if(param == nil, param = \in);
-		if(param.class != Symbol, {
-			"AlgaPattern: the 'param' argument in AlgaOut can only be a Symbol. Using 'in'".error;
-			param = \in
-		});
-
-		//AlgaNode
-		if(node.isAlgaNode, {
-			if(alreadyParsed[node] == nil, {
-				if(node.isAlgaPattern, {
-					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
-					^nil
-				});
-				alreadyParsed[node] = true;
-				currentPatternOutNodes.add([node, param]);
-			});
-		}, {
-			//Patterns
-			if(value != nil, {
-				recursiveObjectList.add(value);
-				value.algaParseObject(
-					func: { | val |
-						if((val != nil).and(recursiveObjectList.includes(val).not), {
-							this.parseOut(val, alreadyParsed)
-						});
-					},
-					replace: false
-				)
-			});
-		});
-
-		^value.algaAsStream;
+		^(parser.parseFX(value, functionSynthDefDict))
 	}
 
 	//Parse the \out key
 	parseOut { | value, alreadyParsed |
-		alreadyParsed = alreadyParsed ? IdentityDictionary();
-
-		case
-		{ value.isAlgaNode } {
-			if(alreadyParsed[value] == nil, {
-				if(value.isAlgaPattern, {
-					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
-					^nil
-				});
-				alreadyParsed[value] = true;
-				currentPatternOutNodes.add([value, \in]);
-			});
-			^value
-		}
-		{ value.isAlgaOut } {
-			^this.parseOutAlgaOut(value, alreadyParsed);
-		};
-
-		//Patterns
-		if(value != nil, {
-			recursiveObjectList.add(value);
-			value.algaParseObject(
-				func: { | val |
-					if((val != nil).and(recursiveObjectList.includes(val).not), {
-						this.parseOut(val, alreadyParsed);
-					});
-				},
-				replace: false
-			);
-		});
-
-		^value.algaAsStream;
-	}
-
-	//Found an AlgaReaderPfunc
-	assignAlgaReaderPfunc { | algaReaderPfunc |
-		var latestPlayer = algaReaderPfunc.patternPlayer;
-		var params = algaReaderPfunc.params;
-		if(latestPlayer != nil, {
-			paramContainsAlgaReaderPfunc = true;
-			latestPlayersAtParam[latestPlayer] = latestPlayersAtParam[latestPlayer] ? Array.newClear;
-			latestPlayersAtParam[latestPlayer] = latestPlayersAtParam[latestPlayer].add(params).flatten;
-		});
-		^algaReaderPfunc;
-	}
-
-	//Parse an object
-	parseGenericObjectParam { | object, functionSynthDefDict, validClasses |
-		if(object != nil, {
-			recursiveObjectList.add(object);
-			object.algaParseObject(
-				func: { | val |
-					if((val != nil).and(recursiveObjectList.includes(val).not), {
-						this.parseParam_inner(val, functionSynthDefDict);
-					});
-				},
-				replace: true,
-				validClasses: validClasses
-			);
-		});
-		^object;
-	}
-
-	//Reset vars used in parsing
-	resetPatternParsingVars {
-		paramContainsAlgaReaderPfunc = false;
-		latestPlayersAtParam = IdentityDictionary();
-		recursiveObjectList = IdentitySet(10);
-	}
-
-	//Parse a Function \def entry
-	parseFunctionDefEntry { | def, functionSynthDefDict |
-		//New defName
-		var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-		//sampleAccurate is set according to sampleAccurateFuncs
-		functionSynthDefDict[defName] = AlgaSynthDef(
-			defName,
-			def,
-			outsMapping: outsMapping,
-			sampleAccurate: sampleAccurateFuncs
-		); //This returns an AlgaSynthDefSpec (for _algaPattern and _algaPatternTempOut)
-
-		//Return the Symbol
-		^defName
-	}
-
-	//Parse the \def entry
-	parseDefEntry { | def, functionSynthDefDict |
-		//Literal functions are non-UGen graph functins!
-		if((def.isFunction).and(def.isLiteralFunction.not), {
-			^this.parseFunctionDefEntry(def, functionSynthDefDict)
-		}, {
-			//Pattern
-			if(def != nil, {
-				recursiveObjectList.add(def);
-				def.algaParseObject(
-					func: { | val |
-						if((val != nil).and(recursiveObjectList.includes(val).not), {
-							this.parseDefEntry(val, functionSynthDefDict);
-						});
-					},
-					replace: true
-				);
-			});
-		});
-		^def
+		^(parser.parseOut(value, alreadyParsed))
 	}
 
 	//Parse an entire def
 	parseDef { | def |
-		var defDef;
-		var defFX;
-		var defOut;
-
-		//Store [defName] -> AlgaSynthDef
-		var functionSynthDefDict = IdentityDictionary();
-
-		//Wrap in an Event if not an Event already
-		if(def.isEvent.not, { def = (def: def) });
-
-		//Store the original def (needed for AlgaPatternPlayer)
-		defPreParsing = def.deepCopy;
-
-		//Retrieve entries that need specific parsing
-		defDef = def[\def];
-		defFX  = def[\fx];
-		defOut = def[\out];
-
-		//Return nil if no def
-		if(defDef == nil, {
-			"AlgaPattern: the Event does not provide a 'def' entry".error;
-			^nil
-		});
-
-		//Parse and replace \def
-		recursiveObjectList = IdentitySet(10); //reset for parseDefEntry
-		def[\def] = this.parseDefEntry(defDef, functionSynthDefDict);
-
-		//Parse \fx
-		recursiveObjectList.clear; //reset for parseFX
-		if(defFX != nil, { def[\fx] = this.parseFX(defFX, functionSynthDefDict) });
-
-		//Parse \out (reset currentPatternOutNodes too)
-		if(defOut != nil, {
-			prevPatternOutNodes = currentPatternOutNodes.copy;
-			currentPatternOutNodes = IdentitySet();
-			recursiveObjectList.clear; //reset for parseOut
-			def[\out] = this.parseOut(defOut)
-		});
-
-		//Parse all the other entries looking for AlgaTemps / ListPatterns
-		def.keysValuesDo({ | key, value |
-			if((key != \fx).and(key != \out), {
-				value = this.parseParam(value, functionSynthDefDict);
-				this.calculatePlayersConnections(key); //Also removes old ones if needed
-				def[key] = value;
-			});
-		});
-
-		^[def, functionSynthDefDict];
+		^(parser.parseDef(def))
 	}
 
 	//Get valid synthDef name
@@ -3126,6 +2778,24 @@ AlgaPattern : AlgaNode {
 				("AlgaPattern: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
 			});
 		});
+	}
+
+	//Reset parser params
+	resetPatternParsingVars {
+		paramContainsAlgaReaderPfunc = false;
+		latestPlayersAtParam         = IdentityDictionary();
+	}
+
+	//Found an AlgaReaderPfunc (used in AlgaParser)
+	assignAlgaReaderPfunc { | algaReaderPfunc |
+		var latestPlayer = algaReaderPfunc.patternPlayer;
+		var params = algaReaderPfunc.params;
+		if(latestPlayer != nil, {
+			paramContainsAlgaReaderPfunc = true;
+			latestPlayersAtParam[latestPlayer] = latestPlayersAtParam[latestPlayer] ? Array.newClear;
+			latestPlayersAtParam[latestPlayer] = latestPlayersAtParam[latestPlayer].add(params).flatten;
+		});
+		^algaReaderPfunc;
 	}
 
 	//Remove an AlgaPatternPlayer connection
@@ -3548,27 +3218,18 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
-		//Reset recursiveObjectList
-		recursiveObjectList = IdentitySet(10);
-
 		//AlgaNode or AlgaArg: go through
 		if(sender.isAlgaNodeOrAlgaArg, {
 			if(forceMix, { mix = true });
 			this.addInNodeAlgaNodeAlgaArg(sender, param, mix);
 		}, {
 			//Pattern
-			if(sender != nil, {
-				recursiveObjectList.add(sender);
-				sender.algaParseObject(
-					func: { | val |
-						if((val != nil).and(recursiveObjectList.includes(val).not), {
-
-							this.addInNode(val, param, mix, forceMix: true)
-						});
-					},
-					replace: false
-				);
-			});
+			parser.parseGenericObject(sender,
+				func: { | val |
+					this.addInNode(val, param, mix, forceMix: true)
+				},
+				replace: false
+			)
 		});
 
 		//Use replaceArgs to set LATEST parameter, for retrieval after .replace ...
