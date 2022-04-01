@@ -23,6 +23,7 @@ AlgaActionScheduler {
 	/*
 	Required vars:
 
+	AlgaNode / AlgaPattern / AlgaPatternPlayer:
 	server, schedInSeconds
 	*/
 

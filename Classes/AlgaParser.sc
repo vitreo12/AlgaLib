@@ -24,8 +24,11 @@ AlgaParser {
 	/*
 	Required vars:
 
-	outsMapping, sampleAccurateFuncs,
-	defPreParsing, currentPatternOutNodes, prevPatternOutNodes
+	AlgaNode:
+	outsMapping
+
+	AlgaPattern:
+	sampleAccurateFuncs, defPreParsing, currentPatternOutNodes, prevPatternOutNodes
 	*/
 
 	*new { | obj |

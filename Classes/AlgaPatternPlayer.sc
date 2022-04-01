@@ -451,7 +451,7 @@ AlgaPatternPlayer {
 
 		//Pattern
 		if(isAlgaReaderPfuncOrAlgaTemp.not, {
-			value.algaParseObject(
+			parser.parseGenericObject(value,
 				func: { | val |
 					this.reassignAlgaReaderPfuncs(val, algaPatternPlayerParam)
 				},
