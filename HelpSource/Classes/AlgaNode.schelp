@@ -590,3 +590,8 @@ private:: addActiveInOutNodes
 private:: checkValidControlName
 private:: addLatestSenderAtParam
 private:: getLatestSenderAtParam
+
+private:: actionScheduler
+private:: checkConnectionAlreadyInPlaceInner
+private:: parser
+private:: unpackPatternOutsMapping

@@ -372,3 +372,7 @@ private:: latestDur
 private:: latestDurStream
 private:: getCurrentEnvironment
 private:: latestCurrentEnvironment
+private:: addInNodeAlgaNodeAlgaArg
+private:: buildFromPattern
+private:: checkPatternValidityAndReturnControlNames
+private:: dispatchPattern
