@@ -212,6 +212,25 @@
 	}
 }
 
+//Converts all dict entries to stream
++Dictionary {
+	algaAsStream {
+		this.keysValuesDo({ | key, entry |
+			this[key] = entry.algaAsStream
+		});
+	}
+}
+
+//Converts all Set entries to stream
++Set {
+	algaAsStream {
+		this.do({ | entry |
+			this.remove(entry);
+			this.add(entry.algaAsStream)
+		})
+	}
+}
+
 //PlayBuf bug with canFreeSynth
 +PlayBuf {
 	algaCanFreeSynth { ^inputs.at(6).isNumber.not or: { inputs.at(6) > 1 } }
