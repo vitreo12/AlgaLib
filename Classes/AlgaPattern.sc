@@ -2580,10 +2580,7 @@ AlgaPattern : AlgaNode {
 
 	//Interpolate fx == reschedule OR replace
 	interpolateFX { | value, time, sched |
-		var paramConnectionTime = paramsConnectionTime[\fx];
-		paramConnectionTime = paramConnectionTime ? connectionTime;
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
-		time = time ? paramConnectionTime;
+		time = time ? this.getParamConnectionTime(\fx);
 
 		//In the case of \fx, replace should be used for AlgaStep
 		if((time == 0).and(sched.isAlgaStep.not), {
@@ -2614,10 +2611,7 @@ AlgaPattern : AlgaNode {
 
 	//Interpolate out == reschedule OR replace
 	interpolateOut { | value, time, shape, sched |
-		var paramConnectionTime = paramsConnectionTime[\out];
-		paramConnectionTime = paramConnectionTime ? connectionTime;
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
-		time = time ? paramConnectionTime;
+		time = time ? this.getParamConnectionTime(\out);
 
 		//Store shape! This is used in createPatternOutReceivers
 		currentPatternOutShape = shape;
@@ -2648,10 +2642,7 @@ AlgaPattern : AlgaNode {
 
 	//Interpolate a parameter that is not in controlNames (like \lag)
 	interpolateScalarOrGenericParam { | sender, param, time, sched |
-		var paramConnectionTime = paramsConnectionTime[param];
-		paramConnectionTime = paramConnectionTime ? connectionTime;
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
-		time = time ? paramConnectionTime;
+		time = time ? this.getParamConnectionTime(param);
 
 		//If time is 0, just change at sched. This includes AlgaStep!
 		if(time == 0, {
@@ -2688,11 +2679,10 @@ AlgaPattern : AlgaNode {
 		sampleAndHold = false, time = 0, shape |
 
 		var isDefault = false;
-		var paramConnectionTime = paramsConnectionTime[param];
 		var controlName;
-		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
-		time = time ? paramConnectionTime;
+
+		//Calc time
+		time = time ? this.getParamConnectionTime(param);
 
 		//This mostly happens on .resetParam. Try to get the default value from defArgs,
 		//restoring the original Pattern's parameter. If it will be nil, the SynthDef's
@@ -3245,7 +3235,7 @@ AlgaPattern : AlgaNode {
 	interpolateDurParamAtSched { | param, value, time, shape, resync, reset, sched |
 		var algaPseg;
 		var paramInterpShape = this.getInterpShape(param);
-		var paramConnectionTime = paramsConnectionTime[param];
+		var paramConnectionTime = this.getParamConnectionTime(param);
 
 		//Check validity of value
 		if((value.isNumber.not).and(value.isPattern.not), {
@@ -3261,8 +3251,10 @@ AlgaPattern : AlgaNode {
 		{ param == \legato }  { algaPseg = interpStreams.legatoAlgaPseg };
 
 		//Check time
-		if(param == \dur, { paramConnectionTime = paramConnectionTime ? paramsConnectionTime[\delta] });
-		time = time ? (paramConnectionTime ? connectionTime);
+		if(param == \dur, {
+			paramConnectionTime = paramConnectionTime ? this.getParamConnectionTime(\delta);
+		});
+		time = time ? paramConnectionTime;
 
 		//Time in AlgaPseg is in beats: it needs to be scaled to seconds
 		time = if(tempoScaling.not, { time * this.clock.tempo });
@@ -3294,8 +3286,10 @@ AlgaPattern : AlgaNode {
 		reset = reset ? durInterpReset;
 
 		//Get shape
-		if(param == \dur, { paramInterpShape = paramInterpShape ? this.getInterpShape(\delta) });
-		shape = shape.algaCheckValidEnv(false) ? paramInterpShape;
+		if(param == \dur, {
+			paramInterpShape = paramInterpShape ? this.getInterpShape(\delta)
+		});
+		shape = shape.algaCheckValidEnv(false) ? paramInterpShape.algaCheckValidEnv(false);
 
 		//Add to scheduler
 		this.addAction(

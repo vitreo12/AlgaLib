@@ -561,6 +561,13 @@ AlgaNode {
 		});
 	}
 
+	//Get a param time
+	getParamConnectionTime { | param = \in |
+		var paramConnectionTime = paramsConnectionTime[param] ? connectionTime;
+		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
+		^paramConnectionTime;
+	}
+
 	//Set interp shape
 	interpShape_ { | value, param, all = false |
 		value = value.algaCheckValidEnv;
@@ -2457,16 +2464,11 @@ AlgaNode {
 
 		//Extract controlName / paramConnectionTime
 		controlName = controlNames[param];
-		paramConnectionTime = paramsConnectionTime[param];
-
+		paramConnectionTime = this.getParamConnectionTime(param);
 		if((controlName.isNil).or(paramConnectionTime.isNil), {
 			("AlgaNode: invalid param for interp synth to free: '" ++ param ++ "'").error;
 			^this
 		});
-
-		//If -1, or invalid, set to global connectionTime
-		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 
 		//calc temporary time
 		time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
@@ -2950,11 +2952,7 @@ AlgaNode {
 	freeInterpSynthAtParam { | sender, param = \in, mix = false, replaceMix = false,
 		replace = false, time, shape |
 		var interpSynthsAtParam = interpSynths[param];
-		var paramConnectionTime = paramsConnectionTime[param];
-
-		//If -1, or invalid, set to global connectionTime
-		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
+		var paramConnectionTime = this.getParamConnectionTime(param);
 
 		//Free them all (check if there were mix entries).
 		//sender == nil comes from <|
