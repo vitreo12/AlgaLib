@@ -27,6 +27,14 @@ AlgaPatternInterpStreams {
 	var <>stretch, <>stretchAlgaPseg;
 	var <>legato, <>legatoAlgaPseg;
 
+	//\fx and \out
+	var <>fx, <>fxStream;
+	var <>out, <>outStream;
+
+	//Scalar and generic params
+	var <scalarAndGenericParams;
+	var <scalarAndGenericParamsStreams;
+
 	//Store it for .replace
 	var <algaReschedulingEventStreamPlayer;
 
@@ -452,5 +460,47 @@ AlgaPatternInterpStreams {
 		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
 			clock: clock
 		)
+	}
+
+	//Store generic params for replaces
+	addScalarAndGenericParams { | key, value |
+		scalarAndGenericParams = scalarAndGenericParams ? IdentityDictionary();
+		scalarAndGenericParams[key] = value;
+		scalarAndGenericParamsStreams = scalarAndGenericParamsStreams ? IdentityDictionary();
+		scalarAndGenericParamsStreams[key] = value.algaAsStream;
+	}
+
+	//Remove generic params
+	removeScalarAndGenericParams { | key |
+		scalarAndGenericParams.removeAt(key);
+		scalarAndGenericParamsStreams.removeAt(key);
+	}
+
+	//Clear generic params
+	clearScalarAndGenericParams {
+		scalarAndGenericParams.clear;
+		scalarAndGenericParamsStreams.clear;
+	}
+
+	//Store \fx
+	addFX { | value |
+		fx = value;
+		fxStream = fx.algaAsStream;
+	}
+
+	//Remove \fx
+	removeFX {
+		fx = nil; fxStream = nil;
+	}
+
+	//Add \out
+	addOut { | value |
+		out = value;
+		outStream = out.algaAsStream;
+	}
+
+	//Remove \out
+	removeOut {
+		out = nil; outStream = nil;
 	}
 }

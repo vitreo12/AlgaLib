@@ -176,7 +176,7 @@ AlgaNode {
 		)
 	}
 
-	*new_ap { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
+	*newAP { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
 		schedInSeconds = false, tempoScaling = false,
 		sampleAccurateFuncs = true,  player, server |
 		^super.new.init(
