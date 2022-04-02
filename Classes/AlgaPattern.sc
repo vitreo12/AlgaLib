@@ -2578,14 +2578,15 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Interpolate fx == replace
+	//Interpolate fx == reschedule OR replace
 	interpolateFX { | value, time, sched |
 		var paramConnectionTime = paramsConnectionTime[\fx];
 		paramConnectionTime = paramConnectionTime ? connectionTime;
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
 
-		if(time == 0, {
+		//In the case of \fx, replace should be used for AlgaStep
+		if((time == 0).and(sched.isAlgaStep.not), {
 			//Parse the fx
 			var functionSynthDefDict = IdentityDictionary();
 			var parsedFX = this.parseFX(value, functionSynthDefDict);
@@ -2594,18 +2595,7 @@ AlgaPattern : AlgaNode {
 			this.compileFunctionSynthDefDictIfNeeded(
 				func: {
 					this.addAction(
-						func: {
-							//Add the new stream
-							interpStreams.addFX(parsedFX);
-
-							//If AlgaStep, ALSO advance the value manually
-							if(sched.isAlgaStep, {
-								var newFXValue = interpStreams.fxStream.next(this.getCurrentEnvironment);
-
-								//Substitute in currentEnvironment so it's picked up
-								if(value != nil, { currentEnvironment[\fx] = newFXValue });
-							});
-						},
+						func: { interpStreams.addFX(parsedFX) },
 						sched: sched,
 						topPriority: true
 					)
@@ -2622,17 +2612,18 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Interpolate out == replace
+	//Interpolate out == reschedule OR replace
 	interpolateOut { | value, time, shape, sched |
 		var paramConnectionTime = paramsConnectionTime[\out];
 		paramConnectionTime = paramConnectionTime ? connectionTime;
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
 
-		//Store shape!
+		//Store shape! This is used in createPatternOutReceivers
 		currentPatternOutShape = shape;
 
-		if(time == 0, {
+		//In the case of \out, replace should be used for AlgaStep
+		if((time == 0).and(sched.isAlgaStep.not), {
 			//Run parsing
 			var parsedOut;
 			prevPatternOutNodes = currentPatternOutNodes.copy;
@@ -2641,18 +2632,7 @@ AlgaPattern : AlgaNode {
 
 			//Sched the new one
 			this.addAction(
-				func: {
-					//Add the new stream
-					interpStreams.addOut(parsedOut);
-
-					//If AlgaStep, ALSO advance the value manually
-					if(sched.isAlgaStep, {
-						var newOutValue = interpStreams.outStream.next(this.getCurrentEnvironment);
-
-						//Substitute in currentEnvironment so it's picked up
-						if(value != nil, { currentEnvironment[\algaOut] = newOutValue });
-					});
-				},
+				func: { interpStreams.addOut(parsedOut) },
 				sched: sched,
 				topPriority: true
 			)
@@ -2673,6 +2653,7 @@ AlgaPattern : AlgaNode {
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
 
+		//If time is 0, just change at sched. This includes AlgaStep!
 		if(time == 0, {
 			this.addAction(
 				func: {
@@ -2685,6 +2666,7 @@ AlgaPattern : AlgaNode {
 						var value = scalarAndGenericParamsStreams[param].next(this.getCurrentEnvironment);
 
 						//Substitute in currentEnvironment so it's picked up
+						//right away in the current createPatternSynth call
 						if(value != nil, { currentEnvironment[param] = value });
 					});
 				},
