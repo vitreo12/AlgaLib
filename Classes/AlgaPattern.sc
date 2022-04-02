@@ -84,8 +84,8 @@ AlgaPattern : AlgaNode {
 	var <>currentPatternBussesAndSynths;
 
 	//Current nodes for \out
-	var <currentPatternOutNodes;
-	var <prevPatternOutNodes;
+	var <>currentPatternOutNodes;
+	var <>prevPatternOutNodes;
 
 	//Current time used for \out replacement
 	var <currentPatternOutTime;
@@ -2171,10 +2171,7 @@ AlgaPattern : AlgaNode {
 				if(parsedOut != nil, {
 					//Can't use \out as key for a pattern
 					patternPairsDict[\algaOut] = Pfunc { | e |
-						//newInterpStreams.outStream.next(e);
-						var val = newInterpStreams.outStream.next(e);
-						val.node.asString.warn;
-						val
+						newInterpStreams.outStream.next(e);
 					};
 					foundOut = true;
 				});
