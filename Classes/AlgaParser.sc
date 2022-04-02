@@ -427,7 +427,8 @@ AlgaParser {
 		//Reset parsing variables
 		this.resetPatternParsingVars;
 
-		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
+		//Loop over the event and parse ListPatterns / AlgaTemps.
+		//Also use as Stream for the final entry.
 		value.keysValuesDo({ | key, entry |
 			var parsedEntry = this.parseParamInner(entry, functionSynthDefDict);
 			value[key] = parsedEntry.algaAsStream;
@@ -507,7 +508,7 @@ AlgaParser {
 			);
 		});
 
-		^value.algaAsStream;
+		^value;
 	}
 
 	//Parse the \out key
@@ -538,6 +539,6 @@ AlgaParser {
 			replace: false
 		);
 
-		^value.algaAsStream;
+		^value;
 	}
 }

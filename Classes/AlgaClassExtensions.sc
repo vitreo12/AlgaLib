@@ -55,11 +55,12 @@
 	//Fallback for AlgaBlock
 	blockIndex { ^(-1) }
 
-	//Like asStream, but also converts inner elements of an Array
+	//Like asStream, but easily overloadable
 	algaAsStream { ^(this.asStream) }
 
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
-	addAction { | condition, func, sched = 0, topPriority = false, schedInSeconds = false, preCheck = false |
+	addAction { | condition, func, sched = 0, topPriority = false,
+		schedInSeconds = false, preCheck = false |
 		AlgaSpinRoutine.waitFor(
 			condition:condition,
 			func:func
@@ -246,6 +247,25 @@
 	algaCanFreeSynth {
 		^this.any({ | item |
 			(item.canFreeSynth).or(item.algaCanFreeSynth)
+		})
+	}
+}
+
+//Converts all dict entries to stream
++Dictionary {
+	algaAsStream {
+		this.keysValuesDo({ | key, entry |
+			this[key] = entry.algaAsStream
+		});
+	}
+}
+
+//Converts all Set entries to stream
++Set {
+	algaAsStream {
+		this.do({ | entry |
+			this.remove(entry);
+			this.add(entry.algaAsStream)
 		})
 	}
 }

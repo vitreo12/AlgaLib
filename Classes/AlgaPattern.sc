@@ -15,12 +15,6 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 AlgaPattern : AlgaNode {
-	/*
-	TODOs:
-
-	1) mixFrom()
-	*/
-
 	//Special groups used in AlgaPattern
 	var <>fxGroup;
 	var <>fxConvGroup;
@@ -89,13 +83,7 @@ AlgaPattern : AlgaNode {
 	//Keep track of ALL active patternBussesAndSynths
 	var <>currentPatternBussesAndSynths;
 
-	//Current fx
-	var <currentFX;
-
-	//Current \out
-	var <currentOut;
-
-	//Current nodes of used in currentOut
+	//Current nodes for \out
 	var <>currentPatternOutNodes;
 	var <>prevPatternOutNodes;
 
@@ -107,11 +95,6 @@ AlgaPattern : AlgaNode {
 
 	//Needed to store reset for various alga params (\out, \fx, etc...)
 	var <currentReset;
-
-	//Needed to store current generic params
-	var <scalarAndGenericParams;
-	var <scalarAndGenericParamsStreams;
-	var <latestScalarUniqueIDs;
 
 	//Store the latest currentEnvironment. This is used for mid-pattern interpolation
 	var <>latestCurrentEnvironment;
@@ -166,7 +149,7 @@ AlgaPattern : AlgaNode {
 	*new { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
 		schedInSeconds = false, tempoScaling = false,
 		sampleAccurateFuncs = true, player, server |
-		^super.new_ap(
+		^super.newAP(
 			def: def,
 			interpTime: interpTime,
 			interpShape: interpShape,
@@ -425,8 +408,14 @@ AlgaPattern : AlgaNode {
 
 	//Used for mid-pattern interpolation
 	getCurrentEnvironment {
-		if(currentEnvironment.size > 0, { ^currentEnvironment });
-		^(latestCurrentEnvironment ? currentEnvironment) //if undefined
+		//If it includes \algaPatternInterpStreams (other Alga keys used in createPattern
+		//could be used instead), then currentEnvironment is an AlgaPattern triggered Event
+		if(currentEnvironment.keys.includes(\algaPatternInterpStreams), {
+			^currentEnvironment
+		});
+
+		//This would then be returned in any other case, including mid-pattern interpolation
+		^(latestCurrentEnvironment ? currentEnvironment)
 	}
 
 	//Free all unused busses from interpStreams
@@ -2050,27 +2039,9 @@ AlgaPattern : AlgaNode {
 		^nil
 	}
 
-	//Store generic params for replaces
-	addScalarAndGenericParams { | key, value, uniqueID |
-		var latestScalarUniqueID;
-		latestScalarUniqueIDs = latestScalarUniqueIDs ? IdentityDictionary();
-		latestScalarUniqueID  = latestScalarUniqueIDs[key];
-
-		scalarAndGenericParams = scalarAndGenericParams ? IdentityDictionary();
-		scalarAndGenericParams[key] = scalarAndGenericParams[key] ? IdentityDictionary();
-		scalarAndGenericParams[key][uniqueID ? latestScalarUniqueID] = value;
-
-		scalarAndGenericParamsStreams = scalarAndGenericParamsStreams ? IdentityDictionary();
-		scalarAndGenericParamsStreams[key] = scalarAndGenericParamsStreams[key] ? IdentityDictionary();
-		scalarAndGenericParamsStreams[key][uniqueID ? latestScalarUniqueID] = value.algaAsStream;
-
-		//Update latest one
-		if(uniqueID != nil, { latestScalarUniqueIDs[key] = uniqueID });
-	}
-
 	//Build the actual pattern
 	createPattern { | replace = false, keepChannelsMapping = false, keepScale = false, sched |
-		var foundDurOrDelta = false;
+		var foundDurOrDelta = false, resetDur = false;
 		var foundSustain = false, resetSustain = false;
 		var foundStretch = false, resetStretch = false;
 		var foundLegato = false, resetLegato = false;
@@ -2183,8 +2154,11 @@ AlgaPattern : AlgaNode {
 			//Add \fx key (parsing everything correctly)
 			if(paramName == \fx, {
 				parsedFX = value;
+				newInterpStreams.addFX(parsedFX);
 				if(parsedFX != nil, {
-					patternPairs = patternPairs.add(\fx).add(parsedFX);
+					patternPairsDict[\fx] = Pfunc { | e |
+						newInterpStreams.fxStream.next(e);
+					};
 					foundFX = true;
 				});
 				isAlgaParam = true;
@@ -2193,8 +2167,12 @@ AlgaPattern : AlgaNode {
 			//Add \out key
 			if(paramName == \out, {
 				parsedOut = value;
+				newInterpStreams.addOut(parsedOut);
 				if(parsedOut != nil, {
-					patternPairs = patternPairs.add(\algaOut).add(parsedOut); //can't use \out
+					//Can't use \out as key for a pattern
+					patternPairsDict[\algaOut] = Pfunc { | e |
+						newInterpStreams.outStream.next(e);
+					};
 					foundOut = true;
 				});
 				isAlgaParam = true;
@@ -2202,21 +2180,13 @@ AlgaPattern : AlgaNode {
 
 			//Scalar parameters OR all other values
 			if(isAlgaParam.not, {
-				var uniqueID = UniqueID.next;
-				this.addScalarAndGenericParams(paramName, value, uniqueID);
+				newInterpStreams.addScalarAndGenericParams(paramName, value);
 				patternPairsDict[paramName] = Pfunc { | e |
-					var val = scalarAndGenericParamsStreams[paramName][uniqueID].next(e);
-					val ? 0
+					newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
 				};
 				foundGenericParams.add(paramName);
 			});
 		});
-
-		//Store current FX for replaces
-		if(foundFX, { currentFX = parsedFX });
-
-		//Store current out for replaces
-		if(foundOut, { currentOut = parsedOut });
 
 		//If replace, find keys in the old pattern if they are not redefined
 		if(replace, {
@@ -2225,20 +2195,9 @@ AlgaPattern : AlgaNode {
 			if(resetSet != nil, {
 				case
 				{ resetSet.class == IdentitySet } {
-					//reset \fx
-					if((foundFX.not).and(resetSet.findMatch(\fx) != nil), {
-						parsedFX = nil; currentFX = nil
-					});
-
-					//reset \out
-					if((foundOut.not).and(resetSet.findMatch(\out) != nil), {
-						parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil;
-						prevPatternOutNodes = nil;
-					});
-
 					//reset \dur
 					if((foundDurOrDelta.not).and(resetSet.findMatch(\dur) != nil), {
-						interpStreams = nil;
+						resetDur = true;
 					});
 
 					//reset \sustain
@@ -2256,31 +2215,50 @@ AlgaPattern : AlgaNode {
 						resetLegato = true;
 					});
 
-					//reset generic params
-					resetSet.do({ | entry |
-						scalarAndGenericParams.removeAt(entry);
-						scalarAndGenericParamsStreams.removeAt(entry)
+					//reset \fx
+					if((foundFX.not).and(resetSet.findMatch(\fx) != nil), {
+						if(interpStreams != nil, { interpStreams.removeFX });
+						parsedFX = nil;
+					});
+
+					//reset \out
+					if((foundOut.not).and(resetSet.findMatch(\out) != nil), {
+						if(interpStreams != nil, { interpStreams.removeOut });
+						parsedOut = nil;
+						currentPatternOutNodes = nil;
+						prevPatternOutNodes = nil;
+					});
+
+					//reset generic params from old interpStreams
+					if(interpStreams != nil, {
+						resetSet.do({ | entry |
+							interpStreams.removeScalarAndGenericParams(entry)
+						});
 					});
 				}
 				{ resetSet == true } {
-					parsedFX = nil; currentFX = nil; //reset \fx
-					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil; prevPatternOutNodes = nil; //reset \out
-					interpStreams = nil; //reset \dur
+					//reset \fx and \out
+					parsedFX = nil;
+					parsedOut = nil;
+					currentPatternOutNodes = nil; prevPatternOutNodes = nil;
+
+					resetDur     = true; //reset \dur
 					resetSustain = true; //reset \sustain
 					resetStretch = true; //reset \stretch
-					resetLegato = true;  //reset \legato
+					resetLegato  = true;  //reset \legato
 
-					//reset all generic params
-					if(scalarAndGenericParams != nil, {
-						scalarAndGenericParams.clear;
-						scalarAndGenericParamsStreams.clear
+					//reset all generic params from old interpStreams
+					if(interpStreams != nil, {
+						interpStreams.removeFX;
+						interpStreams.removeOut;
+						interpStreams.clearScalarAndGenericParams;
 					});
 				};
 			});
 
 			//No \dur from user, set to previous one
 			if(foundDurOrDelta.not, {
-				if((interpStreams == nil).or(algaWasBeingCleared), {
+				if((resetDur).or(algaWasBeingCleared), {
 					this.setDur(1, newInterpStreams)
 				}, {
 					this.setDur(interpStreams.dur, newInterpStreams)
@@ -2314,44 +2292,51 @@ AlgaPattern : AlgaNode {
 				});
 			});
 
-			//No \fx from user, use currentFX if available
-			if(foundFX.not, {
-				if(currentFX != nil, {
-					patternPairs = patternPairs.add(\fx).add(currentFX);
+			//Add old \fx, \out and scalar values
+			if(interpStreams != nil, {
+				//No \fx from user, use currentFX if available
+				if(foundFX.not, {
+					//Needs to be copied from the old one in order to make a "fresh" one
+					var currentFX = interpStreams.fx.copy;
+					if(currentFX != nil, {
+						newInterpStreams.addFX(currentFX);
+						patternPairsDict[\fx] = Pfunc { | e |
+							newInterpStreams.fxStream.next(e)
+						}
+					});
 				});
-			});
 
-			//No \out from user, use currentOut if available
-			if(foundOut.not, {
-				if(currentOut != nil, {
-					patternPairs = patternPairs.add(\algaOut).add(currentOut);
+				//No \out from user, use currentOut if available
+				if(foundOut.not, {
+					//Needs to be copied from the old one in order to make a "fresh" one
+					var currentOut = interpStreams.out.copy;
+					if(currentOut != nil, {
+						newInterpStreams.addOut(currentOut);
+						patternPairsDict[\algaOut] = Pfunc { | e |
+							newInterpStreams.outStream.next(e);
+						}
+					});
 				});
-			});
 
-			//Add old scalarAndGenericParamsStreams
-			if(scalarAndGenericParams != nil, {
-				if(scalarAndGenericParams.size > 0, {
-					scalarAndGenericParams.keysValuesDo({ | paramName, value |
-						//If that specific generic param hasn't been set from user,
-						//use the one from addScalarAndGenericParams if available
-						if(foundGenericParams.findMatch(paramName) == nil, {
-							//Needs to be copied in order to make a "fresh" one
-							var latestValue = scalarAndGenericParams[paramName][
-								latestScalarUniqueIDs[paramName]
-							].copy;
-
-							//This code should be abstracted: it's the same behaviour
-							if(latestValue != nil, {
-								var uniqueID = UniqueID.next;
-								this.addScalarAndGenericParams(paramName, latestValue, uniqueID);
-								patternPairsDict[paramName] = Pfunc { | e |
-									var val = scalarAndGenericParamsStreams[paramName][uniqueID].next(e);
-									val ? 0
-								}
-							});
+				//Reset scalars and generic parameters
+				if(interpStreams.scalarAndGenericParams != nil, {
+					if(interpStreams.scalarAndGenericParams.size > 0, {
+						interpStreams.scalarAndGenericParams.keysValuesDo({ | paramName, value |
+							//If that specific generic param hasn't been set from user,
+							//use the one from the old interpStreams.scalarAndGenericParams if available
+							if(foundGenericParams.findMatch(paramName) == nil, {
+								//Needs to be copied from the old one in order to make a "fresh" one
+								var latestValue = interpStreams.scalarAndGenericParams[paramName].copy;
+								if(latestValue != nil, {
+									newInterpStreams.addScalarAndGenericParams(paramName, value);
+									patternPairsDict[paramName] = Pfunc { | e |
+										newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
+									};
+								});
+							})
 						})
 					})
-				})
+				});
 			});
 		}, {
 			//Else, default them
@@ -2593,48 +2578,95 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Interpolate fx == replace
+	//Interpolate fx == reschedule OR replace
 	interpolateFX { | value, time, sched |
-		"AlgaPattern: changing the 'fx' key. This will trigger 'replace'.".warn;
-		this.replace(
-			def: (def: this.getSynthDef, fx: value),
-			time: time,
-			sched: sched
-		);
-	}
-
-	//Interpolate out == replace
-	interpolateOut { | value, time, shape, sched |
-		"AlgaPattern: changing the 'out' key. This will trigger 'replace'.".warn;
-		currentPatternOutShape = shape; //set shape!
-		this.replace(
-			def: (def: this.getSynthDef, out: value),
-			time: time,
-			sched: sched
-		);
-	}
-
-	//Interpolate a parameter that is not in controlNames (like \lag)
-	interpolateGenericParam { | sender, param, time, sched |
-		var paramConnectionTime = paramsConnectionTime[param];
-		var latestScalarUniqueID = latestScalarUniqueIDs[param];
-		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
+		var paramConnectionTime = paramsConnectionTime[\fx];
+		paramConnectionTime = paramConnectionTime ? connectionTime;
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
 
-		if((time == 0).and(latestScalarUniqueID != nil), {
+		//In the case of \fx, replace should be used for AlgaStep
+		if((time == 0).and(sched.isAlgaStep.not), {
+			//Parse the fx
+			var functionSynthDefDict = IdentityDictionary();
+			var parsedFX = this.parseFX(value, functionSynthDefDict);
+
+			//Replace the fx entry
+			this.compileFunctionSynthDefDictIfNeeded(
+				func: {
+					this.addAction(
+						func: { interpStreams.addFX(parsedFX) },
+						sched: sched,
+						topPriority: true
+					)
+				},
+				functionSynthDefDict: functionSynthDefDict
+			)
+		}, {
+			"AlgaPattern: changing the 'fx' key. This will trigger 'replace'.".warn;
+			this.replace(
+				def: (def: this.getSynthDef, fx: value),
+				time: time,
+				sched: sched
+			);
+		});
+	}
+
+	//Interpolate out == reschedule OR replace
+	interpolateOut { | value, time, shape, sched |
+		var paramConnectionTime = paramsConnectionTime[\out];
+		paramConnectionTime = paramConnectionTime ? connectionTime;
+		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
+		time = time ? paramConnectionTime;
+
+		//Store shape! This is used in createPatternOutReceivers
+		currentPatternOutShape = shape;
+
+		//In the case of \out, replace should be used for AlgaStep
+		if((time == 0).and(sched.isAlgaStep.not), {
+			//Run parsing
+			var parsedOut;
+			prevPatternOutNodes = currentPatternOutNodes.copy;
+			currentPatternOutNodes = IdentitySet();
+			parsedOut = this.parseOut(value);
+
+			//Sched the new one
+			this.addAction(
+				func: { interpStreams.addOut(parsedOut) },
+				sched: sched,
+				topPriority: true
+			)
+		}, {
+			"AlgaPattern: changing the 'out' key. This will trigger 'replace'.".warn;
+			this.replace(
+				def: (def: this.getSynthDef, out: value),
+				time: time,
+				sched: sched
+			);
+		});
+	}
+
+	//Interpolate a parameter that is not in controlNames (like \lag)
+	interpolateScalarOrGenericParam { | sender, param, time, sched |
+		var paramConnectionTime = paramsConnectionTime[param];
+		paramConnectionTime = paramConnectionTime ? connectionTime;
+		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
+		time = time ? paramConnectionTime;
+
+		//If time is 0, just change at sched. This includes AlgaStep!
+		if(time == 0, {
 			this.addAction(
 				func: {
 					//Add the new stream
-					this.addScalarAndGenericParams(param, sender);
+					interpStreams.addScalarAndGenericParams(param, sender);
 
 					//If AlgaStep, ALSO advance the value manually
 					if(sched.isAlgaStep, {
-						var value = scalarAndGenericParamsStreams[param][
-							latestScalarUniqueIDs[param]
-						].next(this.getCurrentEnvironment);
+						var scalarAndGenericParamsStreams = interpStreams.scalarAndGenericParamsStreams;
+						var value = scalarAndGenericParamsStreams[param].next(this.getCurrentEnvironment);
 
 						//Substitute in currentEnvironment so it's picked up
+						//right away in the current createPatternSynth call
 						if(value != nil, { currentEnvironment[param] = value });
 					});
 				},
@@ -2642,7 +2674,7 @@ AlgaPattern : AlgaNode {
 				topPriority: true
 			)
 		}, {
-			("AlgaPattern: changing the '" ++ param.asString ++ "' key, which is either scalar or not present in the AlgaSynthDef. This will trigger 'replace'.").warn;
+			("AlgaPattern: changing the '" ++ param.asString ++ "' key, which is either a scalar or not present in the AlgaSynthDef. This will trigger 'replace'.").warn;
 			this.replace(
 				def: (def: this.getSynthDef, (param): sender), //escape param with ()
 				time: time,
@@ -2834,7 +2866,7 @@ AlgaPattern : AlgaNode {
 		//Scalar param OR
 		//aram is not in controlNames. Probably setting another kind of parameter (like \lag)
 		if((this.isScalarParam(param)).or(controlNames[param] == nil), {
-			^this.interpolateGenericParam(sender, param, time, sched);
+			^this.interpolateScalarOrGenericParam(sender, param, time, sched);
 		});
 
 		//Force Pattern / AlgaArg / AlgaTemp dispatch
