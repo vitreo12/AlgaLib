@@ -102,11 +102,6 @@ AlgaPattern : AlgaNode {
 	//Needed to store reset for various alga params (\out, \fx, etc...)
 	var <currentReset;
 
-	//Needed to store current generic params
-	var <scalarAndGenericParams;
-	var <scalarAndGenericParamsStreams;
-	var <latestScalarUniqueIDs;
-
 	//Store the latest currentEnvironment. This is used for mid-pattern interpolation
 	var <>latestCurrentEnvironment;
 
@@ -2128,24 +2123,6 @@ AlgaPattern : AlgaNode {
 		^nil
 	}
 
-	//Store generic params for replaces
-	addScalarAndGenericParams { | key, value, uniqueID |
-		var latestScalarUniqueID;
-		latestScalarUniqueIDs = latestScalarUniqueIDs ? IdentityDictionary();
-		latestScalarUniqueID  = latestScalarUniqueIDs[key];
-
-		scalarAndGenericParams = scalarAndGenericParams ? IdentityDictionary();
-		scalarAndGenericParams[key] = scalarAndGenericParams[key] ? IdentityDictionary();
-		scalarAndGenericParams[key][uniqueID ? latestScalarUniqueID] = value;
-
-		scalarAndGenericParamsStreams = scalarAndGenericParamsStreams ? IdentityDictionary();
-		scalarAndGenericParamsStreams[key] = scalarAndGenericParamsStreams[key] ? IdentityDictionary();
-		scalarAndGenericParamsStreams[key][uniqueID ? latestScalarUniqueID] = value.algaAsStream;
-
-		//Update latest one
-		if(uniqueID != nil, { latestScalarUniqueIDs[key] = uniqueID });
-	}
-
 	//Build the actual pattern
 	createPattern { | replace = false, keepChannelsMapping = false, keepScale = false, sched |
 		var foundDurOrDelta = false;
@@ -2280,10 +2257,9 @@ AlgaPattern : AlgaNode {
 
 			//Scalar parameters OR all other values
 			if(isAlgaParam.not, {
-				var uniqueID = UniqueID.next;
-				this.addScalarAndGenericParams(paramName, value, uniqueID);
+				newInterpStreams.addScalarAndGenericParams(paramName, value);
 				patternPairsDict[paramName] = Pfunc { | e |
-					var val = scalarAndGenericParamsStreams[paramName][uniqueID].next(e);
+					var val = newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
 					val ? 0
 				};
 				foundGenericParams.add(paramName);
@@ -2334,24 +2310,26 @@ AlgaPattern : AlgaNode {
 						resetLegato = true;
 					});
 
-					//reset generic params
-					resetSet.do({ | entry |
-						scalarAndGenericParams.removeAt(entry);
-						scalarAndGenericParamsStreams.removeAt(entry)
+					//reset generic params from old interpStreams
+					if(interpStreams != nil, {
+						resetSet.do({ | entry |
+							interpStreams.removeScalarAndGenericParams(entry)
+						});
 					});
 				}
 				{ resetSet == true } {
 					parsedFX = nil; currentFX = nil; //reset \fx
-					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil; prevPatternOutNodes = nil; //reset \out
+					parsedOut = nil; currentOut = nil;
+					currentPatternOutNodes = nil; prevPatternOutNodes = nil; //reset \out
+
 					interpStreams = nil; //reset \dur
 					resetSustain = true; //reset \sustain
 					resetStretch = true; //reset \stretch
 					resetLegato = true;  //reset \legato
 
-					//reset all generic params
-					if(scalarAndGenericParams != nil, {
-						scalarAndGenericParams.clear;
-						scalarAndGenericParamsStreams.clear
+					//reset all generic params from old interpStreams
+					if(interpStreams != nil, {
+						interpStreams.clearScalarAndGenericParams;
 					});
 				};
 			});
@@ -2406,30 +2384,27 @@ AlgaPattern : AlgaNode {
 				});
 			});
 
-			//Add old scalarAndGenericParamsStreams
-			if(scalarAndGenericParams != nil, {
-				if(scalarAndGenericParams.size > 0, {
-					scalarAndGenericParams.keysValuesDo({ | paramName, value |
-						//If that specific generic param hasn't been set from user,
-						//use the one from addScalarAndGenericParams if available
-						if(foundGenericParams.findMatch(paramName) == nil, {
-							//Needs to be copied in order to make a "fresh" one
-							var latestValue = scalarAndGenericParams[paramName][
-								latestScalarUniqueIDs[paramName]
-							].copy;
-
-							//This code should be abstracted: it's the same behaviour
-							if(latestValue != nil, {
-								var uniqueID = UniqueID.next;
-								this.addScalarAndGenericParams(paramName, latestValue, uniqueID);
-								patternPairsDict[paramName] = Pfunc { | e |
-									var val = scalarAndGenericParamsStreams[paramName][uniqueID].next(e);
-									val ? 0
-								}
-							});
+			//Add old scalarAndGenericParamsStreams (retrieved from interpStreams and passed to newInterpStreams)
+			if(interpStreams != nil, {
+				if(interpStreams.scalarAndGenericParams != nil, {
+					if(interpStreams.scalarAndGenericParams.size > 0, {
+						interpStreams.scalarAndGenericParams.keysValuesDo({ | paramName, value |
+							//If that specific generic param hasn't been set from user,
+							//use the one from the old interpStreams.scalarAndGenericParams if available
+							if(foundGenericParams.findMatch(paramName) == nil, {
+								//Needs to be copied in order to make a "fresh" one
+								var latestValue = newInterpStreams.scalarAndGenericParams[paramName].copy;
+								if(latestValue != nil, {
+									newInterpStreams.addScalarAndGenericParams(paramName, value);
+									patternPairsDict[paramName] = Pfunc { | e |
+										var val = newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
+										val ? 0
+									};
+								});
+							})
 						})
 					})
-				})
+				});
 			});
 		}, {
 			//Else, default them
@@ -3198,22 +3173,20 @@ AlgaPattern : AlgaNode {
 	//Interpolate a parameter that is not in controlNames (like \lag)
 	interpolateScalarOrGenericParam { | sender, param, time, sched |
 		var paramConnectionTime = paramsConnectionTime[param];
-		var latestScalarUniqueID = latestScalarUniqueIDs[param];
 		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
 		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
 		time = time ? paramConnectionTime;
 
-		if((time == 0).and(latestScalarUniqueID != nil), {
+		if(time == 0, {
 			this.addAction(
 				func: {
 					//Add the new stream
-					this.addScalarAndGenericParams(param, sender);
+					interpStreams.addScalarAndGenericParams(param, sender);
 
 					//If AlgaStep, ALSO advance the value manually
 					if(sched.isAlgaStep, {
-						var value = scalarAndGenericParamsStreams[param][
-							latestScalarUniqueIDs[param]
-						].next(this.getCurrentEnvironment);
+						var scalarAndGenericParamsStreams = interpStreams.scalarAndGenericParamsStreams;
+						var value = scalarAndGenericParamsStreams[param].next(this.getCurrentEnvironment);
 
 						//Substitute in currentEnvironment so it's picked up
 						if(value != nil, { currentEnvironment[param] = value });
@@ -3223,7 +3196,7 @@ AlgaPattern : AlgaNode {
 				topPriority: true
 			)
 		}, {
-			("AlgaPattern: changing the '" ++ param.asString ++ "' key, which is either scalar or not present in the AlgaSynthDef. This will trigger 'replace'.").warn;
+			("AlgaPattern: changing the '" ++ param.asString ++ "' key, which is either a scalar or not present in the AlgaSynthDef. This will trigger 'replace'.").warn;
 			this.replace(
 				def: (def: this.getSynthDef, (param): sender), //escape param with ()
 				time: time,

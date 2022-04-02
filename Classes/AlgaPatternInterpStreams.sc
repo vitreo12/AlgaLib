@@ -27,6 +27,10 @@ AlgaPatternInterpStreams {
 	var <>stretch, <>stretchAlgaPseg;
 	var <>legato, <>legatoAlgaPseg;
 
+	//Scalar and generic params
+	var <scalarAndGenericParams;
+	var <scalarAndGenericParamsStreams;
+
 	//Store it for .replace
 	var <algaReschedulingEventStreamPlayer;
 
@@ -452,5 +456,25 @@ AlgaPatternInterpStreams {
 		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
 			clock: clock
 		)
+	}
+
+	//Store generic params for replaces
+	addScalarAndGenericParams { | key, value |
+		scalarAndGenericParams = scalarAndGenericParams ? IdentityDictionary();
+		scalarAndGenericParams[key] = value;
+		scalarAndGenericParamsStreams = scalarAndGenericParamsStreams ? IdentityDictionary();
+		scalarAndGenericParamsStreams[key] = value.algaAsStream;
+	}
+
+	//Remove generic params
+	removeScalarAndGenericParams { | key |
+		scalarAndGenericParams.removeAt(key);
+		scalarAndGenericParamsStreams.removeAt(key);
+	}
+
+	//Clear generic params
+	clearScalarAndGenericParams {
+		scalarAndGenericParams.clear;
+		scalarAndGenericParamsStreams.clear;
 	}
 }
