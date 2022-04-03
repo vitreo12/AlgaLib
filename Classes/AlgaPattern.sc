@@ -2651,14 +2651,16 @@ AlgaPattern : AlgaNode {
 					//Add the new stream
 					interpStreams.addScalarAndGenericParams(param, sender);
 
-					//If AlgaStep, ALSO advance the value manually
+					//If AlgaStep and pre, ALSO advance the value manually
 					if(sched.isAlgaStep, {
-						var scalarAndGenericParamsStreams = interpStreams.scalarAndGenericParamsStreams;
-						var value = scalarAndGenericParamsStreams[param].next(this.getCurrentEnvironment);
+						if(sched.post.not, {
+							var scalarAndGenericParamsStreams = interpStreams.scalarAndGenericParamsStreams;
+							var value = scalarAndGenericParamsStreams[param].next(this.getCurrentEnvironment);
 
-						//Substitute in currentEnvironment so it's picked up
-						//right away in the current createPatternSynth call
-						if(value != nil, { currentEnvironment[param] = value });
+							//Substitute in currentEnvironment so it's picked up
+							//right away in the current createPatternSynth call
+							if(value != nil, { currentEnvironment[param] = value });
+						});
 					});
 				},
 				sched: sched,
