@@ -1,18 +1,39 @@
-// AlgaInterpreter {
-//     // implement language here, using Interpreter.preProcessor_ to boot it
-//     // together with an Alga server
-// }
+// AlgaLib: SuperCollider implementation of Alga, an interpolating live coding environment.
+// Copyright (C) 2020-2022 Francesco Cameli.
 
-// + Interpreter {
-//     preProcessor_ { | what |
-//         // if any Alga servers are running, don't allow changing preProcessor
-//         // this is quite an "extreme" case, but necessary if imlementing the language
-//         // here in sclang
-//         if(Alga.servers.size > 0, {
-//             "Alga is running. Can't change preProcessor. Reboot interpreter to do so.".error;
-//             ^nil;
-//         });
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
 
-//         preProcessor = what;
-//     }
-// }
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+/*
+AlgaInterpreter {
+	//Add the AlgaInterpreter to the sclang Interpreter
+	*boot {
+		var oldPreProcessor = thisProcess.interpreter.preProcessor;
+		thisProcess.interpreter.preProcessor = { | code |
+			//Run any old preProcessor if defined
+			if(oldPreProcessor.isFunction, {
+				code = oldPreProcessor.value(code)
+			});
+
+			//Run Alga's interpreter
+			this.interpret(code);
+		}
+	}
+
+	//String -> sclang code
+	*interpret { | code |
+		"\nAlgaInterpreter: WIP\n".postln;
+		^code
+	}
+}
+*/
