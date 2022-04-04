@@ -38,33 +38,6 @@ AlgaPatternPlayer {
 	var <stretch = 1, <stretchAlgaPseg;
 	var <manualDur = false;
 
-	//Add an action to scheduler. This takes into account sched == AlgaStep
-	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
-		actionScheduler.addAction(
-			condition: condition,
-			func: func,
-			sched: sched,
-			topPriority: topPriority,
-			preCheck: preCheck
-		)
-	}
-
-	//Iterate through all scheduledStepActions and execute them accordingly
-	advanceAndConsumeScheduledStepActions { | post = false |
-		actionScheduler.advanceAndConsumeScheduledStepActions(post)
-	}
-
-	//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
-	//Otherwise, it will just execute func
-	compileFunctionSynthDefDictIfNeeded { | func, functionSynthDefDict |
-		^actionScheduler.compileFunctionSynthDefDictIfNeeded(func, functionSynthDefDict)
-	}
-
-	//Parse an entry
-	parseParam { | value, functionSynthDefDict |
-		^parser.parseParam(value, functionSynthDefDict)
-	}
-
 	*initClass {
 		StartUp.add({ this.addAlgaPatternPlayerEventType });
 	}
@@ -206,6 +179,33 @@ AlgaPatternPlayer {
 			},
 			functionSynthDefDict: functionSynthDefDict
 		)
+	}
+
+	//Add an action to scheduler. This takes into account sched == AlgaStep
+	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
+		actionScheduler.addAction(
+			condition: condition,
+			func: func,
+			sched: sched,
+			topPriority: topPriority,
+			preCheck: preCheck
+		)
+	}
+
+	//Iterate through all scheduledStepActions and execute them accordingly
+	advanceAndConsumeScheduledStepActions { | post = false |
+		actionScheduler.advanceAndConsumeScheduledStepActions(post)
+	}
+
+	//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
+	//Otherwise, it will just execute func
+	compileFunctionSynthDefDictIfNeeded { | func, functionSynthDefDict |
+		^actionScheduler.compileFunctionSynthDefDictIfNeeded(func, functionSynthDefDict)
+	}
+
+	//Parse an entry
+	parseParam { | value, functionSynthDefDict |
+		^parser.parseParam(value, functionSynthDefDict)
 	}
 
 	sched { ^schedInner }
