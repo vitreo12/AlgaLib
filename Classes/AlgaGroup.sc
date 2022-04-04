@@ -64,6 +64,6 @@ AlgaGroup : Group {
 	}
 }
 
-AlgaParGroup : AbstractGroup {
+AlgaParGroup : AlgaGroup {
 	*creationCmd { ^ParGroup.creationCmd }
 }
