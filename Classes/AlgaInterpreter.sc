@@ -16,24 +16,49 @@
 
 /*
 AlgaInterpreter {
+	classvar oldPreProcessor;
+
 	//Add the AlgaInterpreter to the sclang Interpreter
-	*boot {
-		var oldPreProcessor = thisProcess.interpreter.preProcessor;
+	*push {
+		oldPreProcessor = thisProcess.interpreter.preProcessor;
 		thisProcess.interpreter.preProcessor = { | code |
-			//Run any old preProcessor if defined
-			if(oldPreProcessor.isFunction, {
-				code = oldPreProcessor.value(code)
-			});
+			//Also run the old preProcessor if defined ?
+			//if(oldPreProcessor.isFunction, {
+			//	code = oldPreProcessor.value(code)
+			//});
 
 			//Run Alga's interpreter
 			this.interpret(code);
 		}
 	}
 
+	//Return the old preProcessor function
+	*pop {
+		thisProcess.interpreter.preProcessor = oldPreProcessor;
+	}
+
 	//String -> sclang code
 	*interpret { | code |
-		"\nAlgaInterpreter: WIP\n".postln;
+		code.postln;
 		^code
 	}
 }
+
+//Alias
+AI : AlgaInterpreter { }
+
+/*
+AlgaInterpreter.push
+
+(
+//Alga
+~d1 \sine freq << [~d2 \noise amp << [~d4 \lfo >> freq ~d3 \blip]]
+
+//SC (code between --- will be ignored by the AlgaInterpreter)
+---
+~d5 = { Saw.ar(\freq.kr(440)) };
+~d1 <<+.freq ~d5;
+---
+)
+*/
 */
