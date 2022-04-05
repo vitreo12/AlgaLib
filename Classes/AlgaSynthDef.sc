@@ -238,10 +238,9 @@ AlgaSynthDef : SynthDef {
 				});
 
 				//Finally, print user for certainety when using any dur key
-				if((controlNameName == \dur).or(controlNameName == \sustain).or(
+				if((controlNameName == \dur).or(controlNameName == \delta).or(controlNameName == \sustain).or(
 					controlNameName == \stretch).or(controlNameName == \legato), {
-					("AlgaSynthDef: Note that the '" ++ controlNameName ++ "' parameter is a
-reserved name used in AlgaPatterns. If using this def for an AlgaNode, consider changing the name to activate the interpolation features").warn
+					("AlgaSynthDef: Note that the '" ++ controlNameName ++ "' parameter is a reserved name used in AlgaPatterns. If using this def for an AlgaNode, consider changing the name to activate the interpolation features").warn
 				});
 			});
 
