@@ -2101,6 +2101,16 @@ AlgaPattern : AlgaNode {
 
 				//Remove param entry from eventPairs
 				eventPairs[paramName] = nil;
+			}, {
+				//Scalar
+				newInterpStreams.addScalarAndGenericParams(paramName, paramValue);
+				patternPairsDict[paramName] = Pfunc { | e |
+					newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
+				};
+				foundGenericParams.add(paramName);
+
+				//Remove param entry from eventPairs
+				eventPairs[paramName] = nil;
 			});
 
 			//Add the entry to defaults ONLY if explicit
@@ -2178,7 +2188,7 @@ AlgaPattern : AlgaNode {
 				isAlgaParam = true;
 			});
 
-			//Scalar parameters OR all other values
+			//All other values: they should be treated just like scalars
 			if(isAlgaParam.not, {
 				newInterpStreams.addScalarAndGenericParams(paramName, value);
 				patternPairsDict[paramName] = Pfunc { | e |
