@@ -135,7 +135,11 @@ AlgaProxySpace {
 	}
 
 	at { | key |
-		var node = nodes[key];
+		var node;
+		//Always gotta ignore AlgaParser things
+		if((key == \algaParserRecursiveObjectList).or(
+			key == \algaParserUpdateRecursiveObjectList), { ^nil });
+		node = nodes[key];
 		if(node.isNil, {
 			node = this.newNode;
 			nodes[key] = node;
@@ -166,6 +170,7 @@ AlgaProxySpace {
 			currentEnvironment = saveEnvir;
 		};
 	}
+
 	use { arg function;
 		// temporarily replaces the currentEnvironment with this,
 		// executes function, returns the result of the function
@@ -310,7 +315,13 @@ AlgaProxySpace {
 	}
 
 	put { | key, def |
-		var node = this.at(key);
+		var node;
+
+		//Always gotta ignore AlgaParser things
+		if((key == \algaParserRecursiveObjectList).or(
+			key == \algaParserUpdateRecursiveObjectList), { ^this });
+
+		node = this.at(key);
 
 		//If user explicitly sets an AlgaNode (e.g. ~a = AN( ))
 		//use that and just replace the entry, clearing the old one.
