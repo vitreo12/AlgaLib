@@ -201,6 +201,12 @@ AlgaPattern : AlgaNode {
 			//Needed for Event syncing
 			~isPlaying = true;
 
+			//Check algaSynthDef to be a Symbol
+			if(algaSynthDef.isSymbol.not, {
+				("AlgaPattern: 'def' entry is not a Symbol, but a " ++ algaSynthDef.class ++ ".").error;
+				^this
+			});
+
 			//Deal with sustain
 			if(hasSustain, {
 				//scale by stretch

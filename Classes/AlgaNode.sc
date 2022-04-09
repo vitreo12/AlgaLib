@@ -880,7 +880,7 @@ AlgaNode {
 		});
 		if(rate == nil, {
 			"AlgaNode: 'rate' is nil. 'audio' will be used instead".warn;
-			rate = rate ? \audio;
+			rate = \audio;
 		});
 		synthBus = AlgaBus(server, numChannels, rate);
 	}
