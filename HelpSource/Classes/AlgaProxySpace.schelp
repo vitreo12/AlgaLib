@@ -24,6 +24,8 @@ private:: nodes
 private:: paramsArgs
 private:: patternsEvents
 private:: isTriggerDef
+private:: make
+private:: use
 
 INSTANCEMETHODS::
 
@@ -85,7 +87,11 @@ private:: rpt
 private:: server
 private:: triggerDef
 private:: nodes
+private:: objects
+private:: isValidAlgaClass
 private:: patternsEvents
+private:: make
+private:: use
 
 EXAMPLES::
 code::
