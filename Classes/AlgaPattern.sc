@@ -202,86 +202,87 @@ AlgaPattern : AlgaNode {
 			~isPlaying = true;
 
 			//Check algaSynthDef to be a Symbol
-			if(algaSynthDef.isSymbol.not, {
-				("AlgaPattern: 'def' entry is not a Symbol, but a " ++ algaSynthDef.class ++ ".").error;
-				^this
-			});
+			if(algaSynthDef.isSymbol, {
+				//Deal with sustain
+				if(hasSustain, {
+					//scale by stretch
+					sustain = sustain * stretch;
 
-			//Deal with sustain
-			if(hasSustain, {
-				//scale by stretch
-				sustain = sustain * stretch;
-
-				//If sustainToDur, add to dur. This allows to do things like sustain: -0.5 (from dur).
-				//Also, if sustain is 0 here, it will then use \dur
-				if(~algaPattern.sustainToDur, {
-					sustain = sustain + dur; //dur already includes stretch!
-				});
-
-				//scale by legato
-				if(legato > 0, { sustain = sustain * legato });
-
-				//Finally, if the result is a positive number, go ahead
-				if(sustain > 0, {
-					~algaPattern.isSustainTrig = true;
-					~algaPattern.sustainIDs = Array();
-				}, {
+					//If sustainToDur, add to dur. This allows to do things like sustain: -0.5 (from dur).
+					//Also, if sustain is 0 here, it will then use \dur
 					if(~algaPattern.sustainToDur, {
-						("AlgaPattern: your 'sustain' is 0 or less: " ++
-							sustain ++ ". This might cause the Synths not to be released").warn;
+						sustain = sustain + dur; //dur already includes stretch!
 					});
-					hasSustain = false
+
+					//scale by legato
+					if(legato > 0, { sustain = sustain * legato });
+
+					//Finally, if the result is a positive number, go ahead
+					if(sustain > 0, {
+						~algaPattern.isSustainTrig = true;
+						~algaPattern.sustainIDs = Array();
+					}, {
+						if(~algaPattern.sustainToDur, {
+							("AlgaPattern: your 'sustain' is 0 or less: " ++
+								sustain ++ ". This might cause the Synths not to be released").warn;
+						});
+						hasSustain = false
+					});
 				});
-			});
 
-			//Create the bundle with all needed Synths for this Event.
-			bundle = algaPatternServer.makeBundle(false, {
-				//First, consume scheduledStepActionsPre if there are any
-				~algaPattern.advanceAndConsumeScheduledStepActions(false);
+				//Create the bundle with all needed Synths for this Event.
+				bundle = algaPatternServer.makeBundle(false, {
+					//First, consume scheduledStepActionsPre if there are any
+					~algaPattern.advanceAndConsumeScheduledStepActions(false);
 
-				//Then, create all needed synths
-				~algaPattern.createEventSynths(
-					algaSynthDef: algaSynthDef,
-					algaSynthBus: algaSynthBus,
-					algaPatternInterpStreams: algaPatternInterpStreams,
-					fx: fx,
-					algaOut: algaOut,
-					dur: dur,
-					sustain: sustain,
-					stretch: stretch,
-					legato: legato
-				);
+					//Then, create all needed synths
+					~algaPattern.createEventSynths(
+						algaSynthDef: algaSynthDef,
+						algaSynthBus: algaSynthBus,
+						algaPatternInterpStreams: algaPatternInterpStreams,
+						fx: fx,
+						algaOut: algaOut,
+						dur: dur,
+						sustain: sustain,
+						stretch: stretch,
+						legato: legato
+					);
 
-				//Finally, consume scheduledStepActionsPost if there are any
-				~algaPattern.advanceAndConsumeScheduledStepActions(true);
-			});
+					//Finally, consume scheduledStepActionsPost if there are any
+					~algaPattern.advanceAndConsumeScheduledStepActions(true);
+				});
 
-			//Send bundle to server using the same server / clock as the AlgaPattern
-			//Note that this does not go through the AlgaScheduler directly, but it uses its same clock!
-			schedBundleArrayOnClock(
-				offset,
-				algaPatternClock,
-				bundle,
-				lag,
-				algaPatternServer,
-				latency
-			);
-
-			//Sched sustain if provided
-			if(hasSustain, {
-				~algaPattern.scheduleSustain(
-					sustain,
+				//Send bundle to server using the same server / clock as the AlgaPattern
+				//Note that this does not go through the AlgaScheduler directly, but it uses its same clock!
+				schedBundleArrayOnClock(
 					offset,
+					algaPatternClock,
+					bundle,
 					lag,
+					algaPatternServer,
 					latency
 				);
+
+				//Sched sustain if provided
+				if(hasSustain, {
+					~algaPattern.scheduleSustain(
+						sustain,
+						offset,
+						lag,
+						latency
+					);
+				});
+
+				//Always reset isSustainTrig
+				~algaPattern.isSustainTrig = false;
+
+				//Set latestCurrentEnvironment
+				~algaPattern.latestCurrentEnvironment = currentEnvironment;
+			}, {
+				//Invalid
+				("AlgaPattern: 'def' entry is not a Symbol, but a " ++
+					algaSynthDef.class ++ ".").error;
 			});
-
-			//Always reset isSustainTrig
-			~algaPattern.isSustainTrig = false;
-
-			//Set latestCurrentEnvironment
-			~algaPattern.latestCurrentEnvironment = currentEnvironment;
 		});
 	}
 
