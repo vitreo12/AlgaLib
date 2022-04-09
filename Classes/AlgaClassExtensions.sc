@@ -174,6 +174,18 @@
 //Essential for 'c5' / 'a16' busses not to be interpreted as an Array!
 +String {
 	isNumberOrArray { ^false } //isArray would be true!!
+
+	//Wrapper around Dictionary.loadSamples
+	loadSamples { | server |
+		^Dictionary.loadSamples(this, server)
+	}
+}
+
+//Wrapper around Dictionary.loadSamples
++PathName {
+	loadSamples { | server |
+		^Dictionary.loadSamples(this, server)
+	}
 }
 
 //Fix lincurve with .ir arg
@@ -248,15 +260,6 @@
 		^this.any({ | item |
 			(item.canFreeSynth).or(item.algaCanFreeSynth)
 		})
-	}
-}
-
-//Converts all dict entries to stream
-+Dictionary {
-	algaAsStream {
-		this.keysValuesDo({ | key, entry |
-			this[key] = entry.algaAsStream
-		});
 	}
 }
 
@@ -387,6 +390,13 @@
 			}, {
 				function.value(value, i);
 			});
+		});
+	}
+
+	//Convert all dict entries to streams
+	algaAsStream {
+		this.keysValuesDo({ | key, entry |
+			this[key] = entry.algaAsStream
 		});
 	}
 }
