@@ -341,23 +341,27 @@
 
 +Dictionary {
 	//loadSamples implementation
-	*loadSamplesInner { | path, dict, server |
+	*loadSamplesInner { | path, dict, server, counter |
 		var folderName = path.fileName.asSymbol;
-		dict[folderName] = this.new();
+		var newDict = this.new();
+		dict[folderName] = newDict;
+		if(counter != nil, { dict[counter] = newDict });
 
 		if(path.files.size > 0, {
 			//Not filesDo, which would be recursive. Recursiveness is already handled
-			path.files.do({ | file |
+			path.files.do({ | file, i |
 				var fileNameNoExt = file.fileNameWithoutExtension.asSymbol;
 				if((file.extension == "wav").or(file.extension == "aiff"), {
-					dict[folderName][fileNameNoExt] = Buffer.read(server, file.fullPath);
+					var buffer = Buffer.read(server, file.fullPath);
+					dict[folderName][fileNameNoExt] = buffer;
+					dict[folderName][i] = buffer;
 				});
 			});
 		});
 
-		path.folders.do({ | folder |
+		path.folders.do({ | folder, i |
 			folder = PathName(folder.fullPath.withoutTrailingSlash);
-			this.loadSamplesInner(folder, dict[folderName], server)
+			this.loadSamplesInner(folder, dict[folderName], server, i)
 		});
 
 		if(dict[folderName].size == 0, { dict.removeAt(folderName) });
@@ -365,17 +369,18 @@
 
 	//Load samples of a path to a dict, recursively
 	*loadSamples { | path, server |
-		var dict = this.new();
-
 		server = server ? Server.default;
-
-		if(path.isKindOf(PathName).not, { path = PathName(path) });
-		if(path.isFolder.not, { ^dict });
-		path = PathName(path.fullPath.withoutTrailingSlash);
-
-		this.loadSamplesInner(path, dict, server);
-
-		^dict
+		if(server.serverRunning, {
+			var dict = this.new();
+			if(path.isKindOf(PathName).not, { path = PathName(path) });
+			if(path.isFolder.not, { ^dict });
+			path = PathName(path.fullPath.withoutTrailingSlash);
+			this.loadSamplesInner(path, dict, server);
+			^dict
+		}, {
+			"Server is not running. Cannot load samples.".warn
+			^nil
+		});
 	}
 
 	//Loop over a Dict, unpacking IdentitySet.
