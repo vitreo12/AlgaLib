@@ -19,6 +19,7 @@ AlgaProxySpace {
 	classvar <currentNode;
 	classvar <isTriggerDef = false;
 	var <nodes;
+	var <objects;
 	var <patternsEvents;
 	var <server;
 	var <sched = 1;
@@ -45,6 +46,7 @@ AlgaProxySpace {
 	init {
 		CmdPeriod.add(this);
 		nodes = IdentityDictionary(10);
+		objects = IdentityDictionary(10);
 		patternsEvents = IdentityDictionary(10);
 		interpShape = Env([0, 1], 1);
 		^this
@@ -132,19 +134,6 @@ AlgaProxySpace {
 
 	pop {
 		Environment.pop
-	}
-
-	at { | key |
-		var node;
-		//Always gotta ignore AlgaParser things
-		if((key == \algaParserRecursiveObjectList).or(
-			key == \algaParserUpdateRecursiveObjectList), { ^nil });
-		node = nodes[key];
-		if(node.isNil, {
-			node = this.newNode;
-			nodes[key] = node;
-		});
-		^node
 	}
 
 	//////////////////////
@@ -314,6 +303,14 @@ AlgaProxySpace {
 		^node.replace(def: def);
 	}
 
+	isValidAlgaClass { | def |
+		var classes = [AlgaNode, AlgaPattern, Symbol, Function, Event];
+		classes.do({ | class |
+			if(def.isKindOf(class), { ^true });
+		});
+		^false;
+	}
+
 	put { | key, def |
 		var node;
 
@@ -321,25 +318,64 @@ AlgaProxySpace {
 		if((key == \algaParserRecursiveObjectList).or(
 			key == \algaParserUpdateRecursiveObjectList), { ^this });
 
-		node = this.at(key);
+		//Check if it's a valid class, in such case go ahead with Alga
+		if(this.isValidAlgaClass(def), {
+			node = this.at(key);
+			if(node.isAlgaNode, {
+				//If user explicitly sets an AlgaNode (e.g. ~a = AN( ))
+				//use that and just replace the entry, clearing the old one.
+				if(def.isAlgaNode, { ^this.explicitNode(node, key, def) });
 
-		//If user explicitly sets an AlgaNode (e.g. ~a = AN( ))
-		//use that and just replace the entry, clearing the old one.
-		if(def.isAlgaNode, { ^this.explicitNode(node, key, def) });
+				//New AlgaPattern (Event)
+				if(def.isEvent, {
+					if(node.isAlgaPattern.not, {
+						//If old node was AlgaNode, create the new pattern
+						^this.newPatternFromNode(node, key, def)
+					}, {
+						//If old node was AlgaPattern, perform differential checks
+						if(this.patternDifferential(node, key, def), { ^node });
+					});
+				});
 
-		//New AlgaPattern (Event)
-		if(def.isEvent, {
-			if(node.isAlgaPattern.not, {
-				//If old node was AlgaNode, create the new pattern
-				^this.newPatternFromNode(node, key, def)
+				//Fallback is replace
+				^this.replaceNode(node, key, def);
 			}, {
-				//If old node was AlgaPattern, perform differential checks
-				if(this.patternDifferential(node, key, def), { ^node });
+				("AlgaProxySpace: cannot re-assign the variable '" ++ key ++
+					"' to an AlgaNode. It's a " ++ node.class ++ ".").warn
+				^nil;
+			});
+		}, {
+			//Add to objects otherwises. Need to index nodes directly.
+			//If we'd call this.at, it would create a new node.
+			if(nodes[key].isAlgaNode.not, {
+				objects[key] = def;
+			}, {
+				("AlgaProxySpace: cannot re-assign the variable '" ++ key ++
+					"': it's an AlgaNode.").warn
+				^nil;
 			});
 		});
+	}
 
-		//Fallback is replace
-		^this.replaceNode(node, key, def);
+	at { | key |
+		var node;
+
+		//Always gotta ignore AlgaParser things
+		if((key == \algaParserRecursiveObjectList).or(
+			key == \algaParserUpdateRecursiveObjectList), { ^nil });
+
+		//If the node is nil, either return object or create new node
+		node = nodes[key];
+		if(node == nil, {
+			//Look into objects
+			var object = objects[key];
+			if(object != nil, { ^object });
+
+			//No object, create a new node and return it
+			node = this.newNode;
+			nodes[key] = node;
+		});
+		^node
 	}
 
 	clock { ^Alga.clock(server) }
