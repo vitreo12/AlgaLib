@@ -874,9 +874,15 @@ AlgaNode {
 	}
 
 	createSynthBus {
-		if((numChannels != nil).and(rate != nil), {
-			synthBus = AlgaBus(server, numChannels, rate);
+		if(numChannels == nil, {
+			"AlgaNode: 'numChannels' is nil. 1 will be used instead".warn;
+			numChannels = 1;
 		});
+		if(rate == nil, {
+			"AlgaNode: 'rate' is nil. 'audio' will be used instead".warn;
+			rate = rate ? \audio;
+		});
+		synthBus = AlgaBus(server, numChannels, rate);
 	}
 
 	createInterpNormBusses {

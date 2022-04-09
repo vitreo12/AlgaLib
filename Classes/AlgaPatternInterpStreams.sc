@@ -27,6 +27,9 @@ AlgaPatternInterpStreams {
 	var <>stretch, <>stretchAlgaPseg;
 	var <>legato, <>legatoAlgaPseg;
 
+	//\def
+	var <>def, <>defStream;
+
 	//\fx and \out
 	var <>fx, <>fxStream;
 	var <>out, <>outStream;
@@ -480,6 +483,17 @@ AlgaPatternInterpStreams {
 	clearScalarAndGenericParams {
 		scalarAndGenericParams.clear;
 		scalarAndGenericParamsStreams.clear;
+	}
+
+	//Store \def
+	addDef { | value |
+		def = value;
+		defStream = def.algaAsStream
+	}
+
+	//Remove \def
+	removeDef {
+		def = nil; defStream = nil;
 	}
 
 	//Store \fx

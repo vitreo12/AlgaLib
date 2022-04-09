@@ -171,7 +171,7 @@ AlgaPattern : AlgaNode {
 			var bundle;
 
 			//The AlgaSynthDef
-			var algaSynthDef = ~synthDefName.valueEnvir;
+			var algaSynthDef = ~def;
 
 			//AlgaPattern, the synthBus and its server / clock
 			var algaPattern = ~algaPattern;
@@ -1950,29 +1950,28 @@ AlgaPattern : AlgaNode {
 
 		//Check rates, numChannels, Symbols and controlNames
 		controlNamesSum = this.checkPatternValidityAndReturnControlNames(def);
-		if(controlNamesSum != nil, {
-			//Create controlNames from controlNamesSum
-			this.createControlNamesAndParamsConnectionTime(controlNamesSum);
-
-			//synthDef will be the ListPattern
-			synthDef = def;
-
-			//Substitute the eventPairs entry with the new ListPattern
-			eventPairs[\def] = def;
-
-			//Build pattern from Pattern
-			^this.buildFromPattern(
-				initGroups: initGroups,
-				replace: replace,
-				keepChannelsMapping: keepChannelsMapping,
-				keepScale: keepScale,
-				sched: sched
-			);
+		if(controlNamesSum == nil, {
+			("AlgaPattern: could not retrieve any parameters from the provided 'def'. Only using 'amp'.").warn;
+			controlNamesSum = [ ControlName(\amp, 0, \audio, 1.0) ];
 		});
 
-		//Error
-		("AlgaPattern: could not retrieve any parameters from the provided 'def'").error;
-		^this;
+		//Create controlNames from controlNamesSum
+		this.createControlNamesAndParamsConnectionTime(controlNamesSum);
+
+		//synthDef will be the ListPattern
+		synthDef = def;
+
+		//Substitute the eventPairs entry with the new ListPattern
+		eventPairs[\def] = def;
+
+		//Build pattern from Pattern
+		^this.buildFromPattern(
+			initGroups: initGroups,
+			replace: replace,
+			keepChannelsMapping: keepChannelsMapping,
+			keepScale: keepScale,
+			sched: sched
+		);
 	}
 
 	//Create out: receivers
@@ -2121,9 +2120,12 @@ AlgaPattern : AlgaNode {
 		eventPairs.keysValuesDo({ | paramName, value |
 			var isAlgaParam = false;
 
-			//Add \def key as \instrument
+			//Add \def key
 			if(paramName == \def, {
-				patternPairs = patternPairs.add(\instrument).add(value);
+				newInterpStreams.addDef(value);
+				patternPairsDict[\def] = Pfunc { | e |
+					newInterpStreams.defStream.next(e);
+				};
 				isAlgaParam = true;
 			});
 
