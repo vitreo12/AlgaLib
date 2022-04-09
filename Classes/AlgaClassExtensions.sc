@@ -337,6 +337,44 @@
 }
 
 +Dictionary {
+	//loadSamples implementation
+	*loadSamplesInner { | path, dict, server |
+		var folderName = path.fileName.asSymbol;
+		dict[folderName] = this.new();
+
+		if(path.files.size > 0, {
+			//Not filesDo, which would be recursive. Recursiveness is already handled
+			path.files.do({ | file |
+				var fileNameNoExt = file.fileNameWithoutExtension.asSymbol;
+				if((file.extension == "wav").or(file.extension == "aiff"), {
+					dict[folderName][fileNameNoExt] = Buffer.read(server, file.fullPath);
+				});
+			});
+		});
+
+		path.folders.do({ | folder |
+			folder = PathName(folder.fullPath.withoutTrailingSlash);
+			this.loadSamplesInner(folder, dict[folderName], server)
+		});
+
+		if(dict[folderName].size == 0, { dict.removeAt(folderName) });
+	}
+
+	//Load samples of a path to a dict, recursively
+	*loadSamples { | path, server |
+		var dict = this.new();
+
+		server = server ? Server.default;
+
+		if(path.isKindOf(PathName).not, { path = PathName(path) });
+		if(path.isFolder.not, { ^dict });
+		path = PathName(path.fullPath.withoutTrailingSlash);
+
+		this.loadSamplesInner(path, dict, server);
+
+		^dict
+	}
+
 	//Loop over a Dict, unpacking IdentitySet.
 	//It's used in AlgaBlock to unpack inNodes of an AlgaNode
 	nodesLoop { | function |
