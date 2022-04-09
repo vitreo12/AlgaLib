@@ -95,11 +95,11 @@ Alga {
 
 	*quitServerAndClear { | server, prevServerQuit |
 		if(server != nil, {
-			if(server.serverRunning, {
+			if(server.hasBooted, {
 				server.quit(onComplete: { prevServerQuit[0] = true });
 				fork {
 					3.wait;
-					if(server.serverRunning.not, { prevServerQuit[0] = true });
+					if(server.hasBooted.not, { prevServerQuit[0] = true });
 				}
 			}, {
 				prevServerQuit[0] = true;
