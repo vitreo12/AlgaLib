@@ -341,11 +341,9 @@
 
 +Dictionary {
 	//loadSamples implementation
-	*loadSamplesInner { | path, dict, server, counter |
+	*loadSamplesInner { | path, dict, server |
 		var folderName = path.fileName.asSymbol;
-		var newDict = this.new();
-		dict[folderName] = newDict;
-		if(counter != nil, { dict[counter] = newDict });
+		dict[folderName] = this.new();
 
 		if(path.files.size > 0, {
 			//Not filesDo, which would be recursive. Recursiveness is already handled
@@ -359,9 +357,9 @@
 			});
 		});
 
-		path.folders.do({ | folder, i |
+		path.folders.do({ | folder |
 			folder = PathName(folder.fullPath.withoutTrailingSlash);
-			this.loadSamplesInner(folder, dict[folderName], server, i)
+			this.loadSamplesInner(folder, dict[folderName], server)
 		});
 
 		if(dict[folderName].size == 0, { dict.removeAt(folderName) });
@@ -376,7 +374,7 @@
 			if(path.isFolder.not, { ^dict });
 			path = PathName(path.fullPath.withoutTrailingSlash);
 			this.loadSamplesInner(path, dict, server);
-			^dict
+			dict.do({ | entry | ^entry }); //It only has one entry
 		}, {
 			"Server is not running. Cannot load samples.".warn
 			^nil
