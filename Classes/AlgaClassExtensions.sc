@@ -343,16 +343,24 @@
 	//loadSamples implementation
 	*loadSamplesInner { | path, dict, server, folderCount, post = true |
 		var folderName = path.fileName.asSymbol;
-		var newDict = this.new();
+		var newDict;
 
-		if(post, {
-			("\n- Loading folder: '" ++ folderName ++ "' \n").postln;
+		//Inner calls
+		if(folderCount != nil, {
+			newDict = this.new();
+			dict[folderCount.asSymbol] = newDict;
+			dict[folderName] = newDict;
+			if(post, {
+				("\n- " ++ folderCount ++ ": " ++ path.folderName ++
+					"/" ++ folderName ++ "/ \n").postln;
+			});
+		}, {
+			//First call: use top dict
+			newDict = dict;
+			if(post, {
+				("\n- " ++ folderName ++ "/ \n").postln;
+			});
 		});
-
-		//Folder symbol ( \Samples )
-		dict[folderName] = newDict;
-		//Int symbol ( \0, \1, etc... )
-		if(folderCount != nil, { dict[folderCount.asSymbol] = newDict });
 
 		if(path.files.size > 0, {
 			//Not filesDo, which would be recursive. Recursiveness is already handled
@@ -364,25 +372,27 @@
 					var buffer = Buffer.read(server, file.fullPath);
 
 					if(post, {
-						("Loading sample: '" ++ fileName ++ "'").postln;
+						(i.asString ++ ": '" ++ fileName ++ "'").postln;
 					});
 
 					//Symbol with no extension ( \kick )
-					dict[folderName][fileNameNoExtSym] = buffer;
+					newDict[fileNameNoExtSym] = buffer;
 					//Int index ( 0, 1, etc... )
-					dict[folderName][i] = buffer;
+					newDict[i] = buffer;
 					//Full string name with extension ( "kick" )
-					dict[folderName][fileName] = buffer;
+					newDict[fileName] = buffer;
 					//Full string name with no extension ( "kick.wav" )
-					dict[folderName][fileNameNoExt] = buffer;
+					newDict[fileNameNoExt] = buffer;
 				});
 			});
 		});
 
 		path.folders.do({ | folder, i |
 			folder = PathName(folder.fullPath.withoutTrailingSlash);
-			this.loadSamplesInner(folder, dict[folderName], server, i)
+			this.loadSamplesInner(folder, newDict, server, i)
 		});
+
+		server.sync;
 	}
 
 	//Load samples of a path to a dict, recursively
@@ -390,12 +400,25 @@
 		server = server ? Server.default;
 		if(server.serverRunning, {
 			var dict = this.new();
-			if(path.isKindOf(PathName).not, { path = PathName(path) });
-			if(path.isFolder.not, { ^dict });
-			path = PathName(path.fullPath.withoutTrailingSlash);
-			this.loadSamplesInner(path, dict, server, post: post);
-			"".postln;
-			dict.do({ | entry | ^entry }); //It only has one entry
+			var strPath;
+			if(path.isString, {
+				path = PathName(path.standardizePath)
+			});
+			if(path.isKindOf(PathName).not, {
+				"path must be a String or PathName".error;
+				^nil;
+			});
+			strPath = path.fullPath.withoutTrailingSlash;
+			path = PathName(strPath);
+			if((File.exists(strPath).not).or(path.isFolder.not), {
+				"Path does not exist or it's not a folder".error;
+				^nil;
+			});
+			fork {
+				this.loadSamplesInner(path, dict, server, post: post);
+				"\n- Done!\n".postln;
+			};
+			^dict;
 		}, {
 			"Server is not running. Cannot load samples.".warn
 			^nil
