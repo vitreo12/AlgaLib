@@ -341,9 +341,14 @@
 
 +Dictionary {
 	//loadSamples implementation
-	*loadSamplesInner { | path, dict, server, folderCount |
+	*loadSamplesInner { | path, dict, server, folderCount, post = true |
 		var folderName = path.fileName.asSymbol;
 		var newDict = this.new();
+
+		if(post, {
+			("\n- Loading folder: '" ++ folderName ++ "' \n").postln;
+		});
+
 		//Folder symbol ( \Samples )
 		dict[folderName] = newDict;
 		//Int symbol ( \0, \1, etc... )
@@ -357,6 +362,11 @@
 				var fileNameNoExtSym = fileNameNoExt.asSymbol;
 				if((file.extension == "wav").or(file.extension == "aiff"), {
 					var buffer = Buffer.read(server, file.fullPath);
+
+					if(post, {
+						("Loading sample: '" ++ fileName ++ "'").postln;
+					});
+
 					//Symbol with no extension ( \kick )
 					dict[folderName][fileNameNoExtSym] = buffer;
 					//Int index ( 0, 1, etc... )
@@ -376,14 +386,15 @@
 	}
 
 	//Load samples of a path to a dict, recursively
-	*loadSamples { | path, server |
+	*loadSamples { | path, server, post = true |
 		server = server ? Server.default;
 		if(server.serverRunning, {
 			var dict = this.new();
 			if(path.isKindOf(PathName).not, { path = PathName(path) });
 			if(path.isFolder.not, { ^dict });
 			path = PathName(path.fullPath.withoutTrailingSlash);
-			this.loadSamplesInner(path, dict, server);
+			this.loadSamplesInner(path, dict, server, post: post);
+			"".postln;
 			dict.do({ | entry | ^entry }); //It only has one entry
 		}, {
 			"Server is not running. Cannot load samples.".warn
