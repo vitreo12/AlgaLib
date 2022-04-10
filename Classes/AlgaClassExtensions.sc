@@ -341,25 +341,37 @@
 
 +Dictionary {
 	//loadSamples implementation
-	*loadSamplesInner { | path, dict, server |
+	*loadSamplesInner { | path, dict, server, folderCount |
 		var folderName = path.fileName.asSymbol;
-		dict[folderName] = this.new();
+		var newDict = this.new();
+		//Folder symbol ( \Samples )
+		dict[folderName] = newDict;
+		//Int symbol ( \0, \1, etc... )
+		if(folderCount != nil, { dict[folderCount.asSymbol] = newDict });
 
 		if(path.files.size > 0, {
 			//Not filesDo, which would be recursive. Recursiveness is already handled
 			path.files.do({ | file, i |
-				var fileNameNoExt = file.fileNameWithoutExtension.asSymbol;
+				var fileName = file.fileName.asString;
+				var fileNameNoExt = file.fileNameWithoutExtension;
+				var fileNameNoExtSym = fileNameNoExt.asSymbol;
 				if((file.extension == "wav").or(file.extension == "aiff"), {
 					var buffer = Buffer.read(server, file.fullPath);
-					dict[folderName][fileNameNoExt] = buffer;
+					//Symbol with no extension ( \kick )
+					dict[folderName][fileNameNoExtSym] = buffer;
+					//Int index ( 0, 1, etc... )
 					dict[folderName][i] = buffer;
+					//Full string name with extension ( "kick" )
+					dict[folderName][fileName] = buffer;
+					//Full string name with no extension ( "kick.wav" )
+					dict[folderName][fileNameNoExt] = buffer;
 				});
 			});
 		});
 
-		path.folders.do({ | folder |
+		path.folders.do({ | folder, i |
 			folder = PathName(folder.fullPath.withoutTrailingSlash);
-			this.loadSamplesInner(folder, dict[folderName], server)
+			this.loadSamplesInner(folder, dict[folderName], server, i)
 		});
 
 		if(dict[folderName].size == 0, { dict.removeAt(folderName) });
