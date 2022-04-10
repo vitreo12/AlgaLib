@@ -393,6 +393,15 @@
 		});
 	}
 
+	//Free all samples
+	freeSamples {
+		this.keysValuesDo({ | key, value |
+			if(value.isKindOf(Dictionary), { value.freeSamples });
+			if(value.isBuffer, { value.free });
+			this.removeAt(key);
+		});
+	}
+
 	//Loop over a Dict, unpacking IdentitySet.
 	//It's used in AlgaBlock to unpack inNodes of an AlgaNode
 	nodesLoop { | function |
