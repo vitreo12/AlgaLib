@@ -373,8 +373,6 @@
 			folder = PathName(folder.fullPath.withoutTrailingSlash);
 			this.loadSamplesInner(folder, dict[folderName], server, i)
 		});
-
-		if(dict[folderName].size == 0, { dict.removeAt(folderName) });
 	}
 
 	//Load samples of a path to a dict, recursively
