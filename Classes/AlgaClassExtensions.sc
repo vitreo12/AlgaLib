@@ -335,6 +335,41 @@
 	}
 }
 
+//Read all SynthDefs in a path recursively
++SynthDescLib {
+	readAllInner { | path, beginsWithExclude = "IO" |
+		var strPath = path.fullPath.withoutTrailingSlash;
+		this.read(strPath ++ "/*.scsyndef");
+		path.folders.do({ | folder |
+			var folderName = folder.folderName.asString;
+			if(folderName.beginsWith(beginsWithExclude).not, {
+				this.readAllInner(folder, beginsWithExclude);
+			});
+		});
+	}
+
+	readAll { | path, beginsWithExclude = "IO" |
+		var strPath;
+		path = path ? SynthDef.synthDefDir; //Defaults to SC one. Alga will use AlgaSynthDefs instead
+		beginsWithExclude = beginsWithExclude ? "";
+		beginsWithExclude = beginsWithExclude.withoutTrailingSlash;
+		if(path.isString, {
+			path = PathName(path.standardizePath)
+		});
+		if(path.isKindOf(PathName).not, {
+			"path must be a String or PathName".error;
+			^nil;
+		});
+		strPath = path.fullPath.withoutTrailingSlash;
+		path = PathName(strPath);
+		if((File.exists(strPath).not).or(path.isFolder.not), {
+			"Path does not exist or it's not a folder".error;
+			^nil;
+		});
+		this.readAllInner(path, beginsWithExclude);
+	}
+}
+
 +Set {
 	isSet { ^true }
 }

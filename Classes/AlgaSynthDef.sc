@@ -47,15 +47,22 @@ AlgaSynthDefSpec {
 		if(synthDefPatternOut != nil, { synthDefPatternOut.sendAndAddToGlobalDescLib(server, completionMsg) });
 	}
 
+	writeDefFile { | dir, overwrite = true, mdPlugin |
+		dir = dir ? AlgaStartup.algaSynthDefPath; //Uses Alga's one
+		synthDef.writeDefFile(dir, overwrite, mdPlugin);
+		if(synthDefPattern != nil, { synthDefPattern.writeDefFile(dir, overwrite, mdPlugin) });
+		if(synthDefPatternOut != nil, { synthDefPatternOut.writeDefFile(dir, overwrite, mdPlugin) });
+	}
+
 	load { | server, completionMsg, dir |
-		dir = dir ? AlgaSynthDef.synthDefDir;
+		dir = dir ? AlgaStartup.algaSynthDefPath; //Uses Alga's one
 		synthDef.load(server, completionMsg, dir);
 		if(synthDefPattern != nil, { synthDefPattern.load(server, completionMsg, dir) });
 		if(synthDefPatternOut != nil, { synthDefPatternOut.load(server, completionMsg, dir) });
 	}
 
 	store { | libname=\global, dir, completionMsg, mdPlugin |
-		dir = dir ? AlgaSynthDef.synthDefDir;
+		dir = dir ? AlgaStartup.algaSynthDefPath; //Uses Alga's one
 		synthDef.store(libname, dir, completionMsg, mdPlugin);
 		if(synthDefPattern != nil, { synthDefPattern.store(libname, dir, completionMsg, mdPlugin) });
 		if(synthDefPatternOut != nil, { synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin) });
@@ -399,5 +406,23 @@ AlgaSynthDef : SynthDef {
 	//Always store in global libname
 	add { | libname, completionMsg, keepDef = true |
 		^super.add(\global, completionMsg, keepDef)
+	}
+
+	//Store in Alga's AlgaSynthDefs folder
+	writeDefFile { | dir, overwrite = true, mdPlugin |
+		dir = dir ? AlgaStartup.algaSynthDefPath; //Uses Alga's one
+		^super.writeDefFile(dir, overwrite, mdPlugin);
+	}
+
+	//Store in Alga's AlgaSynthDefs folder
+	load { | server, completionMsg, dir |
+		dir = dir ? AlgaStartup.algaSynthDefPath; //Uses Alga's one
+		^super.load(server, completionMsg, dir);
+	}
+
+	//Store in Alga's AlgaSynthDefs folder
+	store { | libname=\global, dir, completionMsg, mdPlugin |
+		dir = dir ? AlgaStartup.algaSynthDefPath; //Uses Alga's one
+		^super.store(libname, dir, completionMsg, mdPlugin);
 	}
 }

@@ -202,6 +202,10 @@ Alga {
 		}, sampleAccurate:false, makeOutDef:false).add
 	}
 
+	*readAlgaSynthDefs {
+		SynthDescLib.global.readAll(AlgaStartup.algaSynthDefPath);
+	}
+
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
 		var envAlgaServerOptions = topEnvironment[\algaServerOptions];
@@ -280,6 +284,9 @@ Alga {
 
 				//Add alga_silent
 				this.addAlgaSilent;
+
+				//Read all AlgaSynthDefs
+				this.readAlgaSynthDefs;
 
 				//Sync
 				server.sync;
