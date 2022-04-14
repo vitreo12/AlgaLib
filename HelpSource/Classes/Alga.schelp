@@ -56,16 +56,16 @@ Force the recompilation of all link::Classes/AlgaSynthDef::s necessary for link:
 METHOD:: synthDescLib
 Return emphasis::Alga::'s link::Classes/SynthDescLib::.
 
-METHOD:: readAll
+METHOD:: readAllDefs
 Read all the link::Classes/AlgaSynthDef::s in the path recursively. These must have been stored with the code::write::, code::writeDefFile::, code::load:: or code::store:: methods.
 
-METHOD:: algaRead
-Alias for code::readAll::.
+METHOD:: readAlgaSynthDefs
+Alias for code::readAllDefs::.
 
 METHOD:: readDef
 Read a single link::Classes/AlgaSynthDef:: or all the link::Classes/AlgaSynthDef::s in the path non-recursively. These must have been stored with the code::write::, code::writeDefFile::, code::load:: or code::store:: methods.
 
-METHOD:: algaReadDef
+METHOD:: readAlgaSynthDef
 Alias for code::readDef::.
 
 METHOD:: interpolateTempo
@@ -134,4 +134,4 @@ private:: supernovas
 private:: interpTempoRoutines
 private:: addAlgaSilent
 private:: booted
-private:: readAlgaSynthDefs
+private:: readAlgaSynthDefsFolder

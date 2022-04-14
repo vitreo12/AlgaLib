@@ -228,24 +228,26 @@ Alga {
 		}, sampleAccurate:false, makeOutDef:false).add
 	}
 
-	*readAll { | path |
-		SynthDescLib.alga.readAll(path)
+	*readAllDefs { | path, server |
+		server = server ? Server.default;
+		SynthDescLib.alga.readAll(path, server)
 	}
 
-	*algaRead { | path |
-		this.read(path)
+	*readAlgaSynthDefs { | path, server |
+		this.readAllDefs(path, server)
 	}
 
-	*readAlgaSynthDefs {
-		this.readAll(AlgaStartup.algaSynthDefPath);
+	*readAlgaSynthDefsFolder {
+		this.readAllDefs(AlgaStartup.algaSynthDefPath)
 	}
 
-	*readDef { | path |
-		SynthDescLib.alga.readDef(path)
+	*readDef { | path, server |
+		server = server ? Server.default;
+		SynthDescLib.alga.readDef(path, server)
 	}
 
-	*algaReadDef { | path |
-		this.readDef(path)
+	*readAlgaSynthDef { | path, server |
+		this.readDef(path, server)
 	}
 
 	*boot { | onBoot, server, algaServerOptions, clock |
@@ -318,6 +320,9 @@ Alga {
 		//Use AlgaSynthDefs as SC_SYNTHDEF_PATH
 		this.setAlgaSynthDefsDir;
 
+		//Read all AlgaSynthDefs before boot (so server is not sent twice)
+		this.readAlgaSynthDefsFolder;
+
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
@@ -326,9 +331,6 @@ Alga {
 
 				//Add alga_silent
 				this.addAlgaSilent;
-
-				//Read all AlgaSynthDefs
-				this.readAlgaSynthDefs;
 
 				//Execute startup file
 				if(startup != nil, { startup.load });

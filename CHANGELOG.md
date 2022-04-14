@@ -93,6 +93,12 @@
     )
     ```
 
+- `AlgaSynthDef`: can now correctly store and retrieve `AlgaSynthDefs` with the `write` / `load` /
+  `store` calls. By default, these are saved in the `AlgaSynthDefs` folder in the `AlgaLib` folder,
+  but it can be changed to wherever. The definitions in `AlgaSynthDefs` are automatically read at
+  the booting of `Alga`. Other definitions can be read with the `Alga.readAll` / `Alga.readDef`
+  calls.
+
 ## Bug fixes
 
 - Major parser rewrite that leads to more predictable results and a larger amount of patterns supported.

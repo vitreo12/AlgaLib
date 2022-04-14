@@ -126,20 +126,14 @@ AlgaSynthDef : SynthDef {
 	var <>sampleAccurate;
 	var <>outsMapping;
 
-	*readAll { | path |
-		SynthDescLib.alga.readAll(path)
+	*readAll { | path, server |
+		server = server ? Server.default;
+		SynthDescLib.alga.readAll(path, server)
 	}
 
-	*algaRead { | path |
-		this.read(path)
-	}
-
-	*readDef { | path |
-		SynthDescLib.alga.readDef(path)
-	}
-
-	*algaReadDef { | path |
-		this.readDef(path)
+	*readDef { | path, server |
+		server = server ? Server.default;
+		SynthDescLib.alga.readDef(path, server)
 	}
 
 	//Default sampleAccurate to false. If user needs OffsetOut (for pattern accuracy), he must set it to true.
