@@ -49,8 +49,13 @@ AlgaSynthDefSpec {
 
 	writeDefFile { | dir, overwrite = true, mdPlugin |
 		synthDef.writeDefFile(dir, overwrite, mdPlugin);
-		if(synthDefPattern != nil, { synthDefPattern.writeDefFile(dir, overwrite, mdPlugin) });
-		if(synthDefPatternOut != nil, { synthDefPatternOut.writeDefFile(dir, overwrite, mdPlugin) });
+		//Metadata is only needed for the main synthDef
+		if(synthDefPattern != nil, {
+			synthDefPattern.writeDefFile(dir, overwrite, mdPlugin, false) }
+		);
+		if(synthDefPatternOut != nil, {
+			synthDefPatternOut.writeDefFile(dir, overwrite, mdPlugin, false)
+		});
 	}
 
 	//Alias (writeDef can't be used)
@@ -60,14 +65,24 @@ AlgaSynthDefSpec {
 
 	load { | server, completionMsg, dir |
 		synthDef.load(server, completionMsg, dir);
-		if(synthDefPattern != nil, { synthDefPattern.load(server, completionMsg, dir) });
-		if(synthDefPatternOut != nil, { synthDefPatternOut.load(server, completionMsg, dir) });
+		//Metadata is only needed for the main synthDef
+		if(synthDefPattern != nil, {
+			synthDefPattern.load(server, completionMsg, dir, false)
+		});
+		if(synthDefPatternOut != nil, {
+			synthDefPatternOut.load(server, completionMsg, dir, false)
+		});
 	}
 
 	store { | libname=\alga, dir, completionMsg, mdPlugin |
 		synthDef.store(libname, dir, completionMsg, mdPlugin);
-		if(synthDefPattern != nil, { synthDefPattern.store(libname, dir, completionMsg, mdPlugin) });
-		if(synthDefPatternOut != nil, { synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin) });
+		//Metadata is only needed for the main synthDef
+		if(synthDefPattern != nil, {
+			synthDefPattern.store(libname, dir, completionMsg, mdPlugin, false)
+		});
+		if(synthDefPatternOut != nil, {
+			synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin, false)
+		});
 	}
 
 	asSynthDesc { | libname=\alga, keepDef = true |
@@ -430,34 +445,40 @@ AlgaSynthDef : SynthDef {
 	}
 
 	//Store in Alga's AlgaSynthDefs folder
-	writeDefFile { | dir, overwrite = true, mdPlugin |
+	writeDefFile { | dir, overwrite = true, mdPlugin, writeMd = true |
 		//Uses Alga's one
 		dir = (dir ? AlgaStartup.algaSynthDefPath).asString;
 		//Also store archive for Metadata
-		this.writeArchive(dir.withoutTrailingSlash ++ "/" ++ this.name ++ ".scsyndefmd");
+		if(writeMd, {
+			this.writeArchive(dir.withoutTrailingSlash ++ "/"  ++ this.name ++ ".scsyndefmd");
+		});
 		^super.writeDefFile(dir, overwrite, mdPlugin);
 	}
 
 	//Alias (writeDef can't be used)
-	write { | dir, overwrite = true, mdPlugin |
-		^this.writeDefFile(dir, overwrite, mdPlugin)
+	write { | dir, overwrite = true, mdPlugin, writeMd = true |
+		^this.writeDefFile(dir, overwrite, mdPlugin, writeMd)
 	}
 
 	//Store in Alga's AlgaSynthDefs folder
-	load { | server, completionMsg, dir |
+	load { | server, completionMsg, dir, writeMd = true |
 		//Uses Alga's one
 		dir = (dir ? AlgaStartup.algaSynthDefPath).asString;
 		//Also store archive for Metadata
-		this.writeArchive(dir.withoutTrailingSlash ++ "/"  ++ this.name ++ ".scsyndefmd");
+		if(writeMd, {
+			this.writeArchive(dir.withoutTrailingSlash ++ "/"  ++ this.name ++ ".scsyndefmd");
+		});
 		^super.load(server, completionMsg, dir);
 	}
 
 	//Store in Alga's AlgaSynthDefs folder
-	store { | libname=\alga, dir, completionMsg, mdPlugin |
+	store { | libname=\alga, dir, completionMsg, mdPlugin, writeMd = true |
 		//Uses Alga's one
 		dir = (dir ? AlgaStartup.algaSynthDefPath).asString;
 		//Also store archive for Metadata
-		this.writeArchive(dir.withoutTrailingSlash ++ "/" ++ this.name ++ ".scsyndefmd");
+		if(writeMd, {
+			this.writeArchive(dir.withoutTrailingSlash ++ "/"  ++ this.name ++ ".scsyndefmd");
+		});
 		^super.store(libname, dir, completionMsg, mdPlugin);
 	}
 }

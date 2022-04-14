@@ -53,6 +53,9 @@ The new value. Must be an link::Classes/Integer::.
 METHOD:: initSynthDefs
 Force the recompilation of all link::Classes/AlgaSynthDef::s necessary for link::Classes/Alga::'s runtime. This needs to be executed only once anytime the value of emphasis::maxIO:: changes. Before emphasis::boot::, link::Classes/Alga:: already checks that everything is correct.
 
+METHOD:: synthDescLib
+Return emphasis::Alga::'s link::Classes/SynthDescLib::.
+
 METHOD:: readAll
 Read all the link::Classes/AlgaSynthDef::s in the path recursively. These must have been stored with the code::write::, code::writeDefFile::, code::load:: or code::store:: methods.
 

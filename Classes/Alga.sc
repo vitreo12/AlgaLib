@@ -170,6 +170,10 @@ Alga {
 		^clocks[server]
 	}
 
+	*synthDescLib {
+		^(SynthDescLib.alga)
+	}
+
 	*addParGroupOnServerTree { | supernova |
 		//ServerAction passes the server as first arg
 		var serverTreeParGroupFunc = { | server |
