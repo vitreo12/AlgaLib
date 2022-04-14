@@ -1865,16 +1865,14 @@ AlgaPattern : AlgaNode {
 			var controlNamesEntry;
 			var controlNamesListPatternDefaultsEntry;
 
-			synthDescEntry = SynthDescLib.global.at(object);
-
+			synthDescEntry = SynthDescLib.alga.at(object);
 			if(synthDescEntry == nil, {
 				("AlgaPattern: Invalid AlgaSynthDef: '" ++ object.asString ++ "'").error;
 				^nil;
 			});
 
 			synthDefEntry = synthDescEntry.def;
-
-			if(synthDefEntry.class != AlgaSynthDef, {
+			if(synthDefEntry.isKindOf(SynthDef).not, {
 				("AlgaPattern: Invalid AlgaSynthDef: '" ++ object.asString ++"'").error;
 				^nil;
 			});
@@ -2474,7 +2472,7 @@ AlgaPattern : AlgaNode {
 
 	//Get valid synthDef name
 	getSynthDef {
-		if(synthDef.class == AlgaSynthDef, {
+		if(synthDef.isKindOf(SynthDef), {
 			//Normal synthDef
 			^synthDef.name
 		}, {

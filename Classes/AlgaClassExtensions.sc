@@ -308,7 +308,7 @@
 
 +SynthDef {
 	//Like .store but without sending to server: algaStore is executed before Alga.boot
-	algaStore { | libname=\global, dir(synthDefDir), completionMsg, mdPlugin |
+	algaStore { | libname=\alga, dir(synthDefDir), completionMsg, mdPlugin |
 		var lib = SynthDescLib.getLib(libname);
 		var file, path = dir ++ name ++ ".scsyndef";
 		if(metadata.falseAt(\shouldNotSend)) {
@@ -332,6 +332,115 @@
 				this.loadReconstructed(server, completionMsg);
 			};
 		};
+	}
+}
+
+//Read all SynthDefs in a path recursively
++SynthDescLib {
+	readAllInner { | path, server, beginsWithExclude = "IO" |
+		var strPath = path.fullPath.withoutTrailingSlash;
+		this.readDef(strPath, server);
+		path.folders.do({ | folder |
+			var folderName = folder.folderName.asString;
+			if(folderName.beginsWith(beginsWithExclude).not, {
+				this.readAllInner(folder, server, beginsWithExclude);
+			});
+		});
+	}
+
+	readAll { | path, server, beginsWithExclude = "IO" |
+		var strPath;
+		server = server ? Server.default;
+		path = path ? SynthDef.synthDefDir; //Defaults to SC one. Alga will use AlgaSynthDefs instead
+		beginsWithExclude = beginsWithExclude ? "";
+		beginsWithExclude = beginsWithExclude.withoutTrailingSlash;
+		if(path.isString, {
+			path = PathName(path.standardizePath)
+		});
+		if(path.isKindOf(PathName).not, {
+			"path must be a String or PathName".error;
+			^nil;
+		});
+		strPath = path.fullPath.withoutTrailingSlash;
+		path = PathName(strPath);
+		if((File.exists(strPath).not).or(path.isFolder.not), {
+			"Path does not exist or it's not a folder".error;
+			^nil;
+		});
+		this.readAllInner(path, server, beginsWithExclude);
+	}
+
+	algaRead { | path, beginsWithExclude = "IO" |
+		this.readAll(path, beginsWithExclude)
+	}
+
+	readDefInner { | file, server |
+		var name = file.fileNameWithoutExtension;
+		//Read algaPattern and algaPatternTempOut too
+		if((file.extension == "scsyndef").and(
+			(name.endsWith("_algaPattern").or(name.endsWith("_algaPatternTempOut"))).not), {
+			var mdFile = file.pathOnly ++ name ++ ".scsyndefmd";
+			var algaPatternFile = file.pathOnly ++ name ++ "_algaPattern.scsyndef";
+			var algaPatternTempOutFile = file.pathOnly ++ name ++ "_algaPatternTempOut.scsyndef";
+			var algaPatternFileExists = File.exists(algaPatternFile);
+			var algaPatternTempOutFileExists = File.exists(algaPatternTempOutFile);
+
+			//Read scsyndef
+			this.read(file.fullPath);
+
+			//Read algaPatternFile and algaPAtternTempOutFile
+			if(algaPatternFileExists, { this.read(algaPatternFile) });
+			if(algaPatternTempOutFileExists, { this.read(algaPatternTempOutFile) });
+
+			//Send to server too
+			if(server.isKindOf(Server), {
+				if(server.serverRunning, {
+					server.sendMsg("/d_load", file.fullPath);
+					if(algaPatternFileExists, {
+						server.sendMsg("/d_load", algaPatternFile)
+					});
+					if(algaPatternTempOutFileExists, {
+						server.sendMsg("/d_load", algaPatternTempOutFile)
+					});
+				});
+			});
+
+			//Read md file once
+			if(File.exists(mdFile), {
+				var synthDesc = this[name.asSymbol];
+				if(synthDesc != nil, {
+					synthDesc.def = Object.readArchive(mdFile)
+				});
+			});
+		});
+	}
+
+	readDef { | path, server |
+		server = server ? Server.default;
+		if(path.isString, {
+			path = PathName(path.standardizePath.withoutTrailingSlash);
+		});
+		if(path.isKindOf(PathName).not, {
+			"path must be a String or PathName".error;
+			^nil;
+		});
+		case
+		{ path.isFolder } {
+			path.files.do({ | file |
+				this.readDefInner(file, server)
+			});
+		}
+		{ path.isFile } {
+			this.readDefInner(path, server);
+		};
+	}
+
+	algaReadDef { | path, server |
+		this.readDef(path, server)
+	}
+
+	*alga {
+		^this.getLib(\alga)
 	}
 }
 

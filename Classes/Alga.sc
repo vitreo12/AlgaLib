@@ -17,6 +17,8 @@
 Alga {
 	classvar <debug = false;
 
+	classvar <startup;
+
 	classvar <schedulers;
 	classvar <servers;
 	classvar <clocks;
@@ -35,6 +37,8 @@ Alga {
 	}
 
 	*initClass {
+		var algaSynthDescLib = SynthDescLib(\alga);
+
 		servers = IdentityDictionary(1);
 		schedulers = IdentityDictionary(1);
 		clocks = IdentityDictionary(1);
@@ -73,6 +77,24 @@ Alga {
 
 	*maxEnvPoints_ { | value |
 		AlgaStartup.maxEnvPoints = value
+	}
+
+	*startup_ { | path |
+		var pathname;
+		path = path.standardizePath;
+		pathname = PathName(path);
+		if(File.exists(path).not, {
+			("Alga: startup path does not exist: " ++ path.fullPath ).error;
+			^this;
+		});
+		if(pathname.isFile, {
+			if(pathname.extension != "scd", {
+				("Alga: startup file must have a .scd extension").error;
+				^this
+			});
+			startup = path;
+		});
+		^this;
 	}
 
 	*setAlgaSynthDefsDir {
@@ -148,6 +170,10 @@ Alga {
 		^clocks[server]
 	}
 
+	*synthDescLib {
+		^(SynthDescLib.alga)
+	}
+
 	*addParGroupOnServerTree { | supernova |
 		//ServerAction passes the server as first arg
 		var serverTreeParGroupFunc = { | server |
@@ -202,6 +228,28 @@ Alga {
 		}, sampleAccurate:false, makeOutDef:false).add
 	}
 
+	*readAllDefs { | path, server |
+		server = server ? Server.default;
+		SynthDescLib.alga.readAll(path, server)
+	}
+
+	*readAlgaSynthDefs { | path, server |
+		this.readAllDefs(path, server)
+	}
+
+	*readAlgaSynthDefsFolder {
+		this.readAllDefs(AlgaStartup.algaSynthDefPath)
+	}
+
+	*readDef { | path, server |
+		server = server ? Server.default;
+		SynthDescLib.alga.readDef(path, server)
+	}
+
+	*readAlgaSynthDef { | path, server |
+		this.readDef(path, server)
+	}
+
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
 		var envAlgaServerOptions = topEnvironment[\algaServerOptions];
@@ -243,7 +291,7 @@ Alga {
 		});
 
 		//Add to SynthDescLib in order for SynthDef.add to work
-		SynthDescLib.global.addServer(server);
+		SynthDescLib.alga.addServer(server);
 
 		//Run CmdPeriod
 		CmdPeriod.run;
@@ -272,6 +320,9 @@ Alga {
 		//Use AlgaSynthDefs as SC_SYNTHDEF_PATH
 		this.setAlgaSynthDefsDir;
 
+		//Read all AlgaSynthDefs before boot (so server is not sent twice)
+		this.readAlgaSynthDefsFolder;
+
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
@@ -280,6 +331,9 @@ Alga {
 
 				//Add alga_silent
 				this.addAlgaSilent;
+
+				//Execute startup file
+				if(startup != nil, { startup.load });
 
 				//Sync
 				server.sync;

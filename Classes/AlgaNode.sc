@@ -1125,10 +1125,10 @@ AlgaNode {
 		^true;
 	}
 
-	//Unpack controlNames for a single SynthDef
+	//Unpack outsMappings for a single SynthDef
 	unpackSynthDefSymbol { | synthDefSymbol, outsMappingSum |
-		var synthDef = SynthDescLib.global.at(synthDefSymbol).def;
-		if(synthDef == nil, {
+		var synthDef = SynthDescLib.alga.at(synthDefSymbol).def;
+		if(synthDef.isKindOf(SynthDef).not, {
 			("AlgaPattern: Invalid AlgaSynthDef: '" ++
 				synthDefSymbol.asString ++ "'").error;
 			^nil
@@ -1211,7 +1211,7 @@ AlgaNode {
 	buildFromSynthDef { | initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
-		//Retrieve controlNames from SynthDesc
+		//Retrieve controlNames
 		var synthDescControlNames = synthDef.asSynthDesc.controls;
 		if(this.createControlNamesAndParamsConnectionTime(synthDescControlNames).not, { ^this });
 
@@ -1262,14 +1262,14 @@ AlgaNode {
 	dispatchSynthDef { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
-		var synthDesc = SynthDescLib.global.at(def);
+		var synthDesc = SynthDescLib.alga.at(def);
 		if(synthDesc == nil, {
 			("AlgaNode: Invalid AlgaSynthDef: '" ++ def.asString ++ "'").error;
 			^this;
 		});
 
 		synthDef = synthDesc.def;
-		if(synthDef.class != AlgaSynthDef, {
+		if(synthDef.isKindOf(SynthDef).not, {
 			("AlgaNode: Invalid AlgaSynthDef: '" ++ def.asString ++"'").error;
 			^this;
 		});
@@ -1299,7 +1299,7 @@ AlgaNode {
 			).sendAndAddToGlobalDescLib(server);
 
 			//Just get standard SynthDef
-			if(synthDef.class == AlgaSynthDefSpec, { synthDef = synthDef.synthDef });
+			if(synthDef.isKindOf(AlgaSynthDefSpec), { synthDef = synthDef.synthDef });
 
 			//Unlock condition
 			server.sync(wait);
