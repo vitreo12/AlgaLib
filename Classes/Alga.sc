@@ -202,8 +202,24 @@ Alga {
 		}, sampleAccurate:false, makeOutDef:false).add
 	}
 
+	*readAll { | path |
+		SynthDescLib.global.readAll(path)
+	}
+
+	*algaRead { | path |
+		this.read(path)
+	}
+
 	*readAlgaSynthDefs {
-		SynthDescLib.global.readAll(AlgaStartup.algaSynthDefPath);
+		this.readAll(AlgaStartup.algaSynthDefPath);
+	}
+
+	*readDef { | path |
+		SynthDescLib.global.readDef(path)
+	}
+
+	*algaReadDef { | path |
+		this.readDef(path)
 	}
 
 	*boot { | onBoot, server, algaServerOptions, clock |

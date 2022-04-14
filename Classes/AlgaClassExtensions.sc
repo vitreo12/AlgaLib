@@ -339,7 +339,7 @@
 +SynthDescLib {
 	readAllInner { | path, beginsWithExclude = "IO" |
 		var strPath = path.fullPath.withoutTrailingSlash;
-		this.read(strPath ++ "/*.scsyndef");
+		this.readDef(strPath);
 		path.folders.do({ | folder |
 			var folderName = folder.folderName.asString;
 			if(folderName.beginsWith(beginsWithExclude).not, {
@@ -367,6 +367,43 @@
 			^nil;
 		});
 		this.readAllInner(path, beginsWithExclude);
+	}
+
+	algaRead { | path, beginsWithExclude = "IO" |
+		this.readAll(path, beginsWithExclude)
+	}
+
+	readDefInner { | file |
+		var name = file.fileNameWithoutExtension;
+		if(file.extension == "scsyndef", {
+			var mdFile = file.pathOnly ++ name ++ ".scsyndefmd";
+			this.read(file.fullPath);
+			if(File.exists(mdFile), {
+				var synthDesc = this[name.asSymbol];
+				if(synthDesc != nil, {
+					synthDesc.def = Object.readArchive(mdFile)
+				});
+			});
+		});
+	}
+
+	readDef { | path |
+		if(path.isString, {
+			path = PathName(path.standardizePath.withoutTrailingSlash);
+		});
+		case
+		{ path.isFolder } {
+			path.files.do({ | file |
+				this.readDefInner(file)
+			});
+		}
+		{ path.isFile } {
+			this.readDefInner(path);
+		};
+	}
+
+	algaReadDef { | path |
+		this.readDef(path)
 	}
 }
 

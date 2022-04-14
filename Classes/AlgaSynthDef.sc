@@ -54,6 +54,11 @@ AlgaSynthDefSpec {
 		if(synthDefPatternOut != nil, { synthDefPatternOut.writeDefFile(dir, overwrite, mdPlugin) });
 	}
 
+	//Alias
+	writeDef { | dir, overwrite = true, mdPlugin |
+		^this.writeDefFile(dir, overwrite, mdPlugin)
+	}
+
 	load { | server, completionMsg, dir |
 		dir = dir ? AlgaStartup.algaSynthDefPath; //Uses Alga's one
 		synthDef.load(server, completionMsg, dir);
@@ -102,13 +107,28 @@ AlgaSynthDefSpec {
 //makeFadeEnv, however, does not multiply the output, but it is only used for Alga's internal
 //freeing mechanism. Furthermore, outsMapping is provided.
 AlgaSynthDef : SynthDef {
-
 	var <>rate, <>numChannels;
 	var <>canReleaseSynth, <>canFreeSynth;
 
 	var <>explicitFree;
 	var <>sampleAccurate;
 	var <>outsMapping;
+
+	*readAll { | path |
+		SynthDescLib.global.readAll(path)
+	}
+
+	*algaRead { | path |
+		this.read(path)
+	}
+
+	*readDef { | path |
+		SynthDescLib.global.readDef(path)
+	}
+
+	*algaReadDef { | path |
+		this.readDef(path)
+	}
 
 	//Default sampleAccurate to false. If user needs OffsetOut (for pattern accuracy), he must set it to true.
 	*new { | name, func, rates, prependArgs, outsMapping, sampleAccurate = false, variants, metadata |
@@ -358,6 +378,10 @@ AlgaSynthDef : SynthDef {
 			def.outsMapping[out] = i;
 		});
 
+		//Store the original func.
+		//This is mostly needed to prevent writeArchive from complaining
+		def.func = func;
+
 		//Must be array.
 		if(outsMapping.isArray, {
 			var chanCount = 0;
@@ -410,19 +434,33 @@ AlgaSynthDef : SynthDef {
 
 	//Store in Alga's AlgaSynthDefs folder
 	writeDefFile { | dir, overwrite = true, mdPlugin |
-		dir = dir ? AlgaStartup.algaSynthDefPath; //Uses Alga's one
+		//Uses Alga's one
+		dir = dir ? AlgaStartup.algaSynthDefPath;
+		//Also store archive for Metadata
+		this.writeArchive(dir ++ this.name ++ ".scsyndefmd");
 		^super.writeDefFile(dir, overwrite, mdPlugin);
+	}
+
+	//Alias
+	writeDef { | dir, overwrite = true, mdPlugin |
+		^this.writeDefFile(dir, overwrite, mdPlugin)
 	}
 
 	//Store in Alga's AlgaSynthDefs folder
 	load { | server, completionMsg, dir |
-		dir = dir ? AlgaStartup.algaSynthDefPath; //Uses Alga's one
+		//Uses Alga's one
+		dir = dir ? AlgaStartup.algaSynthDefPath;
+		//Also store archive for Metadata
+		this.writeArchive(dir ++ this.name ++ ".scsyndefmd");
 		^super.load(server, completionMsg, dir);
 	}
 
 	//Store in Alga's AlgaSynthDefs folder
 	store { | libname=\global, dir, completionMsg, mdPlugin |
-		dir = dir ? AlgaStartup.algaSynthDefPath; //Uses Alga's one
+		//Uses Alga's one
+		dir = dir ? AlgaStartup.algaSynthDefPath;
+		//Also store archive for Metadata
+		this.writeArchive(dir ++ this.name ++ ".scsyndefmd");
 		^super.store(libname, dir, completionMsg, mdPlugin);
 	}
 }
