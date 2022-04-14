@@ -17,6 +17,8 @@
 Alga {
 	classvar <debug = false;
 
+	classvar <startup;
+
 	classvar <schedulers;
 	classvar <servers;
 	classvar <clocks;
@@ -75,6 +77,24 @@ Alga {
 
 	*maxEnvPoints_ { | value |
 		AlgaStartup.maxEnvPoints = value
+	}
+
+	*startup_ { | path |
+		var pathname;
+		path = path.standardizePath;
+		pathname = PathName(path);
+		if(File.exists(path).not, {
+			("Alga: startup path does not exist: " ++ path.fullPath ).error;
+			^this;
+		});
+		if(pathname.isFile, {
+			if(pathname.extension != "scd", {
+				("Alga: startup file must have a .scd extension").error;
+				^this
+			});
+			startup = path;
+		});
+		^this;
 	}
 
 	*setAlgaSynthDefsDir {
@@ -305,6 +325,9 @@ Alga {
 
 				//Read all AlgaSynthDefs
 				this.readAlgaSynthDefs;
+
+				//Execute startup file
+				if(startup != nil, { startup.load });
 
 				//Sync
 				server.sync;

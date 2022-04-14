@@ -37,6 +37,9 @@ Execute a link::Classes/Function:: on quit.
 ARGUMENT:: server
 The link::Classes/Server:: to quit emphasis::Alga:: from.
 
+METHOD:: startup
+Add a startup file to be executed while emphasis::Alga:: is booting.
+
 METHOD:: maxIO
 Change the maximum number of IO connections between link::Classes/AlgaNode::s. This requires the emphasis::initSynthDefs:: method to re-compile all the necessary link::Classes/AlgaSynthDef::s. The default value is 8.
 ARGUMENT:: value
