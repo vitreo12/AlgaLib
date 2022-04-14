@@ -391,7 +391,7 @@ AlgaParser {
 			synthDefFx = synthDescFx.def;
 		});
 
-		if(synthDefFx.class != AlgaSynthDef, {
+		if(synthDefFx.isKindOf(SynthDef).not, {
 			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++"'").error;
 			^nil;
 		});

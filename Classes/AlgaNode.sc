@@ -1299,7 +1299,7 @@ AlgaNode {
 			).sendAndAddToGlobalDescLib(server);
 
 			//Just get standard SynthDef
-			if(synthDef.class == AlgaSynthDefSpec, { synthDef = synthDef.synthDef });
+			if(synthDef.isKindOf(AlgaSynthDefSpec), { synthDef = synthDef.synthDef });
 
 			//Unlock condition
 			server.sync(wait);
