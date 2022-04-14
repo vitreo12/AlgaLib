@@ -64,13 +64,13 @@ AlgaSynthDefSpec {
 		if(synthDefPatternOut != nil, { synthDefPatternOut.load(server, completionMsg, dir) });
 	}
 
-	store { | libname=\global, dir, completionMsg, mdPlugin |
+	store { | libname=\alga, dir, completionMsg, mdPlugin |
 		synthDef.store(libname, dir, completionMsg, mdPlugin);
 		if(synthDefPattern != nil, { synthDefPattern.store(libname, dir, completionMsg, mdPlugin) });
 		if(synthDefPatternOut != nil, { synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin) });
 	}
 
-	asSynthDesc { | libname=\global, keepDef = true |
+	asSynthDesc { | libname=\alga, keepDef = true |
 		^synthDef.asSynthDesc(libname, keepDef)
 	}
 
@@ -112,7 +112,7 @@ AlgaSynthDef : SynthDef {
 	var <>outsMapping;
 
 	*readAll { | path |
-		SynthDescLib.global.readAll(path)
+		SynthDescLib.alga.readAll(path)
 	}
 
 	*algaRead { | path |
@@ -120,7 +120,7 @@ AlgaSynthDef : SynthDef {
 	}
 
 	*readDef { | path |
-		SynthDescLib.global.readDef(path)
+		SynthDescLib.alga.readDef(path)
 	}
 
 	*algaReadDef { | path |
@@ -418,15 +418,15 @@ AlgaSynthDef : SynthDef {
 		^def
 	}
 
-	//Always store in global libname
+	//Always store in alga libname
 	sendAndAddToGlobalDescLib { | server, completionMsg |
-		desc = this.asSynthDesc(\global, true);
+		desc = this.asSynthDesc(\alga, true);
 		this.send(server, completionMsg)
 	}
 
-	//Always store in global libname
+	//Always store in alga libname
 	add { | libname, completionMsg, keepDef = true |
-		^super.add(\global, completionMsg, keepDef)
+		^super.add(\alga, completionMsg, keepDef)
 	}
 
 	//Store in Alga's AlgaSynthDefs folder
@@ -453,7 +453,7 @@ AlgaSynthDef : SynthDef {
 	}
 
 	//Store in Alga's AlgaSynthDefs folder
-	store { | libname=\global, dir, completionMsg, mdPlugin |
+	store { | libname=\alga, dir, completionMsg, mdPlugin |
 		//Uses Alga's one
 		dir = (dir ? AlgaStartup.algaSynthDefPath).asString;
 		//Also store archive for Metadata

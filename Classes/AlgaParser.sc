@@ -379,7 +379,7 @@ AlgaParser {
 
 		//Check that \def is valid
 		if(isFunction.not, {
-			synthDescFx = SynthDescLib.global.at(def);
+			synthDescFx = SynthDescLib.alga.at(def);
 		});
 
 		if(synthDescFx == nil, {
@@ -455,7 +455,7 @@ AlgaParser {
 		//If individual Symbol, if it's in SynthDescLib, use it as Event.
 		//Otherwise, passthrough (like, \none, \dry)
 		{ value.isSymbol } {
-			if(SynthDescLib.global.at(value) != nil, {
+			if(SynthDescLib.alga.at(value) != nil, {
 				^this.parseFXEvent((def: value), functionSynthDefDict)
 			});
 			^value

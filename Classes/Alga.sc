@@ -35,6 +35,8 @@ Alga {
 	}
 
 	*initClass {
+		var algaSynthDescLib = SynthDescLib(\alga);
+
 		servers = IdentityDictionary(1);
 		schedulers = IdentityDictionary(1);
 		clocks = IdentityDictionary(1);
@@ -203,7 +205,7 @@ Alga {
 	}
 
 	*readAll { | path |
-		SynthDescLib.global.readAll(path)
+		SynthDescLib.alga.readAll(path)
 	}
 
 	*algaRead { | path |
@@ -215,7 +217,7 @@ Alga {
 	}
 
 	*readDef { | path |
-		SynthDescLib.global.readDef(path)
+		SynthDescLib.alga.readDef(path)
 	}
 
 	*algaReadDef { | path |
@@ -263,7 +265,7 @@ Alga {
 		});
 
 		//Add to SynthDescLib in order for SynthDef.add to work
-		SynthDescLib.global.addServer(server);
+		SynthDescLib.alga.addServer(server);
 
 		//Run CmdPeriod
 		CmdPeriod.run;

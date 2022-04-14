@@ -1127,7 +1127,7 @@ AlgaNode {
 
 	//Unpack outsMappings for a single SynthDef
 	unpackSynthDefSymbol { | synthDefSymbol, outsMappingSum |
-		var synthDef = SynthDescLib.global.at(synthDefSymbol).def;
+		var synthDef = SynthDescLib.alga.at(synthDefSymbol).def;
 		if(synthDef.isKindOf(SynthDef).not, {
 			("AlgaPattern: Invalid AlgaSynthDef: '" ++
 				synthDefSymbol.asString ++ "'").error;
@@ -1262,7 +1262,7 @@ AlgaNode {
 	dispatchSynthDef { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
-		var synthDesc = SynthDescLib.global.at(def);
+		var synthDesc = SynthDescLib.alga.at(def);
 		if(synthDesc == nil, {
 			("AlgaNode: Invalid AlgaSynthDef: '" ++ def.asString ++ "'").error;
 			^this;

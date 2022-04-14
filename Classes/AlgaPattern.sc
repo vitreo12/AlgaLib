@@ -1865,7 +1865,7 @@ AlgaPattern : AlgaNode {
 			var controlNamesEntry;
 			var controlNamesListPatternDefaultsEntry;
 
-			synthDescEntry = SynthDescLib.global.at(object);
+			synthDescEntry = SynthDescLib.alga.at(object);
 			if(synthDescEntry == nil, {
 				("AlgaPattern: Invalid AlgaSynthDef: '" ++ object.asString ++ "'").error;
 				^nil;

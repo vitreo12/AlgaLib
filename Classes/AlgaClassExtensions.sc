@@ -308,7 +308,7 @@
 
 +SynthDef {
 	//Like .store but without sending to server: algaStore is executed before Alga.boot
-	algaStore { | libname=\global, dir(synthDefDir), completionMsg, mdPlugin |
+	algaStore { | libname=\alga, dir(synthDefDir), completionMsg, mdPlugin |
 		var lib = SynthDescLib.getLib(libname);
 		var file, path = dir ++ name ++ ".scsyndef";
 		if(metadata.falseAt(\shouldNotSend)) {
@@ -404,6 +404,10 @@
 
 	algaReadDef { | path |
 		this.readDef(path)
+	}
+
+	*alga {
+		^this.getLib(\alga)
 	}
 }
 
