@@ -131,7 +131,7 @@ AlgaSynthDef : SynthDef {
 		SynthDescLib.alga.readAll(path, server)
 	}
 
-	*readDef { | path, server |
+	*read { | path, server |
 		server = server ? Server.default;
 		SynthDescLib.alga.readDef(path, server)
 	}
@@ -438,14 +438,33 @@ AlgaSynthDef : SynthDef {
 		^super.add(\alga, completionMsg, keepDef)
 	}
 
-	//Store in Alga's AlgaSynthDefs folder
-	writeDefFile { | dir, overwrite = true, mdPlugin, writeMd = true |
+	//Used to
+	createDirAndWriteArchiveMd { | dir, writeMd = true |
+		var nameStr = this.name.asString;
+
 		//Uses Alga's one
 		dir = (dir ? AlgaStartup.algaSynthDefPath).asString;
+
+		if(nameStr.endsWith("_algaPattern").or(
+			nameStr.endsWith("_algaPatternTempOut")), {
+			var name = nameStr.replace("_algaPattern", "").replace("TempOut", "");
+			dir = dir.withoutTrailingSlash ++ "/" ++ name;
+		}, {
+			dir = dir.withoutTrailingSlash ++ "/" ++ nameStr;
+		});
+
 		//Also store archive for Metadata
 		if(writeMd, {
-			this.writeArchive(dir.withoutTrailingSlash ++ "/"  ++ this.name ++ ".scsyndefmd");
+			File.mkdir(dir); //Create the new dir only once
+			this.writeArchive(dir ++ "/"  ++ this.name ++ ".scsyndefmd");
 		});
+
+		^dir
+	}
+
+	//Store in Alga's AlgaSynthDefs folder
+	writeDefFile { | dir, overwrite = true, mdPlugin, writeMd = true |
+		dir = this.createDirAndWriteArchiveMd(dir, writeMd);
 		^super.writeDefFile(dir, overwrite, mdPlugin);
 	}
 
@@ -456,23 +475,13 @@ AlgaSynthDef : SynthDef {
 
 	//Store in Alga's AlgaSynthDefs folder
 	load { | server, completionMsg, dir, writeMd = true |
-		//Uses Alga's one
-		dir = (dir ? AlgaStartup.algaSynthDefPath).asString;
-		//Also store archive for Metadata
-		if(writeMd, {
-			this.writeArchive(dir.withoutTrailingSlash ++ "/"  ++ this.name ++ ".scsyndefmd");
-		});
+		dir = this.createDirAndWriteArchiveMd(dir, writeMd);
 		^super.load(server, completionMsg, dir);
 	}
 
 	//Store in Alga's AlgaSynthDefs folder
 	store { | libname=\alga, dir, completionMsg, mdPlugin, writeMd = true |
-		//Uses Alga's one
-		dir = (dir ? AlgaStartup.algaSynthDefPath).asString;
-		//Also store archive for Metadata
-		if(writeMd, {
-			this.writeArchive(dir.withoutTrailingSlash ++ "/"  ++ this.name ++ ".scsyndefmd");
-		});
+		dir = this.createDirAndWriteArchiveMd(dir, writeMd);
 		^super.store(libname, dir, completionMsg, mdPlugin);
 	}
 }
