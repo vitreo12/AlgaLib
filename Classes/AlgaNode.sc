@@ -2295,110 +2295,69 @@ AlgaNode {
 					case
 					//If entry is an AlgaTemp
 					{ entry.isAlgaTemp } {
-						//Check scale / chans
-						var paramTempScale = entry.scale;
-						var paramTempChans = entry.chans;
+						if((paramRate == \control).or(paramRate == \audio), {
+							//Check scale / chans
+							var paramTempScale = entry.scale;
+							var paramTempChans = entry.chans;
 
-						//Create a new AlgaTemp and return its bus (it's already registered, and it returns .busArg)
-						var paramTempBus = this.createAlgaTempSynth(entry, tempSynthsAndBusses, topLevelTempGroup);
+							//Create a new AlgaTemp and return its bus (it's already registered, and it returns .busArg)
+							var paramTempBus = this.createAlgaTempSynth(entry, tempSynthsAndBusses, topLevelTempGroup);
 
-						//Check for channels / rate mismatch
-						if((paramRate != entry.rate).or(paramNumChannels != entry.numChannels).or(
-							paramTempScale != nil).or(paramTempChans != nil), {
-							//Converter bus
-							var paramBus = AlgaBus(server, paramNumChannels, paramRate);
-
-							//Converter symbol
-							var converterSymbol = (
-								"alga_pattern_" ++
-								entry.rate ++
-								entry.numChannels ++
-								"_" ++
-								paramRate ++
-								paramNumChannels ++
-								"_fx"
-							).asSymbol;
-
-							//converter Synth
-							var converterSynth;
-
-							//converter synth args
-							var converterSynthArgs = [
-								\in, paramTempBus,
-								\out, paramBus.index
-							];
-
-							//Calculate scaleArray
-							if(paramTempScale != nil, {
-								var scaleArray = this.calculateScaling(
-									paramName,
-									nil,
-									paramNumChannels,
-									paramTempScale,
-									false //don't update the AlgaNode's scalings dict
-								);
-								converterSynthArgs = converterSynthArgs.addAll(scaleArray);
-							});
-
-							//Calculate chansMapping
-							if(paramTempChans != nil, {
-								var indices = this.calculateSenderChansMappingArray(
-									paramName,
-									nil,
-									paramTempChans,
-									entry.numChannels,
-									paramNumChannels,
-									false //don't update the AlgaNode's chans dict
-								);
-								converterSynthArgs = converterSynthArgs.add(\indices).add(indices);
-							});
-
-							//Create synth
-							converterSynth = AlgaSynth(
-								converterSymbol,
-								converterSynthArgs,
-								topLevelTempGroup,
-								\addToTail,
-								false
-							);
-
-							//Add bus to tempSynth at correct paramName
-							tempSynthArgs = tempSynthArgs.add(paramName).add(paramBus.busArg);
-
-							//Register bus to be freed
-							tempSynthsAndBusses.add(paramBus);
-						}, {
-							//Same rate / num channels: use paramTempBus directly
-							tempSynthArgs = tempSynthArgs.add(paramName).add(paramTempBus);
-						});
-					}
-					//If entry is a Number / Array
-					{ entry.isNumberOrArray } {
-						if(entry.size == 0, {
-							tempSynthArgs = tempSynthArgs.add(paramName).add(entry);
-						}, {
-							//Check if array needs conversion
-							if(paramNumChannels != entry.size, {
-								var arraySize = entry.size;
-
+							//Check for channels / rate mismatch
+							if((paramRate != entry.rate).or(paramNumChannels != entry.numChannels).or(
+								paramTempScale != nil).or(paramTempChans != nil), {
 								//Converter bus
 								var paramBus = AlgaBus(server, paramNumChannels, paramRate);
 
 								//Converter symbol
 								var converterSymbol = (
 									"alga_pattern_" ++
-									paramRate ++
-									arraySize ++
+									entry.rate ++
+									entry.numChannels ++
 									"_" ++
 									paramRate ++
 									paramNumChannels ++
 									"_fx"
 								).asSymbol;
 
-								//Converter Synth
-								var converterSynth = AlgaSynth(
+								//converter Synth
+								var converterSynth;
+
+								//converter synth args
+								var converterSynthArgs = [
+									\in, paramTempBus,
+									\out, paramBus.index
+								];
+
+								//Calculate scaleArray
+								if(paramTempScale != nil, {
+									var scaleArray = this.calculateScaling(
+										paramName,
+										nil,
+										paramNumChannels,
+										paramTempScale,
+										false //don't update the AlgaNode's scalings dict
+									);
+									converterSynthArgs = converterSynthArgs.addAll(scaleArray);
+								});
+
+								//Calculate chansMapping
+								if(paramTempChans != nil, {
+									var indices = this.calculateSenderChansMappingArray(
+										paramName,
+										nil,
+										paramTempChans,
+										entry.numChannels,
+										paramNumChannels,
+										false //don't update the AlgaNode's chans dict
+									);
+									converterSynthArgs = converterSynthArgs.add(\indices).add(indices);
+								});
+
+								//Create synth
+								converterSynth = AlgaSynth(
 									converterSymbol,
-									[ \in, entry, \out, paramBus.index ],
+									converterSynthArgs,
 									topLevelTempGroup,
 									\addToTail,
 									false
@@ -2409,8 +2368,53 @@ AlgaNode {
 
 								//Register bus to be freed
 								tempSynthsAndBusses.add(paramBus);
-							})
-						})
+							}, {
+								//Same rate / num channels: use paramTempBus directly
+								tempSynthArgs = tempSynthArgs.add(paramName).add(paramTempBus);
+							});
+						});
+					}
+					//If entry is a Number / Array
+					{ entry.isNumberOrArray } {
+						if((paramRate == \scalar).or(entry.size == 0), {
+							tempSynthArgs = tempSynthArgs.add(paramName).add(entry);
+						}, {
+							if((paramRate == \control).or(paramRate == \audio), {
+								//Check if array needs conversion
+								if(paramNumChannels != entry.size, {
+									var arraySize = entry.size;
+
+									//Converter bus
+									var paramBus = AlgaBus(server, paramNumChannels, paramRate);
+
+									//Converter symbol
+									var converterSymbol = (
+										"alga_pattern_" ++
+										paramRate ++
+										arraySize ++
+										"_" ++
+										paramRate ++
+										paramNumChannels ++
+										"_fx"
+									).asSymbol;
+
+									//Converter Synth
+									var converterSynth = AlgaSynth(
+										converterSymbol,
+										[ \in, entry, \out, paramBus.index ],
+										topLevelTempGroup,
+										\addToTail,
+										false
+									);
+
+									//Add bus to tempSynth at correct paramName
+									tempSynthArgs = tempSynthArgs.add(paramName).add(paramBus.busArg);
+
+									//Register bus to be freed
+									tempSynthsAndBusses.add(paramBus);
+								});
+							});
+						});
 					};
 				});
 			});
