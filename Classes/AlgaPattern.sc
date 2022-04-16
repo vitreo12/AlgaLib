@@ -461,7 +461,8 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Create a temporary synth according to the specs of the AlgaTemp
-	createAlgaTempSynth { | algaTemp, patternBussesAndSynths, createAlgaTempGroup = false |
+	createAlgaTempSynth { | algaTemp, patternBussesAndSynths,
+		createAlgaTempGroup = false, isFX = false |
 		var tempBus, tempSynth;
 		var tempSynthArgs = [ \gate, 1 ];
 		var tempNumChannels = algaTemp.numChannels;
@@ -510,27 +511,45 @@ AlgaPattern : AlgaNode {
 			if(entry != nil, {
 				//Ignore static params
 				if(this.checkValidControlName(paramName), {
-					//Temporary bus that the patternParamSynth for the fx will write to
-					var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
+					//Control and audio rate parameters
+					if((paramRate == \control).or(paramRate == \audio), {
+						//Temporary bus that the patternParamSynth for the fx will write to
+						var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
 
-					//Add bus to tempSynth at correct paramName
-					tempSynthArgs = tempSynthArgs.add(paramName).add(patternParamBus.busArg);
+						//Add bus to tempSynth at correct paramName
+						tempSynthArgs = tempSynthArgs.add(paramName).add(patternParamBus.busArg);
 
-					//Register bus to be freed
-					patternBussesAndSynths.add(patternParamBus);
+						//Register bus to be freed
+						patternBussesAndSynths.add(patternParamBus);
 
-					//Create a patternParamSynth for the temp param
-					this.createPatternParamSynth(
-						entry: entry,
-						uniqueID: nil,
-						paramName: paramName,
-						paramNumChannels: paramNumChannels,
-						paramRate: paramRate,
-						paramDefault: paramDefault,
-						patternInterpSumBus: patternParamBus,
-						patternBussesAndSynths: patternBussesAndSynths,
-						isAlgaTemp: true
-					)
+						//Create a patternParamSynth for the temp param
+						this.createPatternParamSynth(
+							entry: entry,
+							uniqueID: nil,
+							paramName: paramName,
+							paramNumChannels: paramNumChannels,
+							paramRate: paramRate,
+							paramDefault: paramDefault,
+							patternInterpSumBus: patternParamBus,
+							patternBussesAndSynths: patternBussesAndSynths,
+							isAlgaTemp: true
+						)
+					}, {
+						//Scalar parameters
+
+						//Unpack value
+						var paramValue = entry.next;
+
+						//If Symbol, skip iteration
+						if(paramValue.isSymbol, {
+							if(isFX.not, { skipIteration = true }, { skipIterationFX = true })
+						});
+
+						//Add to args
+						if(paramValue != nil, {
+							tempSynthArgs = tempSynthArgs.add(paramName).add(paramValue)
+						});
+					});
 				});
 			});
 		});
@@ -627,7 +646,8 @@ AlgaPattern : AlgaNode {
 			entry = this.createAlgaTempSynth(
 				algaTemp: algaTemp,
 				patternBussesAndSynths: patternBussesAndSynths,
-				createAlgaTempGroup: isAlgaTemp.not //Top level AlgaTemp
+				createAlgaTempGroup: isAlgaTemp.not, //Top level AlgaTemp
+				isFX: isFX
 			);
 
 			//Valid AlgaTemp. entry is an AlgaBus now
@@ -722,7 +742,7 @@ AlgaPattern : AlgaNode {
 		//It's very important not to use Rest() here, as \dur will also pick it up, generating
 		//an actual double Rest(). Rest() should only be used in \dur / \delta.
 		{ entry.isSymbol } {
-			if(isNotFxAndAlgaTemp, { skipIteration = true }, { skipIterationFX = true });
+			if(isFX.not, { skipIteration = true }, { skipIterationFX = true });
 			^this;
 		};
 
@@ -981,27 +1001,43 @@ AlgaPattern : AlgaNode {
 			if(entry != nil, {
 				//Ignore static params AND \in
 				if((this.checkValidControlName(paramName)).and(paramName != \in), {
-					//Temporary bus that the patternParamSynth for the fx will write to
-					var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
+					//Control or audio parameters
+					if((paramRate == \control).or(paramRate == \audio), {
+						//Temporary bus that the patternParamSynth for the fx will write to
+						var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
 
-					//Add bus to fxSynth at correct paramName
-					fxSynthArgs = fxSynthArgs.add(paramName).add(patternParamBus.busArg);
+						//Add bus to fxSynth at correct paramName
+						fxSynthArgs = fxSynthArgs.add(paramName).add(patternParamBus.busArg);
 
-					//Register bus to be freed
-					patternBussesAndSynthsFx.add(patternParamBus);
+						//Register bus to be freed
+						patternBussesAndSynthsFx.add(patternParamBus);
 
-					//Create a patternParamSynth for the fx param
-					this.createPatternParamSynth(
-						entry: entry,
-						uniqueID: nil,
-						paramName: paramName,
-						paramNumChannels: paramNumChannels,
-						paramRate: paramRate,
-						paramDefault: paramDefault,
-						patternInterpSumBus: patternParamBus, //pass the new Bus
-						patternBussesAndSynths: patternBussesAndSynthsFx,
-						isFX: true
-					)
+						//Create a patternParamSynth for the fx param
+						this.createPatternParamSynth(
+							entry: entry,
+							uniqueID: nil,
+							paramName: paramName,
+							paramNumChannels: paramNumChannels,
+							paramRate: paramRate,
+							paramDefault: paramDefault,
+							patternInterpSumBus: patternParamBus, //pass the new Bus
+							patternBussesAndSynths: patternBussesAndSynthsFx,
+							isFX: true
+						)
+					}, {
+						//Scalar parameters
+
+						//Unpack value
+						var paramValue = entry.next;
+
+						//If symbol, skip
+						if(paramValue.isSymbol, { skipIterationFX = true });
+
+						//Add to args
+						if(paramValue != nil, {
+							fxSynthArgs = fxSynthArgs.add(paramName).add(paramValue);
+						});
+					});
 				});
 			});
 		});
@@ -1263,7 +1299,7 @@ AlgaPattern : AlgaNode {
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
 
-			//
+			//Control and audio parameters
 			if((paramRate == \control).or(paramRate == \audio), {
 				//This is the interpBus for this param that all patternParamSynths will write to.
 				//This will then be used for the actual normalization that happens in the normSynth
@@ -1355,8 +1391,13 @@ AlgaPattern : AlgaNode {
 					patternInterpSumBus
 				);
 			}, {
+				//Scalar parameters
+
 				//Get value from currentEnvironment (patternPairs)
 				var paramValue = currentEnvironment[paramName];
+
+				//If Symbol, skip iteration
+				if(paramValue.isSymbol, { skipIteration = true });
 
 				//Add to synth's args
 				if(paramValue != nil, {
