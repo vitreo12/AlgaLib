@@ -95,13 +95,7 @@ AlgaReschedulingEventStreamPlayer {
 		var stream = player.stream;
 		var clock  = player.clock;
 
-		//TempoClock's schedAbs still expect beats, I need seconds here
-		if(clock.isTempoClock, { clock = SystemClock });
-
-		//absolute scaling
-		when = clock.seconds + when;
-
-		clock.schedAbs(when, {
+		clock.algaSchedInSecondsOnceWithTopPriority(when, {
 			player.stop;
 			this.init(stream, player.event);
 			if(func != nil, { func.value });
