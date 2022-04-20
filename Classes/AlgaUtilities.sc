@@ -167,7 +167,7 @@ AlgaTemp {
 	}
 
 	checkValidSynthDef { | def |
-		var synthDesc = SynthDescLib.global.at(def);
+		var synthDesc = SynthDescLib.alga.at(def);
 		var synthDef;
 
 		if(synthDesc == nil, {
@@ -176,8 +176,7 @@ AlgaTemp {
 		});
 
 		synthDef = synthDesc.def;
-
-		if(synthDef.class != AlgaSynthDef, {
+		if(synthDef.isKindOf(SynthDef).not, {
 			("AlgaTemp: Invalid AlgaSynthDef: '" ++ def.asString ++"'").error;
 			^nil;
 		});

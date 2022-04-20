@@ -36,9 +36,9 @@ AlgaStartup {
 	classvar percentageSplit;
 
 	*initClass {
-		algaSynthDefPath = File.realpath(Alga.class.filenameSymbol).dirname.withTrailingSlash ++ "../AlgaSynthDefs";
-		algaSynthDefIOPath = (algaSynthDefPath ++ "/IO");
-		algaSynthDefIO_numberPath = (algaSynthDefIOPath ++ "/IO_" ++ algaMaxIO ++ "/");
+		algaSynthDefPath = File.realpath(Alga.class.filenameSymbol).dirname.withTrailingSlash ++ "../AlgaSynthDefs/";
+		algaSynthDefIOPath = (algaSynthDefPath ++ "IO/");
+		algaSynthDefIO_numberPath = (algaSynthDefIOPath ++ "IO_" ++ algaMaxIO ++ "/");
 	}
 
 	*algaMaxIO_ { | value |

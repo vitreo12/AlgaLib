@@ -70,6 +70,38 @@
     a.from(880, \_f, sched: AlgaStep())
     ```
 
+- `AlgaPattern`: added the `lf` annotator for functions in order for them to be declared as `LiteralFunctions`. These are used for `keys` that would interpret all `Functions` as `UGen Functions`, while they however could represent a `Pfunc` or `Pif` entry:
+
+    ```SuperCollider
+    (
+    Alga.boot({
+        a = AP((
+            //.lf is needed or it's interpreted as a UGen func
+            def: Pif(Pfunc( { 0.5.coin }.lf ), 
+                { SinOsc.ar(\freq.kr(440)) * EnvPerc.ar },
+                { Saw.ar(\freq.kr(440)) * EnvPerc.ar * 0.5 }
+            ),
+
+            //No need to .lf here as 'freq' does not expect UGen functions like 'def' does
+            freq: Pif( Pfunc { 0.5.coin },
+                AT({ LFNoise0.kr(10) }, scale: [440, 880]),
+                Pseq([ AT { DC.kr(220) }, AT { DC.kr(440) }], inf)
+            )
+        )).play(chans:2)
+    })
+    )
+    ```
+
+- `AlgaSynthDef`: can now correctly store and retrieve `AlgaSynthDefs` with the `write` / `load` /
+  `store` calls. By default, these are saved in the `AlgaSynthDefs` folder in the `AlgaLib` folder,
+  but it can be changed to wherever. The definitions in `AlgaSynthDefs` are automatically read at
+  the booting of `Alga`. Other definitions can be read with the `Alga.readAll` / `Alga.readDef`
+  calls.
+
+## Bug fixes
+
+- Major parser rewrite that leads to more predictable results and a larger amount of patterns supported.
+
 # 1.1.1
 
 ## Bug fixes

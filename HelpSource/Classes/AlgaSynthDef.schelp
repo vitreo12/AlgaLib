@@ -48,10 +48,28 @@ See link::Classes/SynthDef::.
 ARGUMENT:: metadata
 See link::Classes/SynthDef::.
 
+METHOD:: readAll
+Alias for code::Alga.readAllDefs::.
+
+METHOD:: read
+Alias for code::Alga.readDef::.
+
 private:: new_inner
 private:: new_inner_inner
 
 INSTANCEMETHODS::
+
+METHOD:: writeDefFile
+Like link::Classes/SynthDef::'s code::writeDefFile:: method, but it also writes two additional definitions needed for link::Classes/AlgaPattern::s to work.
+
+METHOD:: write
+Alias for code::writeDefFile::.
+
+METHOD:: load
+Like link::Classes/SynthDef::'s code::load:: method, but it also writes two additional definitions needed for link::Classes/AlgaPattern::s to work.
+
+METHOD:: store
+Like link::Classes/SynthDef::'s code::store:: method, but it also writes two additional definitions needed for link::Classes/AlgaPattern::s to work.
 
 private:: add
 private:: canFreeSynth
@@ -62,3 +80,4 @@ private:: outsMapping
 private:: rate
 private:: sampleAccurate
 private:: sendAndAddToGlobalDescLib
+private:: createDirAndWriteArchiveMd

@@ -20,6 +20,7 @@
 	isAlgaEffect { ^false }
 	isAlgaMod { ^false }
 	isAlgaArg { ^false }
+	isAlgaNodeOrAlgaArg { ^((this.isAlgaNode).or(this.isAlgaArg)) }
 	isAlgaOut { ^false }
 	isAlgaTemp { ^false }
 	isAlgaStep { ^false }
@@ -37,6 +38,7 @@
 	isFilterPattern { ^false }
 	isTempoClock { ^false }
 	isSet { ^false }
+	isLiteralFunction { ^false }
 	def { ^nil }
 	isNumberOrArray { ^((this.isNumber).or(this.isArray)) }
 
@@ -53,11 +55,12 @@
 	//Fallback for AlgaBlock
 	blockIndex { ^(-1) }
 
-	//Like asStream, but also converts inner elements of an Array
+	//Like asStream, but easily overloadable
 	algaAsStream { ^(this.asStream) }
 
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
-	addAction { | condition, func, sched = 0, topPriority = false, schedInSeconds = false, preCheck = false |
+	addAction { | condition, func, sched = 0, topPriority = false,
+		schedInSeconds = false, preCheck = false |
 		AlgaSpinRoutine.waitFor(
 			condition:condition,
 			func:func
@@ -115,6 +118,42 @@
 
 		^this
 	}
+
+	//To be overloaded
+	algaResetParsingVars { }
+
+	//Parser valid classes to inspect.
+	//These can be passed as an Array of Classes.
+	algaValidParserClass { | validClasses |
+		validClasses = validClasses ? [
+			Collection,
+			Pattern
+		];
+
+		^(
+			validClasses.collect({ | class |
+				this.isKindOf(class)
+			}).includes(true)
+		);
+	}
+
+	//Loop through every instance variable of an Object and execute func, reassigning the entry
+	algaParseObject { | func, validClasses, replace = false |
+		if(this.isKindOf(Nil).not, {
+			if(this.algaValidParserClass(validClasses), {
+				this.slotsDo { | slot |
+					var val = this.slotAt(slot);
+					var return = if(func.isFunction, { func.(val) }) ? nil;
+					if((replace).and(return != nil), {
+						try {
+							this.slotPut(slot, return)
+						}
+						{ | error | } //Might return error: ignore such cases
+					});
+				}
+			});
+		});
+	}
 }
 
 //Like handleError without stacktrace
@@ -135,6 +174,18 @@
 //Essential for 'c5' / 'a16' busses not to be interpreted as an Array!
 +String {
 	isNumberOrArray { ^false } //isArray would be true!!
+
+	//Wrapper around Dictionary.loadSamples
+	loadSamples { | server |
+		^Dictionary.loadSamples(this, server)
+	}
+}
+
+//Wrapper around Dictionary.loadSamples
++PathName {
+	loadSamples { | server |
+		^Dictionary.loadSamples(this, server)
+	}
 }
 
 //Fix lincurve with .ir arg
@@ -212,6 +263,16 @@
 	}
 }
 
+//Converts all Set entries to stream
++Set {
+	algaAsStream {
+		this.do({ | entry |
+			this.remove(entry);
+			this.add(entry.algaAsStream)
+		})
+	}
+}
+
 //PlayBuf bug with canFreeSynth
 +PlayBuf {
 	algaCanFreeSynth { ^inputs.at(6).isNumber.not or: { inputs.at(6) > 1 } }
@@ -247,7 +308,7 @@
 
 +SynthDef {
 	//Like .store but without sending to server: algaStore is executed before Alga.boot
-	algaStore { | libname=\global, dir(synthDefDir), completionMsg, mdPlugin |
+	algaStore { | libname=\alga, dir(synthDefDir), completionMsg, mdPlugin |
 		var lib = SynthDescLib.getLib(libname);
 		var file, path = dir ++ name ++ ".scsyndef";
 		if(metadata.falseAt(\shouldNotSend)) {
@@ -274,11 +335,214 @@
 	}
 }
 
+//Read all SynthDefs in a path recursively
++SynthDescLib {
+	readAllInner { | path, server, beginsWithExclude = "IO" |
+		var strPath = path.fullPath.withoutTrailingSlash;
+		this.readDef(strPath, server);
+		path.folders.do({ | folder |
+			var folderName = folder.folderName.asString;
+			if(folderName.beginsWith(beginsWithExclude).not, {
+				this.readAllInner(folder, server, beginsWithExclude);
+			});
+		});
+	}
+
+	readAll { | path, server, beginsWithExclude = "IO" |
+		var strPath;
+		server = server ? Server.default;
+		path = path ? SynthDef.synthDefDir; //Defaults to SC one. Alga will use AlgaSynthDefs instead
+		beginsWithExclude = beginsWithExclude ? "";
+		beginsWithExclude = beginsWithExclude.withoutTrailingSlash;
+		if(path.isString, {
+			path = PathName(path.standardizePath)
+		});
+		if(path.isKindOf(PathName).not, {
+			"path must be a String or PathName".error;
+			^nil;
+		});
+		strPath = path.fullPath.withoutTrailingSlash;
+		path = PathName(strPath);
+		if((File.exists(strPath).not).or(path.isFolder.not), {
+			"Path does not exist or it's not a folder".error;
+			^nil;
+		});
+		this.readAllInner(path, server, beginsWithExclude);
+	}
+
+	algaRead { | path, beginsWithExclude = "IO" |
+		this.readAll(path, beginsWithExclude)
+	}
+
+	readDefInner { | file, server |
+		var name = file.fileNameWithoutExtension;
+		//Read algaPattern and algaPatternTempOut too
+		if((file.extension == "scsyndef").and(
+			(name.endsWith("_algaPattern").or(name.endsWith("_algaPatternTempOut"))).not), {
+			var mdFile = file.pathOnly ++ name ++ ".scsyndefmd";
+			var algaPatternFile = file.pathOnly ++ name ++ "_algaPattern.scsyndef";
+			var algaPatternTempOutFile = file.pathOnly ++ name ++ "_algaPatternTempOut.scsyndef";
+			var algaPatternFileExists = File.exists(algaPatternFile);
+			var algaPatternTempOutFileExists = File.exists(algaPatternTempOutFile);
+
+			//Read scsyndef
+			this.read(file.fullPath);
+
+			//Read algaPatternFile and algaPAtternTempOutFile
+			if(algaPatternFileExists, { this.read(algaPatternFile) });
+			if(algaPatternTempOutFileExists, { this.read(algaPatternTempOutFile) });
+
+			//Send to server too
+			if(server.isKindOf(Server), {
+				if(server.serverRunning, {
+					server.sendMsg("/d_load", file.fullPath);
+					if(algaPatternFileExists, {
+						server.sendMsg("/d_load", algaPatternFile)
+					});
+					if(algaPatternTempOutFileExists, {
+						server.sendMsg("/d_load", algaPatternTempOutFile)
+					});
+				});
+			});
+
+			//Read md file once
+			if(File.exists(mdFile), {
+				var synthDesc = this[name.asSymbol];
+				if(synthDesc != nil, {
+					synthDesc.def = Object.readArchive(mdFile)
+				});
+			});
+		});
+	}
+
+	readDef { | path, server |
+		server = server ? Server.default;
+		if(path.isString, {
+			path = PathName(path.standardizePath.withoutTrailingSlash);
+		});
+		if(path.isKindOf(PathName).not, {
+			"path must be a String or PathName".error;
+			^nil;
+		});
+		case
+		{ path.isFolder } {
+			path.files.do({ | file |
+				this.readDefInner(file, server)
+			});
+		}
+		{ path.isFile } {
+			this.readDefInner(path, server);
+		};
+	}
+
+	algaReadDef { | path, server |
+		this.readDef(path, server)
+	}
+
+	*alga {
+		^this.getLib(\alga)
+	}
+}
+
 +Set {
 	isSet { ^true }
 }
 
 +Dictionary {
+	//loadSamples implementation
+	*loadSamplesInner { | path, dict, server, folderCount, post = true |
+		var folderName = path.fileName.asSymbol;
+		var newDict;
+
+		//Inner calls
+		if(folderCount != nil, {
+			newDict = this.new();
+			dict[folderCount.asSymbol] = newDict;
+			dict[folderName] = newDict;
+			if(post, {
+				("\n- " ++ folderCount ++ ": " ++ path.folderName ++
+					"/" ++ folderName ++ "/ \n").postln;
+			});
+		}, {
+			//First call: use top dict
+			newDict = dict;
+			if(post, {
+				("\n- " ++ folderName ++ "/ \n").postln;
+			});
+		});
+
+		if(path.files.size > 0, {
+			//Not filesDo, which would be recursive. Recursiveness is already handled
+			path.files.do({ | file, i |
+				var fileName = file.fileName.asString;
+				var fileNameNoExt = file.fileNameWithoutExtension;
+				var fileNameNoExtSym = fileNameNoExt.asSymbol;
+				if((file.extension == "wav").or(file.extension == "aiff"), {
+					var buffer = Buffer.read(server, file.fullPath);
+
+					if(post, {
+						(i.asString ++ ": '" ++ fileName ++ "'").postln;
+					});
+
+					//Symbol with no extension ( \kick )
+					newDict[fileNameNoExtSym] = buffer;
+					//Int index ( 0, 1, etc... )
+					newDict[i] = buffer;
+					//Full string name with extension ( "kick" )
+					newDict[fileName] = buffer;
+					//Full string name with no extension ( "kick.wav" )
+					newDict[fileNameNoExt] = buffer;
+				});
+			});
+		});
+
+		path.folders.do({ | folder, i |
+			folder = PathName(folder.fullPath.withoutTrailingSlash);
+			this.loadSamplesInner(folder, newDict, server, i)
+		});
+
+		server.sync;
+	}
+
+	//Load samples of a path to a dict, recursively
+	*loadSamples { | path, server, post = true |
+		server = server ? Server.default;
+		if(server.serverRunning, {
+			var dict = this.new();
+			var strPath;
+			if(path.isString, {
+				path = PathName(path.standardizePath)
+			});
+			if(path.isKindOf(PathName).not, {
+				"path must be a String or PathName".error;
+				^nil;
+			});
+			strPath = path.fullPath.withoutTrailingSlash;
+			path = PathName(strPath);
+			if((File.exists(strPath).not).or(path.isFolder.not), {
+				"Path does not exist or it's not a folder".error;
+				^nil;
+			});
+			fork {
+				this.loadSamplesInner(path, dict, server, post: post);
+				"\n- Done!\n".postln;
+			};
+			^dict;
+		}, {
+			"Server is not running. Cannot load samples.".warn
+			^nil
+		});
+	}
+
+	//Free all samples
+	freeSamples {
+		this.keysValuesDo({ | key, value |
+			if(value.isKindOf(Dictionary), { value.freeSamples });
+			if(value.isBuffer, { value.free });
+			this.removeAt(key);
+		});
+	}
+
 	//Loop over a Dict, unpacking IdentitySet.
 	//It's used in AlgaBlock to unpack inNodes of an AlgaNode
 	nodesLoop { | function |
@@ -291,6 +555,13 @@
 			}, {
 				function.value(value, i);
 			});
+		});
+	}
+
+	//Convert all dict entries to streams
+	algaAsStream {
+		this.keysValuesDo({ | key, entry |
+			this[key] = entry.algaAsStream
 		});
 	}
 }

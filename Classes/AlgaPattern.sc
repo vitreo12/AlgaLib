@@ -30,7 +30,7 @@ AlgaPattern : AlgaNode {
 	var <eventPairs;
 
 	//The Event input not manipulated
-	var <defPreParsing;
+	var <>defPreParsing;
 
 	//Use MC expansion or not
 	var <useMultiChannelExpansion = true;
@@ -83,15 +83,9 @@ AlgaPattern : AlgaNode {
 	//Keep track of ALL active patternBussesAndSynths
 	var <>currentPatternBussesAndSynths;
 
-	//Current fx
-	var <currentFX;
-
-	//Current \out
-	var <currentOut;
-
-	//Current nodes of used in currentOut
-	var <currentPatternOutNodes;
-	var <prevPatternOutNodes;
+	//Current nodes for \out
+	var <>currentPatternOutNodes;
+	var <>prevPatternOutNodes;
 
 	//Current time used for \out replacement
 	var <currentPatternOutTime;
@@ -101,11 +95,6 @@ AlgaPattern : AlgaNode {
 
 	//Needed to store reset for various alga params (\out, \fx, etc...)
 	var <currentReset;
-
-	//Needed to store current generic params
-	var <scalarAndGenericParams;
-	var <scalarAndGenericParamsStreams;
-	var <latestScalarUniqueIDs;
 
 	//Store the latest currentEnvironment. This is used for mid-pattern interpolation
 	var <>latestCurrentEnvironment;
@@ -123,9 +112,6 @@ AlgaPattern : AlgaNode {
 	//If true: stop pattern and only fade out (no fade in)
 	//If false: normal play fadeIn / fadeOut mechanism
 	var <stopPatternBeforeReplace = true;
-
-	//Actions scheduled on a step
-	var <scheduledStepActionsPre, <scheduledStepActionsPost;
 
 	//Used to set sustain's gate
 	var <>isSustainTrig = false;
@@ -149,9 +135,6 @@ AlgaPattern : AlgaNode {
 	var <>players;
 	var <>latestPlayersAtParam;
 	var <>paramContainsAlgaReaderPfunc = false;
-
-	//Used for parsing Patterns
-	var <recursivePatternList;
 
 	//Check for manualDur
 	var manualDur = false;
@@ -188,7 +171,7 @@ AlgaPattern : AlgaNode {
 			var bundle;
 
 			//The AlgaSynthDef
-			var algaSynthDef = ~synthDefName.valueEnvir;
+			var algaSynthDef = ~def;
 
 			//AlgaPattern, the synthBus and its server / clock
 			var algaPattern = ~algaPattern;
@@ -218,81 +201,88 @@ AlgaPattern : AlgaNode {
 			//Needed for Event syncing
 			~isPlaying = true;
 
-			//Deal with sustain
-			if(hasSustain, {
-				//scale by stretch
-				sustain = sustain * stretch;
+			//Check algaSynthDef to be a Symbol
+			if(algaSynthDef.isSymbol, {
+				//Deal with sustain
+				if(hasSustain, {
+					//scale by stretch
+					sustain = sustain * stretch;
 
-				//If sustainToDur, add to dur. This allows to do things like sustain: -0.5 (from dur).
-				//Also, if sustain is 0 here, it will then use \dur
-				if(~algaPattern.sustainToDur, {
-					sustain = sustain + dur; //dur already includes stretch!
-				});
-
-				//scale by legato
-				if(legato > 0, { sustain = sustain * legato });
-
-				//Finally, if the result is a positive number, go ahead
-				if(sustain > 0, {
-					~algaPattern.isSustainTrig = true;
-					~algaPattern.sustainIDs = Array();
-				}, {
+					//If sustainToDur, add to dur. This allows to do things like sustain: -0.5 (from dur).
+					//Also, if sustain is 0 here, it will then use \dur
 					if(~algaPattern.sustainToDur, {
-						("AlgaPattern: your 'sustain' is 0 or less: " ++
-							sustain ++ ". This might cause the Synths not to be released").warn;
+						sustain = sustain + dur; //dur already includes stretch!
 					});
-					hasSustain = false
+
+					//scale by legato
+					if(legato > 0, { sustain = sustain * legato });
+
+					//Finally, if the result is a positive number, go ahead
+					if(sustain > 0, {
+						~algaPattern.isSustainTrig = true;
+						~algaPattern.sustainIDs = Array();
+					}, {
+						if(~algaPattern.sustainToDur, {
+							("AlgaPattern: your 'sustain' is 0 or less: " ++
+								sustain ++ ". This might cause the Synths not to be released").warn;
+						});
+						hasSustain = false
+					});
 				});
-			});
 
-			//Create the bundle with all needed Synths for this Event.
-			bundle = algaPatternServer.makeBundle(false, {
-				//First, consume scheduledStepActionsPre if there are any
-				~algaPattern.advanceAndConsumeScheduledStepActions(false);
+				//Create the bundle with all needed Synths for this Event.
+				bundle = algaPatternServer.makeBundle(false, {
+					//First, consume scheduledStepActionsPre if there are any
+					~algaPattern.advanceAndConsumeScheduledStepActions(false);
 
-				//Then, create all needed synths
-				~algaPattern.createEventSynths(
-					algaSynthDef: algaSynthDef,
-					algaSynthBus: algaSynthBus,
-					algaPatternInterpStreams: algaPatternInterpStreams,
-					fx: fx,
-					algaOut: algaOut,
-					dur: dur,
-					sustain: sustain,
-					stretch: stretch,
-					legato: legato
-				);
+					//Then, create all needed synths
+					~algaPattern.createEventSynths(
+						algaSynthDef: algaSynthDef,
+						algaSynthBus: algaSynthBus,
+						algaPatternInterpStreams: algaPatternInterpStreams,
+						fx: fx,
+						algaOut: algaOut,
+						dur: dur,
+						sustain: sustain,
+						stretch: stretch,
+						legato: legato
+					);
 
-				//Finally, consume scheduledStepActionsPost if there are any
-				~algaPattern.advanceAndConsumeScheduledStepActions(true);
-			});
+					//Finally, consume scheduledStepActionsPost if there are any
+					~algaPattern.advanceAndConsumeScheduledStepActions(true);
+				});
 
-			//Send bundle to server using the same server / clock as the AlgaPattern
-			//Note that this does not go through the AlgaScheduler directly, but it uses its same clock!
-			schedBundleArrayOnClock(
-				offset,
-				algaPatternClock,
-				bundle,
-				lag,
-				algaPatternServer,
-				latency
-			);
-
-			//Sched sustain if provided
-			if(hasSustain, {
-				~algaPattern.scheduleSustain(
-					sustain,
+				//Send bundle to server using the same server / clock as the AlgaPattern
+				//Note that this does not go through the AlgaScheduler directly, but it uses its same clock!
+				schedBundleArrayOnClock(
 					offset,
+					algaPatternClock,
+					bundle,
 					lag,
+					algaPatternServer,
 					latency
 				);
+
+				//Sched sustain if provided
+				if(hasSustain, {
+					~algaPattern.scheduleSustain(
+						sustain,
+						offset,
+						lag,
+						latency
+					);
+				});
+
+				//Always reset isSustainTrig
+				~algaPattern.isSustainTrig = false;
+
+				//Set latestCurrentEnvironment
+				~algaPattern.latestCurrentEnvironment = currentEnvironment;
+			}, {
+				//Invalid
+				("AlgaPattern: 'def' entry is not a Symbol, but a " ++
+					algaSynthDef.class ++ ".").error;
 			});
-
-			//Always reset isSustainTrig
-			~algaPattern.isSustainTrig = false;
-
-			//Set latestCurrentEnvironment
-			~algaPattern.latestCurrentEnvironment = currentEnvironment;
 		});
 	}
 
@@ -465,81 +455,14 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Iterate through all scheduledStepActions and execute them accordingly
+	//Advance scheduled actions
 	advanceAndConsumeScheduledStepActions { | post = false |
-		var stepsToRemove = IdentitySet();
-
-		//Pre or post
-		var scheduledStepActions;
-		if(post.not, {
-			scheduledStepActions = scheduledStepActionsPre;
-		}, {
-			scheduledStepActions = scheduledStepActionsPost;
-		});
-
-		//Go ahead with the advancing + removal
-		if(scheduledStepActions.size > 0, {
-			scheduledStepActions.do({ | step |
-				var condition = step.condition;
-				var func = step.func;
-				var retryOnFailure = step.retryOnFailure;
-				var tries = step.tries;
-				var stepCount = step.step;
-
-				if(stepCount <= 0, {
-					if(condition.value, {
-						func.value;
-						stepsToRemove.add(step);
-					}, {
-						if(retryOnFailure.not, {
-							stepsToRemove.add(step);
-						}, {
-							if(tries <= 0, {
-								stepsToRemove.add(step);
-							}, {
-								step.tries = tries - 1;
-							});
-						});
-					});
-				});
-
-				step.step = stepCount - 1;
-			});
-		});
-
-		//stepsToRemove is needed or it won't execute two consecutive true
-		//functions if remove was inserted directly in the call earlier
-		if(stepsToRemove.size > 0, {
-			stepsToRemove.do({ | step | scheduledStepActions.remove(step) })
-		});
-	}
-
-	//Creates a new AlgaStep with set condition and func
-	addScheduledStepAction { | step, condition, func |
-		//A new action must be created, otherwise, if two addActions are being pushed
-		//with the same AlgaStep, only one of the action would be executed (the last one),
-		//as the entry would be overwritten in the OrderedIdentitySet
-		var newStep = step.copy;
-		var post = step.post;
-		var scheduledStepActions;
-		newStep.condition = condition ? { true };
-		newStep.func = func;
-
-		//Create if needed
-		if(post.not, {
-			scheduledStepActionsPre = scheduledStepActionsPre ? OrderedIdentitySet(10);
-			scheduledStepActions = scheduledStepActionsPre;
-		}, {
-			scheduledStepActionsPost = scheduledStepActionsPost ? OrderedIdentitySet(10);
-			scheduledStepActions = scheduledStepActionsPost;
-		});
-
-		//Add
-		scheduledStepActions.add(newStep)
+		actionScheduler.advanceAndConsumeScheduledStepActions(post)
 	}
 
 	//Create a temporary synth according to the specs of the AlgaTemp
-	createAlgaTempSynth { | algaTemp, patternBussesAndSynths, createAlgaTempGroup = false |
+	createAlgaTempSynth { | algaTemp, patternBussesAndSynths,
+		createAlgaTempGroup = false, isFX = false |
 		var tempBus, tempSynth;
 		var tempSynthArgs = [ \gate, 1 ];
 		var tempNumChannels = algaTemp.numChannels;
@@ -588,27 +511,45 @@ AlgaPattern : AlgaNode {
 			if(entry != nil, {
 				//Ignore static params
 				if(this.checkValidControlName(paramName), {
-					//Temporary bus that the patternParamSynth for the fx will write to
-					var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
+					//Control and audio rate parameters
+					if((paramRate == \control).or(paramRate == \audio), {
+						//Temporary bus that the patternParamSynth for the fx will write to
+						var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
 
-					//Add bus to tempSynth at correct paramName
-					tempSynthArgs = tempSynthArgs.add(paramName).add(patternParamBus.busArg);
+						//Add bus to tempSynth at correct paramName
+						tempSynthArgs = tempSynthArgs.add(paramName).add(patternParamBus.busArg);
 
-					//Register bus to be freed
-					patternBussesAndSynths.add(patternParamBus);
+						//Register bus to be freed
+						patternBussesAndSynths.add(patternParamBus);
 
-					//Create a patternParamSynth for the temp param
-					this.createPatternParamSynth(
-						entry: entry,
-						uniqueID: nil,
-						paramName: paramName,
-						paramNumChannels: paramNumChannels,
-						paramRate: paramRate,
-						paramDefault: paramDefault,
-						patternInterpSumBus: patternParamBus,
-						patternBussesAndSynths: patternBussesAndSynths,
-						isAlgaTemp: true
-					)
+						//Create a patternParamSynth for the temp param
+						this.createPatternParamSynth(
+							entry: entry,
+							uniqueID: nil,
+							paramName: paramName,
+							paramNumChannels: paramNumChannels,
+							paramRate: paramRate,
+							paramDefault: paramDefault,
+							patternInterpSumBus: patternParamBus,
+							patternBussesAndSynths: patternBussesAndSynths,
+							isAlgaTemp: true
+						)
+					}, {
+						//Scalar parameters
+
+						//Unpack value
+						var paramValue = entry.next;
+
+						//If Symbol, skip iteration
+						if(paramValue.isSymbol, {
+							if(isFX.not, { skipIteration = true }, { skipIterationFX = true })
+						});
+
+						//Add to args
+						if(paramValue != nil, {
+							tempSynthArgs = tempSynthArgs.add(paramName).add(paramValue)
+						});
+					});
 				});
 			});
 		});
@@ -705,7 +646,8 @@ AlgaPattern : AlgaNode {
 			entry = this.createAlgaTempSynth(
 				algaTemp: algaTemp,
 				patternBussesAndSynths: patternBussesAndSynths,
-				createAlgaTempGroup: isAlgaTemp.not //Top level AlgaTemp
+				createAlgaTempGroup: isAlgaTemp.not, //Top level AlgaTemp
+				isFX: isFX
 			);
 
 			//Valid AlgaTemp. entry is an AlgaBus now
@@ -800,7 +742,7 @@ AlgaPattern : AlgaNode {
 		//It's very important not to use Rest() here, as \dur will also pick it up, generating
 		//an actual double Rest(). Rest() should only be used in \dur / \delta.
 		{ entry.isSymbol } {
-			if(isNotFxAndAlgaTemp, { skipIteration = true }, { skipIterationFX = true });
+			if(isFX.not, { skipIteration = true }, { skipIterationFX = true });
 			^this;
 		};
 
@@ -1059,27 +1001,43 @@ AlgaPattern : AlgaNode {
 			if(entry != nil, {
 				//Ignore static params AND \in
 				if((this.checkValidControlName(paramName)).and(paramName != \in), {
-					//Temporary bus that the patternParamSynth for the fx will write to
-					var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
+					//Control or audio parameters
+					if((paramRate == \control).or(paramRate == \audio), {
+						//Temporary bus that the patternParamSynth for the fx will write to
+						var patternParamBus = AlgaBus(server, paramNumChannels, paramRate);
 
-					//Add bus to fxSynth at correct paramName
-					fxSynthArgs = fxSynthArgs.add(paramName).add(patternParamBus.busArg);
+						//Add bus to fxSynth at correct paramName
+						fxSynthArgs = fxSynthArgs.add(paramName).add(patternParamBus.busArg);
 
-					//Register bus to be freed
-					patternBussesAndSynthsFx.add(patternParamBus);
+						//Register bus to be freed
+						patternBussesAndSynthsFx.add(patternParamBus);
 
-					//Create a patternParamSynth for the fx param
-					this.createPatternParamSynth(
-						entry: entry,
-						uniqueID: nil,
-						paramName: paramName,
-						paramNumChannels: paramNumChannels,
-						paramRate: paramRate,
-						paramDefault: paramDefault,
-						patternInterpSumBus: patternParamBus, //pass the new Bus
-						patternBussesAndSynths: patternBussesAndSynthsFx,
-						isFX: true
-					)
+						//Create a patternParamSynth for the fx param
+						this.createPatternParamSynth(
+							entry: entry,
+							uniqueID: nil,
+							paramName: paramName,
+							paramNumChannels: paramNumChannels,
+							paramRate: paramRate,
+							paramDefault: paramDefault,
+							patternInterpSumBus: patternParamBus, //pass the new Bus
+							patternBussesAndSynths: patternBussesAndSynthsFx,
+							isFX: true
+						)
+					}, {
+						//Scalar parameters
+
+						//Unpack value
+						var paramValue = entry.next;
+
+						//If symbol, skip
+						if(paramValue.isSymbol, { skipIterationFX = true });
+
+						//Add to args
+						if(paramValue != nil, {
+							fxSynthArgs = fxSynthArgs.add(paramName).add(paramValue);
+						});
+					});
 				});
 			});
 		});
@@ -1341,7 +1299,7 @@ AlgaPattern : AlgaNode {
 			var paramRate = controlName.rate;
 			var paramDefault = controlName.defaultValue;
 
-			//
+			//Control and audio parameters
 			if((paramRate == \control).or(paramRate == \audio), {
 				//This is the interpBus for this param that all patternParamSynths will write to.
 				//This will then be used for the actual normalization that happens in the normSynth
@@ -1433,8 +1391,13 @@ AlgaPattern : AlgaNode {
 					patternInterpSumBus
 				);
 			}, {
+				//Scalar parameters
+
 				//Get value from currentEnvironment (patternPairs)
 				var paramValue = currentEnvironment[paramName];
+
+				//If Symbol, skip iteration
+				if(paramValue.isSymbol, { skipIteration = true });
 
 				//Add to synth's args
 				if(paramValue != nil, {
@@ -1844,6 +1807,7 @@ AlgaPattern : AlgaNode {
 		rateList = nil;
 		controlNamesList = nil;
 
+		//Symbol / Function (already parsed)
 		case
 		{ defEntry.isSymbol } {
 			^this.dispatchSynthDef(
@@ -1855,8 +1819,10 @@ AlgaPattern : AlgaNode {
 				sched:sched
 			)
 		}
-		{ (defEntry.isListPattern).or(defEntry.isFilterPattern) } {
-			^this.dispatchListPatternOrFilterPattern(
+
+		//Patterns
+		{ defEntry.isPattern } {
+			^this.dispatchPattern(
 				def: defEntry,
 				initGroups: initGroups,
 				replace: replace,
@@ -1905,8 +1871,8 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Build spec from ListPattern
-	buildFromListPattern { | initGroups = false, replace = false,
+	//Build spec Pattern
+	buildFromPattern { | initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
 		//Generate outsMapping (for outsMapping connectinons)
@@ -1929,98 +1895,85 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Check rates, numChannels, Symbols and controlNames
-	checkListPatternOrFilterPatternValidityAndReturnControlNames { | pattern |
+	checkPatternValidityAndReturnControlNames { | object, controlNamesDict |
 		var numChannelsCount, rateCount;
-		var controlNamesDict = IdentityDictionary();
 		var controlNamesSum = Array.newClear;
+		controlNamesDict = controlNamesDict ? IdentityDictionary();
 
-		//Unpack FilterPattern
-		case
-		{ pattern.isFilterPattern } {
-			controlNamesSum = controlNamesSum.addAll(
-				this.checkListPatternOrFilterPatternValidityAndReturnControlNames(pattern.pattern)
-			);
-		}
-		//Process ListPattern
-		{ pattern.isListPattern } {
-			pattern.list.do({ | entry, i |
-				var synthDescEntry, synthDefEntry;
-				var controlNamesEntry;
-				var controlNamesListPatternDefaultsEntry;
+		//Found a Symbol
+		if(object.isSymbol, {
+			var synthDescEntry, synthDefEntry;
+			var controlNamesEntry;
+			var controlNamesListPatternDefaultsEntry;
 
-				//If another ListPattern / FilterPattern, recursively add stuff
-				if((entry.isListPattern).or(entry.isFilterPattern), {
-					controlNamesSum = controlNamesSum.addAll(
-						this.checkListPatternOrFilterPatternValidityAndReturnControlNames(entry)
-					);
-				}, {
-					if(entry.isSymbol.not, {
-						"AlgaPattern: the ListPattern defining 'def' can only contain Symbols pointing to valid AlgaSynthDefs".error;
-						^nil;
+			synthDescEntry = SynthDescLib.alga.at(object);
+			if(synthDescEntry == nil, {
+				("AlgaPattern: Invalid AlgaSynthDef: '" ++ object.asString ++ "'").error;
+				^nil;
+			});
+
+			synthDefEntry = synthDescEntry.def;
+			if(synthDefEntry.isKindOf(SynthDef).not, {
+				("AlgaPattern: Invalid AlgaSynthDef: '" ++ object.asString ++"'").error;
+				^nil;
+			});
+
+			if(numChannelsCount == nil, {
+				numChannelsCount = synthDefEntry.numChannels;
+				numChannels = numChannelsCount
+			});
+
+			if(rateCount == nil, {
+				rateCount = synthDefEntry.rate;
+				rate = rateCount
+			});
+
+			//Use the highest count of numChannels as "main" one, using that one entry's rate
+			if(synthDefEntry.numChannels > numChannelsCount, {
+				numChannels = synthDefEntry.numChannels;
+				rate = synthDefEntry.rate
+			});
+
+			//Store for next iteration
+			numChannelsCount = synthDefEntry.numChannels;
+			rateCount = synthDefEntry.rate;
+
+			//Add numChannels and rate to numChannelsList and rateList
+			numChannelsList[object] = numChannelsCount;
+			rateList[object] = rateCount;
+
+			//Retrieve controlNames
+			controlNamesEntry = synthDescEntry.controls;
+
+			//Create entry for controlNamesList
+			controlNamesList[object] = IdentityDictionary();
+
+			//Check for duplicates and add correct controlName to controlNamesList[entry.asSymbol]
+			controlNamesEntry.do({ | controlName |
+				var name = controlName.name;
+				if(this.checkValidControlName(name), {
+					//Just check for duplicate names: we only need one entry per param name
+					//for controlNamesSum.
+					if(controlNamesDict[name] == nil, {
+						controlNamesDict[name] = controlName;
+						controlNamesSum = controlNamesSum.add(controlName);
 					});
 
-					synthDescEntry = SynthDescLib.global.at(entry);
-
-					if(synthDescEntry == nil, {
-						("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++ "'").error;
-						^nil;
-					});
-
-					synthDefEntry = synthDescEntry.def;
-
-					if(synthDefEntry.class != AlgaSynthDef, {
-						("AlgaPattern: Invalid AlgaSynthDef: '" ++ entry.asString ++"'").error;
-						^nil;
-					});
-
-					if(numChannelsCount == nil, {
-						numChannelsCount = synthDefEntry.numChannels;
-						numChannels = numChannelsCount
-					});
-
-					if(rateCount == nil, {
-						rateCount = synthDefEntry.rate;
-						rate = rateCount
-					});
-
-					//Use the highest count of numChannels as "main" one, using that one entry's rate
-					if(synthDefEntry.numChannels > numChannelsCount, {
-						numChannels = synthDefEntry.numChannels;
-						rate = synthDefEntry.rate
-					});
-
-					//Store for next iteration
-					numChannelsCount = synthDefEntry.numChannels;
-					rateCount = synthDefEntry.rate;
-
-					//Add numChannels and rate to numChannelsList and rateList
-					numChannelsList[entry.asSymbol] = numChannelsCount;
-					rateList[entry.asSymbol] = rateCount;
-
-					//Retrieve controlNames
-					controlNamesEntry = synthDescEntry.controls;
-
-					//Create entry for controlNamesList
-					controlNamesList[entry.asSymbol] = IdentityDictionary();
-
-					//Check for duplicates and add correct controlName to controlNamesList[entry.asSymbol]
-					controlNamesEntry.do({ | controlName |
-						var name = controlName.name;
-						if(this.checkValidControlName(name), {
-							//Just check for duplicate names: we only need one entry per param name
-							//for controlNamesSum.
-							if(controlNamesDict[name] == nil, {
-								controlNamesDict[name] = controlName;
-								controlNamesSum = controlNamesSum.add(controlName);
-							});
-
-							//Add to IdentityDict for specific def / name combination
-							controlNamesList[entry.asSymbol][name] = controlName;
-						});
-					});
+					//Add to IdentityDict for specific def / name combination
+					controlNamesList[object][name] = controlName;
 				});
 			});
-		};
+		}, {
+			//Pattern
+			parser.parseGenericObject(object,
+				func: { | val |
+					controlNamesSum = controlNamesSum.addAll(
+						this.checkPatternValidityAndReturnControlNames(val, controlNamesDict)
+					);
+				},
+				replace: false
+			)
+		});
 
 		//Sanity checks
 		if(controlNamesSum.size == 0, { ^nil });
@@ -2029,8 +1982,8 @@ AlgaPattern : AlgaNode {
 		^controlNamesSum;
 	}
 
-	//Multiple Symbols over a ListPattern / FilterPattern
-	dispatchListPatternOrFilterPattern { | def, initGroups = false, replace = false,
+	//Multiple Symbols over a Pattern
+	dispatchPattern { | def, initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 		var controlNamesSum;
 		var functionsAndListPattern;
@@ -2042,26 +1995,29 @@ AlgaPattern : AlgaNode {
 		controlNamesList = IdentityDictionary();
 
 		//Check rates, numChannels, Symbols and controlNames
-		controlNamesSum = this.checkListPatternOrFilterPatternValidityAndReturnControlNames(def);
-		if(controlNamesSum != nil, {
-			//Create controlNames from controlNamesSum
-			this.createControlNamesAndParamsConnectionTime(controlNamesSum);
-
-			//synthDef will be the ListPattern
-			synthDef = def;
-
-			//Substitute the eventPairs entry with the new ListPattern
-			eventPairs[\def] = def;
-
-			//Build pattern from ListPattern
-			this.buildFromListPattern(
-				initGroups: initGroups,
-				replace: replace,
-				keepChannelsMapping: keepChannelsMapping,
-				keepScale: keepScale,
-				sched: sched
-			);
+		controlNamesSum = this.checkPatternValidityAndReturnControlNames(def);
+		if(controlNamesSum == nil, {
+			("AlgaPattern: could not retrieve any parameters from the provided 'def'. Only using 'amp'.").warn;
+			controlNamesSum = [ ControlName(\amp, 0, \audio, 1.0) ];
 		});
+
+		//Create controlNames from controlNamesSum
+		this.createControlNamesAndParamsConnectionTime(controlNamesSum);
+
+		//synthDef will be the ListPattern
+		synthDef = def;
+
+		//Substitute the eventPairs entry with the new ListPattern
+		eventPairs[\def] = def;
+
+		//Build pattern from Pattern
+		^this.buildFromPattern(
+			initGroups: initGroups,
+			replace: replace,
+			keepChannelsMapping: keepChannelsMapping,
+			keepScale: keepScale,
+			sched: sched
+		);
 	}
 
 	//Create out: receivers
@@ -2128,27 +2084,9 @@ AlgaPattern : AlgaNode {
 		^nil
 	}
 
-	//Store generic params for replaces
-	addScalarAndGenericParams { | key, value, uniqueID |
-		var latestScalarUniqueID;
-		latestScalarUniqueIDs = latestScalarUniqueIDs ? IdentityDictionary();
-		latestScalarUniqueID  = latestScalarUniqueIDs[key];
-
-		scalarAndGenericParams = scalarAndGenericParams ? IdentityDictionary();
-		scalarAndGenericParams[key] = scalarAndGenericParams[key] ? IdentityDictionary();
-		scalarAndGenericParams[key][uniqueID ? latestScalarUniqueID] = value;
-
-		scalarAndGenericParamsStreams = scalarAndGenericParamsStreams ? IdentityDictionary();
-		scalarAndGenericParamsStreams[key] = scalarAndGenericParamsStreams[key] ? IdentityDictionary();
-		scalarAndGenericParamsStreams[key][uniqueID ? latestScalarUniqueID] = value.algaAsStream;
-
-		//Update latest one
-		if(uniqueID != nil, { latestScalarUniqueIDs[key] = uniqueID });
-	}
-
 	//Build the actual pattern
 	createPattern { | replace = false, keepChannelsMapping = false, keepScale = false, sched |
-		var foundDurOrDelta = false;
+		var foundDurOrDelta = false, resetDur = false;
 		var foundSustain = false, resetSustain = false;
 		var foundStretch = false, resetStretch = false;
 		var foundLegato = false, resetLegato = false;
@@ -2208,6 +2146,16 @@ AlgaPattern : AlgaNode {
 
 				//Remove param entry from eventPairs
 				eventPairs[paramName] = nil;
+			}, {
+				//Scalar
+				newInterpStreams.addScalarAndGenericParams(paramName, paramValue);
+				patternPairsDict[paramName] = Pfunc { | e |
+					newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
+				};
+				foundGenericParams.add(paramName);
+
+				//Remove param entry from eventPairs
+				eventPairs[paramName] = nil;
 			});
 
 			//Add the entry to defaults ONLY if explicit
@@ -2218,9 +2166,12 @@ AlgaPattern : AlgaNode {
 		eventPairs.keysValuesDo({ | paramName, value |
 			var isAlgaParam = false;
 
-			//Add \def key as \instrument
+			//Add \def key
 			if(paramName == \def, {
-				patternPairs = patternPairs.add(\instrument).add(value);
+				newInterpStreams.addDef(value);
+				patternPairsDict[\def] = Pfunc { | e |
+					newInterpStreams.defStream.next(e);
+				};
 				isAlgaParam = true;
 			});
 
@@ -2261,8 +2212,11 @@ AlgaPattern : AlgaNode {
 			//Add \fx key (parsing everything correctly)
 			if(paramName == \fx, {
 				parsedFX = value;
+				newInterpStreams.addFX(parsedFX);
 				if(parsedFX != nil, {
-					patternPairs = patternPairs.add(\fx).add(parsedFX);
+					patternPairsDict[\fx] = Pfunc { | e |
+						newInterpStreams.fxStream.next(e);
+					};
 					foundFX = true;
 				});
 				isAlgaParam = true;
@@ -2271,30 +2225,26 @@ AlgaPattern : AlgaNode {
 			//Add \out key
 			if(paramName == \out, {
 				parsedOut = value;
+				newInterpStreams.addOut(parsedOut);
 				if(parsedOut != nil, {
-					patternPairs = patternPairs.add(\algaOut).add(parsedOut); //can't use \out
+					//Can't use \out as key for a pattern
+					patternPairsDict[\algaOut] = Pfunc { | e |
+						newInterpStreams.outStream.next(e);
+					};
 					foundOut = true;
 				});
 				isAlgaParam = true;
 			});
 
-			//Scalar parameters OR all other values
+			//All other values: they should be treated just like scalars
 			if(isAlgaParam.not, {
-				var uniqueID = UniqueID.next;
-				this.addScalarAndGenericParams(paramName, value, uniqueID);
+				newInterpStreams.addScalarAndGenericParams(paramName, value);
 				patternPairsDict[paramName] = Pfunc { | e |
-					var val = scalarAndGenericParamsStreams[paramName][uniqueID].next(e);
-					val ? 0
+					newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
 				};
 				foundGenericParams.add(paramName);
 			});
 		});
-
-		//Store current FX for replaces
-		if(foundFX, { currentFX = parsedFX });
-
-		//Store current out for replaces
-		if(foundOut, { currentOut = parsedOut });
 
 		//If replace, find keys in the old pattern if they are not redefined
 		if(replace, {
@@ -2303,20 +2253,9 @@ AlgaPattern : AlgaNode {
 			if(resetSet != nil, {
 				case
 				{ resetSet.class == IdentitySet } {
-					//reset \fx
-					if((foundFX.not).and(resetSet.findMatch(\fx) != nil), {
-						parsedFX = nil; currentFX = nil
-					});
-
-					//reset \out
-					if((foundOut.not).and(resetSet.findMatch(\out) != nil), {
-						parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil;
-						prevPatternOutNodes = nil;
-					});
-
 					//reset \dur
 					if((foundDurOrDelta.not).and(resetSet.findMatch(\dur) != nil), {
-						interpStreams = nil;
+						resetDur = true;
 					});
 
 					//reset \sustain
@@ -2334,31 +2273,50 @@ AlgaPattern : AlgaNode {
 						resetLegato = true;
 					});
 
-					//reset generic params
-					resetSet.do({ | entry |
-						scalarAndGenericParams.removeAt(entry);
-						scalarAndGenericParamsStreams.removeAt(entry)
+					//reset \fx
+					if((foundFX.not).and(resetSet.findMatch(\fx) != nil), {
+						if(interpStreams != nil, { interpStreams.removeFX });
+						parsedFX = nil;
+					});
+
+					//reset \out
+					if((foundOut.not).and(resetSet.findMatch(\out) != nil), {
+						if(interpStreams != nil, { interpStreams.removeOut });
+						parsedOut = nil;
+						currentPatternOutNodes = nil;
+						prevPatternOutNodes = nil;
+					});
+
+					//reset generic params from old interpStreams
+					if(interpStreams != nil, {
+						resetSet.do({ | entry |
+							interpStreams.removeScalarAndGenericParams(entry)
+						});
 					});
 				}
 				{ resetSet == true } {
-					parsedFX = nil; currentFX = nil; //reset \fx
-					parsedOut = nil; currentOut = nil; currentPatternOutNodes = nil; prevPatternOutNodes = nil; //reset \out
-					interpStreams = nil; //reset \dur
+					//reset \fx and \out
+					parsedFX = nil;
+					parsedOut = nil;
+					currentPatternOutNodes = nil; prevPatternOutNodes = nil;
+
+					resetDur     = true; //reset \dur
 					resetSustain = true; //reset \sustain
 					resetStretch = true; //reset \stretch
-					resetLegato = true;  //reset \legato
+					resetLegato  = true;  //reset \legato
 
-					//reset all generic params
-					if(scalarAndGenericParams != nil, {
-						scalarAndGenericParams.clear;
-						scalarAndGenericParamsStreams.clear
+					//reset all generic params from old interpStreams
+					if(interpStreams != nil, {
+						interpStreams.removeFX;
+						interpStreams.removeOut;
+						interpStreams.clearScalarAndGenericParams;
 					});
 				};
 			});
 
 			//No \dur from user, set to previous one
 			if(foundDurOrDelta.not, {
-				if((interpStreams == nil).or(algaWasBeingCleared), {
+				if((resetDur).or(algaWasBeingCleared), {
 					this.setDur(1, newInterpStreams)
 				}, {
 					this.setDur(interpStreams.dur, newInterpStreams)
@@ -2392,44 +2350,51 @@ AlgaPattern : AlgaNode {
 				});
 			});
 
-			//No \fx from user, use currentFX if available
-			if(foundFX.not, {
-				if(currentFX != nil, {
-					patternPairs = patternPairs.add(\fx).add(currentFX);
+			//Add old \fx, \out and scalar values
+			if(interpStreams != nil, {
+				//No \fx from user, use currentFX if available
+				if(foundFX.not, {
+					//Needs to be copied from the old one in order to make a "fresh" one
+					var currentFX = interpStreams.fx.copy;
+					if(currentFX != nil, {
+						newInterpStreams.addFX(currentFX);
+						patternPairsDict[\fx] = Pfunc { | e |
+							newInterpStreams.fxStream.next(e)
+						}
+					});
 				});
-			});
 
-			//No \out from user, use currentOut if available
-			if(foundOut.not, {
-				if(currentOut != nil, {
-					patternPairs = patternPairs.add(\algaOut).add(currentOut);
+				//No \out from user, use currentOut if available
+				if(foundOut.not, {
+					//Needs to be copied from the old one in order to make a "fresh" one
+					var currentOut = interpStreams.out.copy;
+					if(currentOut != nil, {
+						newInterpStreams.addOut(currentOut);
+						patternPairsDict[\algaOut] = Pfunc { | e |
+							newInterpStreams.outStream.next(e);
+						}
+					});
 				});
-			});
 
-			//Add old scalarAndGenericParamsStreams
-			if(scalarAndGenericParams != nil, {
-				if(scalarAndGenericParams.size > 0, {
-					scalarAndGenericParams.keysValuesDo({ | paramName, value |
-						//If that specific generic param hasn't been set from user,
-						//use the one from addScalarAndGenericParams if available
-						if(foundGenericParams.findMatch(paramName) == nil, {
-							//Needs to be copied in order to make a "fresh" one
-							var latestValue = scalarAndGenericParams[paramName][
-								latestScalarUniqueIDs[paramName]
-							].copy;
-
-							//This code should be abstracted: it's the same behaviour
-							if(latestValue != nil, {
-								var uniqueID = UniqueID.next;
-								this.addScalarAndGenericParams(paramName, latestValue, uniqueID);
-								patternPairsDict[paramName] = Pfunc { | e |
-									var val = scalarAndGenericParamsStreams[paramName][uniqueID].next(e);
-									val ? 0
-								}
-							});
+				//Reset scalars and generic parameters
+				if(interpStreams.scalarAndGenericParams != nil, {
+					if(interpStreams.scalarAndGenericParams.size > 0, {
+						interpStreams.scalarAndGenericParams.keysValuesDo({ | paramName, value |
+							//If that specific generic param hasn't been set from user,
+							//use the one from the old interpStreams.scalarAndGenericParams if available
+							if(foundGenericParams.findMatch(paramName) == nil, {
+								//Needs to be copied from the old one in order to make a "fresh" one
+								var latestValue = interpStreams.scalarAndGenericParams[paramName].copy;
+								if(latestValue != nil, {
+									newInterpStreams.addScalarAndGenericParams(paramName, value);
+									patternPairsDict[paramName] = Pfunc { | e |
+										newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
+									};
+								});
+							})
 						})
 					})
-				})
+				});
 			});
 		}, {
 			//Else, default them
@@ -2531,527 +2496,24 @@ AlgaPattern : AlgaNode {
 		patternsAsStreams[interpStreams] = pattern.algaAsStream;
 	}
 
-	//Parse a single \fx event
-	parseFXEvent { | value, functionSynthDefDict |
-		var foundInParam = false;
-		var synthDescFx, synthDefFx, controlNamesFx;
-		var isFunction = false;
-		var def;
-
-		//Find \def
-		def = value[\def];
-		if(def == nil, {
-			("AlgaPattern: no 'def' entry in 'fx': '" ++ value.asString ++ "'").error;
-			^nil
-		});
-
-		//If it's a Function, send def to server and replace entries
-		if(def.isFunction, {
-			var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-			//The synthDef will be sent later! just use the def and the desc for now
-			synthDefFx = AlgaSynthDef.new_inner(
-				defName,
-				def,
-				makeFadeEnv: false,
-				makePatternDef: false,
-				makeOutDef: false
-			);
-
-			//Get the desc
-			synthDescFx = synthDefFx.asSynthDesc;
-
-			//Important: NO sampleAccurate (it's only needed for the triggered pattern synths)
-			functionSynthDefDict[defName] = synthDefFx;
-
-			//Replace the def: with the symbol
-			def = defName;
-			value[\def] = defName;
-
-			isFunction = true;
-		});
-
-		//Don't support ListPatterns for now
-		if(def.isSymbol.not, {
-			("AlgaPattern: 'fx' only supports Symbols and Functions as 'def'").error;
-			^nil
-		});
-
-		//Check that \def is valid
-		if(isFunction.not, {
-			synthDescFx = SynthDescLib.global.at(def);
-		});
-
-		if(synthDescFx == nil, {
-			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "'").error;
-			^nil;
-		});
-
-		if(isFunction.not, {
-			synthDefFx = synthDescFx.def;
-		});
-
-		if(synthDefFx.class != AlgaSynthDef, {
-			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++"'").error;
-			^nil;
-		});
-
-		if(synthDefFx.sampleAccurate, {
-			("AlgaPattern: AlgaSynthDef in 'fx': '" ++ def.asString ++"' has 'sampleAccurate' on. This causes synchronization errors").warn;
-		});
-
-		controlNamesFx = synthDescFx.controls;
-		controlNamesFx.do({ | controlName |
-			if(controlName.name == \in, {
-				foundInParam = true;
-				//Pass numChannels / rate of in param to Event
-				value[\inNumChannels] = controlName.numChannels;
-				value[\inRate] = controlName.rate;
-			})
-		});
-
-		//Not found the \in parameter
-		if(foundInParam.not, {
-			("AlgaPattern: Invalid AlgaSynthDef in 'fx': '" ++ def.asString ++ "': It does not provide an 'in' parameter").error;
-			^nil;
-		});
-
-		//Pass controlNames / numChannels / rate to Event
-		value[\controlNames] = controlNamesFx;
-		value[\numChannels] = synthDefFx.numChannels;
-		value[\rate] = synthDefFx.rate;
-
-		//Pass explicitFree to Event
-		value[\explicitFree] = synthDefFx.explicitFree;
-
-		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursivePatternList
-		this.resetPatternParsingVars;
-
-		//Loop over the event and parse ListPatterns / AlgaTemps. Also use as Stream for the final entry.
-		value.keysValuesDo({ | key, entry |
-			var parsedEntry = this.parseParam_inner(entry, functionSynthDefDict);
-			value[key] = parsedEntry.algaAsStream;
-		});
-
-		//Check support for AlgaPatternPlayers on \fx
-		this.calculatePlayersConnections(\fx);
-
-		//Reset paramContainsAlgaReaderPfunc, latestPlayers and recursivePatternList again
-		this.resetPatternParsingVars;
-
-		^value
-	}
-
 	//Parse the \fx key
 	parseFX { | value, functionSynthDefDict |
-		case
-
-		//Single Event
-		{ value.isEvent } {
-			^this.parseFXEvent(value, functionSynthDefDict);
-		}
-
-		//If individual Symbol, if it's in DescLib, use it as Event. Otherwise, passthrough (like, \none, \dry)
-		{ value.isSymbol } {
-			if(SynthDescLib.global.at(value) != nil, {
-				^this.parseFXEvent((def: value), functionSynthDefDict)
-			});
-			^value
-		}
-
-		//If individual Function, wrap in Event
-		{ value.isFunction } {
-			^this.parseFXEvent((def: value), functionSynthDefDict)
-		}
-
-		//ListPattern of any of the above
-		{ value.isListPattern } {
-			value.list.do({ | listEntry, i |
-				var result = this.parseFX(listEntry, functionSynthDefDict); //recursive
-				if(result == nil, { ^nil });
-				value.list[i] = result;
-			});
-			^value;
-		}
-
-		//FilterPattern
-		{ value.isFilterPattern } {
-			var result = this.parseFX(value.pattern, functionSynthDefDict);
-			if(result == nil, { ^nil });
-			value.pattern = result;
-			^value
-		}
-
-		//Generic Pattern
-		{ value.isPattern } {
-			//Protect from recursiveness
-			recursivePatternList.add(value);
-			value.class.instVarNames.do({ | instVarName |
-				try {
-					var instVar = value.perform(instVarName);
-					if(recursivePatternList.includes(instVar).not, {
-						var result = this.parseFX(instVar, functionSynthDefDict);
-						if(result == nil, { ^nil });
-						//ListPatterns and FilterPatterns are already handled
-						if((result.isListPattern.not).and(result.isFilterPattern.not), {
-							value.perform((instVarName ++ "_").asSymbol, result);
-						});
-					});
-				} { | error |
-					//Catch setter errors
-					if(error.isKindOf(DoesNotUnderstandError), {
-						if(error.selector.asString.endsWith("_"), {
-							("AlgaPattern: could not reassign '" ++
-								value.class ++ "." ++ error.selector ++
-								"' for the \fx key. The Class does implement its setter method."
-							).error
-						});
-					})
-				}
-			});
-			^value;
-		}
-
-		//Array
-		{ value.isArray } {
-			value.do({ | entry, i |
-				var result = this.parseFX(entry, functionSynthDefDict);
-				if(result == nil, { ^nil });
-				value[i] = result;
-			});
-			^value;
-		};
-
-		//Fallback
-		("AlgaPattern: invalid Class for the 'fx' entry: '" ++ value.class.asString ++ "'").error;
-		^nil;
-	}
-
-	//Parse a single \out event
-	parseOutAlgaOut { | value, alreadyParsed |
-		var node = value.nodeOrig;
-		var param = value.paramOrig;
-
-		if(param == nil, param = \in);
-		if(param.class != Symbol, {
-			"AlgaPattern: the 'param' argument in AlgaOut can only be a Symbol. Using 'in'".error;
-			param = \in
-		});
-
-		case
-		{ node.isAlgaNode } {
-			if(alreadyParsed[node] == nil, {
-				if(node.isAlgaPattern, {
-					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
-					^nil
-				});
-				alreadyParsed[node] = true;
-				currentPatternOutNodes.add([node, param]);
-			});
-		}
-		{ node.isListPattern } {
-			node.list.do({ | listEntry, i |
-				node.list[i] = this.parseOut(listEntry, alreadyParsed)
-			});
-		}
-		{ node.isFilterPattern } {
-			node.pattern = this.parseOut(node.pattern, alreadyParsed)
-		}
-		{ node.isPattern } {
-			//Protect from recursiveness
-			recursivePatternList.add(value);
-			node.class.instVarNames.do({ | instVarName |
-				try {
-					var instVar = node.perform(instVarName);
-					if(recursivePatternList.includes(instVar).not, {
-						var result = this.parseOut(instVar, alreadyParsed);
-						if(result == nil, { ^nil });
-						//ListPatterns and FilterPatterns are already handled
-						if((result.isListPattern.not).and(result.isFilterPattern.not), {
-							node.perform((instVarName ++ "_").asSymbol, result);
-						});
-					});
-				} { | error |
-					//Catch setter errors
-					if(error.isKindOf(DoesNotUnderstandError), {
-						if(error.selector.asString.endsWith("_"), {
-							("AlgaPattern: could not reassign '" ++
-								node.class ++ "." ++ error.selector ++
-								"' for the \out key. The Class does implement its setter method."
-							).error
-						});
-					})
-				}
-			});
-		};
-
-		^value.algaAsStream;
+		^(parser.parseFX(value, functionSynthDefDict))
 	}
 
 	//Parse the \out key
 	parseOut { | value, alreadyParsed |
-		alreadyParsed = alreadyParsed ? IdentityDictionary();
-
-		case
-		{ value.isAlgaNode } {
-			if(alreadyParsed[value] == nil, {
-				if(value.isAlgaPattern, {
-					"AlgaPattern: the 'out' parameter only supports AlgaNodes, not AlgaPatterns".error;
-					^nil
-				});
-				alreadyParsed[value] = true;
-				currentPatternOutNodes.add([value, \in]);
-			});
-			^value
-		}
-		{ value.isAlgaOut } {
-			^this.parseOutAlgaOut(value, alreadyParsed);
-		}
-		{ value.isListPattern } {
-			value.list.do({ | listEntry, i |
-				var result = this.parseOut(listEntry, alreadyParsed); //recursive, so it picks up other ListPatterns if needed
-				if(result == nil, { ^nil });
-				value.list[i] = result;
-			});
-			^value.algaAsStream; //return the Stream
-		}
-		{ value.isFilterPattern } {
-			var result = this.parseOut(value.pattern, alreadyParsed);
-			if(result == nil, { ^nil });
-			value.pattern = result;
-			^value.algaAsStream; //return the Stream
-		}
-		{ value.isPattern } {
-			//Protect from recursiveness
-			recursivePatternList.add(value);
-			value.class.instVarNames.do({ | instVarName |
-				try {
-					var instVar = value.perform(instVarName);
-					if(recursivePatternList.includes(instVar).not, {
-						var result = this.parseOut(instVar, alreadyParsed);
-						if(result == nil, { ^nil });
-						//ListPatterns and FilterPatterns are already handled
-						if((result.isListPattern.not).and(result.isFilterPattern.not), {
-							value.perform((instVarName ++ "_").asSymbol, result);
-						});
-					});
-				} { | error |
-					//Catch setter errors
-					if(error.isKindOf(DoesNotUnderstandError), {
-						if(error.selector.asString.endsWith("_"), {
-							("AlgaPattern: could not reassign '" ++
-								value.class ++ "." ++ error.selector ++
-								"' for the \out key. The Class does implement its setter method."
-							).error
-						});
-					})
-				}
-			});
-			^value.algaAsStream; //return the Stream
-		}
-		{ value.isArray } {
-			value.do({ | entry, i |
-				var result = this.parseOut(entry, alreadyParsed);
-				if(result == nil, { ^nil });
-				value[i] = result;
-			});
-			^value;
-		}
-		//This can be used to pass Symbols like \none or \dry to just passthrough the sound
-		{ value.isSymbol } {
-			^value
-		};
-
-		//Fallback
-		("AlgaPattern: invalid Class for the 'out' entry: '" ++ value.class.asString ++ "'").error;
-		^nil;
-	}
-
-	//Found an AlgaReaderPfunc
-	assignAlgaReaderPfunc { | algaReaderPfunc |
-		var latestPlayer = algaReaderPfunc.patternPlayer;
-		var params = algaReaderPfunc.params;
-		if(latestPlayer != nil, {
-			paramContainsAlgaReaderPfunc = true;
-			latestPlayersAtParam[latestPlayer] = latestPlayersAtParam[latestPlayer] ? Array.newClear;
-			latestPlayersAtParam[latestPlayer] = latestPlayersAtParam[latestPlayer].add(params).flatten;
-		});
-		^algaReaderPfunc;
-	}
-
-	//Parse a ListPattern
-	parseListPatternParam { | listPattern, functionSynthDefDict |
-		listPattern.list.do({ | listEntry, i |
-			listPattern.list[i] = this.parseParam_inner(listEntry, functionSynthDefDict);
-		});
-		^listPattern;
-	}
-
-	//Parse a FilterPattern
-	parseFilterPatternParam { | filterPattern, functionSynthDefDict |
-		var pattern = filterPattern.pattern;
-		filterPattern.pattern = this.parseParam_inner(pattern, functionSynthDefDict);
-		^filterPattern;
-	}
-
-	//Parse a Pattern looking for AlgaTemp / ListPattern / FilterPattern
-	parseGenericPatternParam { | value, functionSynthDefDict |
-		//Protect from recursiveness
-		recursivePatternList.add(value);
-		value.class.instVarNames.do({ | instVarName |
-			try {
-				var instVar = value.perform(instVarName);
-				if(recursivePatternList.includes(instVar).not, {
-					this.parseParam_inner(instVar, functionSynthDefDict);
-				});
-			} { | error | } //Don't catch errors
-		});
-		^value;
-	}
-
-	//Reset vars used in parsing
-	resetPatternParsingVars {
-		paramContainsAlgaReaderPfunc = false;
-		latestPlayersAtParam = IdentityDictionary();
-		recursivePatternList = IdentitySet(10);
-	}
-
-	//Parse a Function \def entry
-	parseFunctionDefEntry { | def, functionSynthDefDict |
-		//New defName
-		var defName = ("alga_" ++ UniqueID.next).asSymbol;
-
-		//sampleAccurate is set according to sampleAccurateFuncs
-		functionSynthDefDict[defName] = AlgaSynthDef(
-			defName,
-			def,
-			outsMapping: outsMapping,
-			sampleAccurate: sampleAccurateFuncs
-		); //Important: it returns AlgaSynthDefSpec (for _algaPattern and _algaPatternTempOut)
-
-		//Return the Symbol
-		^defName
-	}
-
-	//Parse a ListPattern \def entry
-	parseListPatternDefEntry { | def, functionSynthDefDict |
-		def.list.do({ | entry, i |
-			def.list[i] = this.parseDefEntry(entry, functionSynthDefDict)
-		});
-		^def
-	}
-
-	//Parse a FilterParam \def entry
-	parseFilterPatternDefEntry { | def, functionSynthDefDict |
-		var pattern = def.pattern;
-		def.pattern = this.parseDefEntry(pattern, functionSynthDefDict)
-		^def
-	}
-
-	//Parse a generic Pattern \def entry
-	parseGenericPatternDefEntry { | def, functionSynthDefDict |
-		//Protect from recursiveness
-		recursivePatternList.add(def);
-		def.class.instVarNames.do({ | instVarName |
-			try {
-				var instVar = def.perform(instVarName);
-				if(recursivePatternList.includes(instVar).not, {
-					var result = this.parseDefEntry(instVar, functionSynthDefDict);
-					//ListPatterns / FilterPatterns are already handled
-					if(result.isSymbol, {
-						def.perform((instVarName ++ "_").asSymbol, result);
-					});
-				});
-			} { | error |
-				//Catch setter errors
-				if(error.isKindOf(DoesNotUnderstandError), {
-					if(error.selector.asString.endsWith("_"), {
-						("AlgaPattern: could not reassign '" ++
-							def.class ++ "." ++ error.selector ++
-							"' for the \def key. The Class does implement its setter method."
-						).error
-					});
-				})
-			}
-		});
-		^def
-	}
-
-	//Parse the \def entry
-	parseDefEntry { | def, functionSynthDefDict |
-		case
-		{ def.isFunction } {
-			^this.parseFunctionDefEntry(def, functionSynthDefDict)
-		}
-		{ def.isListPattern } {
-			^this.parseListPatternDefEntry(def, functionSynthDefDict)
-		}
-		{ def.isFilterPattern } {
-			^this.parseFilterPatternDefEntry(def, functionSynthDefDict)
-		}
-		{ def.isPattern } {
-			^this.parseGenericPatternDefEntry(def, functionSynthDefDict)
-		};
-		^def
+		^(parser.parseOut(value, alreadyParsed))
 	}
 
 	//Parse an entire def
 	parseDef { | def |
-		var defDef;
-		var defFX;
-		var defOut;
-
-		//Store [defName] -> AlgaSynthDef
-		var functionSynthDefDict = IdentityDictionary();
-
-		//Wrap in an Event if not an Event already
-		if(def.isEvent.not, { def = (def: def) });
-
-		//Store the original def (needed for AlgaPatternPlayer)
-		defPreParsing = def.deepCopy;
-
-		//Retrieve entries that need specific parsing
-		defDef = def[\def];
-		defFX  = def[\fx];
-		defOut = def[\out];
-
-		//Return nil if no def
-		if(defDef == nil, {
-			"AlgaPattern: the Event does not provide a 'def' entry".error;
-			^nil
-		});
-
-		//Parse and replace \def
-		recursivePatternList = IdentitySet(10); //reset for parseDefEntry
-		def[\def] = this.parseDefEntry(defDef, functionSynthDefDict);
-
-		//Parse \fx
-		recursivePatternList.clear; //reset for parseFX
-		if(defFX != nil, { def[\fx] = this.parseFX(defFX, functionSynthDefDict) });
-
-		//Parse \out (reset currentPatternOutNodes too)
-		if(defOut != nil, {
-			prevPatternOutNodes = currentPatternOutNodes.copy;
-			currentPatternOutNodes = IdentitySet();
-			recursivePatternList.clear; //reset for parseOut
-			def[\out] = this.parseOut(defOut)
-		});
-
-		//Parse all the other entries looking for AlgaTemps / ListPatterns
-		def.keysValuesDo({ | key, value |
-			if((key != \fx).and(key != \out), {
-				value = this.parseParam(value, functionSynthDefDict);
-				this.calculatePlayersConnections(key); //Also removes old ones if needed
-				def[key] = value;
-			});
-		});
-
-		^[def, functionSynthDefDict];
+		^(parser.parseDef(def))
 	}
 
 	//Get valid synthDef name
 	getSynthDef {
-		if(synthDef.class == AlgaSynthDef, {
+		if(synthDef.isKindOf(SynthDef), {
 			//Normal synthDef
 			^synthDef.name
 		}, {
@@ -3174,56 +2636,96 @@ AlgaPattern : AlgaNode {
 		);
 	}
 
-	//Interpolate fx == replace
+	//Interpolate fx == reschedule OR replace
 	interpolateFX { | value, time, sched |
-		"AlgaPattern: changing the 'fx' key. This will trigger 'replace'.".warn;
-		this.replace(
-			def: (def: this.getSynthDef, fx: value),
-			time: time,
-			sched: sched
-		);
+		time = time ? this.getParamConnectionTime(\fx);
+
+		//In the case of \fx, replace should be used for AlgaStep
+		if((time == 0).and(sched.isAlgaStep.not), {
+			//Parse the fx
+			var functionSynthDefDict = IdentityDictionary();
+			var parsedFX = this.parseFX(value, functionSynthDefDict);
+
+			//Replace the fx entry
+			this.compileFunctionSynthDefDictIfNeeded(
+				func: {
+					this.addAction(
+						func: { interpStreams.addFX(parsedFX) },
+						sched: sched,
+						topPriority: true
+					)
+				},
+				functionSynthDefDict: functionSynthDefDict
+			)
+		}, {
+			"AlgaPattern: changing the 'fx' key. This will trigger 'replace'.".warn;
+			this.replace(
+				def: (def: this.getSynthDef, fx: value),
+				time: time,
+				sched: sched
+			);
+		});
 	}
 
-	//Interpolate out == replace
+	//Interpolate out == reschedule OR replace
 	interpolateOut { | value, time, shape, sched |
-		"AlgaPattern: changing the 'out' key. This will trigger 'replace'.".warn;
-		currentPatternOutShape = shape; //set shape!
-		this.replace(
-			def: (def: this.getSynthDef, out: value),
-			time: time,
-			sched: sched
-		);
+		time = time ? this.getParamConnectionTime(\out);
+
+		//Store shape! This is used in createPatternOutReceivers
+		currentPatternOutShape = shape;
+
+		//In the case of \out, replace should be used for AlgaStep
+		if((time == 0).and(sched.isAlgaStep.not), {
+			//Run parsing
+			var parsedOut;
+			prevPatternOutNodes = currentPatternOutNodes.copy;
+			currentPatternOutNodes = IdentitySet();
+			parsedOut = this.parseOut(value);
+
+			//Sched the new one
+			this.addAction(
+				func: { interpStreams.addOut(parsedOut) },
+				sched: sched,
+				topPriority: true
+			)
+		}, {
+			"AlgaPattern: changing the 'out' key. This will trigger 'replace'.".warn;
+			this.replace(
+				def: (def: this.getSynthDef, out: value),
+				time: time,
+				sched: sched
+			);
+		});
 	}
 
 	//Interpolate a parameter that is not in controlNames (like \lag)
 	interpolateScalarOrGenericParam { | sender, param, time, sched |
-		var paramConnectionTime = paramsConnectionTime[param];
-		var latestScalarUniqueID = latestScalarUniqueIDs[param];
-		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
-		time = time ? paramConnectionTime;
+		time = time ? this.getParamConnectionTime(param);
 
-		if((time == 0).and(latestScalarUniqueID != nil), {
+		//If time is 0, just change at sched. This includes AlgaStep!
+		if(time == 0, {
 			this.addAction(
 				func: {
 					//Add the new stream
-					this.addScalarAndGenericParams(param, sender);
+					interpStreams.addScalarAndGenericParams(param, sender);
 
-					//If AlgaStep, ALSO advance the value manually
+					//If AlgaStep and pre, ALSO advance the value manually
 					if(sched.isAlgaStep, {
-						var value = scalarAndGenericParamsStreams[param][
-							latestScalarUniqueIDs[param]
-						].next(this.getCurrentEnvironment);
+						if(sched.post.not, {
+							var scalarAndGenericParamsStreams = interpStreams.scalarAndGenericParamsStreams;
+							var value = scalarAndGenericParamsStreams[param].next(this.getCurrentEnvironment);
 
-						//Substitute in currentEnvironment so it's picked up
-						if(value != nil, { currentEnvironment[param] = value });
+							//Substitute in currentEnvironment so it's picked up
+							//right away in the current createPatternSynth call
+							if(value != nil, { currentEnvironment[param] = value });
+						});
 					});
 				},
 				sched: sched,
 				topPriority: true
 			)
 		}, {
-			("AlgaPattern: changing the '" ++ param.asString ++ "' key, which is either scalar or not present in the AlgaSynthDef. This will trigger 'replace'.").warn;
+			("AlgaPattern: changing the '" ++ param.asString ++ "' key, which is either a scalar or not present in the AlgaSynthDef. This will trigger 'replace'.").warn;
 			this.replace(
 				def: (def: this.getSynthDef, (param): sender), //escape param with ()
 				time: time,
@@ -3237,11 +2739,10 @@ AlgaPattern : AlgaNode {
 		sampleAndHold = false, time = 0, shape |
 
 		var isDefault = false;
-		var paramConnectionTime = paramsConnectionTime[param];
 		var controlName;
-		if(paramConnectionTime == nil, { paramConnectionTime = connectionTime });
-		if(paramConnectionTime < 0, { paramConnectionTime = connectionTime });
-		time = time ? paramConnectionTime;
+
+		//Calc time
+		time = time ? this.getParamConnectionTime(param);
 
 		//This mostly happens on .resetParam. Try to get the default value from defArgs,
 		//restoring the original Pattern's parameter. If it will be nil, the SynthDef's
@@ -3450,6 +2951,24 @@ AlgaPattern : AlgaNode {
 				("AlgaPattern: trying to enstablish a connection from an invalid class: " ++ sender.class).error;
 			});
 		});
+	}
+
+	//Reset parser params
+	resetPatternParsingVars {
+		paramContainsAlgaReaderPfunc = false;
+		latestPlayersAtParam         = IdentityDictionary();
+	}
+
+	//Found an AlgaReaderPfunc (used in AlgaParser)
+	assignAlgaReaderPfunc { | algaReaderPfunc |
+		var latestPlayer = algaReaderPfunc.patternPlayer;
+		var params = algaReaderPfunc.params;
+		if(latestPlayer != nil, {
+			paramContainsAlgaReaderPfunc = true;
+			latestPlayersAtParam[latestPlayer] = latestPlayersAtParam[latestPlayer] ? Array.newClear;
+			latestPlayersAtParam[latestPlayer] = latestPlayersAtParam[latestPlayer].add(params).flatten;
+		});
+		^algaReaderPfunc;
 	}
 
 	//Remove an AlgaPatternPlayer connection
@@ -3776,7 +3295,7 @@ AlgaPattern : AlgaNode {
 	interpolateDurParamAtSched { | param, value, time, shape, resync, reset, sched |
 		var algaPseg;
 		var paramInterpShape = this.getInterpShape(param);
-		var paramConnectionTime = paramsConnectionTime[param];
+		var paramConnectionTime = this.getParamConnectionTime(param);
 
 		//Check validity of value
 		if((value.isNumber.not).and(value.isPattern.not), {
@@ -3792,8 +3311,10 @@ AlgaPattern : AlgaNode {
 		{ param == \legato }  { algaPseg = interpStreams.legatoAlgaPseg };
 
 		//Check time
-		if(param == \dur, { paramConnectionTime = paramConnectionTime ? paramsConnectionTime[\delta] });
-		time = time ? (paramConnectionTime ? connectionTime);
+		if(param == \dur, {
+			paramConnectionTime = paramConnectionTime ? this.getParamConnectionTime(\delta);
+		});
+		time = time ? paramConnectionTime;
 
 		//Time in AlgaPseg is in beats: it needs to be scaled to seconds
 		time = if(tempoScaling.not, { time * this.clock.tempo });
@@ -3825,8 +3346,10 @@ AlgaPattern : AlgaNode {
 		reset = reset ? durInterpReset;
 
 		//Get shape
-		if(param == \dur, { paramInterpShape = paramInterpShape ? this.getInterpShape(\delta) });
-		shape = shape.algaCheckValidEnv(false) ? paramInterpShape;
+		if(param == \dur, {
+			paramInterpShape = paramInterpShape ? this.getInterpShape(\delta)
+		});
+		shape = shape.algaCheckValidEnv(false) ? paramInterpShape.algaCheckValidEnv(false);
 
 		//Add to scheduler
 		this.addAction(
@@ -3981,10 +3504,15 @@ AlgaPattern : AlgaNode {
 
 	//Add entry to inNodes. Unlike AlgaNodes, inNodes can here contain AlgaArgs, as the .replace
 	//mechanism is difference. For AlgaNodes, AlgaArgs can only be used in the args initialization
-	addInNodeAlgaNode { | sender, param = \in, mix = false |
-		var connectionToItself = (this == sender);
+	addInNodeAlgaNodeAlgaArg { | sender, param = \in, mix = false |
+		var connectionToItself;
+		if(sender.isAlgaArg, { sender = sender.sender });
 
-		//Empty entry OR not doing mixing, create new OrderedIdentitySet. Otherwise, add to existing
+		//Detect self connections
+		connectionToItself = (this == sender);
+
+		//Empty entry OR not doing mixing, create new OrderedIdentitySet.
+		//Otherwise, add to existing
 		if((inNodes[param] == nil).or(mix.not), {
 			inNodes[param] = OrderedIdentitySet[sender];
 		}, {
@@ -4004,92 +3532,14 @@ AlgaPattern : AlgaNode {
 		});
 	}
 
-	//Add entries to inNodes
-	addInNodeListPattern { | sender, param = \in |
-		sender.list.do({ | listEntry |
-			if(listEntry.isAlgaArg, { listEntry = listEntry.sender });
-			case
-			{ listEntry.isAlgaNode } {
-				if(inNodes.size == 0, {
-					this.addInNodeAlgaNode(listEntry, param, mix:false);
-				}, {
-					this.addInNodeAlgaNode(listEntry, param, mix:true);
-				});
-			}
-			{ listEntry.isListPattern } {
-				this.addInNodeListPattern(listEntry, param)
-			}
-			{ listEntry.isFilterPattern } {
-				this.addInNodeFilterPattern(listEntry, param);
-			}
-			{ listEntry.isPattern } {
-				this.addInNodeGenericPatternParam(listEntry, param);
-			};
-		});
-	}
-
-	//Add entries to inNodes
-	addInNodeFilterPattern { | sender, param = \in |
-		var entry = sender.pattern;
-		if(entry.isAlgaArg, { entry = entry.sender });
-		case
-		{ entry.isAlgaNode } {
-			if(inNodes.size == 0, {
-				this.addInNodeAlgaNode(entry, param, mix:false);
-			}, {
-				this.addInNodeAlgaNode(entry, param, mix:true);
-			});
-		}
-		{ entry.isListPattern } {
-			this.addInNodeListPattern(entry, param);
-		}
-		{ entry.isFilterPattern } {
-			this.addInNodeFilterPattern(entry, param);
-		}
-		{ entry.isPattern } {
-			this.addInNodeGenericPatternParam(entry, param);
-		};
-	}
-
-	//Add entries to inNodes
-	addInNodeGenericPatternParam { | sender, param = \in |
-		//Protect from recursiveness
-		recursivePatternList.add(sender);
-		sender.class.instVarNames.do({ | instVarName |
-			try {
-				var entry = sender.perform(instVarName);
-				if(recursivePatternList.includes(entry).not, {
-					if(entry.isAlgaArg, { entry = entry.sender });
-					case
-					{ entry.isAlgaNode } {
-						if(inNodes.size == 0, {
-							this.addInNodeAlgaNode(entry, param, mix:false);
-						}, {
-							this.addInNodeAlgaNode(entry, param, mix:true);
-						});
-					}
-					{ entry.isListPattern } {
-						this.addInNodeListPattern(entry, param);
-					}
-					{ entry.isFilterPattern } {
-						this.addInNodeFilterPattern(entry, param);
-					}
-					{ entry.isPattern } {
-						this.addInNodeGenericPatternParam(entry, param);
-					};
-				});
-			} { | error | } //Don't catch errors
-		});
-	}
-
 	//Wrapper for addInNode
-	addInNode { | sender, param = \in, mix = false |
+	addInNode { | sender, param = \in, mix = false, forceMix = false |
 		var controlNameAtParam = controlNames[param];
 		var defaultValue;
 		if(controlNameAtParam != nil, { defaultValue = controlNameAtParam.defaultValue });
 
 		//First of all, remove the outNodes that the previous sender had with the
-		//param of this node, if there was any. Only apply if mix==false (no <<+ / >>+)
+		//param of this node, if there was any. Only apply if mix == false (no <<+ / >>+)
 		if(mix == false, {
 			var oldSenderSet = inNodes[param];
 			if(oldSenderSet != nil, {
@@ -4099,26 +3549,19 @@ AlgaPattern : AlgaNode {
 			});
 		});
 
-		//Reset recursivePatternList
-		recursivePatternList = IdentitySet(10);
-
-		//If AlgaArg or ListPattern, loop around entries and add each of them
-		case
-		{ sender.isAlgaNode } {
-			this.addInNodeAlgaNode(sender, param, mix);
-		}
-		{ sender.isAlgaArg } {
-			this.addInNode(sender.sender, param, mix);
-		}
-		{ sender.isListPattern } {
-			this.addInNodeListPattern(sender, param);
-		}
-		{ sender.isFilterPattern } {
-			this.addInNodeFilterPattern(sender, param);
-		}
-		{ sender.isPattern } {
-			this.addInNodeGenericPatternParam(sender, param);
-		};
+		//AlgaNode or AlgaArg: go through
+		if(sender.isAlgaNodeOrAlgaArg, {
+			if(forceMix, { mix = true });
+			this.addInNodeAlgaNodeAlgaArg(sender, param, mix);
+		}, {
+			//Pattern
+			parser.parseGenericObject(sender,
+				func: { | val |
+					this.addInNode(val, param, mix, forceMix: true)
+				},
+				replace: false
+			)
+		});
 
 		//Use replaceArgs to set LATEST parameter, for retrieval after .replace ...
 		//AlgaNode only uses this for number parameters, but AlgaPattern uses it for any
