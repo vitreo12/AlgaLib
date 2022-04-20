@@ -82,8 +82,7 @@
                 { Saw.ar(\freq.kr(440)) * EnvPerc.ar * 0.5 }
             ),
 
-            //No need to .lf here as 'freq' does not expect UGen functions
-            //like 'def' does
+            //No need to .lf here as 'freq' does not expect UGen functions like 'def' does
             freq: Pif( Pfunc { 0.5.coin },
                 AT({ LFNoise0.kr(10) }, scale: [440, 880]),
                 Pseq([ AT { DC.kr(220) }, AT { DC.kr(440) }], inf)
