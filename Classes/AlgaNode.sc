@@ -4342,7 +4342,7 @@ AlgaNode {
 
 	//Number plays those number of channels sequentially
 	//Array selects specific output
-	createPlaySynth { | time, channelsToPlay, scale, out = 0, replace = false,
+	createPlaySynth { | channelsToPlay, time, scale, out = 0, replace = false,
 		usePrevPlayScale = false, usePrevPlayOut = false |
 		var actualNumChannels, playSynthSymbol;
 
@@ -4456,7 +4456,7 @@ AlgaNode {
 		beingStopped = false;
 	}
 
-	playInner { | time, channelsToPlay, scale, out, sched, replace = false,
+	playInner { | channelsToPlay, time, scale, out, sched, replace = false,
 		usePrevPlayScale = false, usePrevPlayOut = false |
 
 		//Check sched. If replace, it's always 0 (it's already been considered)
@@ -4468,8 +4468,8 @@ AlgaNode {
 			condition: { synthBus != nil },
 			func: {
 				this.createPlaySynth(
-					time: time,
 					channelsToPlay: channelsToPlay,
+					time: time,
 					scale: scale,
 					out: out,
 					replace: replace,
@@ -4482,10 +4482,10 @@ AlgaNode {
 		);
 	}
 
-	play { | time, chans, scale, out = 0, sched |
+	play { | chans, time, scale, out = 0, sched |
 		this.playInner(
-			time: time,
 			channelsToPlay: chans,
+			time: time,
 			scale: scale,
 			out: out,
 			sched: sched
