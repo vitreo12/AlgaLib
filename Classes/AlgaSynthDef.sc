@@ -334,7 +334,7 @@ AlgaSynthDef : SynthDef {
 			if(isScalar, {
 				output
 			}, {
-				//Add \amp if needed
+				//Add \amp if needed: should .kr be used in all cases to save CPU?
 				if(ampProvided.not, {
 					if(rate === \audio,
 						{ output = output * \amp.ar(1) },
