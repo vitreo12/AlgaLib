@@ -27,7 +27,7 @@ AlgaStartup {
 	classvar <algaMaxIO = 8;
 
 	//The less, the less cpu usage of the AlgaDynamicIEnvGen object (needs fixing)
-	classvar <maxEnvPoints = 32;
+	classvar <maxEnvPoints = 16;
 
 	classvar <algaSynthDefPath;
 	classvar <algaSynthDefIOPath;
@@ -53,6 +53,11 @@ AlgaStartup {
 
 	*maxIO_ { | value |
 		this.algaMaxIO_(value)
+	}
+
+	*maxEnvPoints_ { | value |
+		if(value.isNumber.not, { "AlgaStartup: maxEnvPoints must be a number".error; ^this });
+		maxEnvPoints = value;
 	}
 
 	*updateAlgaSynthDefIOPath {
