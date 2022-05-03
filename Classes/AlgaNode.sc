@@ -1743,7 +1743,7 @@ AlgaNode {
 			activeInterpSynth.set(
 				\t_release, 1,
 				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-				\envShape, shape.algaConvertEnv,
+				\envBuf, AlgaDynamicEnvelopes.get(shape),
 			);
 		});
 	}
@@ -1865,7 +1865,7 @@ AlgaNode {
 									\out, interpBus.index,
 									\indices, channelsMapping,
 									\fadeTime, 0,
-									\envShape, interpShape.algaConvertEnv
+									\envShape, AlgaDynamicEnvelopes.get(interpShape, server)
 								];
 
 								//Add scale array to args
@@ -2091,7 +2091,7 @@ AlgaNode {
 					\out, interpBus.index,
 					\indices, channelsMapping,
 					\fadeTime, 0,
-					\envShape, interpShape.algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.get(interpShape, server)
 				];
 
 				//add scaleArray to args
@@ -2525,7 +2525,7 @@ AlgaNode {
 				[
 					\out, interpBus.index,
 					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-					\envShape, shape.algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.get(shape, server)
 				],
 				interpGroup,
 				waitForInst:false
@@ -2568,7 +2568,7 @@ AlgaNode {
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
 				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-				\envShape, shape.algaConvertEnv
+				\envShape, AlgaDynamicEnvelopes.get(shape, server)
 			];
 
 			//calculate scale array (use sender)
@@ -2712,7 +2712,7 @@ AlgaNode {
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
 				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-				\envShape, shape.algaConvertEnv
+				\envShape, AlgaDynamicEnvelopes.get(shape, server)
 			];
 
 			//calculate scale array
@@ -2901,7 +2901,7 @@ AlgaNode {
 						[
 							\out, interpBusAtParam.index,
 							\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-							\envShape, shape.algaConvertEnv
+							\envShape, AlgaDynamicEnvelopes.get(shape, server)
 						],
 						interpGroup,
 						waitForInst:false
@@ -2920,7 +2920,7 @@ AlgaNode {
 				interpSynthAtParam.set(
 					\t_release, 1,
 					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-					\envShape, shape.algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.get(shape, server)
 				);
 
 				//Set correct fadeTime for all active interp synths at param / sender combination
@@ -2993,7 +2993,7 @@ AlgaNode {
 					interpSynthAtParam.set(
 						\t_release, 1,
 						\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-						\envShape, shape.algaConvertEnv
+						\envShape, AlgaDynamicEnvelopes.get(shape, server)
 					);
 				});
 
