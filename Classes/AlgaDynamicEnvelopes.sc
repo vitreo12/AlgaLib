@@ -19,14 +19,21 @@ AlgaDynamicEnvelopes {
 	classvar <envs;
 
 	*initClass {
-		envs = Dictionary(256);
+		envs = IdentityDictionary(2);
 	}
 
 	*add { | env, server |
-		if(envs[env] == nil, {
-			server = server ? Server.default;
-			envs[env] = Buffer.sendCollection(server, env.algaAsArray);
-			^envs[env];
+		var envsAtServer;
+		server = server ? Server.default;
+		envsAtServer = envs[server];
+		if(envsAtServer == nil, {
+			envsAtServer = IdentityDictionary(256);
+			envs[server] = envsAtServer;
+		});
+		if(envsAtServer[env] == nil, {
+			var buffer = Buffer.sendCollection(server, env.algaAsArray);
+			envsAtServer[env] = buffer;
+			^buffer;
 		});
 	}
 
@@ -39,6 +46,6 @@ AlgaDynamicEnvelopes {
 	}
 
 	*get { | env, server |
-		^(envs[env] ? this.add(env, server))
+		^(envs[server][env] ? this.add(env, server))
 	}
 }
