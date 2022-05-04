@@ -18,7 +18,7 @@
 AlgaDynamicEnvelopes {
 	classvar <envs;
 
-	*initClass {
+	*initEnvs {
 		envs = IdentityDictionary(2);
 	}
 
@@ -27,7 +27,8 @@ AlgaDynamicEnvelopes {
 		server = server ? Server.default;
 		envsAtServer = envs[server];
 		if(envsAtServer == nil, {
-			envsAtServer = IdentityDictionary(256);
+			//Can't be IdentityDictionary for Env == Env
+			envsAtServer = Dictionary(256);
 			envs[server] = envsAtServer;
 		});
 		if(envsAtServer[env] == nil, {
@@ -35,6 +36,7 @@ AlgaDynamicEnvelopes {
 			envsAtServer[env] = buffer;
 			^buffer;
 		});
+		^envsAtServer[env];
 	}
 
 	//TODO: free unused envelope Buffers
@@ -46,6 +48,6 @@ AlgaDynamicEnvelopes {
 	}
 
 	*get { | env, server |
-		^(envs[server][env] ? this.add(env, server))
+		^(envs[server][env]) ? this.add(env, server);
 	}
 }
