@@ -580,7 +580,7 @@ AlgaPatternPlayer {
 		reset = reset ? durInterpReset;
 
 		//Get shape
-		shape = shape.algaCheckValidEnv(false) ? Env([0, 1], 1);
+		shape = shape.algaCheckValidEnv(false, server) ? Env([0, 1], 1);
 
 		//Add to scheduler
 		this.addAction(
@@ -732,7 +732,7 @@ AlgaPatternPlayer {
 		entries[param][\entries][uniqueID] = sender.algaAsStream;
 
 		//Get shape
-		shape = shape.algaCheckValidEnv ? Env([0, 1], 1);
+		shape = shape.algaCheckValidEnv(server: server) ? Env([0, 1], 1);
 
 		//Re-trigger interpolation on connected AlgaPattern entries. Note the use of sched
 		algaPatternEntries.keysValuesDo({ | algaPattern, algaPatternParams |

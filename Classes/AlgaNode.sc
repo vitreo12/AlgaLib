@@ -570,7 +570,7 @@ AlgaNode {
 
 	//Set interp shape
 	interpShape_ { | value, param, all = false |
-		value = value.algaCheckValidEnv;
+		value = value.algaCheckValidEnv(server: server);
 		if(value != nil, {
 			//Set the global one if param is nil
 			if(param == nil, { interpShape = value });
@@ -2484,7 +2484,7 @@ AlgaNode {
 		time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
 		//Get shape
-		shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
+		shape = shape.algaCheckValidEnv(server: server) ? this.getInterpShape(param);
 
 		//Get param's numChannels / rate
 		paramNumChannels = controlName.numChannels;
@@ -2885,7 +2885,7 @@ AlgaNode {
 				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
 				//Get shape
-				shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
+				shape = shape.algaCheckValidEnv(server: server) ? this.getInterpShape(param);
 
 				//Only create fadeOut and free normSynth on .disconnect! (not .replace / .replaceMix).
 				//Also, don't create it for the default node, as that needs to be kept alive at all times!
@@ -2986,7 +2986,7 @@ AlgaNode {
 				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
 				//Get shape
-				shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
+				shape = shape.algaCheckValidEnv(server: server) ? this.getInterpShape(param);
 
 				//Start the free on the previous individual interp synth (size is ALWAYS 1 here)
 				interpSynthsAtParam.do({ | interpSynthAtParam |
@@ -3538,6 +3538,9 @@ AlgaNode {
 		//the latest one will be considered when sched comes.
 		//Of course, mix is not affected by this mechanism
 		this.addLatestSenderAtParam(sender, param, mix);
+
+		//Add envelope ASAP for AlgaDynamicEnvelopes to work
+		if(shape != nil, { shape.algaCheckValidEnv(server: server ) });
 
 		//Actual makeConnection
 		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {

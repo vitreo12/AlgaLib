@@ -78,7 +78,7 @@
 	}
 
 	//Check env
-	algaCheckValidEnv { | algaIEnvGen = true |
+	algaCheckValidEnv { | algaIEnvGen = true, server |
 		var levels, times;
 
 		if(this == nil, { ^nil });
@@ -114,6 +114,11 @@
 		if(times.sum == 0, {
 			("Alga: interpShape's Env cannot have its times sum up to 0").error;
 			^nil
+		});
+
+		//Add to library and push the Buffer
+		if(algaIEnvGen.not, {
+			AlgaDynamicEnvelopes.add(this, server)
 		});
 
 		^this

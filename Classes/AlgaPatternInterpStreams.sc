@@ -124,7 +124,7 @@ AlgaPatternInterpStreams {
 				interpSynth.set(
 					\t_release, 1,
 					\fadeTime, if(algaPattern.tempoScaling, { time / algaPattern.clock.tempo }, { time }),
-					\envShape, shape.algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.get(shape, server)
 				);
 			});
 		});
@@ -249,7 +249,7 @@ AlgaPatternInterpStreams {
 				[
 					\out, interpBus.index,
 					\fadeTime, 0,
-					\envShape, Env([0, 1], 1).algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.get(Env([0, 1], 1), server)
 				],
 				interpGroup
 			);
@@ -262,7 +262,7 @@ AlgaPatternInterpStreams {
 				[
 					\out, interpBus.index,
 					\fadeTime, if(algaPattern.tempoScaling, { time / algaPattern.clock.tempo }, { time }),
-					\envShape, shape.algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.get(shape, server)
 				],
 				interpGroup
 			);
@@ -418,7 +418,7 @@ AlgaPatternInterpStreams {
 		this.addInOutNodesDictAtParam(entryOriginal, paramName, false);
 
 		//Get shape
-		shape = shape.algaCheckValidEnv ? algaPattern.getInterpShape(paramName);
+		shape = shape.algaCheckValidEnv(server: server) ? algaPattern.getInterpShape(paramName);
 
 		//Trigger the interpolation process on all the other active interpSynths.
 		//This must always be before createPatternInterpSynthAndBusAtParam
