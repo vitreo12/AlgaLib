@@ -329,6 +329,9 @@ Alga {
 				//Init AlgaDynamicEnvelopes AFTER boot
 				AlgaDynamicEnvelopes.initEnvs;
 
+				//Init the most standard Env([0, 1], 1) envelope
+				AlgaDynamicEnvelopes.add(Env([0, 1], 1), server);
+
 				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
 				this.restoreSynthDefsDir;
 
