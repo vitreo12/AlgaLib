@@ -118,6 +118,7 @@
 
 		//Add to library and push the Buffer
 		if(algaIEnvGen.not, {
+			server = server ? Server.default;
 			AlgaDynamicEnvelopes.add(this, server)
 		});
 
