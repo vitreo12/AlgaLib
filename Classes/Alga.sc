@@ -250,6 +250,20 @@ Alga {
 		this.readDef(path, server)
 	}
 
+	*addEnv { | env, server |
+		server = server ? Server.default;
+		env.algaCheckValidEnv(server: server);
+	}
+
+	*envelopes { | server |
+		server = server ? Server.default;
+		^(AlgaDynamicEnvelopes.envs[server])
+	}
+
+	*envs { | server |
+		^this.envelopes(server);
+	}
+
 	*boot { | onBoot, server, algaServerOptions, clock |
 		var prevServerQuit = [false]; //pass by reference: use Array
 		var envAlgaServerOptions = topEnvironment[\algaServerOptions];
