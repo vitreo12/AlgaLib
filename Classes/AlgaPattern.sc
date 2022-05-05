@@ -3105,7 +3105,9 @@ AlgaPattern : AlgaNode {
 				//The call must happen AFTER replace as both are scheduled at top priority.
 				//stopPattern, then, must happen before replace, thus why it's here
 				//(top priority will put it on top)
-				if(stopPatternBeforeReplace, { this.stopPattern(sched) });
+				if(def == latestReplaceDef, { //this is set in super.replace
+					if(stopPatternBeforeReplace, { this.stopPattern(sched) })
+				});
 			},
 			functionSynthDefDict: functionSynthDefDict
 		);
