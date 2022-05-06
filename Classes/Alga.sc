@@ -336,7 +336,7 @@ Alga {
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
-				//Init AlgaDynamicEnvelopes AFTER boot
+				//Init AlgaDynamicEnvelopes and pre allocate some Buffers
 				AlgaDynamicEnvelopes.initEnvs(server);
 
 				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
