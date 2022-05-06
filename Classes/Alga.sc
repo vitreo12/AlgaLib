@@ -337,10 +337,7 @@ Alga {
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
 				//Init AlgaDynamicEnvelopes AFTER boot
-				AlgaDynamicEnvelopes.initEnvs;
-
-				//Init the most standard Env([0, 1], 1) envelope
-				this.addInterpShape(Env([0, 1], 1), server);
+				AlgaDynamicEnvelopes.initEnvs(server);
 
 				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
 				this.restoreSynthDefsDir;
@@ -353,6 +350,11 @@ Alga {
 
 				//Sync
 				server.sync;
+
+				//Init the most standard Env([0, 1], 1) envelope.
+				//This must come after server.sync in order for AlgaDynamicEnvelopes to
+				//have allocated all Buffers used as preAllocatedBuffers
+				this.addInterpShape(Env([0, 1], 1), server);
 
 				//Turn off all error messages (like nfree) from the server.
 				//Check http://doc.sccode.org/Reference/Server-Command-Reference.html#/error

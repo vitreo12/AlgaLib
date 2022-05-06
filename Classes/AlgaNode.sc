@@ -3567,7 +3567,9 @@ AlgaNode {
 
 		//Check if the new shape needs to be sent to Server
 		if(shape != nil, {
-			shapeNeedsSending = AlgaDynamicEnvelopes.get(shape, server) == nil;
+			shapeNeedsSending = (AlgaDynamicEnvelopes.get(shape, server) == nil).and(
+				AlgaDynamicEnvelopes.isNextBufferPreAllocated.not
+			);
 		});
 
 		//If shape needs sending, wrap in Routine so that .sendCollection's sync is picked up

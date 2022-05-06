@@ -16,10 +16,21 @@
 
 //Store the Env -> Buffer pairs used for envShape
 AlgaDynamicEnvelopes {
-	classvar <envs;
+	classvar <>numPreAllocatedBuffers = 128;
+	classvar <preAllocatedBuffersCount;
 
-	*initEnvs {
+	classvar <envs;
+	classvar <preAllocatedBuffers;
+
+	*initEnvs { | server |
 		envs = IdentityDictionary(2);
+		preAllocatedBuffers = IdentityDictionary(numPreAllocatedBuffers);
+		numPreAllocatedBuffers.do({ | i |
+			//+1 just like Env
+			//+1 for the extra 987654321.0
+			preAllocatedBuffers[i] = Buffer.alloc(server, (Alga.maxEnvPoints * 4) + 2);
+		});
+		preAllocatedBuffersCount = 0;
 	}
 
 	*add { | env, server |
@@ -32,7 +43,16 @@ AlgaDynamicEnvelopes {
 			envs[server] = envsAtServer;
 		});
 		if(envsAtServer[env] == nil, {
-			var buffer = Buffer.sendCollection(server, env.algaAsArray);
+			var envAsArray = env.algaAsArray;
+			var buffer;
+			if(this.isNextBufferPreAllocated, {
+				//preAllocatedBuffers won't require any .sync
+				buffer = preAllocatedBuffers[preAllocatedBuffersCount];
+				buffer.setn(0, envAsArray ++ 987654321.0);
+				preAllocatedBuffersCount = preAllocatedBuffersCount + 1;
+			}, {
+				buffer = Buffer.sendCollection(server, envAsArray);
+			});
 			envsAtServer[env] = buffer;
 			^buffer;
 		});
@@ -54,5 +74,9 @@ AlgaDynamicEnvelopes {
 
 	*get { | env, server |
 		^(envs[server][env])
+	}
+
+	*isNextBufferPreAllocated {
+		^(preAllocatedBuffersCount < numPreAllocatedBuffers);
 	}
 }
