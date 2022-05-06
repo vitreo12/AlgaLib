@@ -70,10 +70,9 @@ Alias for code::readDef::.
 
 METHOD:: addInterpShape
 Add an link::Classes/Env:: to the specific link::Classes/Server:: where emphasis::Alga:: has been booted on. These are represented as link::Classes/Buffer::s on the server, and this operation speeds up any usage of a speficic envelope shape, as it would have already been sent to the server.
-ARGUMENT:: env
-The new link::Classes/Env:: to add.
-ARGUMENT:: server
-The link::Classes/Server:: where emphasis::Alga:: has been booted on. It defaults to code::Server.default::.
+
+METHOD:: removeInterpShape
+Remove the specific link::Classes/Env:: from the server where emphasis::Alga:: has been booted on. This would free the accompanying link::Classes/Buffer::.
 
 METHOD:: interpShapes
 Get the list of link::Classes/Env::s on the specific link::Classes/Server:: where emphasis::Alga:: has been booted on.

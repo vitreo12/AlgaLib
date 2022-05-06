@@ -3575,10 +3575,12 @@ AlgaNode {
 		//If shape needs sending, wrap in Routine so that .sendCollection's sync is picked up
 		if(shapeNeedsSending, {
 			forkIfNeeded {
+				"FORK".warn;
 				shape = shape.algaCheckValidEnv(server: server);
 				makeConnectionFunc.value(shape);
 			}
 		}, {
+			"NO FORK".warn;
 			makeConnectionFunc.value(shape);
 		});
 	}

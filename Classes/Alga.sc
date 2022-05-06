@@ -255,6 +255,11 @@ Alga {
 		shape.algaCheckValidEnv(server: server);
 	}
 
+	*removeInterpShape { | shape, server |
+		server = server ? Server.default;
+		AlgaDynamicEnvelopes.remove(shape, server);
+	}
+
 	*interpShapes { | server |
 		server = server ? Server.default;
 		^(AlgaDynamicEnvelopes.envs[server])

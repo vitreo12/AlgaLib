@@ -16,7 +16,7 @@
 
 //Store the Env -> Buffer pairs used for envShape
 AlgaDynamicEnvelopes {
-	classvar <>numPreAllocatedBuffers = 128;
+	classvar <>numPreAllocatedBuffers = 1;
 	classvar <preAllocatedBuffersCount;
 
 	classvar <envs;
@@ -59,11 +59,16 @@ AlgaDynamicEnvelopes {
 		^envsAtServer[env];
 	}
 
-	//TODO: free unused envelope Buffers
-	*remove { | env |
-		if(envs[env].isBuffer, {
-			envs[env].free;
-			envs.removeAt(env);
+	//TODO: free unused envelope Buffers automatically
+	*remove { | env, server |
+		var envsAtServer;
+		server = server ? Server.default;
+		envsAtServer = envs[server];
+		if(envsAtServer != nil, {
+			if(envsAtServer[env].isBuffer, {
+				envsAtServer[env].free;
+				envsAtServer.removeAt(env);
+			});
 		});
 	}
 
