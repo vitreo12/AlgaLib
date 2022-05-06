@@ -2850,6 +2850,8 @@ AlgaPattern : AlgaNode {
 					sched: sched,
 					topPriority: true //This is essential for scheduled times to work correctly!
 				)
+			}, {
+				"AlgaPattern: can't run 'makeConnection', sender has been cleared".error
 			});
 		};
 

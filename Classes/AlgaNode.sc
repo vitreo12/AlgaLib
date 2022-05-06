@@ -3560,8 +3560,9 @@ AlgaNode {
 					},
 					sched: sched
 				);
-			}, { "AlgaNode: can't run 'makeConnection', sender has been cleared".error }
-			);
+			}, {
+				"AlgaNode: can't run 'makeConnection', sender has been cleared".error
+			});
 		};
 
 		//Check if the new shape needs to be sent to Server
