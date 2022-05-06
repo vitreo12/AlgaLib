@@ -15,7 +15,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 AlgaSpinRoutine {
-	*waitFor { | condition, onComplete, breakCondition, time = 0.01 |
+	*waitFor { | condition, onComplete, breakCondition, time = 0.01, maxTime = 5 |
 		if(condition.class != Function, {
 			"waitFor only accepts a function as condition".error;
 			^nil;
@@ -37,14 +37,20 @@ AlgaSpinRoutine {
 		//Spin around condition, then execute onComplete.
 		//If breakCondition is true, break the loop and don't execute onComplete anymore.
 		fork {
+			var accumTime = 0;
 			var break = false;
 
 			while( { condition.value.not }, {
 				if( breakCondition.value, { condition = { true }; break = true; });
 				time.wait;
+				accumTime = accumTime + time;
+				if(accumTime >= maxTime, {
+					("AlgaSpinRoutine: exceeded maximum wait time: " ++ maxTime).error;
+					condition = { true }; break = true;
+				});
 			});
 
-			if(break == false, {
+			if(break.not, {
 				onComplete.value;
 			});
 		}
