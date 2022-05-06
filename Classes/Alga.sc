@@ -250,18 +250,14 @@ Alga {
 		this.readDef(path, server)
 	}
 
-	*addEnv { | env, server |
+	*addInterpShape { | shape, server |
 		server = server ? Server.default;
-		env.algaCheckValidEnv(server: server);
+		shape.algaCheckValidEnv(server: server);
 	}
 
-	*envelopes { | server |
+	*interpShapes { | server |
 		server = server ? Server.default;
 		^(AlgaDynamicEnvelopes.envs[server])
-	}
-
-	*envs { | server |
-		^this.envelopes(server);
 	}
 
 	*boot { | onBoot, server, algaServerOptions, clock |

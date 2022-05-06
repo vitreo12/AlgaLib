@@ -68,6 +68,16 @@ Read a single link::Classes/AlgaSynthDef:: or all the link::Classes/AlgaSynthDef
 METHOD:: readAlgaSynthDef
 Alias for code::readDef::.
 
+METHOD:: addInterpShape
+Add an link::Classes/Env:: to the specific link::Classes/Server:: where emphasis::Alga:: has been booted on. These are represented as link::Classes/Buffer::s on the server, and this operation speeds up any usage of a speficic envelope shape, as it would have already been sent to the server.
+ARGUMENT:: env
+The new link::Classes/Env:: to add.
+ARGUMENT:: server
+The link::Classes/Server:: where emphasis::Alga:: has been booted on. It defaults to code::Server.default::.
+
+METHOD:: interpShapes
+Get the list of link::Classes/Env::s on the specific link::Classes/Server:: where emphasis::Alga:: has been booted on.
+
 METHOD:: interpolateTempo
 Interpolate the code::tempo:: of the link::Classes/Clock:: that emphasis::Alga:: is using over to a new value. This will affect all the nodes on the emphasis::Alga:: instance.
 ARGUMENT:: tempo
