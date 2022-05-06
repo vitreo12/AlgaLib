@@ -2783,6 +2783,9 @@ AlgaPattern : AlgaNode {
 		replaceMix = false, senderChansMapping, scale, sampleAndHold,
 		time, shape, forceReplace = false, sched |
 
+		var shapeNeedsSending = false;
+		var makeConnectionFunc;
+
 		//Check sched
 		if(replace.not, { sched = sched ? schedInner });
 
@@ -2820,31 +2823,49 @@ AlgaPattern : AlgaNode {
 		this.addLatestSenderAtParam(sender, param);
 
 		//Add envelope ASAP for AlgaDynamicEnvelopes to work
-		if(shape != nil, { shape.algaCheckValidEnv(server: server ) });
+		if(shape != nil, { shape = shape.algaCheckValidEnv(server: server) });
 
-		//All other cases
-		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
-			this.addAction(
-				condition: {
-					(this.algaInstantiatedAsReceiver(param, sender, false)).and(
-						sender.algaInstantiatedAsSender)
-				},
-				func: {
-					if(sender == this.getLatestSenderAtParam(sender, param), {
-						this.makeConnectionInner(
-							sender: sender,
-							param: param,
-							senderChansMapping: senderChansMapping,
-							scale: scale,
-							sampleAndHold: sampleAndHold,
-							time: time,
-							shape: shape
-						)
-					})
-				},
-				sched: sched,
-				topPriority: true //This is essential for scheduled times to work correctly!
-			)
+		//Actual makeConnection function
+		makeConnectionFunc = { | shape |
+			if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
+				this.addAction(
+					condition: {
+						(this.algaInstantiatedAsReceiver(param, sender, false)).and(
+							sender.algaInstantiatedAsSender)
+					},
+					func: {
+						//Check against latest sender!
+						if(sender == this.getLatestSenderAtParam(sender, param), {
+							this.makeConnectionInner(
+								sender: sender,
+								param: param,
+								senderChansMapping: senderChansMapping,
+								scale: scale,
+								sampleAndHold: sampleAndHold,
+								time: time,
+								shape: shape
+							)
+						})
+					},
+					sched: sched,
+					topPriority: true //This is essential for scheduled times to work correctly!
+				)
+			});
+		};
+
+		//Check if the new shape needs to be sent to Server
+		if(shape != nil, {
+			shapeNeedsSending = AlgaDynamicEnvelopes.get(shape, server) == nil;
+		});
+
+		//If shape needs sending, wrap in Routine so that .sendCollection's sync is picked up
+		if(shapeNeedsSending, {
+			forkIfNeeded {
+				shape = shape.algaCheckValidEnv(server: server);
+				makeConnectionFunc.value(shape);
+			}
+		}, {
+			makeConnectionFunc.value(shape);
 		});
 	}
 
@@ -3797,7 +3818,7 @@ AMP : AlgaMonoPattern {}
 				\out, interpBus.index,
 				\env_out, envBus.index,
 				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-				\envShape, AlgaDynamicEnvelopes.get(shape, server)
+				\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 			],
 			interpGroup,
 			waitForInst:false
@@ -3847,7 +3868,7 @@ AMP : AlgaMonoPattern {}
 				patternOutEnvSynth.set(
 					\t_release, 1,
 					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-					\envShape, AlgaDynamicEnvelopes.get(shape, server)
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 				);
 
 				//When freed

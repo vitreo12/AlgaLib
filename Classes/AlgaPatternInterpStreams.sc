@@ -124,7 +124,7 @@ AlgaPatternInterpStreams {
 				interpSynth.set(
 					\t_release, 1,
 					\fadeTime, if(algaPattern.tempoScaling, { time / algaPattern.clock.tempo }, { time }),
-					\envShape, AlgaDynamicEnvelopes.get(shape, server)
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 				);
 			});
 		});
@@ -249,7 +249,7 @@ AlgaPatternInterpStreams {
 				[
 					\out, interpBus.index,
 					\fadeTime, 0,
-					\envShape, AlgaDynamicEnvelopes.get(Env([0, 1], 1), server)
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
 				],
 				interpGroup
 			);
@@ -262,7 +262,7 @@ AlgaPatternInterpStreams {
 				[
 					\out, interpBus.index,
 					\fadeTime, if(algaPattern.tempoScaling, { time / algaPattern.clock.tempo }, { time }),
-					\envShape, AlgaDynamicEnvelopes.get(shape, server)
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 				],
 				interpGroup
 			);

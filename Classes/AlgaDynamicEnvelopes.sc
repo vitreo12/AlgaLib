@@ -47,8 +47,12 @@ AlgaDynamicEnvelopes {
 		});
 	}
 
-	*get { | env, server |
-		var val = (envs[server][env]) ? this.add(env, server);
+	*getOrAdd { | env, server |
+		var val = this.get(env, server) ? this.add(env, server);
 		if(val.isBuffer, { ^val }, { -1 });
+	}
+
+	*get { | env, server |
+		^(envs[server][env])
 	}
 }
