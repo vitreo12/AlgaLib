@@ -15,32 +15,38 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 AlgaSpinRoutine {
-	*waitFor { | condition, func, interval = 0.005, maxTime = 5 |
-		//First, check if condition is true already, no need to go into a routine if that's the case
-		if(condition.value, {
-			func.value;
-		}, {
-			//Spin around condition, then execute onComplete, if not exceeding maximum wait time
-			fork {
-				var accumTime = 0;
-				var exceededMaxTime = false;
-
-				while( { condition.value.not }, {
-					interval.wait;
-					accumTime = accumTime + interval;
-					if(maxTime != nil, {
-						if(accumTime >= maxTime, {
-							"AlgaSpinRoutine: exceeded maximum wait time".error;
-							exceededMaxTime = true;
-							condition = { true };
-						});
-					});
-				});
-
-				if(exceededMaxTime.not, {
-					func.value;
-				});
-			}
+	*waitFor { | condition, onComplete, breakCondition, time = 0.01 |
+		if(condition.class != Function, {
+			"waitFor only accepts a function as condition".error;
+			^nil;
 		});
+
+		if(onComplete.class != Function, {
+			"waitFor only accepts a function as onComplete".error;
+			^nil;
+		});
+
+		if(condition.value, {
+			^onComplete.value;
+		});
+
+		if(breakCondition.isNil, {
+			breakCondition = { false }
+		});
+
+		//Spin around condition, then execute onComplete.
+		//If breakCondition is true, break the loop and don't execute onComplete anymore.
+		fork {
+			var break = false;
+
+			while( { condition.value.not }, {
+				if( breakCondition.value, { condition = { true }; break = true; });
+				time.wait;
+			});
+
+			if(break == false, {
+				onComplete.value;
+			});
+		}
 	}
 }
