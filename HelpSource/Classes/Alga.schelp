@@ -50,6 +50,9 @@ Change the maximum number of points allowed for an link::Classes/Env:: used as c
 ARGUMENT:: value
 The new value. Must be an link::Classes/Integer::.
 
+METHOD:: disableNodeOrdering
+Disable the automatic node ordering. This is an expensive operation for code::sclang:: the more complex a network becomes.
+
 METHOD:: initSynthDefs
 Force the recompilation of all link::Classes/AlgaSynthDef::s necessary for link::Classes/Alga::'s runtime. This needs to be executed only once anytime the value of emphasis::maxIO:: changes. Before emphasis::boot::, link::Classes/Alga:: already checks that everything is correct.
 

@@ -247,57 +247,59 @@ AlgaBlock {
 
 	//Re-arrange block on connection
 	rearrangeBlock { | sender, receiver |
-		var server, supernova;
-		var ignoreStages;
-		var newConnection = false;
+		if(Alga.disableNodeOrdering.not, {
+			var server, supernova;
+			var ignoreStages;
+			var newConnection = false;
 
-		//Update lastSender
-		lastSender = sender ? lastSender;
+			//Update lastSender
+			lastSender = sender ? lastSender;
 
-		//Stage 1: detect feedbacks between sender and receiver (if they're valid)
-		if((sender != nil).and(receiver != nil), {
-			this.stage1(sender, receiver);
-			newConnection = true;
-		});
-
-		//Find unused feedback loops (from previous disconnections)
-		this.findAllUnusedFeedbacks;
-
-		//Find upper most nodes. This is done out of stage1 as it must always be executed,
-		//while stage1 might not be (sender == nil and receiver == nil). At the same time,
-		//this needs to happen before the other stages.
-		this.findUpperMostNodes;
-
-		//Ignore the successive stages IF
-		//NOT a new connection AND
-		//upperMostNodes is 0 (full FB block)
-		ignoreStages = (newConnection.not).and(upperMostNodes.size == 0);
-		if(ignoreStages.not, {
-			//Stage 2: order nodes according to I/O
-			this.stage2;
-
-			//Check lastSender's server (it's been updated if sender != nil in stage1)
-			server = if(lastSender != nil, { lastSender.server }, { Server.default });
-
-			//Check if it's supernova
-			supernova = Alga.supernova(server);
-
-			//Stages 3-4
-			if(supernova, {
-				//Stage 3: optimize the ordered nodes (make groups)
-				this.stage3;
-
-				//Build ParGroups / Groups out of the optimized ordered nodes
-				this.stage4_supernova;
-			}, {
-				//No stage3 (no need to parallelize order):
-				//simply add orderedNods to group
-				this.stage4_scsynth;
+			//Stage 1: detect feedbacks between sender and receiver (if they're valid)
+			if((sender != nil).and(receiver != nil), {
+				this.stage1(sender, receiver);
+				newConnection = true;
 			});
-		});
 
-		//Debug space
-		if(Alga.debug, { "".postln });
+			//Find unused feedback loops (from previous disconnections)
+			this.findAllUnusedFeedbacks;
+
+			//Find upper most nodes. This is done out of stage1 as it must always be executed,
+			//while stage1 might not be (sender == nil and receiver == nil). At the same time,
+			//this needs to happen before the other stages.
+			this.findUpperMostNodes;
+
+			//Ignore the successive stages IF
+			//NOT a new connection AND
+			//upperMostNodes is 0 (full FB block)
+			ignoreStages = (newConnection.not).and(upperMostNodes.size == 0);
+			if(ignoreStages.not, {
+				//Stage 2: order nodes according to I/O
+				this.stage2;
+
+				//Check lastSender's server (it's been updated if sender != nil in stage1)
+				server = if(lastSender != nil, { lastSender.server }, { Server.default });
+
+				//Check if it's supernova
+				supernova = Alga.supernova(server);
+
+				//Stages 3-4
+				if(supernova, {
+					//Stage 3: optimize the ordered nodes (make groups)
+					this.stage3;
+
+					//Build ParGroups / Groups out of the optimized ordered nodes
+					this.stage4_supernova;
+				}, {
+					//No stage3 (no need to parallelize order):
+					//simply add orderedNods to group
+					this.stage4_scsynth;
+				});
+			});
+
+			//Debug space
+			if(Alga.debug, { "".postln });
+		});
 	}
 
 	/***********/
@@ -820,112 +822,114 @@ AlgaBlocksDict {
 	}
 
 	*createNewBlockIfNeeded_inner { | receiver, sender |
-		var newBlockIndex;
-		var newBlock;
+		if(Alga.disableNodeOrdering.not, {
+			var newBlockIndex;
+			var newBlock;
 
-		var receiverBlockIndex;
-		var senderBlockIndex;
-		var receiverBlock;
-		var senderBlock;
+			var receiverBlockIndex;
+			var senderBlockIndex;
+			var receiverBlock;
+			var senderBlock;
 
-		//Unpack things
-		receiverBlockIndex = receiver.blockIndex;
-		senderBlockIndex = sender.blockIndex;
-		receiverBlock = blocksDict[receiverBlockIndex];
-		senderBlock = blocksDict[senderBlockIndex];
+			//Unpack things
+			receiverBlockIndex = receiver.blockIndex;
+			senderBlockIndex = sender.blockIndex;
+			receiverBlock = blocksDict[receiverBlockIndex];
+			senderBlock = blocksDict[senderBlockIndex];
 
-		//Create new block if both connections didn't have any
-		if((receiverBlockIndex == -1).and(senderBlockIndex == -1), {
-			//"No block indices. Creating a new one".warn;
+			//Create new block if both connections didn't have any
+			if((receiverBlockIndex == -1).and(senderBlockIndex == -1), {
+				//"No block indices. Creating a new one".warn;
 
-			newBlock = AlgaBlock(Alga.parGroup(receiver.server));
-			if(newBlock == nil, { ^nil });
+				newBlock = AlgaBlock(Alga.parGroup(receiver.server));
+				if(newBlock == nil, { ^nil });
 
-			newBlockIndex = newBlock.blockIndex;
+				newBlockIndex = newBlock.blockIndex;
 
-			receiver.blockIndex = newBlockIndex;
-			sender.blockIndex = newBlockIndex;
+				receiver.blockIndex = newBlockIndex;
+				sender.blockIndex = newBlockIndex;
 
-			//Add nodes to the block
-			newBlock.addNode(receiver);
-			newBlock.addNode(sender);
+				//Add nodes to the block
+				newBlock.addNode(receiver);
+				newBlock.addNode(sender);
 
-			//Add block to blocksDict
-			blocksDict.put(newBlockIndex, newBlock);
-		}, {
-			//If they are not already in same block
-			if(receiverBlockIndex != senderBlockIndex, {
-				//Merge receiver with sender if receiver is not in a block yet
-				if(receiverBlockIndex == -1, {
-					//"No receiver block index. Set to sender's".warn;
+				//Add block to blocksDict
+				blocksDict.put(newBlockIndex, newBlock);
+			}, {
+				//If they are not already in same block
+				if(receiverBlockIndex != senderBlockIndex, {
+					//Merge receiver with sender if receiver is not in a block yet
+					if(receiverBlockIndex == -1, {
+						//"No receiver block index. Set to sender's".warn;
 
-					//Check block validity
-					if(senderBlock == nil, {
-						//("Invalid block with index " ++ senderBlockIndex).error;
-						^nil;
-					});
-
-					//Add proxy to the block
-					receiver.blockIndex = senderBlockIndex;
-					senderBlock.addNode(receiver);
-
-					//This is for the changed at the end of function...
-					newBlockIndex = senderBlockIndex;
-				}, {
-					//Merge sender with receiver if sender is not in a block yet
-					if(senderBlockIndex == -1, {
-
-						//"No sender block index. Set to receiver".warn;
-
-						if(receiverBlock == nil, {
-							//("Invalid block with index " ++ receiverBlockIndex).error;
+						//Check block validity
+						if(senderBlock == nil, {
+							//("Invalid block with index " ++ senderBlockIndex).error;
 							^nil;
 						});
 
 						//Add proxy to the block
-						sender.blockIndex = receiverBlockIndex;
-						receiverBlock.addNode(sender);
+						receiver.blockIndex = senderBlockIndex;
+						senderBlock.addNode(receiver);
 
 						//This is for the changed at the end of function...
-						newBlockIndex = receiverBlockIndex;
+						newBlockIndex = senderBlockIndex;
 					}, {
-						//Else, it means both nodes are already in blocks.
-						//Create a new one and merge them into a new one (including relative ins/outs)
+						//Merge sender with receiver if sender is not in a block yet
+						if(senderBlockIndex == -1, {
 
-						//"Different block indices. Merge into a new one".warn;
+							//"No sender block index. Set to receiver".warn;
 
-						newBlock = AlgaBlock(Alga.parGroup(receiver.server));
-						if(newBlock == nil, { ^nil });
+							if(receiverBlock == nil, {
+								//("Invalid block with index " ++ receiverBlockIndex).error;
+								^nil;
+							});
 
-						//Merge the old blocks into the new one
-						newBlock.copyBlock(blocksDict[senderBlockIndex]);
-						newBlock.copyBlock(blocksDict[receiverBlockIndex]);
+							//Add proxy to the block
+							sender.blockIndex = receiverBlockIndex;
+							receiverBlock.addNode(sender);
 
-						//Change index
-						newBlockIndex = newBlock.blockIndex;
+							//This is for the changed at the end of function...
+							newBlockIndex = receiverBlockIndex;
+						}, {
+							//Else, it means both nodes are already in blocks.
+							//Create a new one and merge them into a new one (including relative ins/outs)
 
-						//Remove previous blocks
-						blocksDict.removeAt(receiverBlockIndex);
-						blocksDict.removeAt(senderBlockIndex);
+							//"Different block indices. Merge into a new one".warn;
 
-						//Add the two nodes to this new block
-						receiver.blockIndex = newBlockIndex;
-						sender.blockIndex = newBlockIndex;
-						newBlock.addNode(receiver);
-						newBlock.addNode(sender);
+							newBlock = AlgaBlock(Alga.parGroup(receiver.server));
+							if(newBlock == nil, { ^nil });
 
-						//Finally, add the actual block to the dict
-						blocksDict.put(newBlockIndex, newBlock);
+							//Merge the old blocks into the new one
+							newBlock.copyBlock(blocksDict[senderBlockIndex]);
+							newBlock.copyBlock(blocksDict[receiverBlockIndex]);
+
+							//Change index
+							newBlockIndex = newBlock.blockIndex;
+
+							//Remove previous blocks
+							blocksDict.removeAt(receiverBlockIndex);
+							blocksDict.removeAt(senderBlockIndex);
+
+							//Add the two nodes to this new block
+							receiver.blockIndex = newBlockIndex;
+							sender.blockIndex = newBlockIndex;
+							newBlock.addNode(receiver);
+							newBlock.addNode(sender);
+
+							//Finally, add the actual block to the dict
+							blocksDict.put(newBlockIndex, newBlock);
+						});
 					});
 				});
 			});
+
+			//If the function passes through (no actions taken), pass receiver's block instead
+			if(newBlockIndex == nil, { newBlockIndex = receiver.blockIndex });
+
+			//Actually reorder the block's nodes starting from the receiver
+			this.rearrangeBlock(newBlockIndex, sender, receiver);
 		});
-
-		//If the function passes through (no actions taken), pass receiver's block instead
-		if(newBlockIndex == nil, { newBlockIndex = receiver.blockIndex });
-
-		//Actually reorder the block's nodes starting from the receiver
-		this.rearrangeBlock(newBlockIndex, sender, receiver);
 	}
 
 	*rearrangeBlock { | index, sender, receiver |
