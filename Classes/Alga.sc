@@ -16,6 +16,7 @@
 
 Alga {
 	classvar <debug = false;
+	classvar <disableNodeOrdering = false;
 
 	classvar <startup;
 
@@ -55,6 +56,12 @@ Alga {
 	*debug_ { | value |
 		if(value.isKindOf(Boolean), {
 			debug = value
+		});
+	}
+
+	*disableNodeOrdering_ { | value |
+		if(value.isKindOf(Boolean), {
+			disableNodeOrdering = value
 		});
 	}
 

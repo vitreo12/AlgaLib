@@ -68,6 +68,9 @@ Read a single link::Classes/AlgaSynthDef:: or all the link::Classes/AlgaSynthDef
 METHOD:: readAlgaSynthDef
 Alias for code::readDef::.
 
+METHOD:: disableNodeOrdering
+Disable the automatic node ordering. This is an expensive operation for code::sclang:: the more complex a network becomes.
+
 METHOD:: interpolateTempo
 Interpolate the code::tempo:: of the link::Classes/Clock:: that emphasis::Alga:: is using over to a new value. This will affect all the nodes on the emphasis::Alga:: instance.
 ARGUMENT:: tempo
