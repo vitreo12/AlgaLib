@@ -221,7 +221,7 @@ AlgaPatternInterpStreams {
 	createPatternInterpSynthAndBusAtParam { | paramName, paramRate, paramNumChannels,
 		entry, entryOriginal, uniqueID, time = 0, shape |
 
-		var interpGroup = algaPattern.interpGroup;
+		var interpGroupEnv = algaPattern.interpGroupEnv;
 		var interpBus, interpSynth;
 		var scaleArray;
 
@@ -251,7 +251,7 @@ AlgaPatternInterpStreams {
 					\fadeTime, 0,
 					\envShape, Env([0, 1], 1).algaConvertEnv
 				],
-				interpGroup
+				interpGroupEnv
 			);
 			interpSynths[paramName] = IdentityDictionary().put(uniqueID, interpSynth);
 			interpBusses[paramName] = IdentityDictionary().put(uniqueID, interpBus);
@@ -264,7 +264,7 @@ AlgaPatternInterpStreams {
 					\fadeTime, if(algaPattern.tempoScaling, { time / algaPattern.clock.tempo }, { time }),
 					\envShape, shape.algaConvertEnv
 				],
-				interpGroup
+				interpGroupEnv
 			);
 			interpSynths[paramName].put(uniqueID, interpSynth);
 			interpBusses[paramName].put(uniqueID, interpBus);

@@ -19,6 +19,7 @@ AlgaPattern : AlgaNode {
 	var <>fxGroup;
 	var <>fxConvGroup;
 	var <>synthConvGroup;
+	var <>interpGroupEnv;
 
 	//The actual Pattern
 	var <pattern;

@@ -818,6 +818,7 @@ AlgaNode {
 			synthGroup = AlgaParGroup(group);
 			normGroup = AlgaParGroup(group);
 			interpGroup = AlgaParGroup(group);
+			this.interpGroupEnv = AlgaParGroup(group);
 			tempGroup = AlgaParGroup(group);
 		}, {
 			//With mixing and everything, it's nice to parallelize interpGroup, normGroup and tempGroup.
@@ -851,6 +852,7 @@ AlgaNode {
 				this.fxGroup = nil;
 				this.fxConvGroup = nil;
 				this.synthConvGroup = nil;
+				this.interpGroupEnv = nil;
 			});
 		});
 	}
