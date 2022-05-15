@@ -1,6 +1,8 @@
 //Network
 (
 Alga.boot({
+	Alga.debug = true;
+
 	a = AN.debug({ DC.ar(\in.ar) }, name: \a);
 	b = AN.debug({ DC.ar(\in.ar) }, name: \b);
 	c = AN.debug({ DC.ar(\in.ar) }, name: \c);
@@ -80,6 +82,8 @@ f.inNodes
 //Multi-feedback network
 (
 Alga.boot({
+	Alga.debug = true;
+
 	a = AN.debug({ DC.ar(\in.ar) }, name: \a);
 	b = AN.debug({ DC.ar(\in.ar) }, name: \b);
 	c = AN.debug({ DC.ar(\in.ar) }, name: \c);

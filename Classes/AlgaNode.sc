@@ -1662,7 +1662,6 @@ AlgaNode {
 
 	//Remove activeInNodes / outNodes and reorder block
 	removeActiveNodeAndRearrangeBlock { | param, sender |
-		"AO".warn;
 		if(sender.isAlgaArg, { sender = sender.sender });
 		if(sender.isAlgaNode, {
 			//If this == sender, no need to go through with this

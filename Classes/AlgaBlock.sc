@@ -500,73 +500,47 @@ AlgaBlock {
 		});
 	}
 
-	//Order nodes according to their I/O
-	orderNodes {
-		//Bail after 5k tries
-		var bailLimit = 5000;
-		var bailCounter = 0;
+	//Order a single node with DFS on its outputs
+	orderNode { | node, traversedList |
+		//Nodes with no IO should not be added to orderedNodes
+		var noIO = (node.activeInNodes.size == 0).and(node.activeOutNodes.size == 0);
 
-		//Count all nodes down
-		var nodeCounter = nodes.size;
+		//Add current node to traversedList
+		traversedList.add(node);
 
-		//Keep going 'til all nodes are done
-		while { nodeCounter > 0 } {
-			nodes.do({ | node |
-				if(visitedNodes.includes(node).not, {
-					var activeInNodesDone = true;
-					var noIO = false;
-
-					//If it has activeInNodesDone, check if all of them have
-					//already been added. Also, ignore FB connections (their position is irrelevant)
-					//FB's will maintain the same order thanks to nodes being OrderedIdentitySet
-					if(node.activeInNodes.size > 0, {
-						block { | break |
-							node.activeInNodes.do({ | sendersSet |
-								sendersSet.do({ | sender |
-									//This can happen on CmdPeriod.
-									//Make sure sender is in nodes or it will loop forever.
-									if(nodes.includes(sender), {
-										var visited = visitedNodes.includes(sender);
-										var isFeedback = this.isFeedback(sender, node);
-										var aboutToBail = bailCounter == (bailLimit - 1);
-
-										//If about to bail, it means that the connection is actually
-										//still present, but perhaps in between being changed.
-										//It should be kept, and dealt with when new connections are introduced.
-										//This is quit an edge case that should be handled better.
-										if(aboutToBail, {
-											activeInNodesDone = true;
-											break.value(nil);
-										});
-
-										//Standard behaviour: if unvisited and not feedback, keep spinning
-										if((visited.not).and(isFeedback.not), {
-											activeInNodesDone = false;
-											break.value(nil);
-										});
-									});
-								});
-							});
-						};
-					}, {
-						//If also no outs, it's a node that has to be removed.
-						//It will be done later in stage4 for all nodes that
-						//haven't been added to orderedNodes
-						if(node.activeOutNodes.size == 0, { noIO = true });
-					});
-
-					//If so, this node can be added
-					if(activeInNodesDone, {
-						visitedNodes.add(node);
-						nodeCounter = nodeCounter - 1;
-						if(noIO.not, { orderedNodes.add(node) });
-					});
+		//DFS from the node
+		node.activeOutNodes.keysValuesDo({ | outNode, param |
+			var visited = visitedNodes.includes(outNode);
+			if(visited.not, {
+				//Ignore feedbacks. traversedList is used to catch
+				//dangling feedbacks with .disconnect calls
+				var isFeedback = (this.isFeedback(node, outNode)).or(
+					traversedList.includes(outNode));
+				if(isFeedback.not, {
+					this.orderNode(outNode, traversedList);
 				});
 			});
+		});
 
-			bailCounter = bailCounter + 1;
-			if(bailCounter == bailLimit, { nodeCounter = 0 });
-		}
+		//Completed DFS
+		if(noIO.not, { orderedNodes.add(node) });
+		visitedNodes.add(node);
+	}
+
+	//Order nodes according to their I/O using a topsort algorithm:
+	//https://www.youtube.com/watch?v=eL-KzMXSXXI&ab_channel=WilliamFiset
+	orderNodes {
+		if(nodes.size > 0, {
+			while({ visitedNodes.size != nodes.size }, {
+				var unvisitedNode = nodes.choose;
+				var traversedList = IdentitySet(8);
+				while({ visitedNodes.includes(unvisitedNode) }, {
+					unvisitedNode = nodes.choose;
+				});
+				this.orderNode(unvisitedNode, traversedList);
+			});
+			orderedNodes.reverse;
+		});
 	}
 
 	/***********/
