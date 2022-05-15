@@ -6,7 +6,6 @@ Alga.boot({
 	b = AN.debug({\in.ar}, name: \b, interpTime: 2);
 	c = AN.debug({\in.ar}, name: \c);
 	d = AN.debug({\in.ar}, name: \d);
-
 	e = AN.debug({\in.ar}, name: \e);
 
 	a >> b;

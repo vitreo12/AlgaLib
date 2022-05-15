@@ -244,6 +244,15 @@
 	isEvent { ^true }
 }
 
+//Reverse items of an OrderedIdentitySet
++OrderedIdentitySet {
+	reverse {
+		if(items.isSequenceableCollection, {
+			items = items.reverse
+		})
+	}
+}
+
 //For Array lincurve
 +SequenceableCollection {
 	algaLinCurve { arg ... args; ^this.multiChannelPerform('algaLinCurve', *args) }
