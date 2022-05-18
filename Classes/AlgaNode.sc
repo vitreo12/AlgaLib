@@ -4550,21 +4550,18 @@ AlgaNode {
 	//Global init: all interp synths and synth are correct
 	algaInstantiated {
 		if(algaCleared, { ^false });
-
 		interpSynths.do({ | interpSynthsAtParam |
 			interpSynthsAtParam.do( { | interpSynthAtParam |
 				if(interpSynthAtParam.algaInstantiated.not, { ^false })
 			});
 		});
-
-		^(synth.algaInstantiated);
+		^((synth != nil).and(synth.algaInstantiated).and(synthBus != nil));
 	}
 
 	//To send signal, only the synth and synthBus are needed to be surely insantiated
 	algaInstantiatedAsSender {
-		if(synth == nil, { ^false });
 		if(algaCleared, { ^false });
-		^((synth.algaInstantiated).and(synthBus != nil));
+		^((synth != nil).and(synth.algaInstantiated).and(synthBus != nil));
 	}
 
 	//To receive signals, and perform interpolation, the specific interpSynth(s)
@@ -4612,12 +4609,24 @@ AlgaNode {
 
 	//Move inside another group (head)
 	moveToHead { | argGroup |
-		group.moveToHead(argGroup);
+		if(this.algaInstantiatedAsSender, {
+			group.moveToHead(argGroup);
+		}, {
+			this.addAction({ this.algaInstantiatedAsSender }, {
+				group.moveToHead(argGroup);
+			});
+		});
 	}
 
 	//Move inside another group (tail)
 	moveToTail { | argGroup |
-		group.moveToTail(argGroup);
+		if(this.algaInstantiatedAsSender, {
+			group.moveToTail(argGroup);
+		}, {
+			this.addAction({ this.algaInstantiatedAsSender }, {
+				group.moveToTail(argGroup);
+			});
+		});
 	}
 
 	clock { ^(actionScheduler.scheduler.clock) }

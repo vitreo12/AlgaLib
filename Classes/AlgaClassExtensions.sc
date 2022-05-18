@@ -305,8 +305,8 @@
 	run { }
 
 	//When group is invalid
-	moveToHead { }
-	moveToTail { }
+	moveToHead { "Calling 'moveToHead' for nil.".error }
+	moveToTail { "Calling 'moveToTail' for nil.".error }
 
 	//Like handleError without stacktrace
 	algaHandleError { | error |
