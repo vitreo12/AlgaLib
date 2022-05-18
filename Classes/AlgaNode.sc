@@ -4608,23 +4608,27 @@ AlgaNode {
 	}
 
 	//Move inside another group (head)
-	moveToHead { | argGroup |
+	moveToHead { | argGroup, spin = false |
 		if(this.algaInstantiatedAsSender, {
 			group.moveToHead(argGroup);
 		}, {
-			this.addAction({ this.algaInstantiatedAsSender }, {
-				group.moveToHead(argGroup);
+			if(spin, {
+				this.addAction({ this.algaInstantiatedAsSender }, {
+					group.moveToHead(argGroup);
+				});
 			});
 		});
 	}
 
 	//Move inside another group (tail)
-	moveToTail { | argGroup |
+	moveToTail { | argGroup, spin = false |
 		if(this.algaInstantiatedAsSender, {
 			group.moveToTail(argGroup);
 		}, {
-			this.addAction({ this.algaInstantiatedAsSender }, {
-				group.moveToTail(argGroup);
+			if(spin, {
+				this.addAction({ this.algaInstantiatedAsSender }, {
+					group.moveToTail(argGroup);
+				});
 			});
 		});
 	}
