@@ -596,3 +596,4 @@ private:: actionScheduler
 private:: checkConnectionAlreadyInPlaceInner
 private:: parser
 private:: unpackPatternOutsMapping
+private:: getParamConnectionTime
