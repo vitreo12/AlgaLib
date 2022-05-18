@@ -61,21 +61,16 @@ AlgaBlock {
 	}
 
 	init { | parGroup |
-		//Essential to be ordered to maintain when things were added to block!
-		nodes          = OrderedIdentitySet(10);
-		feedbackNodes  = IdentityDictionary(10);
-
-		visitedNodes   = OrderedIdentitySet(10);
+		nodes                  = IdentitySet(10);
+		feedbackNodes          = IdentityDictionary(10);
+		visitedNodes           = IdentitySet(10);
 		disconnectVisitedNodes = IdentitySet(10);
-
-		upperMostNodes = OrderedIdentitySet(10);
-		orderedNodes   = OrderedIdentitySet(10);
-
-		groupedOrderedNodes = Array.newClear;
-
-		groups         = OrderedIdentitySet(10);
-		group          = Group(parGroup, \addToHead);
-		blockIndex     = group.nodeID;
+		upperMostNodes         = IdentitySet(10);
+		orderedNodes           = OrderedIdentitySet(10);
+		groupedOrderedNodes    = OrderedIdentitySet(10);
+		groups                 = OrderedIdentitySet(10);
+		group                  = Group(parGroup, \addToHead);
+		blockIndex             = group.nodeID;
 
 		//Remove from blocks dict when group gets freed, eventually
 		group.onFree({
@@ -501,7 +496,7 @@ AlgaBlock {
 	}
 
 	//Order a single node with DFS on its outputs
-	orderNode { | node, traversedList |
+	orderNode { | node, unvisitedNodes, traversedList |
 		//Nodes with no IO should not be added to orderedNodes
 		var noIO = (node.activeInNodes.size == 0).and(node.activeOutNodes.size == 0);
 
@@ -517,7 +512,7 @@ AlgaBlock {
 				var isFeedback = (this.isFeedback(node, outNode)).or(
 					traversedList.includes(outNode));
 				if(isFeedback.not, {
-					this.orderNode(outNode, traversedList);
+					this.orderNode(outNode, unvisitedNodes, traversedList);
 				});
 			});
 		});
@@ -525,19 +520,18 @@ AlgaBlock {
 		//Completed DFS
 		if(noIO.not, { orderedNodes.add(node) });
 		visitedNodes.add(node);
+		unvisitedNodes.remove(node);
 	}
 
 	//Order nodes according to their I/O using a topsort algorithm:
 	//https://www.youtube.com/watch?v=eL-KzMXSXXI&ab_channel=WilliamFiset
 	orderNodes {
 		if(nodes.size > 0, {
-			while({ visitedNodes.size != nodes.size }, {
-				var unvisitedNode = nodes.choose;
+			var unvisitedNodes = nodes.copy;
+			while({ unvisitedNodes.size > 0 }, {
+				var unvisitedNode = unvisitedNodes.choose;
 				var traversedList = IdentitySet(8);
-				while({ visitedNodes.includes(unvisitedNode) }, {
-					unvisitedNode = nodes.choose;
-				});
-				this.orderNode(unvisitedNode, traversedList);
+				this.orderNode(unvisitedNode, unvisitedNodes, traversedList);
 			});
 			orderedNodes.reverse;
 		});
@@ -551,9 +545,9 @@ AlgaBlock {
 	stage3 {
 		//Clear all needed stuff
 		visitedNodes.clear;
-		groupedOrderedNodes = Array.newClear;
+		groupedOrderedNodes.clear;
 		currentGroupSet = IdentitySet();
-		groupedOrderedNodes = groupedOrderedNodes.add(currentGroupSet);
+		groupedOrderedNodes.add(currentGroupSet);
 
 		//Run optimizer
 		this.optimizeOrderedNodes;
@@ -580,7 +574,7 @@ AlgaBlock {
 		if(currentGroupSetIncludesASender, {
 			var newGroupSet = IdentitySet();
 			newGroupSet.add(node);
-			groupedOrderedNodes = groupedOrderedNodes.add(newGroupSet);
+			groupedOrderedNodes.add(newGroupSet);
 			currentGroupSet = newGroupSet;
 		}, {
 			//Add to currentGroupSet
