@@ -54,7 +54,7 @@ a.from(
 )
 
 //Using AlgaTemp to create temporary nodes, instead of relying on 'running' ones.
-//AlgaTep allows to have individual 'scale' and 'chans' control.
+//AlgaTemp allows to have individual 'scale' and 'chans' control.
 (
 a.from(
 	Pseq([

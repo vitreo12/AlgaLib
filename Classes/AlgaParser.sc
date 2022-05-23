@@ -227,7 +227,7 @@ AlgaParser {
 
 		//Reset the vars for parsing a pattern parameter
 		if((obj.isAlgaPattern).or(obj.isAlgaPatternPlayer), {
-			this.resetPatternParsingVars
+			this.resetPatternParsingVars;
 		});
 
 		//Actual parsing

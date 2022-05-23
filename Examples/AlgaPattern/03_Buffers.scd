@@ -28,7 +28,7 @@ a.from(c, \buf, time: 2, sched: 1);
 a.from(Pseq([b, c], inf), \buf, time: 0, sched: 1);
 
 //Go faster
-a.from(0.25, \dur, time: 2, sched: 1);
+a.from(0.25, \dur, time: 3, sched: 1);
 
 //Declare a reverb
 d = AN({ FreeVerb.ar(\in.ar([0, 0]), 1) }).play;

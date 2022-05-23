@@ -30,18 +30,5 @@ a.from(Pwhite(220, 880), \freq, time: 3, sched: 1);
 //Interpolation can be sampled and held instead of being dynamic
 a.from(Pseq([220, 440, 880], inf), \freq, sampleAndHold: true, time: 3, sched: 1);
 
-//Change \dur does not trigger interpolation (yet), but it applies the changes directly
-a.from(Pwhite(0.03, 0.5), \dur, sched: 1);
-
-//Alternatively, the 'replaceDur' option can be used to trigger a 'replace' call, allowing for volume transitions
-a.replaceDur = true;
-
-//'The stopPatternBeforeReplace' option permits to either just stop the pattern before replacing (true),
-//or to wait for the crossfade to finish before stopping the old one (false)
-a.stopPatternBeforeReplace = false;
-
-//Now it will 'replace'
-a.from(0.25, \dur, time: 3, sched: 1);
-
 //Bye bye
 a.clear(time: 2);

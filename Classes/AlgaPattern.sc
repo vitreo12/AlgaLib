@@ -2721,6 +2721,12 @@ AlgaPattern : AlgaNode {
 							if(value != nil, { currentEnvironment[param] = value });
 						});
 					});
+
+					//Add to replaceArgs
+					replaceArgs[param] = sender;
+
+					//This is not an explicit arg anymore
+					explicitArgs[param] = false;
 				},
 				sched: sched,
 				topPriority: true
@@ -2955,7 +2961,7 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Reset parser params
-	resetPatternParsingVars {
+	algaResetParsingVars {
 		paramContainsAlgaReaderPfunc = false;
 		latestPlayersAtParam         = IdentityDictionary();
 	}

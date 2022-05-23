@@ -333,12 +333,14 @@ AlgaNode {
 			topPriority: topPriority,
 			preCheck: preCheck
 		)
+		^this;
 	}
 
 	//If needed, it will compile the AlgaSynthDefs in functionSynthDefDict and wait before executing func.
 	//Otherwise, it will just execute func
 	compileFunctionSynthDefDictIfNeeded { | func, functionSynthDefDict |
-		^actionScheduler.compileFunctionSynthDefDictIfNeeded(func, functionSynthDefDict);
+		actionScheduler.compileFunctionSynthDefDictIfNeeded(func, functionSynthDefDict);
+		^this;
 	}
 
 	//Wait for all args to be instantiated before going forward
@@ -3035,12 +3037,6 @@ AlgaNode {
 			}, {
 				inNodes[param].add(sender);
 			})
-		}, {
-			//Number / AlgaTemp. Always replace as mixing is not supported for numbers
-			replaceArgs[param] = sender;
-
-			//This is not an explicit arg anymore
-			explicitArgs[param] = false;
 		});
 	}
 
@@ -3085,6 +3081,12 @@ AlgaNode {
 
 			//Like inNodes / outNodes. They get freed on the accoding interpSynth
 			this.addActiveInOutNodes(sender, param);
+		}, {
+			//Number / AlgaTemp. Always replace as mixing is not supported for numbers
+			replaceArgs[param] = sender;
+
+			//This is not an explicit arg anymore
+			explicitArgs[param] = false;
 		});
 	}
 
