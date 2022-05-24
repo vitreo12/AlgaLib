@@ -26,7 +26,7 @@ For *AlgaLib* to work correctly, a set of specific `UGens` must be installed. To
 follow these simple instructions:
 
 1. Download the correct version for your OS from 
-https://github.com/vitreo12/AlgaUGens/releases/tag/v1.0.0
+https://github.com/vitreo12/AlgaUGens/releases/tag/v1.1.0
 
 2. Unzip the file to your *SuperCollider*'s `Platform.userExtensionDir`. 
 

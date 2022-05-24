@@ -7,7 +7,7 @@ related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/A
 DESCRIPTION::
 note::
 For link::Classes/Alga:: to work correctly, it is required to install the emphasis::AlgaUGens:: plugin extensions. To do so, download the emphasis::AlgaUGens:: zip file from
-https://github.com/vitreo12/AlgaUGens/releases/tag/v1.0.0 and extract it
+https://github.com/vitreo12/AlgaUGens/releases/tag/v1.1.0 and extract it
 to your code::Platform.userExtensionDir::
 ::
 
@@ -71,6 +71,14 @@ Read a single link::Classes/AlgaSynthDef:: or all the link::Classes/AlgaSynthDef
 METHOD:: readAlgaSynthDef
 Alias for code::readDef::.
 
+METHOD:: addInterpShape
+Add an link::Classes/Env:: to the specific link::Classes/Server:: where emphasis::Alga:: has been booted on. These are represented as link::Classes/Buffer::s on the server, and this operation speeds up any usage of a speficic envelope shape, as it would have already been sent to the server.
+
+METHOD:: removeInterpShape
+Remove the specific link::Classes/Env:: from the server where emphasis::Alga:: has been booted on. This would free the accompanying link::Classes/Buffer::.
+
+METHOD:: interpShapes
+Get the list of link::Classes/Env::s on the specific link::Classes/Server:: where emphasis::Alga:: has been booted on.
 
 METHOD:: interpolateTempo
 Interpolate the code::tempo:: of the link::Classes/Clock:: that emphasis::Alga:: is using over to a new value. This will affect all the nodes on the emphasis::Alga:: instance.

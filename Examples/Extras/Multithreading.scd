@@ -16,8 +16,7 @@ c = {
 	//50 separated banks of 50 sine oscillators.
 	//Their load will be spread across multiple CPU cores.
 	50.do({
-		var bank = AlgaNode(\sines);
-		reverb <<+ bank;
+		reverb <<+ AlgaNode(\sines);
 	});
 
 	//Print CPU usage

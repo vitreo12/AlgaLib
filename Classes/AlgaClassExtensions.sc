@@ -78,7 +78,7 @@
 	}
 
 	//Check env
-	algaCheckValidEnv { | algaIEnvGen = true |
+	algaCheckValidEnv { | algaIEnvGen = true, server |
 		var levels, times;
 
 		if(this == nil, { ^nil });
@@ -114,6 +114,12 @@
 		if(times.sum == 0, {
 			("Alga: interpShape's Env cannot have its times sum up to 0").error;
 			^nil
+		});
+
+		//Add to library and push the Buffer
+		if(algaIEnvGen, {
+			server = server ? Server.default;
+			AlgaDynamicEnvelopes.add(this, server)
 		});
 
 		^this
@@ -645,6 +651,27 @@
 //Add support for >> and >>+
 +Buffer {
 	isBuffer { ^true }
+
+	//To debug .sendCollection used for Envs
+	/*
+	streamCollection { arg collstream, collsize, startFrame = 0, wait = -1, action;
+		var bundsize, pos;
+		// wait = -1 allows an OSC roundtrip between packets
+		// wait = 0 might not be safe in a high traffic situation
+		// maybe okay with tcp
+		pos = collstream.pos;
+		while { pos < collsize } {
+			var msg = ['/b_setn', bufnum, pos + startFrame, bundsize]
+				++ Array.fill(bundsize, { collstream.next });
+			msg.asString.error;
+			// 1626 max size for setn under udp
+			bundsize = min(1626, collsize - pos);
+			server.listSendMsg(msg);
+			pos = collstream.pos;
+			//if(wait >= 0) { wait.wait } { server.sync };
+		};
+	}
+	*/
 }
 
 +Clock {

@@ -2790,6 +2790,9 @@ AlgaPattern : AlgaNode {
 		replaceMix = false, senderChansMapping, scale, sampleAndHold,
 		time, shape, forceReplace = false, sched |
 
+		var shapeNeedsSending = false;
+		var makeConnectionFunc;
+
 		//Check sched
 		if(replace.not, { sched = sched ? schedInner });
 
@@ -2826,29 +2829,54 @@ AlgaPattern : AlgaNode {
 		//the latest one will be considered when sched comes.
 		this.addLatestSenderAtParam(sender, param);
 
-		//All other cases
-		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
-			this.addAction(
-				condition: {
-					(this.algaInstantiatedAsReceiver(param, sender, false)).and(
-						sender.algaInstantiatedAsSender)
-				},
-				func: {
-					if(sender == this.getLatestSenderAtParam(sender, param), {
-						this.makeConnectionInner(
-							sender: sender,
-							param: param,
-							senderChansMapping: senderChansMapping,
-							scale: scale,
-							sampleAndHold: sampleAndHold,
-							time: time,
-							shape: shape
-						)
-					})
-				},
-				sched: sched,
-				topPriority: true //This is essential for scheduled times to work correctly!
-			)
+		//Add envelope ASAP for AlgaDynamicEnvelopes to work
+		if(shape != nil, { shape = shape.algaCheckValidEnv(server: server) });
+
+		//Actual makeConnection function
+		makeConnectionFunc = { | shape |
+			if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
+				this.addAction(
+					condition: {
+						(this.algaInstantiatedAsReceiver(param, sender, false)).and(
+							sender.algaInstantiatedAsSender)
+					},
+					func: {
+						//Check against latest sender!
+						if(sender == this.getLatestSenderAtParam(sender, param), {
+							this.makeConnectionInner(
+								sender: sender,
+								param: param,
+								senderChansMapping: senderChansMapping,
+								scale: scale,
+								sampleAndHold: sampleAndHold,
+								time: time,
+								shape: shape
+							)
+						})
+					},
+					sched: sched,
+					topPriority: true //This is essential for scheduled times to work correctly!
+				)
+			}, {
+				"AlgaPattern: can't run 'makeConnection', sender has been cleared".error
+			});
+		};
+
+		//Check if the new shape needs to be sent to Server
+		if(shape != nil, {
+			shapeNeedsSending = (AlgaDynamicEnvelopes.get(shape, server) == nil).and(
+				AlgaDynamicEnvelopes.isNextBufferPreAllocated.not
+			);
+		});
+
+		//If shape needs sending, wrap in Routine so that .sendCollection's sync is picked up
+		if(shapeNeedsSending, {
+			forkIfNeeded {
+				shape = shape.algaCheckValidEnv(server: server);
+				makeConnectionFunc.value(shape);
+			}
+		}, {
+			makeConnectionFunc.value(shape);
 		});
 	}
 
@@ -3358,7 +3386,7 @@ AlgaPattern : AlgaNode {
 		if(param == \dur, {
 			paramInterpShape = paramInterpShape ? this.getInterpShape(\delta)
 		});
-		shape = shape.algaCheckValidEnv(false) ? paramInterpShape.algaCheckValidEnv(false);
+		shape = shape.algaCheckValidEnv(false, server) ? paramInterpShape.algaCheckValidEnv(false, server);
 
 		//Add to scheduler
 		this.addAction(
@@ -3774,7 +3802,7 @@ AMP : AlgaMonoPattern {}
 		paramRate = controlNamesAtParam.rate;
 
 		//Get shape
-		shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
+		shape = shape.algaCheckValidEnv(server: server) ? this.getInterpShape(param);
 
 		//Lock interpBus with uniqueID
 		this.lockInterpBus(uniqueID, interpBus);
@@ -3803,7 +3831,7 @@ AMP : AlgaMonoPattern {}
 				\out, interpBus.index,
 				\env_out, envBus.index,
 				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-				\envShape, shape.algaConvertEnv
+				\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 			],
 			interpGroup,
 			waitForInst:false
@@ -3837,7 +3865,7 @@ AMP : AlgaMonoPattern {}
 		time = time ? 0;
 
 		//Get shape
-		shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
+		shape = shape.algaCheckValidEnv(server: server) ? this.getInterpShape(param);
 
 		if(patternOutEnvSynthsAtParamAlgaPattern != nil, {
 			patternOutEnvSynthsAtParamAlgaPattern.keysValuesDo({ | uniqueIDAlgaSynthBus, patternOutEnvSynth |
@@ -3853,7 +3881,7 @@ AMP : AlgaMonoPattern {}
 				patternOutEnvSynth.set(
 					\t_release, 1,
 					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-					\envShape, shape.algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 				);
 
 				//When freed

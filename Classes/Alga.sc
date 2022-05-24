@@ -217,10 +217,10 @@ Alga {
 	}
 
 	*checkAlgaUGens {
-		if((\AlgaDynamicIEnvGen.asClass == nil).or(\AlgaAudioControl.asClass == nil), {
+		if((\AlgaDynamicIEnvGenBuf.asClass == nil).or(\AlgaDynamicIEnvGen.asClass == nil).or(\AlgaAudioControl.asClass == nil), {
 			"\n************************************************\n".postln;
 			"The AlgaUGens plugin extension is not installed. Read the following instructions to install it:".warn;
-			"\n1) Download the AlgaUGens plugin extension from https://github.com/vitreo12/AlgaUGens/releases/tag/v1.0.0".postln;
+			"\n1) Download the AlgaUGens plugin extension from https://github.com/vitreo12/AlgaUGens/releases/tag/v1.1.0".postln;
 			"2) Unzip the file to your 'Platform.userExtensionDir'".postln;
 			"\nAfter the installation, no further action is required: Alga will detect the UGens, use them internally and this message will not be shown again.\n".postln;
 			"************************************************\n".postln;
@@ -255,6 +255,21 @@ Alga {
 
 	*readAlgaSynthDef { | path, server |
 		this.readDef(path, server)
+	}
+
+	*addInterpShape { | shape, server |
+		server = server ? Server.default;
+		shape.algaCheckValidEnv(server: server);
+	}
+
+	*removeInterpShape { | shape, server |
+		server = server ? Server.default;
+		AlgaDynamicEnvelopes.remove(shape, server);
+	}
+
+	*interpShapes { | server |
+		server = server ? Server.default;
+		^(AlgaDynamicEnvelopes.envs[server])
 	}
 
 	*boot { | onBoot, server, algaServerOptions, clock |
@@ -333,6 +348,9 @@ Alga {
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
+				//Init AlgaDynamicEnvelopes and pre allocate some Buffers
+				AlgaDynamicEnvelopes.initEnvs(server);
+
 				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
 				this.restoreSynthDefsDir;
 
@@ -344,6 +362,11 @@ Alga {
 
 				//Sync
 				server.sync;
+
+				//Init the most standard Env([0, 1], 1) envelope.
+				//This must come after server.sync in order for AlgaDynamicEnvelopes to
+				//have allocated all Buffers used as preAllocatedBuffers
+				this.addInterpShape(Env([0, 1], 1), server);
 
 				//Turn off all error messages (like nfree) from the server.
 				//Check http://doc.sccode.org/Reference/Server-Command-Reference.html#/error

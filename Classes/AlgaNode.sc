@@ -572,7 +572,7 @@ AlgaNode {
 
 	//Set interp shape
 	interpShape_ { | value, param, all = false |
-		value = value.algaCheckValidEnv;
+		value = value.algaCheckValidEnv(server: server);
 		if(value != nil, {
 			//Set the global one if param is nil
 			if(param == nil, { interpShape = value });
@@ -1748,7 +1748,7 @@ AlgaNode {
 			activeInterpSynth.set(
 				\t_release, 1,
 				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-				\envShape, shape.algaConvertEnv,
+				\envBuf, AlgaDynamicEnvelopes.getOrAdd(shape, server),
 			);
 		});
 	}
@@ -1870,7 +1870,7 @@ AlgaNode {
 									\out, interpBus.index,
 									\indices, channelsMapping,
 									\fadeTime, 0,
-									\envShape, interpShape.algaConvertEnv
+									\envShape, AlgaDynamicEnvelopes.getOrAdd(interpShape, server)
 								];
 
 								//Add scale array to args
@@ -2096,7 +2096,7 @@ AlgaNode {
 					\out, interpBus.index,
 					\indices, channelsMapping,
 					\fadeTime, 0,
-					\envShape, interpShape.algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(interpShape, server)
 				];
 
 				//add scaleArray to args
@@ -2489,7 +2489,7 @@ AlgaNode {
 		time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
 		//Get shape
-		shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
+		shape = shape.algaCheckValidEnv(server: server) ? this.getInterpShape(param);
 
 		//Get param's numChannels / rate
 		paramNumChannels = controlName.numChannels;
@@ -2530,7 +2530,7 @@ AlgaNode {
 				[
 					\out, interpBus.index,
 					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-					\envShape, shape.algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 				],
 				interpGroup,
 				waitForInst:false
@@ -2573,7 +2573,7 @@ AlgaNode {
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
 				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-				\envShape, shape.algaConvertEnv
+				\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 			];
 
 			//calculate scale array (use sender)
@@ -2717,7 +2717,7 @@ AlgaNode {
 				\out, interpBus.index,
 				\indices, senderChansMappingToUse,
 				\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-				\envShape, shape.algaConvertEnv
+				\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 			];
 
 			//calculate scale array
@@ -2890,7 +2890,7 @@ AlgaNode {
 				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
 				//Get shape
-				shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
+				shape = shape.algaCheckValidEnv(server: server) ? this.getInterpShape(param);
 
 				//Only create fadeOut and free normSynth on .disconnect! (not .replace / .replaceMix).
 				//Also, don't create it for the default node, as that needs to be kept alive at all times!
@@ -2906,7 +2906,7 @@ AlgaNode {
 						[
 							\out, interpBusAtParam.index,
 							\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-							\envShape, shape.algaConvertEnv
+							\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 						],
 						interpGroup,
 						waitForInst:false
@@ -2925,7 +2925,7 @@ AlgaNode {
 				interpSynthAtParam.set(
 					\t_release, 1,
 					\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-					\envShape, shape.algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 				);
 
 				//Set correct fadeTime for all active interp synths at param / sender combination
@@ -2991,14 +2991,14 @@ AlgaNode {
 				time = this.calculateTemporaryLongestWaitTime(time, paramConnectionTime);
 
 				//Get shape
-				shape = shape.algaCheckValidEnv ? this.getInterpShape(param);
+				shape = shape.algaCheckValidEnv(server: server) ? this.getInterpShape(param);
 
 				//Start the free on the previous individual interp synth (size is ALWAYS 1 here)
 				interpSynthsAtParam.do({ | interpSynthAtParam |
 					interpSynthAtParam.set(
 						\t_release, 1,
 						\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-						\envShape, shape.algaConvertEnv
+						\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 					);
 				});
 
@@ -3526,7 +3526,11 @@ AlgaNode {
 
 	//<<.param sender
 	makeConnection { | sender, param = \in, replace = false, mix = false,
-		replaceMix = false, senderChansMapping, scale, time, shape, forceReplace = false, sched = 0 |
+		replaceMix = false, senderChansMapping, scale, time, shape,
+		forceReplace = false, sched = 0 |
+
+		var shapeNeedsSending = false;
+		var makeConnectionFunc;
 
 		//Check sched
 		if(replace.not, { sched = sched ? schedInner });
@@ -3539,29 +3543,49 @@ AlgaNode {
 
 		//Store latest sender. This is used to only execute the latest .from call.
 		//This allows for a smoother live coding experience: instead of triggering
-		//every .from that was executed (perhaps the user found a mistake), only
-		//the latest one will be considered when sched comes.
-		//Of course, mix is not affected by this mechanism
+		//every .from that was executed (perhaps the user found a mistake), only the latest one
+		//will be considered when sched comes. Mix is not affected by this mechanism
 		this.addLatestSenderAtParam(sender, param, mix);
 
-		//Actual makeConnection
-		if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
-			this.addAction(
-				condition: {
-					(this.algaInstantiatedAsReceiver(param, sender, mix)).and(
-						sender.algaInstantiatedAsSender)
-				},
-				func: {
-					if(sender == this.getLatestSenderAtParam(sender, param, mix), {
-						this.makeConnectionInner(sender, param, replace, mix,
-							replaceMix, senderChansMapping, scale, time:time, shape:shape
-						)
-					});
-				},
-				sched: sched
+		//Actual makeConnection function
+		makeConnectionFunc = { | shape |
+			if(this.algaCleared.not.and(sender.algaCleared.not).and(sender.algaToBeCleared.not), {
+				this.addAction(
+					condition: {
+						(this.algaInstantiatedAsReceiver(param, sender, mix)).and(
+							sender.algaInstantiatedAsSender)
+					},
+					func: {
+						//Check against latest sender!
+						if(sender == this.getLatestSenderAtParam(sender, param, mix), {
+							this.makeConnectionInner(sender, param, replace, mix,
+								replaceMix, senderChansMapping, scale, time:time, shape:shape
+							)
+						});
+					},
+					sched: sched
+				);
+			}, {
+				"AlgaNode: can't run 'makeConnection', sender has been cleared".error
+			});
+		};
+
+		//Check if the new shape needs to be sent to Server
+		if(shape != nil, {
+			shapeNeedsSending = (AlgaDynamicEnvelopes.get(shape, server) == nil).and(
+				AlgaDynamicEnvelopes.isNextBufferPreAllocated.not
 			);
-		}, { "AlgaNode: can't makeConnection, sender has been cleared".error; }
-		);
+		});
+
+		//If shape needs sending, wrap in Routine so that .sendCollection's sync is picked up
+		if(shapeNeedsSending, {
+			forkIfNeeded {
+				shape = shape.algaCheckValidEnv(server: server);
+				makeConnectionFunc.value(shape);
+			}
+		}, {
+			makeConnectionFunc.value(shape);
+		});
 	}
 
 	//<<.param { }

@@ -8,12 +8,14 @@ Alga.boot({
 })
 )
 
+s.plotTree
+
 (
 //Randomly change a's fm scale every 3 seconds
 fork {
     loop {
         a.from(b, \fm, scale:[rrand(-200, -30), rrand(10, 250)]);
-        3.wait;
+        6.wait;
     }
 };
 
@@ -21,7 +23,7 @@ fork {
 fork {
     loop {
         b.from(a, \fm, scale:[rrand(-150, -10), rrand(3, 30)]);
-        2.wait;
+        4.wait;
     }
 }
 )
