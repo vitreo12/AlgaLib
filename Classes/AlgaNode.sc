@@ -325,7 +325,7 @@ AlgaNode {
 	}
 
 	//Add an action to scheduler. This takes into account sched == AlgaStep
-	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
+	addAction { | condition, func, sched = 0, topPriority = false, preCheck = true |
 		actionScheduler.addAction(
 			condition: condition,
 			func: func,
@@ -1258,7 +1258,8 @@ AlgaNode {
 					keepScale:keepScale
 				);
 			},
-			sched: sched
+			sched: sched,
+			preCheck: true
 		);
 	}
 

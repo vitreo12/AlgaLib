@@ -475,9 +475,6 @@ AlgaScheduler : AlgaThread {
 	addAction { | condition, func, sched = 0, topPriority = false, schedInSeconds = false, preCheck = false |
 		var action;
 
-		//Only numbers or AlgaQuant
-		if((sched.isNumber.not).and(sched.isAlgaQuant.not), { sched = 0 });
-
 		//Only booleans
 		if(topPriority.isKindOf(Boolean).not, { topPriority = false });
 
@@ -486,23 +483,28 @@ AlgaScheduler : AlgaThread {
 
 		//Only functions
 		if((condition.isFunction.not).or(func.isFunction.not), {
-			"AlgaScheduler: addAction only accepts Functions as both the condition and the func arguments".error;
+			"AlgaScheduler: addAction only accepts Functions as both the 'condition' and 'func' arguments".error;
 			^this;
 		});
 
-		//If preCheck, if the condition is already true, execute the function without adding it to the scheduler
-		if(preCheck, {
-			if(condition.value, {
-				if(verbose, {
-					("AlgaScheduler: executing function:" + func.def.context.asString + "as condition was true already").postcln;
-				});
-				^func.value
-			});
-		});
+		//Only numbers or AlgaQuant
+		if((sched.isNumber.not).and(sched.isAlgaQuant.not), { sched = 0 });
 
 		//Only positive numbers
-		sched = sched ? 0;
 		if(sched.isNumber, { if(sched < 0, { sched = 0 }) });
+
+		//If preCheck, if the condition is already true and scheduling is 0,
+		//execute the function without adding it to the scheduler
+		if(preCheck, {
+			if((condition.value).and(sched == 0), {
+				if(verbose, {
+					("AlgaScheduler: executing function: " ++
+						func.def.context.asString ++
+						" as condition was true already and sched was 0").postcln;
+				});
+				^server.makeBundle(server.latency, func);
+			});
+		});
 
 		//New action
 		action = [condition, func, sched, topPriority, schedInSeconds];

@@ -78,7 +78,7 @@ AlgaActionScheduler {
 	}
 
 	//Add an action to scheduler. This takes into account sched == AlgaStep
-	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
+	addAction { | condition, func, sched = 0, topPriority = false, preCheck = true |
 		//AlgaStep scheduling.
 		//I reverted the support for topPriority for one simple reason: it would only be used for replace.
 		//As such, the problem is that any connection that was scheduled at the same time won't happen anyways,
