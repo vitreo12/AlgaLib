@@ -22,7 +22,21 @@ AlgaPatternInterpStreams {
 	var <server;
 
 	//The time entries
-	var <>dur, <>sustain, <>stretch, <>legato;
+	var <>dur, <>durAlgaPseg;
+	var <>sustain, <>sustainAlgaPseg;
+	var <>stretch, <>stretchAlgaPseg;
+	var <>legato, <>legatoAlgaPseg;
+
+	//\def
+	var <>def, <>defStream;
+
+	//\fx and \out
+	var <>fx, <>fxStream;
+	var <>out, <>outStream;
+
+	//Scalar and generic params
+	var <scalarAndGenericParams;
+	var <scalarAndGenericParamsStreams;
 
 	//Store it for .replace
 	var <algaReschedulingEventStreamPlayer;
@@ -109,8 +123,8 @@ AlgaPatternInterpStreams {
 				//even after the first trigger of \t_release.
 				interpSynth.set(
 					\t_release, 1,
-					\fadeTime, time,
-					\envShape, shape.algaConvertEnv
+					\fadeTime, if(algaPattern.tempoScaling, { time / algaPattern.clock.tempo }, { time }),
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 				);
 			});
 		});
@@ -207,7 +221,7 @@ AlgaPatternInterpStreams {
 	createPatternInterpSynthAndBusAtParam { | paramName, paramRate, paramNumChannels,
 		entry, entryOriginal, uniqueID, time = 0, shape |
 
-		var interpGroup = algaPattern.interpGroup;
+		var interpGroupEnv = algaPattern.interpGroupEnv;
 		var interpBus, interpSynth;
 		var scaleArray;
 
@@ -235,9 +249,9 @@ AlgaPatternInterpStreams {
 				[
 					\out, interpBus.index,
 					\fadeTime, 0,
-					\envShape, Env([0, 1], 1).algaConvertEnv
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
 				],
-				interpGroup
+				interpGroupEnv
 			);
 			interpSynths[paramName] = IdentityDictionary().put(uniqueID, interpSynth);
 			interpBusses[paramName] = IdentityDictionary().put(uniqueID, interpBus);
@@ -247,10 +261,10 @@ AlgaPatternInterpStreams {
 				interpSymbol,
 				[
 					\out, interpBus.index,
-					\fadeTime, time,
-					\envShape, shape.algaConvertEnv
+					\fadeTime, if(algaPattern.tempoScaling, { time / algaPattern.clock.tempo }, { time }),
+					\envShape, AlgaDynamicEnvelopes.getOrAdd(shape, server)
 				],
-				interpGroup
+				interpGroupEnv
 			);
 			interpSynths[paramName].put(uniqueID, interpSynth);
 			interpBusses[paramName].put(uniqueID, interpBus);
@@ -404,7 +418,7 @@ AlgaPatternInterpStreams {
 		this.addInOutNodesDictAtParam(entryOriginal, paramName, false);
 
 		//Get shape
-		shape = algaPattern.checkValidEnv(shape) ? algaPattern.getInterpShape(paramName);
+		shape = shape.algaCheckValidEnv(server: server) ? algaPattern.getInterpShape(paramName);
 
 		//Trigger the interpolation process on all the other active interpSynths.
 		//This must always be before createPatternInterpSynthAndBusAtParam
@@ -449,5 +463,58 @@ AlgaPatternInterpStreams {
 		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
 			clock: clock
 		)
+	}
+
+	//Store generic params for replaces
+	addScalarAndGenericParams { | key, value |
+		scalarAndGenericParams = scalarAndGenericParams ? IdentityDictionary();
+		scalarAndGenericParams[key] = value;
+		scalarAndGenericParamsStreams = scalarAndGenericParamsStreams ? IdentityDictionary();
+		scalarAndGenericParamsStreams[key] = value.algaAsStream;
+	}
+
+	//Remove generic params
+	removeScalarAndGenericParams { | key |
+		scalarAndGenericParams.removeAt(key);
+		scalarAndGenericParamsStreams.removeAt(key);
+	}
+
+	//Clear generic params
+	clearScalarAndGenericParams {
+		scalarAndGenericParams.clear;
+		scalarAndGenericParamsStreams.clear;
+	}
+
+	//Store \def
+	addDef { | value |
+		def = value;
+		defStream = def.algaAsStream
+	}
+
+	//Remove \def
+	removeDef {
+		def = nil; defStream = nil;
+	}
+
+	//Store \fx
+	addFX { | value |
+		fx = value;
+		fxStream = fx.algaAsStream;
+	}
+
+	//Remove \fx
+	removeFX {
+		fx = nil; fxStream = nil;
+	}
+
+	//Add \out
+	addOut { | value |
+		out = value;
+		outStream = out.algaAsStream;
+	}
+
+	//Remove \out
+	removeOut {
+		out = nil; outStream = nil;
 	}
 }

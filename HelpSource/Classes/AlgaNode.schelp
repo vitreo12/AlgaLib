@@ -47,6 +47,8 @@ ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 ARGUMENT:: schedInSeconds
 Specify if all sched actions should be scheduled in seconds, opposing to beats. Default is code::false::.
+ARGUMENT:: tempoScaling
+Specify if all timed actions should be scaled by the clock's tempo. Default is code::false::.
 ARGUMENT:: outsMapping
 It works just like link::Classes/AlgaSynthDef::'s emphasis::outsMapping:: argument, but for the case of using an emphasis::UGen function:: as the emphasis::obj:: argument. Specify new mappings by an array that maps symbols to specific output channels. If not specified, the default code::\out1, \out2, etc..:: symbols can be used to address specific channels.
 ARGUMENT:: server
@@ -54,6 +56,7 @@ Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaNode:: on
 
 
 private:: new_ap
+private:: newAP
 private:: debug
 
 
@@ -72,6 +75,8 @@ ARGUMENT:: out
 Specify a link::Classes/Bus:: index to play the node to.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+
+discussion::
 code::
 AlgaNode.ar({ SinOsc.ar([440, 450]) }).play //Play both channels
 
@@ -274,6 +279,10 @@ Specify a sched value to use for new actions. This will be used if sched is not 
 
 METHOD:: schedInSeconds
 Specify if all sched actions should be scheduled in seconds, opposing to beats. Default is code::false::.
+
+
+METHOD:: tempoScaling
+Specify if all timed actions should be scaled by the clock's tempo. Default is code::false::.
 
 
 EXAMPLES::
@@ -578,3 +587,13 @@ private:: parseFilterPatternParam
 private:: parseGenericPatternParam
 private:: parseParam
 private:: parseParam_inner
+private:: addActiveInOutNodes
+private:: checkValidControlName
+private:: addLatestSenderAtParam
+private:: getLatestSenderAtParam
+
+private:: actionScheduler
+private:: checkConnectionAlreadyInPlaceInner
+private:: parser
+private:: unpackPatternOutsMapping
+private:: getParamConnectionTime

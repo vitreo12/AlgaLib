@@ -47,21 +47,45 @@ AlgaSynthDefSpec {
 		if(synthDefPatternOut != nil, { synthDefPatternOut.sendAndAddToGlobalDescLib(server, completionMsg) });
 	}
 
+	writeDefFile { | dir, overwrite = true, mdPlugin |
+		synthDef.writeDefFile(dir, overwrite, mdPlugin);
+		//Metadata is only needed for the main synthDef
+		if(synthDefPattern != nil, {
+			synthDefPattern.writeDefFile(dir, overwrite, mdPlugin, false) }
+		);
+		if(synthDefPatternOut != nil, {
+			synthDefPatternOut.writeDefFile(dir, overwrite, mdPlugin, false)
+		});
+	}
+
+	//Alias (writeDef can't be used)
+	write { | dir, overwrite = true, mdPlugin |
+		^this.writeDefFile(dir, overwrite, mdPlugin)
+	}
+
 	load { | server, completionMsg, dir |
-		dir = dir ? AlgaSynthDef.synthDefDir;
 		synthDef.load(server, completionMsg, dir);
-		if(synthDefPattern != nil, { synthDefPattern.load(server, completionMsg, dir) });
-		if(synthDefPatternOut != nil, { synthDefPatternOut.load(server, completionMsg, dir) });
+		//Metadata is only needed for the main synthDef
+		if(synthDefPattern != nil, {
+			synthDefPattern.load(server, completionMsg, dir, false)
+		});
+		if(synthDefPatternOut != nil, {
+			synthDefPatternOut.load(server, completionMsg, dir, false)
+		});
 	}
 
-	store { | libname=\global, dir, completionMsg, mdPlugin |
-		dir = dir ? AlgaSynthDef.synthDefDir;
+	store { | libname=\alga, dir, completionMsg, mdPlugin |
 		synthDef.store(libname, dir, completionMsg, mdPlugin);
-		if(synthDefPattern != nil, { synthDefPattern.store(libname, dir, completionMsg, mdPlugin) });
-		if(synthDefPatternOut != nil, { synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin) });
+		//Metadata is only needed for the main synthDef
+		if(synthDefPattern != nil, {
+			synthDefPattern.store(libname, dir, completionMsg, mdPlugin, false)
+		});
+		if(synthDefPatternOut != nil, {
+			synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin, false)
+		});
 	}
 
-	asSynthDesc { | libname=\global, keepDef = true |
+	asSynthDesc { | libname=\alga, keepDef = true |
 		^synthDef.asSynthDesc(libname, keepDef)
 	}
 
@@ -95,13 +119,22 @@ AlgaSynthDefSpec {
 //makeFadeEnv, however, does not multiply the output, but it is only used for Alga's internal
 //freeing mechanism. Furthermore, outsMapping is provided.
 AlgaSynthDef : SynthDef {
-
 	var <>rate, <>numChannels;
 	var <>canReleaseSynth, <>canFreeSynth;
 
 	var <>explicitFree;
 	var <>sampleAccurate;
 	var <>outsMapping;
+
+	*readAll { | path, server |
+		server = server ? Server.default;
+		SynthDescLib.alga.readAll(path, server)
+	}
+
+	*read { | path, server |
+		server = server ? Server.default;
+		SynthDescLib.alga.readDef(path, server)
+	}
 
 	//Default sampleAccurate to false. If user needs OffsetOut (for pattern accuracy), he must set it to true.
 	*new { | name, func, rates, prependArgs, outsMapping, sampleAccurate = false, variants, metadata |
@@ -232,8 +265,15 @@ AlgaSynthDef : SynthDef {
 				});
 
 				//Check for invalid names
-				if((controlNameName == \out).or(controlNameName == \patternTempOut), {
+				if((controlNameName == \out).or(controlNameName == \patternTempOut).or(
+					controlNameName == \timingOffset).or(controlNameName == \lag), {
 					Error("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally. Choose another name.").algaThrow;
+				});
+
+				//Finally, print user for certainety when using any dur key
+				if((controlNameName == \dur).or(controlNameName == \delta).or(controlNameName == \sustain).or(
+					controlNameName == \stretch).or(controlNameName == \legato), {
+					("AlgaSynthDef: Note that the '" ++ controlNameName ++ "' parameter is a reserved name used in AlgaPatterns. If using this def for an AlgaNode, consider changing the name to activate the interpolation features").warn
 				});
 			});
 
@@ -294,7 +334,7 @@ AlgaSynthDef : SynthDef {
 			if(isScalar, {
 				output
 			}, {
-				//Add \amp if needed
+				//Add \amp if needed: should .kr be used in all cases to save CPU?
 				if(ampProvided.not, {
 					if(rate === \audio,
 						{ output = output * \amp.ar(1) },
@@ -344,6 +384,10 @@ AlgaSynthDef : SynthDef {
 			def.outsMapping[out] = i;
 		});
 
+		//Store the original func.
+		//This is mostly needed to prevent writeArchive from complaining
+		def.func = func;
+
 		//Must be array.
 		if(outsMapping.isArray, {
 			var chanCount = 0;
@@ -383,14 +427,61 @@ AlgaSynthDef : SynthDef {
 		^def
 	}
 
-	//Always store in global libname
+	//Always store in alga libname
 	sendAndAddToGlobalDescLib { | server, completionMsg |
-		desc = this.asSynthDesc(\global, true);
+		desc = this.asSynthDesc(\alga, true);
 		this.send(server, completionMsg)
 	}
 
-	//Always store in global libname
+	//Always store in alga libname
 	add { | libname, completionMsg, keepDef = true |
-		^super.add(\global, completionMsg, keepDef)
+		^super.add(\alga, completionMsg, keepDef)
+	}
+
+	//Used to
+	createDirAndWriteArchiveMd { | dir, writeMd = true |
+		var nameStr = this.name.asString;
+
+		//Uses Alga's one
+		dir = (dir ? AlgaStartup.algaSynthDefPath).asString;
+
+		if(nameStr.endsWith("_algaPattern").or(
+			nameStr.endsWith("_algaPatternTempOut")), {
+			var name = nameStr.replace("_algaPattern", "").replace("TempOut", "");
+			dir = dir.withoutTrailingSlash ++ "/" ++ name;
+		}, {
+			dir = dir.withoutTrailingSlash ++ "/" ++ nameStr;
+		});
+
+		//Also store archive for Metadata
+		if(writeMd, {
+			File.mkdir(dir); //Create the new dir only once
+			this.writeArchive(dir ++ "/"  ++ this.name ++ ".scsyndefmd");
+		});
+
+		^dir
+	}
+
+	//Store in Alga's AlgaSynthDefs folder
+	writeDefFile { | dir, overwrite = true, mdPlugin, writeMd = true |
+		dir = this.createDirAndWriteArchiveMd(dir, writeMd);
+		^super.writeDefFile(dir, overwrite, mdPlugin);
+	}
+
+	//Alias (writeDef can't be used)
+	write { | dir, overwrite = true, mdPlugin, writeMd = true |
+		^this.writeDefFile(dir, overwrite, mdPlugin, writeMd)
+	}
+
+	//Store in Alga's AlgaSynthDefs folder
+	load { | server, completionMsg, dir, writeMd = true |
+		dir = this.createDirAndWriteArchiveMd(dir, writeMd);
+		^super.load(server, completionMsg, dir);
+	}
+
+	//Store in Alga's AlgaSynthDefs folder
+	store { | libname=\alga, dir, completionMsg, mdPlugin, writeMd = true |
+		dir = this.createDirAndWriteArchiveMd(dir, writeMd);
+		^super.store(libname, dir, completionMsg, mdPlugin);
 	}
 }

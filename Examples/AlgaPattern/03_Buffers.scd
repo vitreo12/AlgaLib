@@ -2,7 +2,7 @@
 Alga.boot({
 	//Simple Buffer player
 	AlgaSynthDef(\playBuf, {
-		PlayBuf.ar(2, \buf.kr(0), BufRateScale.kr(\buf.kr), doneAction:2)
+		PlayBuf.ar(2, \buf.ir(0), BufRateScale.kr(\buf.ir), doneAction:2)
 	}, sampleAccurate: true).add;
 
 	//Read a kick and a snare
@@ -17,7 +17,7 @@ Alga.boot({
 		def: \playBuf,
 		dur: 0.5,
 		buf: b
-	)).play(chans: 2).stopPatternBeforeReplace_(false);
+	)).play(chans: 2).stopPatternBeforeReplace_(false).replaceDur_(true);
 });
 )
 
@@ -28,7 +28,7 @@ a.from(c, \buf, time: 2, sched: 1);
 a.from(Pseq([b, c], inf), \buf, time: 0, sched: 1);
 
 //Go faster
-a.from(0.25, \dur, time: 2, sched: 1);
+a.from(0.25, \dur, time: 3, sched: 1);
 
 //Declare a reverb
 d = AN({ FreeVerb.ar(\in.ar([0, 0]), 1) }).play;

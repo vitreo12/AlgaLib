@@ -1,6 +1,8 @@
 //Network
 (
 Alga.boot({
+	Alga.debug = true;
+
 	a = AN.debug({ DC.ar(\in.ar) }, name: \a);
 	b = AN.debug({ DC.ar(\in.ar) }, name: \b);
 	c = AN.debug({ DC.ar(\in.ar) }, name: \c);
@@ -35,7 +37,7 @@ Alga.boot({
 
 	//s.plotTree;
 },
-//algaServerOptions: AlgaServerOptions(supernova: true)
+algaServerOptions: AlgaServerOptions(supernova: true)
 );
 )
 
@@ -80,6 +82,8 @@ f.inNodes
 //Multi-feedback network
 (
 Alga.boot({
+	Alga.debug = true;
+
 	a = AN.debug({ DC.ar(\in.ar) }, name: \a);
 	b = AN.debug({ DC.ar(\in.ar) }, name: \b);
 	c = AN.debug({ DC.ar(\in.ar) }, name: \c);

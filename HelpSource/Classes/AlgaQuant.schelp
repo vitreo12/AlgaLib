@@ -1,0 +1,41 @@
+TITLE:: AlgaQuant
+summary:: Utility class to schedule actions on a specific bar
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaPattern, Classes/AlgaNode, Classes/AlgaStep
+
+DESCRIPTION::
+An link::Classes/AlgaQuant:: is a utility class that allows the user to schedule actions on a specific bar.
+
+CLASSMETHODS::
+METHOD:: new
+ARGUMENT:: quant
+The bar in the future.
+ARGUMENT:: phase
+Shift the trigger by a set number of beats.
+ARGUMENT:: wrapPhase
+Wrap the phase around the length of the bar.
+
+INSTANCEMETHODS::
+private:: isAlgaQuant
+private:: phase
+private:: quant
+private:: wrapPhase
+
+
+EXAMPLES::
+code::
+(
+Alga.boot({
+	a = AlgaPattern({ SinOsc.ar * EnvPerc.ar }).play(chans: 2)
+});
+)
+
+//Schedule at the next bar
+a.from(0.5, \dur, sched: AlgaQuant(1));
+
+//Schedule in two bars
+a.from(0.25, \dur, sched: AlgaQuant(2));
+
+//Schedule at the next bar + 1 beat
+a.from(0.5, \dur, sched: AlgaQuant(1, 1));
+::

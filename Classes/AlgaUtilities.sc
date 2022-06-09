@@ -18,7 +18,7 @@
 //It can be used to dynamically set parameters of a connected Node (like scale and chans).
 AlgaArg {
 	//The streams
-	var <senderStream, <chansStream, <scaleStream;
+	var <chansStream, <scaleStream;
 
 	//The unpacked entries
 	var <sender, <chans, <scale;
@@ -28,15 +28,14 @@ AlgaArg {
 	}
 
 	init { | argSender, argChans, argScale |
-		senderStream = argSender.algaAsStream; //Pattern support
+		sender       = argSender;
 		chansStream  = argChans.algaAsStream;  //Pattern support
 		scaleStream  = argScale.algaAsStream;  //Pattern support
 	}
 
-	algaAdvance {
-		sender = senderStream.next;
-		chans  = chansStream.next;
-		scale  = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
+	algaAdvance { | e |
+		chans  = chansStream.next(e);
+		scale  = scaleStream.next(e).copy; //.copy is necessary not to replace entry in scaleStream
 		scale.algaAdvanceArrayScaleValues;
 	}
 
@@ -109,12 +108,12 @@ AlgaOut {
 		scaleStream  = argScale.algaAsStream; //Pattern support
 	}
 
-	algaAdvance {
-		node  = nodeStream.next;
-		param = paramStream.next;
-		chans = chansStream.next;
-		scale = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
-		scale.algaAdvanceArrayScaleValues;
+	algaAdvance { | e |
+		node  = nodeStream.next(e);
+		param = paramStream.next(e);
+		chans = chansStream.next(e);
+		scale = scaleStream.next(e).copy; //.copy is necessary not to replace entry in scaleStream
+		scale.algaAdvanceArrayScaleValues(e);
 	}
 
 	isAlgaOut { ^true }
@@ -157,10 +156,10 @@ AlgaTemp {
 		algaReaderPfuncParams = Array.newClear();
 	}
 
-	algaAdvance {
-		chans = chansStream.next;
-		scale = scaleStream.next.copy; //.copy is necessary not to replace entry in scaleStream
-		scale.algaAdvanceArrayScaleValues;
+	algaAdvance { | e |
+		chans = chansStream.next(e);
+		scale = scaleStream.next(e).copy; //.copy is necessary not to replace entry in scaleStream
+		scale.algaAdvanceArrayScaleValues(e);
 	}
 
 	setDef { | argDef |
@@ -168,7 +167,7 @@ AlgaTemp {
 	}
 
 	checkValidSynthDef { | def |
-		var synthDesc = SynthDescLib.global.at(def);
+		var synthDesc = SynthDescLib.alga.at(def);
 		var synthDef;
 
 		if(synthDesc == nil, {
@@ -177,8 +176,7 @@ AlgaTemp {
 		});
 
 		synthDef = synthDesc.def;
-
-		if(synthDef.class != AlgaSynthDef, {
+		if(synthDef.isKindOf(SynthDef).not, {
 			("AlgaTemp: Invalid AlgaSynthDef: '" ++ def.asString ++"'").error;
 			^nil;
 		});
@@ -232,12 +230,30 @@ AlgaStep {
 //Alias
 AS : AlgaStep {}
 
+//Schedule actios on bars
+AlgaQuant {
+	var <quant, <phase, <wrapPhase = false;
+
+	*new { | quant = 1, phase = 0, wrapPhase = false |
+		if(quant <= 0, {
+			quant = 1;
+			"AlgaQuant: only positive values are supported. 1 will be used instead.".warn;
+		});
+		^super.newCopyArgs(quant, phase, wrapPhase);
+	}
+
+	isAlgaQuant { ^true }
+}
+
+//Alias
+AQ : AlgaQuant {}
+
 //Advance Array values for scale (min / max can be Patterns)
 +SequenceableCollection {
-	algaAdvanceArrayScaleValues {
+	algaAdvanceArrayScaleValues { | e |
 		this.do({ | entry, i |
 			if(entry.isStream, {
-				var entryNext = entry.next;
+				var entryNext = entry.next(e);
 				this[i] = entryNext;
 			});
 		});

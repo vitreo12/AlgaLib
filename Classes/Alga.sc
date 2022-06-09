@@ -16,12 +16,18 @@
 
 Alga {
 	classvar <debug = false;
+	classvar <disableNodeOrdering = false;
+
+	classvar <startup;
 
 	classvar <schedulers;
 	classvar <servers;
 	classvar <clocks;
 	classvar <parGroups;
 	classvar <oldSynthDefsDir;
+
+	//These are used since I can't add vars to the Clock class
+	classvar <interpTempoRoutines;
 
 	//Store if server is supernova or not
 	classvar <supernovas;
@@ -32,12 +38,16 @@ Alga {
 	}
 
 	*initClass {
+		var algaSynthDescLib = SynthDescLib(\alga);
+
 		servers = IdentityDictionary(1);
 		schedulers = IdentityDictionary(1);
 		clocks = IdentityDictionary(1);
 		parGroups = IdentityDictionary(1);
 
 		supernovas = IdentityDictionary(1);
+
+		interpTempoRoutines = IdentityDictionary(1);
 
 		//Make sure to reset it
 		"SC_SYNTHDEF_PATH".unsetenv;
@@ -46,6 +56,12 @@ Alga {
 	*debug_ { | value |
 		if(value.isKindOf(Boolean), {
 			debug = value
+		});
+	}
+
+	*disableNodeOrdering_ { | value |
+		if(value.isKindOf(Boolean), {
+			disableNodeOrdering = value
 		});
 	}
 
@@ -70,6 +86,24 @@ Alga {
 		AlgaStartup.maxEnvPoints = value
 	}
 
+	*startup_ { | path |
+		var pathname;
+		path = path.standardizePath;
+		pathname = PathName(path);
+		if(File.exists(path).not, {
+			("Alga: startup path does not exist: " ++ path.fullPath ).error;
+			^this;
+		});
+		if(pathname.isFile, {
+			if(pathname.extension != "scd", {
+				("Alga: startup file must have a .scd extension").error;
+				^this
+			});
+			startup = path;
+		});
+		^this;
+	}
+
 	*setAlgaSynthDefsDir {
 		oldSynthDefsDir = "SC_SYNTHDEF_PATH".getenv;
 		"SC_SYNTHDEF_PATH".setenv(AlgaStartup.algaSynthDefPath);
@@ -90,11 +124,11 @@ Alga {
 
 	*quitServerAndClear { | server, prevServerQuit |
 		if(server != nil, {
-			if(server.serverRunning, {
+			if(server.hasBooted, {
 				server.quit(onComplete: { prevServerQuit[0] = true });
 				fork {
 					3.wait;
-					if(server.serverRunning.not, { prevServerQuit[0] = true });
+					if(server.hasBooted.not, { prevServerQuit[0] = true });
 				}
 			}, {
 				prevServerQuit[0] = true;
@@ -143,6 +177,10 @@ Alga {
 		^clocks[server]
 	}
 
+	*synthDescLib {
+		^(SynthDescLib.alga)
+	}
+
 	*addParGroupOnServerTree { | supernova |
 		//ServerAction passes the server as first arg
 		var serverTreeParGroupFunc = { | server |
@@ -179,10 +217,10 @@ Alga {
 	}
 
 	*checkAlgaUGens {
-		if((\AlgaDynamicIEnvGen.asClass == nil).or(\AlgaAudioControl.asClass == nil), {
+		if((\AlgaDynamicIEnvGenBuf.asClass == nil).or(\AlgaDynamicIEnvGen.asClass == nil).or(\AlgaAudioControl.asClass == nil), {
 			"\n************************************************\n".postln;
 			"The AlgaUGens plugin extension is not installed. Read the following instructions to install it:".warn;
-			"\n1) Download the AlgaUGens plugin extension from https://github.com/vitreo12/AlgaUGens/releases/tag/v1.0.0".postln;
+			"\n1) Download the AlgaUGens plugin extension from https://github.com/vitreo12/AlgaUGens/releases/tag/v1.1.0".postln;
 			"2) Unzip the file to your 'Platform.userExtensionDir'".postln;
 			"\nAfter the installation, no further action is required: Alga will detect the UGens, use them internally and this message will not be shown again.\n".postln;
 			"************************************************\n".postln;
@@ -195,6 +233,43 @@ Alga {
 		AlgaSynthDef.new_inner(\alga_silent, {
 			Silent.ar
 		}, sampleAccurate:false, makeOutDef:false).add
+	}
+
+	*readAllDefs { | path, server |
+		server = server ? Server.default;
+		SynthDescLib.alga.readAll(path, server)
+	}
+
+	*readAlgaSynthDefs { | path, server |
+		this.readAllDefs(path, server)
+	}
+
+	*readAlgaSynthDefsFolder {
+		this.readAllDefs(AlgaStartup.algaSynthDefPath)
+	}
+
+	*readDef { | path, server |
+		server = server ? Server.default;
+		SynthDescLib.alga.readDef(path, server)
+	}
+
+	*readAlgaSynthDef { | path, server |
+		this.readDef(path, server)
+	}
+
+	*addInterpShape { | shape, server |
+		server = server ? Server.default;
+		shape.algaCheckValidEnv(server: server);
+	}
+
+	*removeInterpShape { | shape, server |
+		server = server ? Server.default;
+		AlgaDynamicEnvelopes.remove(shape, server);
+	}
+
+	*interpShapes { | server |
+		server = server ? Server.default;
+		^(AlgaDynamicEnvelopes.envs[server])
 	}
 
 	*boot { | onBoot, server, algaServerOptions, clock |
@@ -238,7 +313,7 @@ Alga {
 		});
 
 		//Add to SynthDescLib in order for SynthDef.add to work
-		SynthDescLib.global.addServer(server);
+		SynthDescLib.alga.addServer(server);
 
 		//Run CmdPeriod
 		CmdPeriod.run;
@@ -267,17 +342,36 @@ Alga {
 		//Use AlgaSynthDefs as SC_SYNTHDEF_PATH
 		this.setAlgaSynthDefsDir;
 
+		//Read all AlgaSynthDefs before boot (so server is not sent twice)
+		this.readAlgaSynthDefsFolder;
+
 		//Boot
 		AlgaSpinRoutine.waitFor( { prevServerQuit[0] == true }, {
 			server.waitForBoot({
+				//Init AlgaDynamicEnvelopes and pre allocate some Buffers
+				AlgaDynamicEnvelopes.initEnvs(server);
+
 				//Alga has booted: it is now safe to reset SC_SYNTHDEF_PATH
 				this.restoreSynthDefsDir;
 
 				//Add alga_silent
 				this.addAlgaSilent;
 
+				//Execute startup file
+				if(startup != nil, { startup.load });
+
 				//Sync
 				server.sync;
+
+				//Init the most standard Env([0, 1], 1) envelope.
+				//This must come after server.sync in order for AlgaDynamicEnvelopes to
+				//have allocated all Buffers used as preAllocatedBuffers
+				this.addInterpShape(Env([0, 1], 1), server);
+
+				//Turn off all error messages (like nfree) from the server.
+				//Check http://doc.sccode.org/Reference/Server-Command-Reference.html#/error
+				//for more information. 0 turns them all off
+				server.makeBundle(server.latency, nil, [[ "/error", 0 ]]);
 
 				//Execute onBoot function
 				onBoot.value;
@@ -294,5 +388,36 @@ Alga {
 				onQuit.value;
 			});
 		});
+	}
+
+	*interpolateTempo {| tempo = 1, time = 0, shape,
+		delta = 0.1, schedInSeconds = false, sched = 1, server |
+		var clock;
+		server = server ? Server.default;
+		clock = clocks[server];
+		if(clock != nil, {
+			clock.interpolateTempo(
+				tempo: tempo,
+				time: time,
+				shape: shape,
+				delta: delta,
+				schedInSeconds: schedInSeconds,
+				sched: sched
+			)
+		});
+	}
+
+	//Alias
+	*interpTempo { | tempo = 1, time = 0, shape,
+		delta = 0.1, schedInSeconds = false, sched = 1, server |
+		this.interpolateTempo(
+			tempo: tempo,
+			time: time,
+			shape: shape,
+			delta: delta,
+			schedInSeconds: schedInSeconds,
+			sched: sched,
+			server: server
+		)
 	}
 }

@@ -207,8 +207,8 @@ AlgaScheduler : AlgaThread {
 		currentExecAction = action;
 		currentExecActionOffset = 0; //reset it here, so that nested calls have proper index offset
 
-		//execute and remove action
-		server.bind({ func.value });
+		//Execute and remove action
+		server.makeBundle(server.latency, func);
 		this.removeAction(action);
 
 		//Reset currentExecAction (so it's reset for new stage)
@@ -306,7 +306,7 @@ AlgaScheduler : AlgaThread {
 				//This will be the core of clock / server syncing of actions
 				//Consume actions (they are ordered thanks to OrderedIdentitySet)
 				while({ actions.size > 0 }, {
-					var action, sched, topPriority, schedInSeconds;
+					var action, sched, topPriority, schedInSeconds, schedIsMoreThanZero = false;
 
 					if(cascadeMode, {
 						//if cascading, pop action from top of the list.
@@ -325,6 +325,7 @@ AlgaScheduler : AlgaThread {
 
 					//Individual sched for the action
 					sched = action[2];
+					if(sched.isNumber, { schedIsMoreThanZero = sched > 0 });
 
 					//Check if the specific action has to be executed with top priority
 					topPriority = action[3];
@@ -333,7 +334,7 @@ AlgaScheduler : AlgaThread {
 					schedInSeconds = action[4];
 
 					//Found a sched value (run in the future on the clock)
-					if(sched > 0, {
+					if(schedIsMoreThanZero.or(sched.isAlgaQuant), {
 						var functionOnSched;
 
 						if(interruptOnSched, {
@@ -386,12 +387,14 @@ AlgaScheduler : AlgaThread {
 							//In sched time, execute the function
 							if(topPriority, {
 								if(schedInSeconds, {
+									if(sched.isAlgaQuant, { sched = sched.quant + sched.phase });
 									clock.algaSchedInSecondsOnceWithTopPriority(sched, functionOnSched)
 								}, {
 									clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
 								})
 							}, {
 								if(schedInSeconds, {
+									if(sched.isAlgaQuant, { sched = sched.quant + sched.phase });
 									clock.algaSchedInSecondsOnce(sched, functionOnSched)
 								}, {
 									clock.algaSchedAtQuantOnce(sched, functionOnSched)
@@ -422,12 +425,14 @@ AlgaScheduler : AlgaThread {
 							//In sched time, execute the function
 							if(topPriority, {
 								if(schedInSeconds, {
+									if(sched.isAlgaQuant, { sched = sched.quant + sched.phase });
 									clock.algaSchedInSecondsOnceWithTopPriority(sched, functionOnSched)
 								}, {
 									clock.algaSchedAtQuantOnceWithTopPriority(sched, functionOnSched)
 								});
 							}, {
 								if(schedInSeconds, {
+									if(sched.isAlgaQuant, { sched = sched.quant + sched.phase });
 									clock.algaSchedInSecondsOnce(sched, functionOnSched)
 								}, {
 									clock.algaSchedAtQuantOnce(sched, functionOnSched)
@@ -435,7 +440,7 @@ AlgaScheduler : AlgaThread {
 							});
 						});
 					}, {
-						//Actual loop function, sched == 0
+						//Actual loop function, sched == 0 and not an AlgaQuant
 						this.loopFunc(action);
 					});
 				});
@@ -470,34 +475,36 @@ AlgaScheduler : AlgaThread {
 	addAction { | condition, func, sched = 0, topPriority = false, schedInSeconds = false, preCheck = false |
 		var action;
 
-		//Only numbers
-		if(sched.isNumber.not, { sched = 0 });
-
 		//Only booleans
-		if((topPriority != false).and(topPriority != true), { topPriority = false });
+		if(topPriority.isKindOf(Boolean).not, { topPriority = false });
 
 		//No condition == { true }
 		condition = condition ? { true };
 
 		//Only functions
 		if((condition.isFunction.not).or(func.isFunction.not), {
-			"AlgaScheduler: addAction only accepts Functions as both the condition and the func arguments".error;
+			"AlgaScheduler: addAction only accepts Functions as both the 'condition' and 'func' arguments".error;
 			^this;
 		});
 
-		//If preCheck, if the condition is already true, execute the function without adding it to the scheduler
-		if(preCheck, {
-			if(condition.value, {
-				if(verbose, {
-					("AlgaScheduler: executing function:" + func.def.context.asString + "as condition was true already").postcln;
-				});
-				^func.value
-			});
-		});
+		//Only numbers or AlgaQuant
+		if((sched.isNumber.not).and(sched.isAlgaQuant.not), { sched = 0 });
 
 		//Only positive numbers
-		sched = sched ? 0;
-		if(sched < 0, { sched = 0 });
+		if(sched.isNumber, { if(sched < 0, { sched = 0 }) });
+
+		//If preCheck, if the condition is already true and scheduling is 0,
+		//execute the function without adding it to the scheduler
+		if(preCheck, {
+			if((condition.value).and(sched == 0), {
+				if(verbose, {
+					("AlgaScheduler: executing function: " ++
+						func.def.context.asString ++
+						" as condition was true already and sched was 0").postcln;
+				});
+				^server.makeBundle(server.latency, func);
+			});
+		});
 
 		//New action
 		action = [condition, func, sched, topPriority, schedInSeconds];
@@ -548,7 +555,6 @@ AlgaPatch {
 		}, {
 			("Alga is not booted on server" + server.name).error;
 		});
-		^nil;
 	}
 }
 

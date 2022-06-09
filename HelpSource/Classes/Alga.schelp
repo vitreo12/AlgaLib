@@ -1,13 +1,13 @@
 TITLE:: Alga
 summary:: live coding environment focused on the interpolation between sonic nodes
 categories:: Alga
-related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaServerOptions, Clasess/AlgaProxySpace
+related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/AlgaPatch, Classes/AlgaServerOptions, Classes/AlgaProxySpace
 
 
 DESCRIPTION::
 note::
 For link::Classes/Alga:: to work correctly, it is required to install the emphasis::AlgaUGens:: plugin extensions. To do so, download the emphasis::AlgaUGens:: zip file from
-https://github.com/vitreo12/AlgaUGens/releases/tag/v1.0.0 and extract it
+https://github.com/vitreo12/AlgaUGens/releases/tag/v1.1.0 and extract it
 to your code::Platform.userExtensionDir::
 ::
 
@@ -37,6 +37,9 @@ Execute a link::Classes/Function:: on quit.
 ARGUMENT:: server
 The link::Classes/Server:: to quit emphasis::Alga:: from.
 
+METHOD:: startup
+Add a startup file to be executed while emphasis::Alga:: is booting.
+
 METHOD:: maxIO
 Change the maximum number of IO connections between link::Classes/AlgaNode::s. This requires the emphasis::initSynthDefs:: method to re-compile all the necessary link::Classes/AlgaSynthDef::s. The default value is 8.
 ARGUMENT:: value
@@ -47,8 +50,74 @@ Change the maximum number of points allowed for an link::Classes/Env:: used as c
 ARGUMENT:: value
 The new value. Must be an link::Classes/Integer::.
 
+METHOD:: disableNodeOrdering
+Disable the automatic node ordering. This is an expensive operation for code::sclang:: the more complex a network becomes.
+
 METHOD:: initSynthDefs
 Force the recompilation of all link::Classes/AlgaSynthDef::s necessary for link::Classes/Alga::'s runtime. This needs to be executed only once anytime the value of emphasis::maxIO:: changes. Before emphasis::boot::, link::Classes/Alga:: already checks that everything is correct.
+
+METHOD:: synthDescLib
+Return emphasis::Alga::'s link::Classes/SynthDescLib::.
+
+METHOD:: readAllDefs
+Read all the link::Classes/AlgaSynthDef::s in the path recursively. These must have been stored with the code::write::, code::writeDefFile::, code::load:: or code::store:: methods.
+
+METHOD:: readAlgaSynthDefs
+Alias for code::readAllDefs::.
+
+METHOD:: readDef
+Read a single link::Classes/AlgaSynthDef:: or all the link::Classes/AlgaSynthDef::s in the path non-recursively. These must have been stored with the code::write::, code::writeDefFile::, code::load:: or code::store:: methods.
+
+METHOD:: readAlgaSynthDef
+Alias for code::readDef::.
+
+METHOD:: addInterpShape
+Add an link::Classes/Env:: to the specific link::Classes/Server:: where emphasis::Alga:: has been booted on. These are represented as link::Classes/Buffer::s on the server, and this operation speeds up any usage of a speficic envelope shape, as it would have already been sent to the server.
+
+METHOD:: removeInterpShape
+Remove the specific link::Classes/Env:: from the server where emphasis::Alga:: has been booted on. This would free the accompanying link::Classes/Buffer::.
+
+METHOD:: interpShapes
+Get the list of link::Classes/Env::s on the specific link::Classes/Server:: where emphasis::Alga:: has been booted on.
+
+METHOD:: interpolateTempo
+Interpolate the code::tempo:: of the link::Classes/Clock:: that emphasis::Alga:: is using over to a new value. This will affect all the nodes on the emphasis::Alga:: instance.
+ARGUMENT:: tempo
+The new tempo
+ARGUMENT:: time
+The time in seconds that the interpolation process will take
+ARGUMENT:: shape
+An optional link::Classes/Env:: to determine the shape of the interpolation.
+ARGUMENT:: delta
+Specify the resolution of the tempo change: how often should the tempo value be updated?
+ARGUMENT:: schedInSeconds
+Specify if the code::sched:: argument should be considered in seconds instead of beats / bars.
+ARGUMENT:: sched
+When the interpolation should be triggered
+ARGUMENT:: server
+The server used for the specific emphasis::Alga:: instance.
+
+discussion::
+code::
+(
+Alga.boot({
+	a = AP((
+		def: { SinOsc.ar * EnvPerc.ar(release: 0.1 * \tempo.kr(1)) },
+		tempo: Pfunc { Alga.clocks[Server.default].tempo.reciprocal }
+	)).play(chans: 2)
+})
+)
+
+//10 times faster
+Alga.interpTempo(tempo: 10, time: 5)
+
+//Using a shape
+Alga.interpTempo(tempo: 3, time: 8, shape: Env([0, 1, 0, 1], [1, 2, 3]))
+::
+
+METHOD:: interpTempo
+Alias for code::interpolateTempo::
+
 
 private:: clearAllSchedulers
 private:: clearScheduler
@@ -74,6 +143,7 @@ private:: quitServerAndClear
 private:: setSupernova
 private:: supernova
 private:: supernovas
-
+private:: interpTempoRoutines
 private:: addAlgaSilent
 private:: booted
+private:: readAlgaSynthDefsFolder
