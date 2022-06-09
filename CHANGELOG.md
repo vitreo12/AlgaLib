@@ -34,7 +34,8 @@
     a.interpStretch(0.5, time: 3, shape: Env([0, 1, 0.5, 1], [2, 3, 4]))
     ```
 
-- `AlgaPattern` now supports scalar parameters. This is now the preferred way of interfacing with `Buffer` parameters. Also, scalar parameters can be used for optimization reasons for parameters that need to be set only once at the trigger of the `Synth` instance, without the overhead of the interpolator.
+- `AlgaPattern` now supports scalar parameters. This is now the preferred way of interfacing with `Buffer` parameters (check `Examples/AlgaPattern/03_Buffers.scd`).
+Also, scalar parameters can be used for optimization reasons for parameters that need to be set only once at the trigger of the `Synth` instance, without the overhead of the interpolator.
 
     ```SuperCollider
     (
@@ -46,11 +47,15 @@
     })
     )
 
-    //These can be changed anytime
+    //Change at next step
     a.from(Pseq([330, 660], inf), \f, sched: AlgaStep())
+
+    //Change at next beat
+    a.from(Pseq([220, 440, 880], inf), \f, sched: 1)
     ```
 
-- `AlgaPattern` and `AlgaPatternPlayer` now support `Pfunc` and `Pkey`. All scalar and non-SynthDef parameters are now retrievable from any parameter. These are ordered alphabetically:
+- `AlgaPattern` and `AlgaPatternPlayer` now support `Pfunc` and `Pkey`. 
+All scalar and non-SynthDef parameters are now retrievable from any parameter. These are ordered alphabetically:
 
     ```SuperCollider
     (
@@ -70,7 +75,8 @@
     a.from(880, \_f, sched: AlgaStep())
     ```
 
-- `AlgaPattern`: added the `lf` annotator for functions in order for them to be declared as `LiteralFunctions`. These are used for `keys` that would interpret all `Functions` as `UGen Functions`, while they however could represent a `Pfunc` or `Pif` entry:
+- `AlgaPattern`: added the `lf` annotator for functions in order for them to be declared as `LiteralFunctions`. 
+These are used for `keys` that would interpret all `Functions` as `UGen Functions`, while they however could represent a `Pfunc` or `Pif` entry:
 
     ```SuperCollider
     (
