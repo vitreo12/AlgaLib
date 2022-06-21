@@ -137,7 +137,7 @@ AlgaSynthDef : SynthDef {
 	}
 
 	//Default sampleAccurate to false. If user needs OffsetOut (for pattern accuracy), he must set it to true.
-	*new { | name, func, rates, prependArgs, outsMapping, sampleAccurate = false, variants, metadata |
+	*new { | name, func, rates, prependArgs, outsMapping, sampleAccurate = false, allowOut = false, variants, metadata |
 		^this.new_inner(
 			name: name,
 			func: func,
@@ -145,13 +145,14 @@ AlgaSynthDef : SynthDef {
 			prependArgs: prependArgs,
 			outsMapping: outsMapping,
 			sampleAccurate: sampleAccurate,
+			allowOut: allowOut,
 			variants: variants,
 			metadata: metadata
 		)
 	}
 
 	*new_inner { | name, func, rates, prependArgs, outsMapping,
-		sampleAccurate = false, variants, metadata, makeFadeEnv = true,
+		sampleAccurate = false, allowOut = false, variants, metadata, makeFadeEnv = true,
 		makePatternDef = true, makeOutDef = true |
 		var defPattern, defOut;
 		var result;
@@ -163,6 +164,7 @@ AlgaSynthDef : SynthDef {
 			prependArgs: prependArgs,
 			outsMapping: outsMapping,
 			sampleAccurate: sampleAccurate,
+			allowOut: allowOut,
 			variants: variants,
 			metadata: metadata,
 			makeFadeEnv: makeFadeEnv,
@@ -178,6 +180,7 @@ AlgaSynthDef : SynthDef {
 				prependArgs: prependArgs,
 				outsMapping: outsMapping,
 				sampleAccurate: sampleAccurate,
+				allowOut: allowOut,
 				variants: variants,
 				metadata: metadata,
 				makeFadeEnv: makeFadeEnv,
@@ -195,6 +198,7 @@ AlgaSynthDef : SynthDef {
 				prependArgs: prependArgs,
 				outsMapping: outsMapping,
 				sampleAccurate: sampleAccurate,
+				allowOut: allowOut,
 				variants: variants,
 				metadata: metadata,
 				makeFadeEnv: makeFadeEnv,
@@ -209,7 +213,7 @@ AlgaSynthDef : SynthDef {
 
 	*new_inner_inner { | name, func, rates, prependArgs, outsMapping,
 		sampleAccurate = false, variants, metadata, makeFadeEnv = true,
-		makePatternDef = false, makeOutDef = false, ignoreOutWarning = false |
+		makePatternDef = false, makeOutDef = false, allowOut = false |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var outerBuildSynthDef = UGen.buildSynthDef;
 
@@ -278,7 +282,7 @@ AlgaSynthDef : SynthDef {
 			});
 
 			//Check if user has explicit Outs, this is not permitted (allow LocalOut for inner fb)
-			if(ignoreOutWarning.not, {
+			if(allowOut.not, {
 				buildSynthDef.children.do({ | ugen |
 					if((ugen.isKindOf(AbstractOut)).and(ugen.isKindOf(LocalOut).not), {
 						Error("AlgaSynthDef: Out / OffsetOut cannot be explicitly set. They are declared internally.").algaThrow;
