@@ -540,6 +540,10 @@ AlgaNode {
 		tempoScaling = value
 	}
 
+	name_ { | value |
+		name = value.asSymbol;
+	}
+
 	setParamsConnectionTime { | value, param, all = false |
 		//If all, set all paramConnectionTime regardless of their previous value
 		if(all, {

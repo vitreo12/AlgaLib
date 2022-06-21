@@ -128,20 +128,22 @@ AlgaProxySpace {
 		if(currentEnvironment !== this, {
 			Environment.push(this)
 		}, {
-			"AlgaProxySpace: this environment is already current".warn
+			"AlgaProxySpace: this environment has already been pushed".warn
 		});
 	}
 
-	pop {
-		Environment.pop
-	}
+	pop { Environment.pop }
+
+	keys { ^nodes.keys }
 
 	//////////////////////
 	// From Environment //
 	//////////////////////
+
 	*make { arg function;
 		^this.new.make(function)
 	}
+
 	*use { arg function;
 		^this.new.use(function)
 	}
@@ -174,6 +176,7 @@ AlgaProxySpace {
 		};
 		^result
 	}
+
 	//////////////////////
 	//////////////////////
 	//////////////////////
@@ -197,6 +200,7 @@ AlgaProxySpace {
 	explicitNode { | node, key, def |
 		node.clear;
 		nodes[key] = def;
+		def.name = key;
 		^def;
 	}
 
@@ -230,6 +234,7 @@ AlgaProxySpace {
 
 		//Replace entry
 		nodes[key] = pattern;
+		pattern.name = key;
 		^pattern;
 	}
 
@@ -373,6 +378,7 @@ AlgaProxySpace {
 
 			//No object, create a new node and return it
 			node = this.newNode;
+			node.name = key;
 			nodes[key] = node;
 		});
 		^node
