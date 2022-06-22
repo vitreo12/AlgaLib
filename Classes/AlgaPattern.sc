@@ -663,6 +663,8 @@ AlgaPattern : AlgaNode {
 				senderRate = "control";
 				senderNumChannels = paramNumChannels;
 				entry = paramDefault;
+				("AlgaPattern: trying to set an invalid AlgaTemp for param '" ++ paramName ++
+					"'. Using default value " ++ paramDefault.asString ++" instead").error;
 				validParam = true;
 			});
 		});
@@ -671,81 +673,84 @@ AlgaPattern : AlgaNode {
 		sender = entry;
 
 		//Valid values are Numbers / Arrays / AlgaNodes / Buffers / Nils
-		case
+		//validParam is set for AlgaTemp, no need to re-do checks
+		if(validParam.not, {
+			case
 
-		//Number / Array
-		{ entry.isNumberOrArray } {
-			if(entry.isArray, {
-				//an array
-				senderNumChannels = entry.size;
-				senderRate = "control";
-			}, {
-				//a num
-				senderNumChannels = 1;
-				senderRate = "control";
-			});
-			validParam = true;
-		}
-
-		//AlgaNode
-		{ entry.isAlgaNode } {
-			sender = entry; //essential for chansMapping (entry gets modified)
-			if(entry.algaInstantiated, {
-				if((entry.algaCleared).or(entry.algaToBeCleared), {
-					//("AlgaPattern: can't connect to an AlgaNode that's been cleared").error;
-					^this;
+			//Number / Array
+			{ entry.isNumberOrArray } {
+				if(entry.isArray, {
+					//an array
+					senderNumChannels = entry.size;
+					senderRate = "control";
 				}, {
-					if(entry.synthBus != nil, {
-						if(entry.synthBus.bus != nil, {
-							senderRate = entry.rate;
-							senderNumChannels = entry.numChannels;
-							entry = entry.synthBus.busArg;
-							validParam = true;
+					//a num
+					senderNumChannels = 1;
+					senderRate = "control";
+				});
+				validParam = true;
+			}
+
+			//AlgaNode
+			{ entry.isAlgaNode } {
+				sender = entry; //essential for chansMapping (entry gets modified)
+				if(entry.algaInstantiated, {
+					if((entry.algaCleared).or(entry.algaToBeCleared), {
+						//("AlgaPattern: can't connect to an AlgaNode that's been cleared").error;
+						^this;
+					}, {
+						if(entry.synthBus != nil, {
+							if(entry.synthBus.bus != nil, {
+								senderRate = entry.rate;
+								senderNumChannels = entry.numChannels;
+								entry = entry.synthBus.busArg;
+								validParam = true;
+							}, {
+								("AlgaPattern: can't connect to an AlgaNode with an invalid synthBus").error;
+							});
 						}, {
 							("AlgaPattern: can't connect to an AlgaNode with an invalid synthBus").error;
 						});
-					}, {
-						("AlgaPattern: can't connect to an AlgaNode with an invalid synthBus").error;
 					});
+				}, {
+					//otherwise, use default
+					senderRate = "control";
+					senderNumChannels = paramNumChannels;
+					entry = paramDefault;
+					scale = nil;
+					chansMapping = nil;
+					("AlgaPattern: AlgaNode wasn't algaInstantiated yet. Using the default value " ++
+						entry ++ " for '" ++ paramName ++ "'").warn;
+					validParam = true;
 				});
-			}, {
-				//otherwise, use default
+			}
+
+			//Buffer
+			{ entry.isBuffer } {
+				entry = entry.bufnum;
+				senderNumChannels = 1;
+				senderRate = "control";
+				validParam = true;
+			}
+
+			//Nil, use default
+			{ entry.isNil } {
 				senderRate = "control";
 				senderNumChannels = paramNumChannels;
 				entry = paramDefault;
-				scale = nil;
-				chansMapping = nil;
-				("AlgaPattern: AlgaNode wasn't algaInstantiated yet. Using the default value " ++
-					entry ++ " for '" ++ paramName ++ "'").warn;
+				("AlgaPattern: trying to set 'nil' for param '" ++ paramName ++
+					"'. Using default value " ++ paramDefault.asString ++" instead").error;
 				validParam = true;
-			});
-		}
+			}
 
-		//Buffer
-		{ entry.isBuffer } {
-			entry = entry.bufnum;
-			senderNumChannels = 1;
-			senderRate = "control";
-			validParam = true;
-		}
-
-		//Nil, use default
-		{ entry.isNil } {
-			senderRate = "control";
-			senderNumChannels = paramNumChannels;
-			entry = paramDefault;
-			("AlgaPattern: trying to set 'nil' for param '" ++ paramName ++
-				"'. Using default value " ++ paramDefault.asString ++" instead").error;
-			validParam = true;
-		}
-
-		//Symbol (like, \skip or \rest): skip iteration.
-		//It's very important not to use Rest() here, as \dur will also pick it up, generating
-		//an actual double Rest(). Rest() should only be used in \dur / \delta.
-		{ entry.isSymbol } {
-			if(isFX.not, { skipIteration = true }, { skipIterationFX = true });
-			^this;
-		};
+			//Symbol (like, \skip or \rest): skip iteration.
+			//It's very important not to use Rest() here, as \dur will also pick it up, generating
+			//an actual double Rest(). Rest() should only be used in \dur / \delta.
+			{ entry.isSymbol } {
+				if(isFX.not, { skipIteration = true }, { skipIterationFX = true });
+				^this;
+			};
+		});
 
 		if(validParam, {
 			//Get the bus where interpolation envelope is written to...
