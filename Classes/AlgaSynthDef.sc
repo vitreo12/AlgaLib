@@ -447,8 +447,9 @@ AlgaSynthDef : SynthDef {
 		var nameStr = this.name.asString;
 
 		//Uses Alga's one
-		dir = (dir ? AlgaStartup.algaSynthDefPath).asString;
+		dir = PathName((dir ? AlgaStartup.algaSynthDefPath).asString).absolutePath;
 
+		//Create alternative files
 		if(nameStr.endsWith("_algaPattern").or(
 			nameStr.endsWith("_algaPatternTempOut")), {
 			var name = nameStr.replace("_algaPattern", "").replace("TempOut", "");
