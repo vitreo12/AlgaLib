@@ -43,6 +43,8 @@ a.outsMapping.postln;
 ::
 ARGUMENT:: sampleAccurate
 Use link::Classes/OffsetOut:: instead of the default link::Classes/Out::. This is mostly useful for link::Classes/AlgaSynthDef::s that will be used in link::Classes/AlgaPattern::s.
+ARGUMENT:: allowOut
+Allow using any kind of link::Classes/AbstractOut:: in the graph. Note that this should only be used with very specific use cases in mind, like the one in code::Examples/Extras/AlgaMonoPattern::.
 ARGUMENT:: variants
 See link::Classes/SynthDef::.
 ARGUMENT:: metadata
