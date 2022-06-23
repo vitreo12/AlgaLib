@@ -2332,7 +2332,7 @@ AlgaPattern : AlgaNode {
 			//No \sustain from user, set to previous one
 			if(foundSustain.not, {
 				if(resetSustain, {
-					this.setSustain(0, newInterpStreams)
+					this.setSustain(1, newInterpStreams)
 				}, {
 					this.setSustain(interpStreams.sustain, newInterpStreams)
 				});
@@ -2405,9 +2405,9 @@ AlgaPattern : AlgaNode {
 		}, {
 			//Else, default them
 			if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
-			if(foundSustain.not, { this.setSustain(0, newInterpStreams) });
+			if(foundSustain.not, { this.setSustain(1, newInterpStreams) });
 			if(foundStretch.not, { this.setStretch(1, newInterpStreams) });
-			if(foundLegato.not, { this.setLegato(0, newInterpStreams) });
+			if(foundLegato.not,  { this.setLegato(0, newInterpStreams) });
 		});
 
 		//Set the correct synthBus in newInterpStreams!!!
