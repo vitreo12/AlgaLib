@@ -4,6 +4,7 @@ p = APS.boot({
 	AlgaSynthDef(\seq1_ar, {
 		ReplaceOut.ar(\b.ir, \val.ar);
 		FreeSelf.kr(1 - \gate.kr(1));
+		Silent.ar;
 	},
 	allowOut: true).add
 }, algaServerOptions: AlgaServerOptions(supernova: true));
