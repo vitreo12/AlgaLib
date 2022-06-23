@@ -62,8 +62,8 @@
 	addAction { | condition, func, sched = 0, topPriority = false,
 		schedInSeconds = false, preCheck = false |
 		AlgaSpinRoutine.waitFor(
-			condition:condition,
-			func:func
+			condition: condition,
+			func: func
 		);
 	}
 
