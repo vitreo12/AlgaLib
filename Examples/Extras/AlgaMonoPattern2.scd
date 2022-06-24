@@ -2,7 +2,9 @@
 p = APS.boot({
 	//ReplaceOut is needed in order to always overwrite on new trigger
 	AlgaSynthDef(\seq1_ar, {
-		ReplaceOut.ar(\b.ir, \val.ar);
+		var startVal = Latch.kr(InFeedback.ar(\b.ir), 1);
+		var val = AlgaSmoother.ar(1, startVal, \val.ar, \smooth.ir(0));
+		ReplaceOut.ar(\b.ir, val);
 		FreeSelf.kr(1 - \gate.kr(1));
 		Silent.ar;
 	},
@@ -23,6 +25,7 @@ b = Bus.audio(s);
 ~b = (
 	def: \seq1_ar,
 	b: b.index,
+	smooth: Pseq([0, 0.1, 0.2], inf),
 	val: Pseq([
 		220,
 		AlgaTemp({ SinOsc.ar(Rand(5, 150)) }, scale: [220, 1000]),
