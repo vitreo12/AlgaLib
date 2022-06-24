@@ -3,7 +3,7 @@ p = APS.boot({
 	//ReplaceOut is needed in order to always overwrite on new trigger
 	AlgaSynthDef(\seq1_ar, {
 		var startVal = Latch.kr(InFeedback.ar(\b.ir), 1);
-		var val = AlgaSmoother.ar(1, startVal, \val.ar, \smooth.ir(0));
+		var val = AlgaSmoother.ar(startVal, \val.ar, \smooth.ir(0));
 		ReplaceOut.ar(\b.ir, val);
 		FreeSelf.kr(1 - \gate.kr(1));
 		Silent.ar;
