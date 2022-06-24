@@ -2,21 +2,18 @@
 p = APS.boot({
 	//ReplaceOut is needed in order to always overwrite on new trigger
 	AlgaSynthDef(\seq1_ar, {
-		var startVal = Latch.kr(InFeedback.ar(\b.ir), 1);
-		var val = AlgaSmoother.ar(startVal, \val.ar, \smooth.ir(0));
-		ReplaceOut.ar(\b.ir, val);
+		var startVal = Latch.kr(InFeedback.ar(\out.ir), 1);
 		FreeSelf.kr(1 - \gate.kr(1));
-		Silent.ar;
+		AlgaSmoother.ar(startVal, \val.ar, \smooth.ir(0));
 	},
-	allowOut: true).add
+	replaceOut: true).add
 }, algaServerOptions: AlgaServerOptions(supernova: true));
 p.sched = 0;
 )
 
 //Node to play
 (
-b = Bus.audio(s);
-~a = AN({ \seq.ar; SinOsc.ar(\freq.ar(440)) }, [\freq, AlgaTemp({ In.ar(b.index) })]);
+~a = AN({ SinOsc.ar(\freq.ar(440)) });
 ~a.play(2);
 )
 
@@ -24,17 +21,18 @@ b = Bus.audio(s);
 (
 ~b = (
 	def: \seq1_ar,
-	b: b.index,
-	smooth: Pseq([0, 0.1, 0.2], inf),
+	smooth: Pseq([0.05, 0.1, 0.2], inf),
 	val: Pseq([
 		220,
 		AlgaTemp({ SinOsc.ar(Rand(5, 150)) }, scale: [220, 1000]),
 		880
 	], inf),
 	dur: 0.25,
-	sustain: Pkey(\dur),
-	out: AlgaOut(~a, \seq) //Trick to maintain node ordering. This is crucial for supernova
+	sustain: Pkey(\dur)
 );
+
+//Connect sequencer
+~a <<.freq ~b;
 )
 
 //Interpolation still works

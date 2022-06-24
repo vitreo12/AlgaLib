@@ -2,36 +2,37 @@
 p = APS.boot({
 	//ReplaceOut is needed in order to always overwrite on new trigger
 	AlgaSynthDef(\seq1, {
-		ReplaceOut.kr(\b.ir, \val.kr);
-		FreeSelf.kr(Impulse.kr(0))
+		FreeSelf.kr(1 - \gate.kr(1));
+		\val.kr
 	},
-	allowOut: true).add
+	replaceOut: true).add
 });
 p.sched = 0;
 )
 
 //Node to play
 (
-b = Bus.control(s);
-~a = AN({ \seq.kr; SinOsc.ar(\freq.kr(440)) }, [\freq, AlgaTemp({ In.kr(b.index) })]);
-~a.play;
+~a = AN({ SinOsc.ar(\freq.kr(440)) });
+~a.play(2);
 )
 
 //Sequencer
 (
 ~b = (
 	def: \seq1,
-	b: b.index,
 	val: Pseq([220, 440, 880], inf),
 	dur: 0.25,
-	out: AlgaOut(~a, \seq) //Trick to maintain node ordering. This is crucial for supernova
+	sustain: Pkey(\dur)
 );
+
+//Connect sequencer
+~a <<.freq ~b;
 )
 
 //Interpolation still works
 (
 ~b.it = 5;
-~b <<.val Pwhite(220, 880);
+~b <<.val Pseq([220, 440, 880], inf);
 )
 
 //Latest values are preserved
