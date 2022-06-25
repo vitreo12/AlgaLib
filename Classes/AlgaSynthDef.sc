@@ -367,11 +367,10 @@ AlgaSynthDef : SynthDef {
 					});
 				).multiNewList([rate, outCtl] ++ output);
 				if(makeOutDef, {
+					//No ReplaceOut for patternTempOut
 					var outTempCtl = \patternTempOut.ir(0);
 					(
-						if(replaceOut, { ReplaceOut }, {
-							if((rate === \audio).and(sampleAccurate), { OffsetOut }, { Out })
-						});
+						if((rate === \audio).and(sampleAccurate), { OffsetOut }, { Out })
 					).multiNewList([rate, outCtl] ++ output);
 				});
 			})
