@@ -1,3 +1,17 @@
+/*
+Dev info:
+
+In the future, this should be abstracted in one class: AlgaMonoPattern.
+This should also handle PROPER interpolation / smoothing across retriggers.
+The smoothing value must always be less than dur, so only the previous Synth
+needs to be taken care of. The previous Synth should be freed with its time
+being the new smooth value, and a descending interpolation. The new Synth
+would perform the ascending one.
+
+For this new behaviour, an additional Bus per Synth is needed to retrieve
+these values.
+*/
+
 (
 p = APS.boot({
 	//ReplaceOut is needed in order to always overwrite on new trigger
