@@ -15,19 +15,19 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 AlgaSpinRoutine {
-	*waitFor { | condition, onComplete, breakCondition, time = 0.01, maxTime = 5 |
+	*waitFor { | condition, func, breakCondition, interval = 0.01, maxTime = 5 |
 		if(condition.class != Function, {
 			"waitFor only accepts a function as condition".error;
 			^nil;
 		});
 
-		if(onComplete.class != Function, {
-			"waitFor only accepts a function as onComplete".error;
+		if(func.class != Function, {
+			"waitFor only accepts a function as func".error;
 			^nil;
 		});
 
 		if(condition.value, {
-			^onComplete.value;
+			^func.value;
 		});
 
 		if(breakCondition.isNil, {
@@ -42,8 +42,8 @@ AlgaSpinRoutine {
 
 			while( { condition.value.not }, {
 				if( breakCondition.value, { condition = { true }; break = true; });
-				time.wait;
-				accumTime = accumTime + time;
+				interval.wait;
+				accumTime = accumTime + interval;
 				if(accumTime >= maxTime, {
 					("AlgaSpinRoutine: exceeded maximum wait time: " ++ maxTime).error;
 					condition = { true }; break = true;
@@ -51,7 +51,7 @@ AlgaSpinRoutine {
 			});
 
 			if(break.not, {
-				onComplete.value;
+				func.value;
 			});
 		}
 	}

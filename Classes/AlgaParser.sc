@@ -481,9 +481,8 @@ AlgaParser {
 	parseOutAlgaOut { | value, alreadyParsed |
 		var node = value.nodeOrig;
 		var param = value.paramOrig;
-
-		if(param == nil, param = \in);
-		if(param.class != Symbol, {
+		param = param ? \in;
+		if(param.isKindOf(Symbol).not, {
 			"AlgaPattern: the 'param' argument in AlgaOut can only be a Symbol. Using 'in'".error;
 			param = \in
 		});

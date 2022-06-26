@@ -137,7 +137,8 @@ AlgaSynthDef : SynthDef {
 	}
 
 	//Default sampleAccurate to false. If user needs OffsetOut (for pattern accuracy), he must set it to true.
-	*new { | name, func, rates, prependArgs, outsMapping, sampleAccurate = false, variants, metadata |
+	*new { | name, func, rates, prependArgs, outsMapping, sampleAccurate = false,
+		replaceOut = false, variants, metadata |
 		^this.new_inner(
 			name: name,
 			func: func,
@@ -145,14 +146,15 @@ AlgaSynthDef : SynthDef {
 			prependArgs: prependArgs,
 			outsMapping: outsMapping,
 			sampleAccurate: sampleAccurate,
+			replaceOut: replaceOut,
 			variants: variants,
 			metadata: metadata
 		)
 	}
 
 	*new_inner { | name, func, rates, prependArgs, outsMapping,
-		sampleAccurate = false, variants, metadata, makeFadeEnv = true,
-		makePatternDef = true, makeOutDef = true |
+		sampleAccurate = false, replaceOut = false, variants,
+		metadata, makeFadeEnv = true, makePatternDef = true, makeOutDef = true |
 		var defPattern, defOut;
 		var result;
 
@@ -163,6 +165,7 @@ AlgaSynthDef : SynthDef {
 			prependArgs: prependArgs,
 			outsMapping: outsMapping,
 			sampleAccurate: sampleAccurate,
+			replaceOut: replaceOut,
 			variants: variants,
 			metadata: metadata,
 			makeFadeEnv: makeFadeEnv,
@@ -178,6 +181,7 @@ AlgaSynthDef : SynthDef {
 				prependArgs: prependArgs,
 				outsMapping: outsMapping,
 				sampleAccurate: sampleAccurate,
+				replaceOut: replaceOut,
 				variants: variants,
 				metadata: metadata,
 				makeFadeEnv: makeFadeEnv,
@@ -195,6 +199,7 @@ AlgaSynthDef : SynthDef {
 				prependArgs: prependArgs,
 				outsMapping: outsMapping,
 				sampleAccurate: sampleAccurate,
+				replaceOut: replaceOut,
 				variants: variants,
 				metadata: metadata,
 				makeFadeEnv: makeFadeEnv,
@@ -209,7 +214,7 @@ AlgaSynthDef : SynthDef {
 
 	*new_inner_inner { | name, func, rates, prependArgs, outsMapping,
 		sampleAccurate = false, variants, metadata, makeFadeEnv = true,
-		makePatternDef = false, makeOutDef = false, ignoreOutWarning = false |
+		makePatternDef = false, makeOutDef = false, replaceOut = false, ignoreOutWarning = false |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var outerBuildSynthDef = UGen.buildSynthDef;
 
@@ -267,7 +272,9 @@ AlgaSynthDef : SynthDef {
 				//Check for invalid names
 				if((controlNameName == \out).or(controlNameName == \patternTempOut).or(
 					controlNameName == \timingOffset).or(controlNameName == \lag), {
-					Error("AlgaSynthDef: the '" ++ controlNameName.asString ++ "' parameter cannot be explicitly set. It's used internally. Choose another name.").algaThrow;
+					if(controlName.rate != \scalar, {
+						Error("AlgaSynthDef: special parameter '" ++ controlNameName ++ "' must be scalar").algaThrow;
+					});
 				});
 
 				//Finally, print user for certainety when using any dur key
@@ -353,11 +360,18 @@ AlgaSynthDef : SynthDef {
 				});
 
 				//\out control business
-				outCtl = Control.names(\out).ir(0);
-				(if(rate === \audio and: { sampleAccurate }) { OffsetOut } { Out }).multiNewList([rate, outCtl] ++ output);
+				outCtl = \out.ir(0);
+				(
+					if(replaceOut, { ReplaceOut }, {
+						if((rate === \audio).and(sampleAccurate), { OffsetOut }, { Out })
+					});
+				).multiNewList([rate, outCtl] ++ output);
 				if(makeOutDef, {
-					var outTempCtl = Control.names(\patternTempOut).ir(0);
-					(if(rate === \audio and: { sampleAccurate }) { OffsetOut } { Out }).multiNewList([rate, outTempCtl] ++ output)
+					//No ReplaceOut for patternTempOut
+					var outTempCtl = \patternTempOut.ir(0);
+					(
+						if((rate === \audio).and(sampleAccurate), { OffsetOut }, { Out })
+					).multiNewList([rate, outCtl] ++ output);
 				});
 			})
 		});
@@ -443,8 +457,9 @@ AlgaSynthDef : SynthDef {
 		var nameStr = this.name.asString;
 
 		//Uses Alga's one
-		dir = (dir ? AlgaStartup.algaSynthDefPath).asString;
+		dir = PathName((dir ? AlgaStartup.algaSynthDefPath).asString).absolutePath;
 
+		//Create alternative files
 		if(nameStr.endsWith("_algaPattern").or(
 			nameStr.endsWith("_algaPatternTempOut")), {
 			var name = nameStr.replace("_algaPattern", "").replace("TempOut", "");

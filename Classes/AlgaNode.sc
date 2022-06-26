@@ -540,6 +540,10 @@ AlgaNode {
 		tempoScaling = value
 	}
 
+	name_ { | value |
+		name = value.asSymbol;
+	}
+
 	setParamsConnectionTime { | value, param, all = false |
 		//If all, set all paramConnectionTime regardless of their previous value
 		if(all, {
@@ -4635,29 +4639,13 @@ AlgaNode {
 	}
 
 	//Move inside another group (head)
-	moveToHead { | argGroup, spin = false |
-		if(this.algaInstantiatedAsSender, {
-			group.moveToHead(argGroup);
-		}, {
-			if(spin, {
-				this.addAction({ this.algaInstantiatedAsSender }, {
-					group.moveToHead(argGroup);
-				});
-			});
-		});
+	moveToHead { | argGroup |
+		group.moveToHead(argGroup);
 	}
 
 	//Move inside another group (tail)
-	moveToTail { | argGroup, spin = false |
-		if(this.algaInstantiatedAsSender, {
-			group.moveToTail(argGroup);
-		}, {
-			if(spin, {
-				this.addAction({ this.algaInstantiatedAsSender }, {
-					group.moveToTail(argGroup);
-				});
-			});
-		});
+	moveToTail { | argGroup |
+		group.moveToTail(argGroup);
 	}
 
 	clock { ^(actionScheduler.scheduler.clock) }

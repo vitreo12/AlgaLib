@@ -1,3 +1,19 @@
+# 1.2.1
+
+## New features
+
+- `AlgaPattern`: `sustain` is now defaulted to 1. This does not affect `AlgaSynthDef`s that do not implement a `\gate` parameter or that can already free themselves.
+
+- `AlgaSynthDef`: add the `replaceOut` argument. This allows users to use `ReplaceOut` as output instead of `Out` / `OffsetOut`.
+
+## Bug fixes
+
+- `AlgaNode`: Fixed `moveToHead` and `moveToTail`. No `AlgaSpinRoutine` is used anymore, as that was causing the node ordering for `AlgaBlock` to not work if the nodes were not instantiated yet.
+
+- `AlgaPattern`: Fixed multichannel `AlgaTemp`s.
+
+- `AlgaOut`: Fixed the parameter argument. It was only working with `\in` before.
+
 # 1.2
 
 ## New features
