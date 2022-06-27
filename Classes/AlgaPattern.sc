@@ -1534,7 +1534,7 @@ AlgaPattern : AlgaNode {
 				algaMonoPatternBus = AlgaBus(server, numChannels, rate);
 				patternSynthArgs = patternSynthArgs.add(
 					\monoPatternOut).add(algaMonoPatternBus.index).add(
-					//\fadeTime).add(if(tempoScaling, { time / this.clock.tempo }, { time })).add(
+					\fadeTime).add(if(tempoScaling, { time / this.clock.tempo }, { time })).add(
 					\envShape).add(AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
 				)
 			});
@@ -1560,7 +1560,7 @@ AlgaPattern : AlgaNode {
 				var time = currentEnvironment[\time] ? 0;
 				this.activeMonoSynths.do({ | activeMonoSynth |
 					activeMonoSynth.set(
-						//\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
+						\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 						\envShape, AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
 					)
 				});

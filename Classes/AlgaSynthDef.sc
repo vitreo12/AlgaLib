@@ -214,7 +214,7 @@ AlgaSynthDef : SynthDef {
 
 	*new_inner_inner { | name, func, rates, prependArgs, outsMapping,
 		sampleAccurate = false, variants, metadata, makeFadeEnv = true,
-		makePatternDef = false, makeOutDef = false, replaceOut = false, ignoreOutWarning = false |
+		makePatternDef = false, makeOutDef = false, replaceOut = false, ignoreOutWarning = false, ignoreAmp = false |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var outerBuildSynthDef = UGen.buildSynthDef;
 
@@ -342,7 +342,7 @@ AlgaSynthDef : SynthDef {
 				output
 			}, {
 				//Add \amp if needed: should .kr be used in all cases to save CPU?
-				if(ampProvided.not, {
+				if((ignoreAmp.not).and(ampProvided.not), {
 					if(rate === \audio,
 						{ output = output * \amp.ar(1) },
 						{ output = output * \amp.kr(1) }
