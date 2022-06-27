@@ -2549,13 +2549,17 @@ AlgaPattern : AlgaNode {
 
 		//AlgaMonoPattern has its own normalizer for its interpolation to work correctly
 		if(this.isAlgaMonoPattern, {
-			this.outNormBus   = AlgaBus(server, numChannels + 1, rate);
+			var outNormBus = AlgaBus(server, numChannels + 1, rate);
+			this.outNormBus = outNormBus;
 			this.outNormSynth = AlgaSynth(
 				("alga_norm_" ++ rate ++ numChannels).asSymbol,
 				[ \args, this.outNormBus.busArg, \out, this.synthBus.index ],
-				this.synthConvGroup,
+				this.synthConvGroup, //Use this group as it's going to be after synthGroup anyways
 				waitForInst: false
-			)
+			);
+			this.outNormSynth.onFree({
+				outNormBus.free
+			});
 		});
 	}
 
