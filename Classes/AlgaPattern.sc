@@ -1527,13 +1527,10 @@ AlgaPattern : AlgaNode {
 
 		//The actual patternSynth according to the user's def
 		if(skipIteration.not, {
-			//AlgaMonoPattern: create new Bus
-			var algaMonoPatternBus;
+			//AlgaMonoPattern: attach arguments
 			if(this.isAlgaMonoPattern, {
 				var time = currentEnvironment[\time] ? 0;
-				algaMonoPatternBus = AlgaBus(server, numChannels, rate);
 				patternSynthArgs = patternSynthArgs.add(
-					\monoPatternOut).add(algaMonoPatternBus.index).add(
 					\fadeTime).add(if(tempoScaling, { time / this.clock.tempo }, { time })).add(
 					\envShape).add(AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
 				)
@@ -1557,27 +1554,23 @@ AlgaPattern : AlgaNode {
 
 			//AlgaMonoPattern: free previous Synth / Bus and assign anew
 			if(this.isAlgaMonoPattern, {
+				//Set release / time / shape for old synths
 				var time = currentEnvironment[\time] ? 0;
 				this.activeMonoSynths.do({ | activeMonoSynth |
 					activeMonoSynth.set(
+						\t_release, 1,
 						\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
 						\envShape, AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
 					)
 				});
-				if(this.prevMonoSynth != nil, {
-					this.prevMonoSynth.set(\t_release, 1);
-					this.prevMonoSynth.onFree({ | prevMonoSynth |
-						var prevMonoBus = this.activeMonoBusses[prevMonoSynth];
-						this.activeMonoSynths.remove(prevMonoSynth);
-						if(prevMonoBus != nil, {
-							prevMonoBus.free;
-							this.activeMonoBusses.removeAt(prevMonoSynth)
-						});
-					});
+
+				//Function to free current one (will be triggered in a future activeMonoSynths.do call)
+				patternSynth.onFree({ | prevMonoSynth |
+					this.activeMonoSynths.remove(prevMonoSynth);
 				});
+
+				//Update entries
 				this.activeMonoSynths.add(patternSynth);
-				this.activeMonoBusses[patternSynth] = algaMonoPatternBus;
-				this.prevMonoSynth = patternSynth;
 			});
 		});
 
@@ -3701,8 +3694,7 @@ AP : AlgaPattern {}
 
 //Monophonic pattern execution
 AlgaMonoPattern : AlgaPattern {
-	var <>activeMonoSynths, <>activeMonoBusses;
-	var <>prevMonoSynth;
+	var <>activeMonoSynths;
 
 	isAlgaMonoPattern { ^true }
 

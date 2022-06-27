@@ -321,7 +321,6 @@ AlgaNode {
 			this.currentActiveInterpBusses = IdentityDictionary(10);
 			if(this.isAlgaMonoPattern, {
 				this.activeMonoSynths = IdentitySet(10);
-				this.activeMonoBusses = IdentityDictionary(10);
 			});
 		});
 
