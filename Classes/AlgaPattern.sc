@@ -1891,6 +1891,7 @@ AlgaPattern : AlgaNode {
 
 		//Retrieve channels and rate
 		numChannels = synthDef.numChannels;
+		if(this.isAlgaMonoPattern, { numChannels = numChannels - 1 }); //Account for [\in, \env] of the norm
 		rate = synthDef.rate;
 
 		//Generate outsMapping (for outsMapping connectinons)
@@ -2548,11 +2549,9 @@ AlgaPattern : AlgaNode {
 
 		//AlgaMonoPattern has its own normalizer for its interpolation to work correctly
 		if(this.isAlgaMonoPattern, {
-			//numChannels for the AlgaMonoPattern definitions already take into account
-			//the [value, env] pair, so they are 1 extra already. Hence the -1
-			this.outNormBus   = AlgaBus(server, numChannels, rate);
+			this.outNormBus   = AlgaBus(server, numChannels + 1, rate);
 			this.outNormSynth = AlgaSynth(
-				("alga_norm_" ++ rate ++ (numChannels - 1)).asSymbol,
+				("alga_norm_" ++ rate ++ numChannels).asSymbol,
 				[ \args, this.outNormBus.busArg, \out, this.synthBus.index ],
 				this.synthConvGroup,
 				waitForInst: false
@@ -3146,7 +3145,7 @@ AlgaPattern : AlgaNode {
 
 	//Don't support <<+ for now
 	mixFrom { | sender, param = \in, inChans, scale, time, shape, sched |
-		"AlgaPattern: mixFrom is not supported yet".error;
+		"AlgaPattern: 'mixFrom' is unsupported".error;
 	}
 
 	// <<| \param (goes back to defaults)
