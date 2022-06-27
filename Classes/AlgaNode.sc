@@ -319,6 +319,10 @@ AlgaNode {
 			this.currentPatternBussesAndSynths = IdentityDictionary(10);
 			this.currentActivePatternParamSynths = IdentityDictionary(10);
 			this.currentActiveInterpBusses = IdentityDictionary(10);
+			if(this.isAlgaMonoPattern, {
+				this.activeMonoSynths = IdentitySet(10);
+				this.activeMonoBusses = IdentityDictionary(10);
+			});
 		});
 
 		^true;
@@ -478,6 +482,7 @@ AlgaNode {
 				});
 			});
 
+			//Parse def
 			argDefAndFunctionSynthDefDict = this.parseDef(argDef);
 			argDef = argDefAndFunctionSynthDefDict[0];
 			functionSynthDefDict = argDefAndFunctionSynthDefDict[1];
@@ -818,14 +823,23 @@ AlgaNode {
 
 		//For AlgaPattern, use a ParGroup to parallelize
 		if(this.isAlgaPattern, {
-			this.fxConvGroup = AlgaParGroup(group);
-			this.fxGroup = AlgaParGroup(group);
-			this.synthConvGroup = AlgaParGroup(group);
-			synthGroup = AlgaParGroup(group);
-			normGroup = AlgaParGroup(group);
-			interpGroup = AlgaParGroup(group);
-			this.interpGroupEnv = AlgaParGroup(group);
-			tempGroup = AlgaParGroup(group);
+			if(this.isAlgaMonoPattern, {
+				this.synthConvGroup = AlgaGroup(group);
+				synthGroup = AlgaGroup(group);
+				normGroup = AlgaGroup(group);
+				interpGroup = AlgaGroup(group);
+				this.interpGroupEnv = AlgaGroup(group);
+				tempGroup = AlgaGroup(group);
+			}, {
+				this.fxConvGroup = AlgaParGroup(group);
+				this.fxGroup = AlgaParGroup(group);
+				this.synthConvGroup = AlgaParGroup(group);
+				synthGroup = AlgaParGroup(group);
+				normGroup = AlgaParGroup(group);
+				interpGroup = AlgaParGroup(group);
+				this.interpGroupEnv = AlgaParGroup(group);
+				tempGroup = AlgaParGroup(group);
+			});
 		}, {
 			//With mixing and everything, it's nice to parallelize interpGroup, normGroup and tempGroup.
 			//Of course, with fewer parameters and / or mix inputs, the gains will not be huge.

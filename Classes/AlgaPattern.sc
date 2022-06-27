@@ -1527,6 +1527,19 @@ AlgaPattern : AlgaNode {
 
 		//The actual patternSynth according to the user's def
 		if(skipIteration.not, {
+			//AlgaMonoPattern: create new Bus
+			var algaMonoPatternBus;
+			if(this.isAlgaMonoPattern, {
+				var time = currentEnvironment[\time] ? 0;
+				algaMonoPatternBus = AlgaBus(server, numChannels, rate);
+				patternSynthArgs = patternSynthArgs.add(
+					\monoPatternOut).add(algaMonoPatternBus.index).add(
+					//\fadeTime).add(if(tempoScaling, { time / this.clock.tempo }, { time })).add(
+					\envShape).add(AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
+				)
+			});
+
+			//New Pattern synth
 			patternSynth = AlgaSynth(
 				algaSynthDef,
 				patternSynthArgs,
@@ -1540,6 +1553,31 @@ AlgaPattern : AlgaNode {
 			//If sustain, add patternSynth to sustains'
 			if(isSustainTrig, {
 				sustainIDs = sustainIDs.add(patternSynth.nodeID)
+			});
+
+			//AlgaMonoPattern: free previous Synth / Bus and assign anew
+			if(this.isAlgaMonoPattern, {
+				var time = currentEnvironment[\time] ? 0;
+				this.activeMonoSynths.do({ | activeMonoSynth |
+					activeMonoSynth.set(
+						//\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
+						\envShape, AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
+					)
+				});
+				if(this.prevMonoSynth != nil, {
+					this.prevMonoSynth.set(\t_release, 1);
+					this.prevMonoSynth.onFree({ | prevMonoSynth |
+						var prevMonoBus = this.activeMonoBusses[prevMonoSynth];
+						this.activeMonoSynths.remove(prevMonoSynth);
+						if(prevMonoBus != nil, {
+							prevMonoBus.free;
+							this.activeMonoBusses.removeAt(prevMonoSynth)
+						});
+					});
+				});
+				this.activeMonoSynths.add(patternSynth);
+				this.activeMonoBusses[patternSynth] = algaMonoPatternBus;
+				this.prevMonoSynth = patternSynth;
 			});
 		});
 
@@ -1687,8 +1725,10 @@ AlgaPattern : AlgaNode {
 			if(controlNamesToUse == nil, { controlNamesToUse = controlNames });
 		});
 
-		//algaSynthDef with _algaPattern
-		algaSynthDef = (algaSynthDef.asString ++ "_algaPattern").asSymbol;
+		//algaSynthDef with _algaPattern. AlgaMonoPattern doesn't need it anyways
+		if(this.isAlgaMonoPattern.not, {
+			algaSynthDef = (algaSynthDef.asString ++ "_algaPattern").asSymbol;
+		});
 
 		//If streams being stopped (happens for AlgaStep + stopPatternBeforeReplace)
 		//This must be checked here as the eventSynth is already being triggered
@@ -2332,7 +2372,11 @@ AlgaPattern : AlgaNode {
 			//No \sustain from user, set to previous one
 			if(foundSustain.not, {
 				if(resetSustain, {
-					this.setSustain(1, newInterpStreams)
+					if(this.isAlgaMonoPattern, {
+						this.setSustain(0, newInterpStreams)
+					}, {
+						this.setSustain(1, newInterpStreams)
+					});
 				}, {
 					this.setSustain(interpStreams.sustain, newInterpStreams)
 				});
@@ -2405,7 +2449,13 @@ AlgaPattern : AlgaNode {
 		}, {
 			//Else, default them
 			if(foundDurOrDelta.not, { this.setDur(1, newInterpStreams) });
-			if(foundSustain.not, { this.setSustain(1, newInterpStreams) });
+			if(foundSustain.not, {
+				if(this.isAlgaMonoPattern, {
+					this.setSustain(0, newInterpStreams)
+				}, {
+					this.setSustain(1, newInterpStreams)
+				});
+			});
 			if(foundStretch.not, { this.setStretch(1, newInterpStreams) });
 			if(foundLegato.not,  { this.setLegato(0, newInterpStreams) });
 		});
@@ -3649,13 +3699,19 @@ AlgaPattern : AlgaNode {
 //Alias
 AP : AlgaPattern {}
 
-/*
-//Implements Pmono behaviour
-AlgaMonoPattern : AlgaPattern {}
+//Monophonic pattern execution
+AlgaMonoPattern : AlgaPattern {
+	var <>activeMonoSynths, <>activeMonoBusses;
+	var <>prevMonoSynth;
+
+	isAlgaMonoPattern { ^true }
+
+	//No replace
+	replace { }
+}
 
 //Alias
 AMP : AlgaMonoPattern {}
-*/
 
 //Extension to support out: from AlgaPattern
 +AlgaNode {

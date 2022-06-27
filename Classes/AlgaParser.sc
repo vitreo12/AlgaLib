@@ -299,6 +299,16 @@ AlgaParser {
 		defFX  = def[\fx];
 		defOut = def[\out];
 
+		//AlgaMonoPattern
+		if(obj.isAlgaMonoPattern, {
+			var defRate = def[\rate] ? \audio;
+			if((defRate != \audio).and(defRate != \control), {
+				"AlgaMonoPattern: 'rate' can only be 'audio' or 'control'".error;
+				^nil;
+			});
+			defDef = ("algaMonoPattern_" ++ defRate).asSymbol;
+		});
+
 		//Return nil if no def
 		if(defDef == nil, {
 			"AlgaPattern: the Event does not provide a 'def' entry".error;
