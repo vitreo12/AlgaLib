@@ -1527,10 +1527,11 @@ AlgaPattern : AlgaNode {
 
 		//The actual patternSynth according to the user's def
 		if(skipIteration.not, {
-			//AlgaMonoPattern: attach arguments
+			//AlgaMonoPattern: attach arguments, writing to the outNormBus
 			if(this.isAlgaMonoPattern, {
 				var time = currentEnvironment[\time] ? 0;
 				patternSynthArgs = patternSynthArgs.add(
+					\out).add(this.outNormBus.index).add(
 					\fadeTime).add(if(tempoScaling, { time / this.clock.tempo }, { time })).add(
 					\envShape).add(AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
 				)
@@ -1541,7 +1542,8 @@ AlgaPattern : AlgaNode {
 				algaSynthDef,
 				patternSynthArgs,
 				synthGroup,
-				waitForInst: false
+				if(this.isAlgaMonoPattern, { \addToTail }, { \addToHead }),
+				false
 			);
 
 			//Add pattern synth to algaPatternSynths, and free it when patternSynth gets freed
@@ -2543,6 +2545,19 @@ AlgaPattern : AlgaNode {
 		//Needed for manual .step + .replace
 		patternsAsStreams = (patternsAsStreams ? IdentityDictionary());
 		patternsAsStreams[interpStreams] = pattern.algaAsStream;
+
+		//AlgaMonoPattern has its own normalizer for its interpolation to work correctly
+		if(this.isAlgaMonoPattern, {
+			//numChannels for the AlgaMonoPattern definitions already take into account
+			//the [value, env] pair, so they are 1 extra already. Hence the -1
+			this.outNormBus   = AlgaBus(server, numChannels, rate);
+			this.outNormSynth = AlgaSynth(
+				("alga_norm_" ++ rate ++ (numChannels - 1)).asSymbol,
+				[ \args, this.outNormBus.busArg, \out, this.synthBus.index ],
+				this.synthConvGroup,
+				waitForInst: false
+			)
+		});
 	}
 
 	//Parse the \fx key
@@ -3157,11 +3172,14 @@ AlgaPattern : AlgaNode {
 	replace { | def, args, time, sched = 1, outsMapping, reset = false, keepOutsMappingIn = true,
 		keepOutsMappingOut = true, keepScalesIn = true, keepScalesOut = true |
 
-		//Parse the def
-		var defAndFunctionSynthDefDict = this.parseDef(def);
+		var defAndFunctionSynthDefDict;
 		var functionSynthDefDict;
 
-		//Unpack
+		//Not supported for AMP
+		if(this.isAlgaMonoPattern, { "AlgaMonoPattern: 'replace' is unsupported".error; ^this });
+
+		//Parse the def
+		defAndFunctionSynthDefDict = this.parseDef(def);
 		def = defAndFunctionSynthDefDict[0];
 		functionSynthDefDict = defAndFunctionSynthDefDict[1];
 
@@ -3694,12 +3712,10 @@ AP : AlgaPattern {}
 
 //Monophonic pattern execution
 AlgaMonoPattern : AlgaPattern {
+	var <>outNormSynth, <>outNormBus;
 	var <>activeMonoSynths;
 
 	isAlgaMonoPattern { ^true }
-
-	//No replace
-	replace { }
 }
 
 //Alias

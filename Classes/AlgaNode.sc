@@ -823,6 +823,7 @@ AlgaNode {
 		//For AlgaPattern, use a ParGroup to parallelize
 		if(this.isAlgaPattern, {
 			if(this.isAlgaMonoPattern, {
+				//No need to parallelize these as there are mostly going to be one active at each time
 				this.synthConvGroup = AlgaGroup(group);
 				synthGroup = AlgaGroup(group);
 				normGroup = AlgaGroup(group);

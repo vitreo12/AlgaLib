@@ -299,13 +299,23 @@ AlgaParser {
 		defFX  = def[\fx];
 		defOut = def[\out];
 
-		//AlgaMonoPattern
+		//AlgaMonoPattern. Check validity of entries
 		if(obj.isAlgaMonoPattern, {
 			var defRate = def[\rate] ? \audio;
 			if((defRate != \audio).and(defRate != \control), {
 				"AlgaMonoPattern: 'rate' can only be 'audio' or 'control'".error;
 				^nil;
 			});
+			if(defFX != nil, {
+				"AlgaMonoPattern: 'fx' is unsupported".error;
+				^nil;
+			});
+			if(defOut != nil, {
+				"AlgaMonoPattern: 'out' is unsupported".error;
+				^nil;
+			});
+
+			//Multichannel ????
 			defDef = ("algaMonoPattern_" ++ defRate).asSymbol;
 		});
 
