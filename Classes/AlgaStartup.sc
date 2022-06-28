@@ -30,13 +30,15 @@ AlgaStartup {
 	classvar <algaSynthDefPath;
 	classvar <algaSynthDefIOPath;
 	classvar <algaSynthDefIO_numberPath;
+	classvar <algaMonoPatternPath;
 
-	classvar percentageSplit;
+	classvar percentageSplit = 0;
 
 	*initClass {
 		algaSynthDefPath = File.realpath(Alga.class.filenameSymbol).dirname.withTrailingSlash ++ "../AlgaSynthDefs/";
 		algaSynthDefIOPath = (algaSynthDefPath ++ "IO/");
 		algaSynthDefIO_numberPath = (algaSynthDefIOPath ++ "IO_" ++ algaMaxIO ++ "/");
+		algaMonoPatternPath = (algaSynthDefIO_numberPath ++ "AlgaMonoPattern/");
 	}
 
 	*algaMaxIO_ { | value |
@@ -60,6 +62,7 @@ AlgaStartup {
 
 	*updateAlgaSynthDefIOPath {
 		algaSynthDefIO_numberPath = (algaSynthDefIOPath ++ "/IO_" ++ algaMaxIO ++ "/").asString;
+		algaMonoPatternPath = (algaSynthDefIO_numberPath ++ "AlgaMonoPattern/");
 	}
 
 	*initSynthDefs {
@@ -92,6 +95,7 @@ AlgaStartup {
 						this.initAlgaNorm;
 						this.initAlgaMixFades;
 						this.initAlgaPatternInterp;
+						this.initAlgaMonoPattern;
 						"\n-> Done!".postln;
 					}, {
 						("Could not create path: " ++ algaSynthDefIO_numberPath).error;
@@ -113,7 +117,7 @@ AlgaStartup {
 
 		var percentageCounter = 0.0;
 
-		"\n(1/5) Generating the alga_play definitions...".postln;
+		"\n(1/6) Generating the alga_play definitions...".postln;
 
 		algaMaxIO.do({ | i |
 			var arrayOfZeros_in, arrayOfIndices;
@@ -194,7 +198,7 @@ input = " ++ func ++ "(input * \\scale.kr(1)) * AlgaEnvGate.kr(gate:\\gate.kr(1)
 		var exponentialPercentageSplit = 100.0 / (algaMaxIO * algaMaxIO);
 		var percentageCounter = 0.0;
 
-		"\n(2/5) Generating the alga_interp definitions (this step takes the longest time)...".postln;
+		"\n(2/6) Generating the alga_interp definitions (this step takes the longest time)...".postln;
 
 		//var file = File("~/AlgaSynthDefsTest.scd".standardizePath,"w");
 
@@ -258,7 +262,6 @@ input = " ++ func ++ "(input * \\scale.kr(1)) * AlgaEnvGate.kr(gate:\\gate.kr(1)
 
 				//Not done already
 				if(isAlreadyDone.isNil, {
-					var outs = "outs[0] = out;";
 					var indices_ar = "in;";
 					var indices_kr = "in;";
 					var env_pattern_ar = "\\env.ar(0);";
@@ -268,10 +271,6 @@ input = " ++ func ++ "(input * \\scale.kr(1)) * AlgaEnvGate.kr(gate:\\gate.kr(1)
 
 					//constant multiplier. this is set when mix's scale argument is a single Number
 					var multiplier = "\\outMultiplier.ir(1);";
-
-					if(y > 1, {
-						outs = y.asString ++ ".do({ | i | outs[i] = out[i]});";
-					});
 
 					//keep in; for i == 0
 					if(i > 1, {
@@ -345,10 +344,7 @@ out = " ++ scaling ++ "
 env = " ++ env ++ "
 out = out * outMultiplier;
 out = out * env;
-outs = Array.newClear(" ++ (y + 1) ++ ");
-" ++ outs ++ "
-outs[" ++ y ++ "] = env;
-outs;
+[out, env].flatten
 }, makeFadeEnv:false, sampleAccurate:false, makePatternDef:false, makeOutDef:false, ignoreAmp:true).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);
 
 //Used in patterns (env comes from outside)
@@ -369,10 +365,7 @@ out = out * outMultiplier;
 env = " ++ env_pattern ++ "
 env = " ++ sampleAndHold ++ "
 out = out * env;
-outs = Array.newClear(" ++ (y + 1) ++ ");
-" ++ outs ++ "
-outs[" ++ y ++ "] = env;
-outs;
+[out, env].flatten
 }, makeFadeEnv:false, sampleAccurate:false, makePatternDef:false, makeOutDef:false, ignoreAmp:true).algaStore(dir:AlgaStartup.algaSynthDefIO_numberPath);
 
 //Used in patterns + fx (no env)
@@ -430,7 +423,7 @@ out = out * env;
 	*initAlgaNorm {
 		var percentageCounter = 0.0;
 
-		"\n(3/5) Generating the alga_norm definitions...".postln;
+		"\n(3/6) Generating the alga_norm definitions...".postln;
 
 		algaMaxIO.do({ | i |
 
@@ -503,7 +496,7 @@ out;
 	*initAlgaMixFades {
 		var percentageCounter = 0.0;
 
-		"\n(4/5) Generating the alga_fadeIn / alga_fadeOut definitions...".postln;
+		"\n(4/6) Generating the alga_fadeIn / alga_fadeOut definitions...".postln;
 
 		algaMaxIO.do({ | i |
 			var fadein_kr, fadein_ar;
@@ -589,7 +582,7 @@ val[" ++ i ++ "] = env;
 	*initAlgaPatternInterp {
 		var result;
 
-		"\n(5/5) Generating the alga_pattern_interp definitions...".postln;
+		"\n(5/6) Generating the alga_pattern_interp definitions...".postln;
 
 		result = "
 AlgaSynthDef.new_inner_inner(\\alga_pattern_interp_env_audio, {
@@ -603,5 +596,51 @@ AlgaDynamicIEnvGenBuf.kr(\\envShape.kr(-1), \\fadeTime.kr(0), maxSize: AlgaStart
 		result.interpret;
 
 		("100 %").postln;
+	}
+
+	*initAlgaMonoPattern {
+		var algaMonoPatternFolder = algaSynthDefIO_numberPath ++ "/AlgaMonoPattern";
+		var algaMonoPatternFolderCreated = File.mkdir(algaMonoPatternFolder);
+		if(algaMonoPatternFolderCreated, {
+			var percentageCounter = 0.0;
+
+			"\n(6/6) Generating the alga_monoPattern definitions...".postln;
+
+			algaMaxIO.do({ | i |
+				var arrayOfZeros_in;
+
+				(percentageCounter.asStringPrec(2) ++ " %").postln;
+				percentageCounter = percentageCounter + percentageSplit;
+
+				i = i + 1;
+
+				if(i == 1, {
+					arrayOfZeros_in = "0";
+				}, {
+					arrayOfZeros_in = "[";
+
+					//[0, 0, 0...
+					i.do({
+						arrayOfZeros_in = arrayOfZeros_in ++ "0,";
+					});
+
+					//remove trailing coma [0, 0, 0, and enclose in bracket -> [0, 0, 0]
+					arrayOfZeros_in = arrayOfZeros_in[0..(arrayOfZeros_in.size - 2)] ++ "]";
+				});
+
+				["audio", "control"].do({ | rate |
+					var rate_short = if(rate == "audio" , { "ar" }, { "kr" });
+					var result = "
+AlgaSynthDef.new_inner_inner(\\alga_monoPattern_" ++ rate ++ i.asString ++ ", {
+var env = AlgaDynamicIEnvGenBuf." ++ rate_short ++ "(\\envShape.kr(-1), \\fadeTime.kr(0), maxSize: AlgaStartup.maxEnvPoints, release: \\t_release.tr(0));
+[\\in." ++ rate_short ++ "(" ++ arrayOfZeros_in ++ ") * env, env].flatten
+}, makeFadeEnv:false, sampleAccurate:true, makePatternDef:false, makeOutDef:false, ignoreAmp: true).algaStore(dir:AlgaStartup.algaMonoPatternPath);
+";
+					result.interpret;
+				});
+			});
+
+			("100 %").postln;
+		});
 	}
 }

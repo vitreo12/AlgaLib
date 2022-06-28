@@ -301,9 +301,14 @@ AlgaParser {
 
 		//AlgaMonoPattern. Check validity of entries
 		if(obj.isAlgaMonoPattern, {
-			var defRate = def[\rate] ? \audio;
+			var defRate  = def[\rate] ? \audio;
+			var defChans = (((def[\chans] ? def[\channels]) ? def[\numChans]) ? def[\numChannels]) ? 1;
 			if((defRate != \audio).and(defRate != \control), {
 				"AlgaMonoPattern: 'rate' can only be 'audio' or 'control'".error;
+				^nil;
+			});
+			if(defChans.isInteger.not, {
+				"AlgaMonoPattern: 'chans' can only be an Integer".error;
 				^nil;
 			});
 			if(defFX != nil, {
@@ -315,8 +320,12 @@ AlgaParser {
 				^nil;
 			});
 
+			//Set numChannels / rate
+			obj.monoRate = defRate;
+			obj.monoNumChannels = defChans;
+
 			//Multichannel ????
-			defDef = ("algaMonoPattern_" ++ defRate).asSymbol;
+			defDef = ("alga_monoPattern_" ++ defRate ++ defChans).asSymbol;
 		});
 
 		//Return nil if no def

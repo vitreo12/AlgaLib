@@ -245,7 +245,9 @@ Alga {
 	}
 
 	*readAlgaSynthDefsFolder {
-		this.readAllDefs(AlgaStartup.algaSynthDefPath)
+		this.readAllDefs(AlgaStartup.algaSynthDefPath);
+		//AlgaMonoPattern's defs are needed in the Alga library desc
+		this.readAllDefs(AlgaStartup.algaMonoPatternPath);
 	}
 
 	*readDef { | path, server |

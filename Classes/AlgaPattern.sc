@@ -1528,12 +1528,14 @@ AlgaPattern : AlgaNode {
 		//The actual patternSynth according to the user's def
 		if(skipIteration.not, {
 			//AlgaMonoPattern: attach arguments, writing to the outNormBus
+			var algaMonoTime, algaMonoShape;
 			if(this.isAlgaMonoPattern, {
-				var time = currentEnvironment[\time] ? 0;
+				algaMonoTime = currentEnvironment[\time] ? this.interpTime;
+				algaMonoShape = currentEnvironment[\shape] ? this.interpShape;
 				patternSynthArgs = patternSynthArgs.add(
 					\out).add(this.outNormBus.index).add(
-					\fadeTime).add(if(tempoScaling, { time / this.clock.tempo }, { time })).add(
-					\envShape).add(AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
+					\fadeTime).add(if(tempoScaling, { algaMonoTime / this.clock.tempo }, { algaMonoTime })).add(
+					\envShape).add(AlgaDynamicEnvelopes.getOrAdd(algaMonoShape, server)
 				)
 			});
 
@@ -1542,8 +1544,7 @@ AlgaPattern : AlgaNode {
 				algaSynthDef,
 				patternSynthArgs,
 				synthGroup,
-				if(this.isAlgaMonoPattern, { \addToTail }, { \addToHead }),
-				false
+				waitForInst: false
 			);
 
 			//Add pattern synth to algaPatternSynths, and free it when patternSynth gets freed
@@ -1557,12 +1558,11 @@ AlgaPattern : AlgaNode {
 			//AlgaMonoPattern: free previous Synth / Bus and assign anew
 			if(this.isAlgaMonoPattern, {
 				//Set release / time / shape for old synths
-				var time = currentEnvironment[\time] ? 0;
 				this.activeMonoSynths.do({ | activeMonoSynth |
 					activeMonoSynth.set(
 						\t_release, 1,
-						\fadeTime, if(tempoScaling, { time / this.clock.tempo }, { time }),
-						\envShape, AlgaDynamicEnvelopes.getOrAdd(Env([0, 1], 1), server)
+						\fadeTime, if(tempoScaling, { algaMonoTime / this.clock.tempo }, { algaMonoTime }),
+						\envShape, AlgaDynamicEnvelopes.getOrAdd(algaMonoShape, server)
 					)
 				});
 
@@ -1881,18 +1881,31 @@ AlgaPattern : AlgaNode {
 	buildFromSynthDef { | initGroups = false, replace = false,
 		keepChannelsMapping = false, keepScale = false, sched = 0 |
 
-		var synthDescControlNames;
+		if(this.isAlgaMonoPattern.not, {
+			//Retrieve controlNames from SynthDesc
+			var synthDescControlNames = synthDef.asSynthDesc.controls;
 
-		//Retrieve controlNames from SynthDesc
-		synthDescControlNames = synthDef.asSynthDesc.controls;
+			//Create controlNames
+			this.createControlNamesAndParamsConnectionTime(synthDescControlNames);
 
-		//Create controlNames
-		this.createControlNamesAndParamsConnectionTime(synthDescControlNames);
+			//Retrieve channels and rate
+			numChannels = synthDef.numChannels;
+			rate = synthDef.rate;
+		}, {
+			//This doesn't work with asSynthDesc due to a bug in loading
+			//synthdefs from disk (which is the case for AMP). This is why I developed
+			//the custom archive approach with AlgaSynthDef.read.
+			//This Could perhaps implemented for AMP aswell, but for now this is fine
+			var synthDescControlNames = synthDef.controlNames;
 
-		//Retrieve channels and rate
-		numChannels = synthDef.numChannels;
-		if(this.isAlgaMonoPattern, { numChannels = numChannels - 1 }); //Account for [\in, \env] of the norm
-		rate = synthDef.rate;
+			//Create controlNames
+			this.createControlNamesAndParamsConnectionTime(synthDescControlNames);
+
+			//Retrieve channels and rate. This don't work from the synthDef
+			//since it's loaded from disk.
+			numChannels = this.monoNumChannels;
+			rate = this.monoRate;
+		});
 
 		//Generate outsMapping (for outsMapping connectinons)
 		this.calculateOutsMapping(replace, keepChannelsMapping);
@@ -2553,13 +2566,11 @@ AlgaPattern : AlgaNode {
 			this.outNormBus = outNormBus;
 			this.outNormSynth = AlgaSynth(
 				("alga_norm_" ++ rate ++ numChannels).asSymbol,
-				[ \args, this.outNormBus.busArg, \out, this.synthBus.index ],
+				[ \args, outNormBus.busArg, \out, synthBus.index ],
 				this.synthConvGroup, //Use this group as it's going to be after synthGroup anyways
 				waitForInst: false
 			);
-			this.outNormSynth.onFree({
-				outNormBus.free
-			});
+			this.outNormSynth.onFree({ outNormBus.free });
 		});
 	}
 
@@ -3717,12 +3728,19 @@ AP : AlgaPattern {}
 AlgaMonoPattern : AlgaPattern {
 	var <>outNormSynth, <>outNormBus;
 	var <>activeMonoSynths;
+	var <>monoNumChannels, <>monoRate;
 
 	isAlgaMonoPattern { ^true }
 }
 
 //Alias
 AMP : AlgaMonoPattern {}
+
+//Alias
+AlgaMono : AlgaMonoPattern {}
+
+//Alias
+AM : AlgaMonoPattern {}
 
 //Extension to support out: from AlgaPattern
 +AlgaNode {

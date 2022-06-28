@@ -385,8 +385,13 @@ AlgaPatternInterpStreams {
 			("AlgaPatternInterpStreams: Invalid controlName for param '" ++ paramName ++ "'").error
 		});
 
-		//Unpack
+		//Unpack name
 		paramName = controlName.name;
+
+		//AlgaMonoPattern: only consider the \in parameter
+		if((algaPattern.isAlgaMonoPattern).and(paramName != \in), { ^nil });
+
+		//Unpack other entries
 		paramRate = controlName.rate;
 		paramNumChannels = controlName.numChannels;
 		paramDefault = controlName.defaultValue;

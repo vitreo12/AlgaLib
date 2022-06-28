@@ -35,6 +35,7 @@ AlgaDynamicEnvelopes {
 
 	*add { | env, server |
 		var envsAtServer;
+		if(env.isKindOf(Env).not, { ^nil });
 		server = server ? Server.default;
 		envsAtServer = envs[server];
 		if(envsAtServer == nil, {
@@ -73,7 +74,7 @@ AlgaDynamicEnvelopes {
 	}
 
 	*getOrAdd { | env, server |
-		var val = this.get(env, server) ? this.add(env, server);
+		var val = (this.get(env, server) ? this.add(env, server)) ? this.get(Env([0, 1], 1), server);
 		if(val.isBuffer, { ^val }, { -1 });
 	}
 

@@ -1150,22 +1150,19 @@ AlgaNode {
 	//Unpack outsMappings for a single SynthDef
 	unpackSynthDefSymbol { | synthDefSymbol, outsMappingSum |
 		var synthDef = SynthDescLib.alga.at(synthDefSymbol).def;
-		if(synthDef.isKindOf(SynthDef).not, {
-			("AlgaPattern: Invalid AlgaSynthDef: '" ++
-				synthDefSymbol.asString ++ "'").error;
-			^nil
-		});
-		synthDef.outsMapping.keysValuesDo({ | key, outMapping |
-			var oldOutsMapping = outsMappingSum[key];
-			if(oldOutsMapping == nil, {
-				outsMappingSum[key] = outMapping
-			}, {
-				if(oldOutsMapping != outMapping, {
-					("AlgaPattern: outsMapping mismatch of SynthDef '" ++
-						synthDefSymbol ++ "' for key '" ++ key ++ "'. Expected '" ++
-						oldOutsMapping ++ "' but got '" ++ outMapping ++ "'").error;
-					^nil;
-				})
+		if(synthDef.isKindOf(AlgaSynthDef), {
+			synthDef.outsMapping.keysValuesDo({ | key, outMapping |
+				var oldOutsMapping = outsMappingSum[key];
+				if(oldOutsMapping == nil, {
+					outsMappingSum[key] = outMapping
+				}, {
+					if(oldOutsMapping != outMapping, {
+						("AlgaPattern: outsMapping mismatch of SynthDef '" ++
+							synthDefSymbol ++ "' for key '" ++ key ++ "'. Expected '" ++
+							oldOutsMapping ++ "' but got '" ++ outMapping ++ "'").error;
+						^nil;
+					})
+				});
 			});
 		});
 	}
@@ -1199,7 +1196,9 @@ AlgaNode {
 			if(outsMappingSynthDef == nil, { ^nil });
 		}, {
 			//Normal case (no ListPattern): synthDef is an actual synthDef
-			outsMappingSynthDef = synthDef.outsMapping;
+			if(synthDef.isKindOf(AlgaSynthDef), {
+				outsMappingSynthDef = synthDef.outsMapping
+			});
 		});
 
 		//Accumulate channelsMapping across .replace calls.
@@ -2257,6 +2256,7 @@ AlgaNode {
 
 	//Check valid controlName name
 	checkValidControlName { | paramName |
+		if(this.isAlgaMonoPattern, { ^(paramName == \in) });
 		^((paramName != '?').and(paramName != \instrument).and(
 			paramName != \def).and(paramName != \out).and(
 			paramName != \gate).and(paramName != \fadeTime).and(

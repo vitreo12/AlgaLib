@@ -1,5 +1,7 @@
-#Never skip IO
-!IO/
-
 *.scsyndef
 *.scsyndefmd
+
+#Never skip IO and AlgaMonoPattern
+!IO/*
+!IO/*/*
+!IO/*/AlgaMonoPattern/*
