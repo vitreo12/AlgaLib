@@ -1,0 +1,21 @@
+TITLE:: AlgaMonoPattern
+summary:: Alga module representing a monophonic interpolated sequencer
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern
+
+DESCRIPTION::
+Helo
+
+INSTANCEMETHODS::
+
+EXAMPLES::
+code::
+a = 10
+::
+
+private:: activeMonoSynths
+private:: isAlgaMonoPattern
+private:: monoNumChannels
+private:: monoRate
+private:: outNormBus
+private:: outNormSynth

@@ -1,6 +1,6 @@
 (
 Alga.boot({
-	a = AN({ SinOsc.ar(\freq.ar(440!2)) }).play;
+	a = AN({ SinOsc.ar(\freq.ar(440!2)) });
 
 	b = AMP((
 		rate: \audio,
@@ -23,5 +23,10 @@ Alga.boot({
 
 	a <<.freq b;
 	a <<.amp c;
+
+	//Restart patterns and play
+	b.restartPattern(sched: 1);
+	c.restartPattern(sched: 1);
+	a.play(time: 0.1, sched: 1);
 })
 )
