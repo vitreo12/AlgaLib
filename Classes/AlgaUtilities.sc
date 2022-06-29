@@ -68,6 +68,11 @@ AlgaArg {
 		if(sender.isAlgaNode, { ^sender.outNodes });
 		^nil
 	}
+
+	reset {
+		chansStream.reset;
+		scaleStream.reset;
+	}
 }
 
 //Alias
@@ -117,6 +122,13 @@ AlgaOut {
 	}
 
 	isAlgaOut { ^true }
+
+	reset {
+		nodeStream.reset;
+		paramStream.reset;
+		chansStream.reset;
+		scaleStream.reset;
+	}
 }
 
 //Alias
@@ -190,6 +202,11 @@ AlgaTemp {
 	}
 
 	isAlgaTemp { ^true }
+
+	reset {
+		chansStream.reset;
+		scaleStream.reset;
+	}
 }
 
 //Alias

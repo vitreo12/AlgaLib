@@ -2150,7 +2150,7 @@ AlgaPattern : AlgaNode {
 		var parsedOut;
 		var foundOut = false;
 		var foundGenericParams = IdentitySet();
-		var patternPairs = Array.newClear;
+		var patternPairs     = Array.newClear();
 		var patternPairsDict = IdentityDictionary();
 
 		//Create new interpStreams. NOTE that the Pfunc in dur uses this, as interpStreams
@@ -3301,12 +3301,12 @@ AlgaPattern : AlgaNode {
 
 	//Stop pattern
 	stopPattern { | sched = 0 |
+		var interpStreamsLock = interpStreams;
 		//Check sched
 		sched = sched ? schedInner;
 		sched = sched ? 0;
 		if(sched.isAlgaStep, {
 			if(interpStreams != nil, {
-				var interpStreamsLock = interpStreams;
 				this.addAction(
 					func: {
 						//This will be then checked against in createEventSynths!
@@ -3320,9 +3320,9 @@ AlgaPattern : AlgaNode {
 				)
 			});
 		}, {
-			if(interpStreams != nil, {
-				if(interpStreams.algaReschedulingEventStreamPlayer != nil, {
-					interpStreams.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched);
+			if(interpStreamsLock != nil, {
+				if(interpStreamsLock.algaReschedulingEventStreamPlayer != nil, {
+					interpStreamsLock.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched);
 				});
 				patternsAsStreams.removeAt(interpStreams);
 			});
@@ -3331,14 +3331,53 @@ AlgaPattern : AlgaNode {
 
 	//Resume pattern
 	resumePattern { | sched = 0 |
+		var interpStreamsLock = interpStreams;
 		//Check sched
 		sched = sched ? schedInner;
 		sched = sched ? 0;
 		if(sched == 0, {
-			interpStreams.algaReschedulingEventStreamPlayer.play
+			interpStreamsLock.algaReschedulingEventStreamPlayer.play
 		}, {
 			this.addAction(
-				func: { interpStreams.algaReschedulingEventStreamPlayer.play },
+				func: { interpStreamsLock.algaReschedulingEventStreamPlayer.play },
+				sched: sched
+			)
+		});
+	}
+
+	//Restart pattern
+	restartPattern { | sched = 0 |
+		var interpStreamsLock = interpStreams;
+		if(sched.isAlgaStep, {
+			this.addAction(
+				func: {
+					if(sched.post.not, {
+						interpStreamsLock.beingStopped = true
+					});
+					interpStreamsLock.algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
+						interpStreamsLock.resetPattern;
+						interpStreamsLock.beingStopped = false;
+					});
+				},
+				sched: sched
+			);
+		}, {
+			interpStreamsLock.algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, {
+				interpStreamsLock.resetPattern;
+			});
+		});
+	}
+
+	//Reset pattern
+	resetPattern { | sched = 0 |
+		var interpStreamsLock = interpStreams;
+		if(sched == 0, {
+			interpStreamsLock.resetPattern;
+		}, {
+			this.addAction(
+				func: {
+					interpStreamsLock.resetPattern;
+				},
 				sched: sched
 			)
 		});
@@ -3587,7 +3626,7 @@ AlgaPattern : AlgaNode {
 
 	//stop and reschedule in the future
 	reschedule { | sched = 0 |
-		interpStreams.algaReschedulingEventStreamPlayer.reschedule(sched);
+		interpStreams.algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched);
 	}
 
 	//Re-connect a param (used in AlgaPatternPlayer)

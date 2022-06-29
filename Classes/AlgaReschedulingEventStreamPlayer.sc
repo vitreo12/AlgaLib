@@ -32,7 +32,6 @@ AlgaReschedulingEventStreamPlayer {
 
 	stop { player.stop }
 	reset { player.reset }
-	refresh { player.refresh }
 
 	//Stops and remove all actions that relate to the same EventStreamPlayer
 	//that were scheduled for the exact time of the stopping.

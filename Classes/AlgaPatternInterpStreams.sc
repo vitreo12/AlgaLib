@@ -470,6 +470,44 @@ AlgaPatternInterpStreams {
 		)
 	}
 
+	//Reset all Streams used
+	resetPattern {
+		//Reset algaReschedulingEventStreamPlayer
+		algaReschedulingEventStreamPlayer.reset;
+
+		//Reset all Streams
+		entries.do({ | entryDict |
+			entryDict.do({ | entry |
+				entry.reset
+			});
+		});
+
+		//Reset all scalar and generic params
+		scalarAndGenericParams.do({ | scalarAndGenericParamDict |
+			scalarAndGenericParamDict.do({ | scalarAndGenericParam |
+				scalarAndGenericParam.reset
+			});
+		});
+
+		//Reset dur, sustain, stretch, legato
+		dur.reset;
+		durAlgaPseg.reset;
+		sustain.reset;
+		sustainAlgaPseg.reset;
+		stretch.reset;
+		stretchAlgaPseg.reset;
+		legato.reset;
+		legatoAlgaPseg.reset;
+
+		//Reset def, out, fx
+		def.reset;
+		defStream.reset;
+		out.reset;
+		outStream.reset;
+		fx.reset;
+		fxStream.reset;
+	}
+
 	//Store generic params for replaces
 	addScalarAndGenericParams { | key, value |
 		scalarAndGenericParams = scalarAndGenericParams ? IdentityDictionary();
