@@ -17,6 +17,7 @@
 //https://scsynth.org/t/set-patterns-dur-right-away/3103/9
 AlgaReschedulingEventStreamPlayer {
 	var <player;
+	var <oldStream;
 
 	*new { | stream, event |
 		^super.new.init(stream, event)
@@ -27,7 +28,7 @@ AlgaReschedulingEventStreamPlayer {
 	}
 
 	play { | argClock, doReset = false, quant |
-		player.play(argClock, doReset, quant)
+		player.play(argClock ? player.clock, doReset, quant)
 	}
 
 	stop { player.stop }
@@ -37,6 +38,7 @@ AlgaReschedulingEventStreamPlayer {
 	//that were scheduled for the exact time of the stopping.
 	stopAtTopPriority { | when = 0 |
 		var clock  = player.clock;
+		oldStream  = player.stream;
 		clock.algaSchedAtQuantOnceWithTopPriority(when, {
 			var queue = clock.queue;
 			this.stop; //Stop first
@@ -64,7 +66,7 @@ AlgaReschedulingEventStreamPlayer {
 
 		clock.algaSchedOnceWithTopPriority(when, {
 			player.stop;
-			this.init(stream, player.event);
+			this.init(stream ? oldStream, player.event);
 			if(func != nil, { func.value });
 			//play has some overhead, find the leanest way.
 			//Check TempoClockPriority.scd: the example with nested clock shows what happens here.
@@ -80,7 +82,7 @@ AlgaReschedulingEventStreamPlayer {
 
 		clock.algaSchedAtQuantOnceWithTopPriority(quant, {
 			player.stop;
-			this.init(stream, player.event);
+			this.init(stream ? oldStream, player.event);
 			if(func != nil, { func.value });
 			//play has some overhead, find the leanest way.
 			//Check TempoClockPriority.scd: the example with nested clock shows what happens here.
@@ -96,13 +98,13 @@ AlgaReschedulingEventStreamPlayer {
 
 		clock.algaSchedInSecondsOnceWithTopPriority(when, {
 			player.stop;
-			this.init(stream, player.event);
+			this.init(stream ? oldStream, player.event);
 			if(func != nil, { func.value });
 			//play has some overhead, find the leanest way.
 			//Check TempoClockPriority.scd: the example with nested clock shows what happens here.
 			//timing is correct: even if in top priority, play will be pushed to bottom, as it has nested
 			//clock calls. However, it still is executed at the right precise timing
-			player.play(player.clock, quant:0); //still play on its former clock
+			player.play(clock, quant:0);
 		});
 	}
 

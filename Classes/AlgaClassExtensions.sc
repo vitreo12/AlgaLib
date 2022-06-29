@@ -584,14 +584,6 @@
 
 +Pattern {
 	isPattern { ^true }
-
-	playAlgaRescheduling { | clock, protoEvent, quant |
-		clock = clock ? TempoClock.default;
-		^AlgaReschedulingEventStreamPlayer(
-			this.asStream,
-			protoEvent
-		).play(clock, false, quant)
-	}
 }
 
 +Stream {

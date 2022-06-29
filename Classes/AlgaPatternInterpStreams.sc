@@ -464,10 +464,11 @@ AlgaPatternInterpStreams {
 	}
 
 	//Play a pattern as an AlgaReschedulingEventStreamPlayer and return it
-	playAlgaReschedulingEventStreamPlayer { | pattern, clock |
-		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
-			clock: clock
-		)
+	playAlgaReschedulingEventStreamPlayer { | patternAsStream, clock |
+		clock = clock ? TempoClock.default;
+		algaReschedulingEventStreamPlayer = AlgaReschedulingEventStreamPlayer(
+			patternAsStream,
+		).play(clock, false)
 	}
 
 	//Reset all Streams used
@@ -483,10 +484,9 @@ AlgaPatternInterpStreams {
 		});
 
 		//Reset all scalar and generic params
-		scalarAndGenericParams.do({ | scalarAndGenericParamDict |
-			scalarAndGenericParamDict.do({ | scalarAndGenericParam |
-				scalarAndGenericParam.reset
-			});
+		scalarAndGenericParams.keysValuesDo({ | key, scalarAndGenericParam |
+			scalarAndGenericParam.reset;
+			scalarAndGenericParamsStreams[key].reset;
 		});
 
 		//Reset dur, sustain, stretch, legato

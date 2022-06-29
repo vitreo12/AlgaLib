@@ -2536,6 +2536,10 @@ AlgaPattern : AlgaNode {
 		//Create the Pattern
 		pattern = Pbind(*patternPairs);
 
+		//Needed for manual .step + .replace
+		patternsAsStreams = (patternsAsStreams ? IdentityDictionary());
+		patternsAsStreams[newInterpStreams] = pattern.algaAsStream;
+
 		//Determine if \out interpolation is required
 		this.createPatternOutReceivers;
 
@@ -2545,7 +2549,7 @@ AlgaPattern : AlgaNode {
 			this.addAction(
 				func: {
 					newInterpStreams.playAlgaReschedulingEventStreamPlayer(
-						pattern: pattern,
+						patternAsStream: patternsAsStreams[newInterpStreams],
 						clock: this.clock
 					);
 				},
@@ -2555,10 +2559,6 @@ AlgaPattern : AlgaNode {
 
 		//Update latest interpStreams
 		interpStreams = newInterpStreams;
-
-		//Needed for manual .step + .replace
-		patternsAsStreams = (patternsAsStreams ? IdentityDictionary());
-		patternsAsStreams[interpStreams] = pattern.algaAsStream;
 
 		//AlgaMonoPattern has its own normalizer for its interpolation to work correctly
 		if(this.isAlgaMonoPattern, {
@@ -3301,86 +3301,150 @@ AlgaPattern : AlgaNode {
 
 	//Stop pattern
 	stopPattern { | sched = 0 |
-		var interpStreamsLock = interpStreams;
-		//Check sched
-		sched = sched ? schedInner;
-		sched = sched ? 0;
-		if(sched.isAlgaStep, {
-			if(interpStreams != nil, {
+		var func = { | interpStreamsArg, schedArg |
+			if(schedArg.isAlgaStep, {
 				this.addAction(
 					func: {
 						//This will be then checked against in createEventSynths!
-						if(stopPatternBeforeReplace.and(sched.post.not), {
-							interpStreamsLock.beingStopped = true
+						if(stopPatternBeforeReplace.and(schedArg.post.not), {
+							interpStreamsArg.beingStopped = true
 						});
-						interpStreamsLock.algaReschedulingEventStreamPlayer.stop;
-						patternsAsStreams.removeAt(interpStreamsLock);
+						interpStreamsArg.algaReschedulingEventStreamPlayer.stop;
+						//patternsAsStreams.removeAt(interpStreamsArg);
 					},
-					sched: sched
+					sched: schedArg
 				)
+			}, {
+				interpStreamsArg.algaReschedulingEventStreamPlayer.stopAtTopPriority(schedArg);
+				//patternsAsStreams.removeAt(interpStreamsArg);
 			});
-		}, {
-			if(interpStreamsLock != nil, {
-				if(interpStreamsLock.algaReschedulingEventStreamPlayer != nil, {
-					interpStreamsLock.algaReschedulingEventStreamPlayer.stopAtTopPriority(sched);
+		};
+
+		//Set sched
+		sched = sched ? schedInner;
+		sched = sched ? 0;
+
+		//Make sure interpStreams are valid
+		this.addAction(
+			condition: {
+				if(interpStreams != nil, {
+					interpStreams.algaReschedulingEventStreamPlayer != nil
+				}, {
+					false
 				});
-				patternsAsStreams.removeAt(interpStreams);
-			});
-		});
+			},
+			func: {
+				func.value(interpStreams, sched)
+			},
+			preCheck: true
+		)
 	}
 
 	//Resume pattern
 	resumePattern { | sched = 0 |
-		var interpStreamsLock = interpStreams;
-		//Check sched
+		var func = { | interpStreamsArg, schedArg |
+			this.addAction(
+				func: {
+					interpStreamsArg.algaReschedulingEventStreamPlayer.play
+				},
+				sched: schedArg,
+				preCheck: (schedArg == 0)
+			)
+		};
+
+		//Set sched
 		sched = sched ? schedInner;
 		sched = sched ? 0;
-		if(sched == 0, {
-			interpStreamsLock.algaReschedulingEventStreamPlayer.play
-		}, {
-			this.addAction(
-				func: { interpStreamsLock.algaReschedulingEventStreamPlayer.play },
-				sched: sched
-			)
-		});
+
+		//Make sure interpStreams are valid
+		this.addAction(
+			condition: {
+				if(interpStreams != nil, {
+					interpStreams.algaReschedulingEventStreamPlayer != nil
+				}, {
+					false
+				});
+			},
+			func: {
+				func.value(interpStreams, sched)
+			},
+			preCheck: true
+		)
 	}
 
 	//Restart pattern
 	restartPattern { | sched = 0 |
-		var interpStreamsLock = interpStreams;
-		if(sched.isAlgaStep, {
-			this.addAction(
-				func: {
-					if(sched.post.not, {
-						interpStreamsLock.beingStopped = true
-					});
-					interpStreamsLock.algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
-						interpStreamsLock.resetPattern;
-						interpStreamsLock.beingStopped = false;
-					});
-				},
-				sched: sched
-			);
-		}, {
-			interpStreamsLock.algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, {
-				interpStreamsLock.resetPattern;
+		var func = { | interpStreamsArg, schedArg |
+			if(schedArg.isAlgaStep, {
+				this.addAction(
+					func: {
+						if(schedArg.post.not, {
+							interpStreamsArg.beingStopped = true
+						});
+						interpStreamsArg.algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
+							interpStreamsArg.resetPattern;
+							interpStreamsArg.beingStopped = false;
+						});
+					},
+					sched: schedArg
+				)
+			}, {
+				interpStreamsArg.algaReschedulingEventStreamPlayer.rescheduleAtQuant(schedArg, {
+					interpStreamsArg.resetPattern;
+				});
 			});
-		});
+		};
+
+		//Set sched
+		sched = sched ? schedInner;
+		sched = sched ? 0;
+
+		//Make sure interpStreams are valid
+		this.addAction(
+			condition: {
+				if(interpStreams != nil, {
+					interpStreams.algaReschedulingEventStreamPlayer != nil
+				}, {
+					false
+				});
+			},
+			func: {
+				func.value(interpStreams, sched)
+			},
+			preCheck: true
+		)
 	}
 
 	//Reset pattern
 	resetPattern { | sched = 0 |
-		var interpStreamsLock = interpStreams;
-		if(sched == 0, {
-			interpStreamsLock.resetPattern;
-		}, {
+		var func = { | interpStreamsArg, schedArg |
 			this.addAction(
 				func: {
-					interpStreamsLock.resetPattern;
+					interpStreamsArg.resetPattern;
 				},
-				sched: sched
+				sched: schedArg,
+				preCheck: (sched == 0)
 			)
-		});
+		};
+
+		//Set sched
+		sched = sched ? schedInner;
+		sched = sched ? 0;
+
+		//Make sure interpStreams are valid
+		this.addAction(
+			condition: {
+				if(interpStreams != nil, {
+					interpStreams.algaReschedulingEventStreamPlayer != nil
+				}, {
+					false
+				});
+			},
+			func: {
+				func.value(interpStreams, sched)
+			},
+			preCheck: true
+		)
 	}
 
 	//Remove an AlgaPatternPlayer
