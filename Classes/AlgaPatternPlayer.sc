@@ -24,6 +24,7 @@ AlgaPatternPlayer {
 	var <durInterpReset = false;
 	var <tempoScaling = false;
 
+	var <entriesOrder;
 	var <entries;
 	var <results;
 	var <algaPatterns;
@@ -46,6 +47,7 @@ AlgaPatternPlayer {
 		Event.addEventType(\algaPatternPlayer, #{
 			var algaPatternPlayer = ~algaPatternPlayer;
 			var entries = algaPatternPlayer.entries;
+			var entriesOrder = algaPatternPlayer.entriesOrder;
 			var results = algaPatternPlayer.results;
 			var algaPatterns = algaPatternPlayer.algaPatterns;
 
@@ -54,13 +56,23 @@ AlgaPatternPlayer {
 
 			//Advance entries and results' pointers
 			if(algaPatternPlayer.beingStopped.not, {
-				entries.keysValuesDo({ | key, value |
+				entriesOrder.do({ | key |
+					var value = entries[key];
 					//For interpolation, value can be IdentityDictionary(UniqueID -> entry)
 					if(key != \dur, {
 						value[\entries].keysValuesDo({ | uniqueID, entry |
 							//Advance patterns
 							var entryVal = entry.next(currentEnvironment);
 							entryVal.algaAdvance(currentEnvironment);
+
+							//Store value for Pfunc / Pkey retrieval
+							//However, this doesn't work when triggering interpolation:
+							//it will only consider the lastID one
+							if(entryVal.isEvent.not, {
+								if(uniqueID == value[\lastID], {
+									currentEnvironment[key] = entryVal
+								});
+							});
 
 							//Assign results
 							results[key][uniqueID] = entryVal;
@@ -86,6 +98,7 @@ AlgaPatternPlayer {
 		var patternPairs = Array.newClear;
 		var foundDurOrDelta = false;
 		var functionSynthDefDict = IdentityDictionary(); //AlgaTemp parser needs this
+
 		manualDur = false;
 
 		//Get scheduler
@@ -109,6 +122,7 @@ AlgaPatternPlayer {
 		//Create vars
 		results = IdentityDictionary();
 		entries = IdentityDictionary();
+		entriesOrder = Array.newClear();
 		algaPatterns = IdentitySet();
 		algaPatternEntries = IdentityDictionary();
 
@@ -143,6 +157,9 @@ AlgaPatternPlayer {
 					entries[key][\entries] = IdentityDictionary();
 					entries[key][\entries][uniqueID] = entry.algaAsStream; //.next support
 				});
+
+				//Add to entriesOrder
+				entriesOrder = entriesOrder.add(key);
 			});
 		}, {
 			("AlgaPatternPlayer: Invalid 'def': " ++ argDef.class.asString).error;
@@ -158,6 +175,9 @@ AlgaPatternPlayer {
 
 		//Add reschedulable \stretch
 		patternPairs = patternPairs.add(\stretch).add(Pfunc { | e | stretch.next(e) });
+
+		//Order entries alphabetically
+		entriesOrder = entriesOrder[entriesOrder.order];
 
 		//Finally, only activate the pattern if all AlgaTemps are compiled
 		this.compileFunctionSynthDefDictIfNeeded(
