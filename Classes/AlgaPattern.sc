@@ -140,6 +140,9 @@ AlgaPattern : AlgaNode {
 	//Check for manualDur
 	var manualDur = false;
 
+	//Start pattern when creted
+	var <>startPattern = true;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -148,7 +151,7 @@ AlgaPattern : AlgaNode {
 
 	//Doesn't have args and outsMapping like AlgaNode. Default sched to 1 (so it plays on clock)
 	*new { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
-		schedInSeconds = false, tempoScaling = false,
+		start = true, schedInSeconds = false, tempoScaling = false,
 		sampleAccurateFuncs = true, player, server |
 		^super.newAP(
 			def: def,
@@ -157,6 +160,7 @@ AlgaPattern : AlgaNode {
 			playTime: playTime,
 			playSafety: playSafety,
 			sched: sched,
+			startPattern: start,
 			schedInSeconds: schedInSeconds,
 			tempoScaling: tempoScaling,
 			sampleAccurateFuncs: sampleAccurateFuncs,
@@ -2540,18 +2544,18 @@ AlgaPattern : AlgaNode {
 		patternsAsStreams = (patternsAsStreams ? IdentityDictionary());
 		patternsAsStreams[newInterpStreams] = pattern.algaAsStream;
 
-		//Determine if \out interpolation is required
-		this.createPatternOutReceivers;
+		//Create the pattern AlgaReschedulingEventStreamPlayer right away
+		newInterpStreams.newAlgaReschedulingEventStreamPlayer(
+			patternAsStream: patternsAsStreams[newInterpStreams],
+		);
 
-		//Schedule the start of the pattern on the AlgaScheduler. All the rest in this
-		//createPattern function is non scheduled as it it better to create it right away.
-		if(manualDur.not, {
+		//Schedule the playing on the ALgaScheduler
+		if(startPattern.and(manualDur.not), {
 			this.addAction(
 				func: {
 					newInterpStreams.playAlgaReschedulingEventStreamPlayer(
-						patternAsStream: patternsAsStreams[newInterpStreams],
-						clock: this.clock
-					);
+						this.clock
+					)
 				},
 				sched: sched
 			);
@@ -2559,6 +2563,9 @@ AlgaPattern : AlgaNode {
 
 		//Update latest interpStreams
 		interpStreams = newInterpStreams;
+
+		//Determine if \out interpolation is required
+		this.createPatternOutReceivers;
 
 		//AlgaMonoPattern has its own normalizer for its interpolation to work correctly
 		if(this.isAlgaMonoPattern, {
@@ -3299,6 +3306,23 @@ AlgaPattern : AlgaNode {
 	//Alias of advance. This allows pattern.()
 	value { | sched = 0 | this.advance(sched) }
 
+	//Exec function when interpStreams are valid
+	runFuncOnValidInterpStreams { | func, sched = 0 |
+		this.addAction(
+			condition: {
+				if(interpStreams != nil, {
+					interpStreams.algaReschedulingEventStreamPlayer != nil
+				}, {
+					false
+				});
+			},
+			func: {
+				func.value(interpStreams, sched)
+			},
+			preCheck: true
+		)
+	}
+
 	//Stop pattern
 	stopPattern { | sched = 0 |
 		var func = { | interpStreamsArg, schedArg |
@@ -3312,10 +3336,14 @@ AlgaPattern : AlgaNode {
 						interpStreamsArg.algaReschedulingEventStreamPlayer.stop;
 						//patternsAsStreams.removeAt(interpStreamsArg);
 					},
-					sched: schedArg
+					sched: schedArg,
+					topPriority: true
 				)
 			}, {
-				interpStreamsArg.algaReschedulingEventStreamPlayer.stopAtTopPriority(schedArg);
+				interpStreamsArg.algaReschedulingEventStreamPlayer.stopAtTopPriority(
+					schedArg,
+					this.clock
+				);
 				//patternsAsStreams.removeAt(interpStreamsArg);
 			});
 		};
@@ -3325,30 +3353,20 @@ AlgaPattern : AlgaNode {
 		sched = sched ? 0;
 
 		//Make sure interpStreams are valid
-		this.addAction(
-			condition: {
-				if(interpStreams != nil, {
-					interpStreams.algaReschedulingEventStreamPlayer != nil
-				}, {
-					false
-				});
-			},
-			func: {
-				func.value(interpStreams, sched)
-			},
-			preCheck: true
-		)
+		this.runFuncOnValidInterpStreams(func, sched);
 	}
 
 	//Resume pattern
-	resumePattern { | sched = 0 |
+	playPattern { | sched = 0 |
 		var func = { | interpStreamsArg, schedArg |
 			this.addAction(
 				func: {
-					interpStreamsArg.algaReschedulingEventStreamPlayer.play
+					interpStreamsArg.beingStopped = false;
+					interpStreamsArg.playAlgaReschedulingEventStreamPlayer(
+						this.clock
+					)
 				},
-				sched: schedArg,
-				preCheck: (schedArg == 0)
+				sched: schedArg
 			)
 		};
 
@@ -3357,19 +3375,7 @@ AlgaPattern : AlgaNode {
 		sched = sched ? 0;
 
 		//Make sure interpStreams are valid
-		this.addAction(
-			condition: {
-				if(interpStreams != nil, {
-					interpStreams.algaReschedulingEventStreamPlayer != nil
-				}, {
-					false
-				});
-			},
-			func: {
-				func.value(interpStreams, sched)
-			},
-			preCheck: true
-		)
+		this.runFuncOnValidInterpStreams(func, sched);
 	}
 
 	//Restart pattern
@@ -3381,17 +3387,23 @@ AlgaPattern : AlgaNode {
 						if(schedArg.post.not, {
 							interpStreamsArg.beingStopped = true
 						});
-						interpStreamsArg.algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
-							interpStreamsArg.resetPattern;
-							interpStreamsArg.beingStopped = false;
-						});
+						interpStreamsArg.algaReschedulingEventStreamPlayer.rescheduleAtQuant(
+							quant: 0,
+							func: {
+								interpStreamsArg.resetPattern;
+								interpStreamsArg.beingStopped = false;
+							},
+							clock: this.clock
+						);
 					},
 					sched: schedArg
 				)
 			}, {
-				interpStreamsArg.algaReschedulingEventStreamPlayer.rescheduleAtQuant(schedArg, {
-					interpStreamsArg.resetPattern;
-				});
+				interpStreamsArg.algaReschedulingEventStreamPlayer.rescheduleAtQuant(
+					quant: schedArg,
+					func: { interpStreamsArg.resetPattern },
+					clock: this.clock
+				);
 			});
 		};
 
@@ -3400,30 +3412,15 @@ AlgaPattern : AlgaNode {
 		sched = sched ? 0;
 
 		//Make sure interpStreams are valid
-		this.addAction(
-			condition: {
-				if(interpStreams != nil, {
-					interpStreams.algaReschedulingEventStreamPlayer != nil
-				}, {
-					false
-				});
-			},
-			func: {
-				func.value(interpStreams, sched)
-			},
-			preCheck: true
-		)
+		this.runFuncOnValidInterpStreams(func, sched);
 	}
 
 	//Reset pattern
 	resetPattern { | sched = 0 |
 		var func = { | interpStreamsArg, schedArg |
 			this.addAction(
-				func: {
-					interpStreamsArg.resetPattern;
-				},
-				sched: schedArg,
-				preCheck: (sched == 0)
+				func: { interpStreamsArg.resetPattern },
+				sched: schedArg
 			)
 		};
 
@@ -3432,19 +3429,7 @@ AlgaPattern : AlgaNode {
 		sched = sched ? 0;
 
 		//Make sure interpStreams are valid
-		this.addAction(
-			condition: {
-				if(interpStreams != nil, {
-					interpStreams.algaReschedulingEventStreamPlayer != nil
-				}, {
-					false
-				});
-			},
-			func: {
-				func.value(interpStreams, sched)
-			},
-			preCheck: true
-		)
+		this.runFuncOnValidInterpStreams(func, sched);
 	}
 
 	//Remove an AlgaPatternPlayer
@@ -3471,6 +3456,8 @@ AlgaPattern : AlgaNode {
 			});
 			if((isResync.not).or(isReset), { this.setDur(value) });
 		};
+		var interpStreamsLock = interpStreams;
+		var algaReschedulingEventStreamPlayerLock = interpStreams.algaReschedulingEventStreamPlayer;
 
 		//Check sched
 		sched = sched ? schedInner;
@@ -3482,11 +3469,9 @@ AlgaPattern : AlgaNode {
 			this.addAction(
 				condition: { this.algaInstantiated },
 				func: {
-					var interpStreamsLock = interpStreams;
-					var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
-					if(algaReschedulingEventStreamPlayer != nil, {
+					if((interpStreamsLock != nil).and(algaReschedulingEventStreamPlayerLock != nil), {
 						interpStreamsLock.beingStopped = true;
-						algaReschedulingEventStreamPlayer.rescheduleAtQuant(0, {
+						algaReschedulingEventStreamPlayerLock.rescheduleAtQuant(0, {
 							stopInterpAndSetDur.value;
 							interpStreamsLock.beingStopped = false;
 						})
@@ -3500,9 +3485,8 @@ AlgaPattern : AlgaNode {
 			this.addAction(
 				condition: { this.algaInstantiated },
 				func: {
-					var algaReschedulingEventStreamPlayer = interpStreams.algaReschedulingEventStreamPlayer;
-					if(algaReschedulingEventStreamPlayer != nil, {
-						algaReschedulingEventStreamPlayer.rescheduleAtQuant(sched, {
+					if(algaReschedulingEventStreamPlayerLock != nil, {
+						algaReschedulingEventStreamPlayerLock.rescheduleAtQuant(sched, {
 							stopInterpAndSetDur.value;
 						});
 					})

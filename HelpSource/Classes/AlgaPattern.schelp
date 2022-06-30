@@ -27,6 +27,8 @@ ARGUMENT:: playSafety
 Specify a different safety method to use to scale the output of a node when using the emphasis::play:: method. Accepted values are: code::'clip', 'tanh', 'softclip', 'limiter', 'none'::.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaPattern:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+ARGUMENT:: start
+Start the link::Classes/AlgaPattern:: when created. This will be started at the specified code::sched::.
 ARGUMENT:: schedInSeconds
 Specify if all sched actions should be scheduled in seconds, opposing to beats. Default is code::false::.
 ARGUMENT:: tempoScaling
@@ -60,8 +62,8 @@ Stop the link::Classes/AlgaPattern::.
 ARGUMENT:: sched
 Schedule at a specific time.
 
-METHOD:: resumePattern
-Resume the link::Classes/AlgaPattern::.
+METHOD:: playPattern
+Play the link::Classes/AlgaPattern::.
 ARGUMENT:: sched
 Schedule at a specific time.
 
@@ -394,3 +396,7 @@ private:: dispatchPattern
 private:: algaResetParsingVars
 private:: interpGroupEnv
 private:: interpolateScalarOrGenericParam
+
+private:: resetPattern
+private:: runFuncOnValidInterpStreams
+private:: startPattern

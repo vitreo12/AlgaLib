@@ -588,6 +588,10 @@
 
 +Stream {
 	isStream { ^true }
+
+	newAlgaReschedulingEventStreamPlayer { | event  |
+		^AlgaReschedulingEventStreamPlayer(this, event)
+	}
 }
 
 +ListPattern {

@@ -463,12 +463,17 @@ AlgaPatternInterpStreams {
 		});
 	}
 
-	//Play a pattern as an AlgaReschedulingEventStreamPlayer and return it
-	playAlgaReschedulingEventStreamPlayer { | patternAsStream, clock |
+	//Create an AlgaReschedulingEventStreamPlayer and play it
+	newAlgaReschedulingEventStreamPlayer { | patternAsStream |
+		algaReschedulingEventStreamPlayer = patternAsStream.newAlgaReschedulingEventStreamPlayer;
+	}
+
+	//Play the AlgaReschedulingEventStreamPlayer
+	playAlgaReschedulingEventStreamPlayer { | clock |
 		clock = clock ? TempoClock.default;
-		algaReschedulingEventStreamPlayer = AlgaReschedulingEventStreamPlayer(
-			patternAsStream,
-		).play(clock, false)
+		if(algaReschedulingEventStreamPlayer != nil, {
+			algaReschedulingEventStreamPlayer.play(clock, false)
+		})
 	}
 
 	//Reset all Streams used

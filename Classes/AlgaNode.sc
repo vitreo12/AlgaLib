@@ -177,7 +177,7 @@ AlgaNode {
 	}
 
 	*newAP { | def, interpTime, interpShape, playTime, playSafety, sched = 1,
-		schedInSeconds = false, tempoScaling = false,
+		startPattern = true, schedInSeconds = false, tempoScaling = false,
 		sampleAccurateFuncs = true,  player, server |
 		^super.new.init(
 			argDef: def,
@@ -186,6 +186,7 @@ AlgaNode {
 			argPlayTime: playTime,
 			argPlaySafety: playSafety,
 			argSched: sched,
+			argStartPattern: startPattern,
 			argSchedInSeconds: schedInSeconds,
 			argTempoScaling: tempoScaling,
 			argSampleAccurateFuncs: sampleAccurateFuncs,
@@ -419,7 +420,7 @@ AlgaNode {
 	}
 
 	init { | argDef, argArgs, argConnectionTime = 0, argInterpShape,
-		argPlayTime = 0, argPlaySafety, argSched = 0, argOutsMapping,
+		argPlayTime = 0, argPlaySafety, argSched = 0, argStartPattern = false, argOutsMapping,
 		argSampleAccurateFuncs = true, argSchedInSeconds = false,
 		argTempoScaling = false, argPlayer, argServer, argName |
 
@@ -470,6 +471,9 @@ AlgaNode {
 
 			//Init sampleAccurateFuncs: must happen BEFORE parseDef
 			this.sampleAccurateFuncs_(argSampleAccurateFuncs);
+
+			//Set startPattern
+			this.startPattern = argStartPattern;
 
 			//Assign player
 			if(argPlayer.isAlgaPatternPlayer, {

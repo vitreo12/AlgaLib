@@ -59,11 +59,11 @@ AlgaPatternPlayer {
 					if(key != \dur, {
 						value[\entries].keysValuesDo({ | uniqueID, entry |
 							//Advance patterns
-							entry = entry.next(currentEnvironment);
-							entry.algaAdvance(currentEnvironment);
+							var entryVal = entry.next(currentEnvironment);
+							entryVal.algaAdvance(currentEnvironment);
 
 							//Assign results
-							results[key][uniqueID] = entry;
+							results[key][uniqueID] = entryVal;
 						});
 					});
 				});
@@ -84,7 +84,6 @@ AlgaPatternPlayer {
 	init { | argDef, argServer |
 		var scheduler;
 		var patternPairs = Array.newClear;
-		var patternPairsDict = IdentityDictionary();
 		var foundDurOrDelta = false;
 		var functionSynthDefDict = IdentityDictionary(); //AlgaTemp parser needs this
 		manualDur = false;
@@ -113,7 +112,7 @@ AlgaPatternPlayer {
 		algaPatterns = IdentitySet();
 		algaPatternEntries = IdentityDictionary();
 
-		//1) Add support for arrays to keep ordering of execution of params!
+		//1) Add support for alphabetical retrieval of parameters with Pkey / Pfunc
 
 		//Event handling
 		if(argDef.isEvent, {
@@ -143,7 +142,6 @@ AlgaPatternPlayer {
 					entries[key][\lastID] = uniqueID;
 					entries[key][\entries] = IdentityDictionary();
 					entries[key][\entries][uniqueID] = entry.algaAsStream; //.next support
-					patternPairsDict[key] = entry;
 				});
 			});
 		}, {
@@ -154,22 +152,12 @@ AlgaPatternPlayer {
 		//Add reschedulable \dur
 		if(foundDurOrDelta, {
 			if(manualDur.not, {
-				patternPairsDict[\dur] = Pfunc { | e | dur.next(e) }
+				patternPairs = patternPairs.add(\dur).add(Pfunc { | e | dur.next(e) });
 			});
 		});
 
 		//Add reschedulable \stretch
-		patternPairsDict[\stretch] = Pfunc { | e | stretch.next(e) };
-
-		//Order pattern pairs dict alphabetically and convert to array.
-		//This allows the user to use Pfunc { | e | } functions with any
-		//scalar OR generic parameter, as long as they're ordered alphabetically
-		if(patternPairsDict.size > 0, {
-			var order = patternPairsDict.order;
-			var entries = patternPairsDict.atAll(order);
-			var array = ([order] ++ [entries]).lace(order.size * 2);
-			patternPairs = patternPairs ++ array;
-		});
+		patternPairs = patternPairs.add(\stretch).add(Pfunc { | e | stretch.next(e) });
 
 		//Finally, only activate the pattern if all AlgaTemps are compiled
 		this.compileFunctionSynthDefDictIfNeeded(
@@ -182,7 +170,7 @@ AlgaPatternPlayer {
 	}
 
 	//Add an action to scheduler. This takes into account sched == AlgaStep
-	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
+	addAction { | condition, func, sched = 0, topPriority = false, preCheck = true |
 		actionScheduler.addAction(
 			condition: condition,
 			func: func,
@@ -272,44 +260,140 @@ AlgaPatternPlayer {
 		tempoScaling = value
 	}
 
+	//Exec function when interpStreams are valid
+	runFuncOnValidPatternAsStream { | func, sched = 0 |
+		this.addAction(
+			condition: {
+				patternAsStream != nil
+			},
+			func: {
+				func.value(patternAsStream, algaReschedulingEventStreamPlayer, sched)
+			},
+			preCheck: true
+		)
+	}
+
 	//Run the pattern
-	play { | sched = 1 |
-		if(manualDur.not, {
-			sched = sched ? schedInner;
-			sched = sched ? 0;
-			this.addAction(
-				condition: { pattern != nil },
-				func: {
-					beingStopped = false;
-					algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
-						clock: this.clock
-					);
-				},
-				sched: sched
-			);
-		});
+	play { | sched = 0 |
+		var func = { | patternAsStreamArg, algaReschedulingEventStreamPlayerArg, schedArg |
+			if(manualDur.not, {
+				this.addAction(
+					func: {
+						beingStopped = false;
+						algaReschedulingEventStreamPlayer =
+						patternAsStreamArg.newAlgaReschedulingEventStreamPlayer.play(
+							this.clock,
+							false
+						)
+					},
+					sched: schedArg
+				);
+			});
+		};
+
+		sched = sched ? schedInner;
+		sched = sched ? 0;
+
+		this.runFuncOnValidPatternAsStream(func, sched);
 	}
 
 	//Stop the pattern
-	stop { | sched = 1 |
+	stop { | sched = 0 |
+		var func = { | patternAsStreamArg, algaReschedulingEventStreamPlayerArg, schedArg |
+			if(schedArg.isAlgaStep, {
+				if(algaReschedulingEventStreamPlayerArg != nil, {
+					this.addAction(
+						func: {
+							if(schedArg.post.not, { beingStopped = true });
+							algaReschedulingEventStreamPlayerArg.stop
+						},
+						sched: schedArg
+					)
+				});
+			}, {
+				if(algaReschedulingEventStreamPlayerArg != nil, {
+					algaReschedulingEventStreamPlayerArg.stopAtTopPriority(
+						schedArg,
+						this.clock
+					)
+				});
+			});
+		};
+
 		sched = sched ? schedInner;
 		sched = sched ? 0;
-		if(sched.isAlgaStep, {
-			if(algaReschedulingEventStreamPlayer != nil, {
-				var algaReschedulingEventStreamPlayerLock = algaReschedulingEventStreamPlayer;
+
+		this.runFuncOnValidPatternAsStream(func, sched);
+	}
+
+	//Restart the pattern
+	restart { | sched = 0 |
+		var func = { | patternAsStreamArg, algaReschedulingEventStreamPlayerArg, schedArg |
+			if(schedArg.isAlgaStep, {
 				this.addAction(
 					func: {
-						if(sched.post.not, { beingStopped = true });
-						algaReschedulingEventStreamPlayerLock.stop
+						if(algaReschedulingEventStreamPlayerArg != nil, {
+							if(schedArg.post.not, {
+								beingStopped = true
+							});
+							algaReschedulingEventStreamPlayerArg.rescheduleAtQuant(
+								quant: 0,
+								func: {
+									this.resetEntries;
+									beingStopped = false;
+								},
+								clock: this.clock
+							);
+						});
 					},
-					sched: sched
+					sched: schedArg
 				)
+			}, {
+				if(algaReschedulingEventStreamPlayerArg != nil, {
+					algaReschedulingEventStreamPlayerArg.rescheduleAtQuant(
+						quant: schedArg,
+						func: { this.resetEntries },
+						clock: this.clock
+					);
+				});
 			});
-		}, {
-			if(algaReschedulingEventStreamPlayer != nil, {
-				algaReschedulingEventStreamPlayer.stopAtTopPriority(sched)
+		};
+
+		sched = sched ? schedInner;
+		sched = sched ? 0;
+
+		this.runFuncOnValidPatternAsStream(func, sched);
+	}
+
+	//Reset the pattern
+	reset { | sched = 0 |
+		var func = { | patternAsStreamArg, algaReschedulingEventStreamPlayerArg, schedArg |
+			this.addAction(
+				func: {
+					if(algaReschedulingEventStreamPlayerArg != nil, {
+						this.resetEntries
+					});
+				},
+				sched: schedArg
+			)
+		};
+
+		sched = sched ? schedInner;
+		sched = sched ? 0;
+
+		this.runFuncOnValidPatternAsStream(func, sched);
+	}
+
+	//Reset all entries
+	resetEntries {
+		entries.do({ | value |
+			value[\entries].do({ | entry |
+				entry.reset;
 			});
 		});
+
+		dur.reset;
+		stretch.reset;
 	}
 
 	//Manually advance the pattern. 'next' as function name won't work as it's reserved, apparently

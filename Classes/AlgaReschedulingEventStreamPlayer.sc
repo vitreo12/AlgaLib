@@ -36,8 +36,8 @@ AlgaReschedulingEventStreamPlayer {
 
 	//Stops and remove all actions that relate to the same EventStreamPlayer
 	//that were scheduled for the exact time of the stopping.
-	stopAtTopPriority { | when = 0 |
-		var clock  = player.clock;
+	stopAtTopPriority { | when = 0, clock |
+		clock      = clock ? player.clock;
 		oldStream  = player.stream;
 		clock.algaSchedAtQuantOnceWithTopPriority(when, {
 			var queue = clock.queue;
@@ -60,10 +60,9 @@ AlgaReschedulingEventStreamPlayer {
 		})
 	}
 
-	reschedule { | when = 0, func |
+	reschedule { | when = 0, func, clock |
 		var stream = player.stream;
-		var clock  = player.clock;
-
+		clock      = clock ? player.clock;
 		clock.algaSchedOnceWithTopPriority(when, {
 			player.stop;
 			this.init(stream ? oldStream, player.event);
@@ -76,10 +75,9 @@ AlgaReschedulingEventStreamPlayer {
 		});
 	}
 
-	rescheduleAtQuant { | quant = 0, func |
+	rescheduleAtQuant { | quant = 0, func, clock |
 		var stream = player.stream;
-		var clock  = player.clock;
-
+		clock      = clock ? player.clock;
 		clock.algaSchedAtQuantOnceWithTopPriority(quant, {
 			player.stop;
 			this.init(stream ? oldStream, player.event);
@@ -92,10 +90,9 @@ AlgaReschedulingEventStreamPlayer {
 		});
 	}
 
-	rescheduleAbs { | when = 0, func |
+	rescheduleAbs { | when = 0, func, clock |
 		var stream = player.stream;
-		var clock  = player.clock;
-
+		clock      = clock ? player.clock;
 		clock.algaSchedInSecondsOnceWithTopPriority(when, {
 			player.stop;
 			this.init(stream ? oldStream, player.event);

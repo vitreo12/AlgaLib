@@ -23,14 +23,21 @@ Start the execution of the link::Classes/AlgaPatternPlayer::.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
+METHOD:: stop
+Stop the link::Classes/AlgaPatternPlayer::
+
+METHOD:: reset
+Reset the link::Classes/AlgaPatternPlayer::
+
+METHOD:: restart
+Restart the link::Classes/AlgaPatternPlayer::
+
+
 METHOD:: advance
 Manually advance the link::Classes/AlgaPatternPlayer::.
 
 METHOD:: step
 Alias for code::advance::.
-
-METHOD:: stop
-Stop the link::Classes/AlgaPatternPlayer::
 
 METHOD:: from
 ARGUMENT:: sender
@@ -197,3 +204,5 @@ private:: setDurAtSched
 private:: setStretchAtSched
 private:: stretch
 private:: stretchAlgaPseg
+private:: resetEntries
+private:: runFuncOnValidPatternAsStream

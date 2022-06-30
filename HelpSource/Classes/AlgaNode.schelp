@@ -65,10 +65,10 @@ INSTANCEMETHODS::
 
 METHOD:: play
 Play the link::Classes/AlgaNode:: to SuperCollider's output. Note that this method also ensures that no dangerous audio signals are forwarded to your speaker's output, with an implementation inspired by the SafetyNet quark ( https://github.com/adcxyz/SafetyNet ).
-ARGUMENT:: time
-Define a temporary connection time that the method takes to complete, applying the necessary interpolations. If not specified, emphasis::playTime:: will be used.
 ARGUMENT:: chans
 Specify an link::Classes/Array:: of output channels to play, which can contain emphasis::outsMapping:: symbols. It's also possible to just specify a number, in which case it determines how many channels will be played.
+ARGUMENT:: time
+Define a temporary connection time that the method takes to complete, applying the necessary interpolations. If not specified, emphasis::playTime:: will be used.
 ARGUMENT:: scale
 Specify a link::Classes/Number:: to scale the output by.
 ARGUMENT:: out
