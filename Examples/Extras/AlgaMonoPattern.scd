@@ -1,29 +1,36 @@
 (
-p = APS.boot({
-	//ReplaceOut is needed in order to always overwrite on new trigger
-	AlgaSynthDef(\seq1, {
-		ReplaceOut.kr(\b.ir, \val.kr(440)); FreeSelf.kr(Impulse.kr(0)) },
-	allowOut: true).add
-});
-p.sched = 0;
+Alga.boot({
+	a = AN({ SinOsc.ar(\freq.ar(440!2)) });
+
+	b = AMP((
+		rate: \audio,
+		chans: 2,
+		time: Pwhite(0.01, 1),
+		in: Pseq([
+			AlgaTemp({ SinOsc.ar([Rand(1, 100), Rand(1, 100)]) }, scale: [Pwhite(220, 440), Pwhite(440, 880)]),
+			[440, 660],
+			880
+		], inf),
+		dur: Prand([0.125, 0.25, 0.5, 1], inf)
+	), start: false);
+
+	c = AMP((
+		rate: \audio,
+		time: Pwhite(0.01, 1),
+		in: AlgaTemp({ SinOsc.ar(Rand(1, 1000)) }),
+		dur: Prand([0.5, 1, 2], inf)
+	), start: false);
+
+	//Define connections as usual
+	a <<.freq b;
+	a <<.amp c;
+
+	//Make sure everything is instantiated
+	0.5.wait;
+
+	//Play patterns and output
+	b.playPattern(sched: 1);
+	c.playPattern(sched: 1);
+	a.play(time: 0.1, sched: 1);
+})
 )
-
-//Node to play
-(
-b = Bus.control(s);
-~a = AN({ SinOsc.ar(\freq.kr(440)) }, [\freq, AlgaTemp({ In.kr(b.index) })]);
-~a.play;
-)
-
-//Sequencer
-~b = (def: \seq1, b: b.index, val: Pseq([220, 440, 880], inf), dur: 0.25);
-
-//Interpolation still works
-(
-~b.it = 5;
-~b <<.val Pwhite(220, 880);
-)
-
-//Latest values are preserved
-~b.stopPattern;
-~b.resumePattern;
