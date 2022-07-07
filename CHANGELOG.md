@@ -50,7 +50,7 @@
 
 - `AlgaOut`: Fixed the parameter argument. It was only working with `\in` before.
 
-# 1.2
+# 1.2.0
 
 ## New features
 
