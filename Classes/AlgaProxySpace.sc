@@ -212,7 +212,8 @@ AlgaProxySpace {
 		var interpShape = node.interpShape;
 		var playTime = node.playTime;
 		var defBeforeMod = def.copy; //def gets modified in AlgaPattern. Store the original one
-		var pattern = AlgaPattern(
+		var class = if(def[\mono] == true, { AlgaMonoPattern }, { AlgaPattern });
+		var pattern = class.new(
 			def: def,
 			interpTime: interpTime,
 			interpShape: interpShape,
