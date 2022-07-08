@@ -59,6 +59,9 @@
 	//Like asStream, but easily overloadable
 	algaAsStream { ^(this.asStream) }
 
+	//Like asStream, but easily overloadable
+	algaNext { | e | ^this.next(e) }
+
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
 	addAction { | condition, func, sched = 0, topPriority = false,
 		schedInSeconds = false, preCheck = false |
@@ -276,6 +279,13 @@
 		^this.any({ | item |
 			(item.canFreeSynth).or(item.algaCanFreeSynth)
 		})
+	}
+
+	//Support .next for [Pattern, Pattern, etc...]
+	algaNext { | e |
+		var result = Array.newClear(this.size);
+		this.do { | entry, i | result[i] = entry.algaNext(e) };
+		^result
 	}
 }
 
