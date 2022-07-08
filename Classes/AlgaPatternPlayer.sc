@@ -18,7 +18,7 @@
 AlgaPatternPlayer {
 	var <pattern, <patternAsStream, <algaReschedulingEventStreamPlayer;
 	var actionScheduler, parser;
-	var <timeInner = 0, <schedInner = 1;
+	var <timeInner = 0, <schedInner = 1, <shapeInner;
 	var <schedResync = 1;
 	var <durInterpResync = true;
 	var <durInterpReset = false;
@@ -234,6 +234,34 @@ AlgaPatternPlayer {
 			^this;
 		});
 		timeInner = value
+	}
+
+	interpTime { ^this.time }
+
+	interpTime_ { | value |
+		this.time_(value)
+	}
+
+	it { ^this.time }
+
+	it_ { | value |
+		this.time_(value)
+	}
+
+	shape { ^shapeInner }
+
+	shape_ { | value |
+		if(value.isKindOf(Env).not, {
+			"AlgaPatternPlayer: 'shape' can only be an Env".error;
+			^this;
+		});
+		shapeInner = value
+	}
+
+	interpShape { ^this.shape }
+
+	interpShape_ { | value |
+		this.shape_(value)
 	}
 
 	schedInSeconds_ { | value |
@@ -909,6 +937,7 @@ AlgaPatternPlayer {
 		time = time ? 0;
 		sched = sched ? schedInner;
 		sched = sched ? 0;
+		shape = shape ? shapeInner;
 
 		// \dur / \stretch
 		case

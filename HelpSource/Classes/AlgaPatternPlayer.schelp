@@ -88,6 +88,9 @@ Manually set a code::sched:: value to use when not specified explicitly.
 METHOD:: time
 Manually set a code::time:: value to use when not specified explicitly.
 
+METHOD:: shape
+Manually set a code::shape:: value to use when not specified explicitly.
+
 METHOD:: tempoScaling
 Specify if all timed actions should be scaled by the clock's tempo. Default is code::false::.
 
@@ -206,3 +209,9 @@ private:: stretch
 private:: stretchAlgaPseg
 private:: resetEntries
 private:: runFuncOnValidPatternAsStream
+
+private:: entriesOrder
+private:: interpShape
+private:: interpTime
+private:: shapeInner
+private:: it
