@@ -2986,6 +2986,12 @@ AlgaPattern : AlgaNode {
 	//from implementation
 	fromInner { | sender, param = \in, chans, scale, sampleAndHold,
 		time, shape, forceReplace = false, sched |
+
+		//AlgaMonoPattern: could be \value or \val
+		if(this.isAlgaMonoPattern, {
+			if((param == \value).or(param == \val), { param = \in })
+		});
+
 		//delta == dur
 		if(param == \delta, { param = \dur });
 

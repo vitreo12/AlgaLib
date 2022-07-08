@@ -6,15 +6,15 @@ related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaPatte
 DESCRIPTION::
 An link::Classes/AlgaMonoPattern:: is a monophonic sequencer with interpolation capabilities. It works similarly to an link link::Classes/AlgaPattern::, with the difference of the pattern being triggered sequentially. link::Classes/AlgaMonoPattern::s feature a set of special keys:
 
-1. code::rate:: - The rate of the sequencer. This defaults to code::\control::.
+1. code::rate:: - The rate of the sequencer, defaulting to code::\control::. Accepted values are: code::\control, \kr, \audio, \ar::.
 
-2. code::chans:: - The number of channels of the sequencer. This defaults to 1.
+2. code::chans:: - The number of channels of the sequencer, defaulting to 1. This can be aliased to code::channels, numChans, numChannels::.
 
-3. code::in:: - The values of the sequencer.
+3. code::in:: - The values of the sequencer. This can be aliased to code::value, val::.
 
-4. code::time:: - The interpolation times between triggers.
+4. code::time:: - The interpolation times between triggers. This can be aliased to code::interpTime, it::.
 
-5. code::shape:: - The interpolation shapes of the interpolation times.
+5. code::shape:: - The interpolation shapes of the interpolation times. This can be aliased to code::interpShape, is::.
 
 INSTANCEMETHODS::
 

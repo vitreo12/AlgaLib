@@ -303,6 +303,8 @@ AlgaParser {
 		if(obj.isAlgaMonoPattern, {
 			var defRate  = def[\rate] ? \audio;
 			var defChans = (((def[\chans] ? def[\channels]) ? def[\numChans]) ? def[\numChannels]) ? 1;
+			if(defRate == \ar, { defRate = \audio });
+			if(defRate == \kr, { defRate = \control });
 			if((defRate != \audio).and(defRate != \control), {
 				"AlgaMonoPattern: 'rate' can only be 'audio' or 'control'".error;
 				^nil;
@@ -318,6 +320,19 @@ AlgaParser {
 			if(defOut != nil, {
 				"AlgaMonoPattern: 'out' is unsupported".error;
 				^nil;
+			});
+			if(def[\in] == nil, {
+				def[\in] = def[\value] ? def[\val];
+				if(def[\in] == nil, {
+					"AlgaMonoPattern: invalid 'in', 'value' or 'val'".error;
+					^nil;
+				});
+			});
+			if(def[\time] == nil, {
+				def[\time] = def[\interpTime] ? def[\it];
+			});
+			if(def[\shape] == nil, {
+				def[\shape] = def[\interpShape] ? def[\is];
 			});
 
 			//Set numChannels / rate
