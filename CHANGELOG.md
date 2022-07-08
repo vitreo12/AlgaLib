@@ -1,6 +1,6 @@
 # 1.3.0
 
-# New features
+## New features
 
 - `AlgaMonoPattern`: a new class that implements a monophonic interpolated sequencer. Check its help files for more examples
 
