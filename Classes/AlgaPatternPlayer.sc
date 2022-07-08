@@ -62,7 +62,7 @@ AlgaPatternPlayer {
 					if(key != \dur, {
 						value[\entries].keysValuesDo({ | uniqueID, entry |
 							//Advance patterns
-							var entryVal = entry.next(currentEnvironment);
+							var entryVal = entry.algaNext(currentEnvironment);
 							entryVal.algaAdvance(currentEnvironment);
 
 							//Store value for Pfunc / Pkey retrieval
@@ -155,7 +155,7 @@ AlgaPatternPlayer {
 					entries[key] = IdentityDictionary();
 					entries[key][\lastID] = uniqueID;
 					entries[key][\entries] = IdentityDictionary();
-					entries[key][\entries][uniqueID] = entry.algaAsStream; //.next support
+					entries[key][\entries][uniqueID] = entry.algaAsStream; //.algaNext support
 				});
 
 				//Add to entriesOrder
@@ -169,12 +169,12 @@ AlgaPatternPlayer {
 		//Add reschedulable \dur
 		if(foundDurOrDelta, {
 			if(manualDur.not, {
-				patternPairs = patternPairs.add(\dur).add(Pfunc { | e | dur.next(e) });
+				patternPairs = patternPairs.add(\dur).add(Pfunc { | e | dur.algaNext(e) });
 			});
 		});
 
 		//Add reschedulable \stretch
-		patternPairs = patternPairs.add(\stretch).add(Pfunc { | e | stretch.next(e) });
+		patternPairs = patternPairs.add(\stretch).add(Pfunc { | e | stretch.algaNext(e) });
 
 		//Order entries alphabetically
 		entriesOrder = entriesOrder[entriesOrder.order];
@@ -424,11 +424,11 @@ AlgaPatternPlayer {
 			//If sched is 0, go right away: user might have its own scheduling setup
 			if(sched == 0, {
 				//Empty event as protoEvent!
-				patternAsStream.next(()).play;
+				patternAsStream.algaNext(()).play;
 			}, {
 				this.addAction(
 					//Empty event as protoEvent!
-					func: { patternAsStream.next(()).play },
+					func: { patternAsStream.algaNext(()).play },
 					sched: sched
 				);
 			});
@@ -752,11 +752,11 @@ AlgaPatternPlayer {
 			var keyOrFunc = algaReaderPfunc.keyOrFunc;
 			var repeats = algaReaderPfunc.repeats;
 
-			//Temporarily .next the stream so that results[] have a valid value ASAP...
+			//Temporarily .algaNext the stream so that results[] have a valid value ASAP...
 			//Should this be done without copy?
 			var lastID = entries[algaPatternPlayerParam][\lastID];
 			var tempEntryStream = entries[algaPatternPlayerParam][\entries][lastID].deepCopy;
-			results[algaPatternPlayerParam][lastID] = tempEntryStream.next(currentEnvironment);
+			results[algaPatternPlayerParam][lastID] = tempEntryStream.algaNext(currentEnvironment);
 
 			//Re-build the AlgaReaderPfunc
 			case

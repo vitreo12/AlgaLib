@@ -543,7 +543,7 @@ AlgaPattern : AlgaNode {
 						//Scalar parameters
 
 						//Unpack value
-						var paramValue = entry.next;
+						var paramValue = entry.algaNext;
 
 						//If Symbol, skip iteration
 						if(paramValue.isSymbol, {
@@ -625,7 +625,7 @@ AlgaPattern : AlgaNode {
 		//Only if not using MC (it's already been unpacked) OR
 		//is FX / AlgaTemp / Temporary (the mid-interpolation ones)
 		if((useMultiChannelExpansion.not).or(isFX).or(isAlgaTemp).or(isTemporary), {
-			if(entry.isStream, { entry = entry.next(this.getCurrentEnvironment) });
+			if(entry.isStream, { entry = entry.algaNext(this.getCurrentEnvironment) });
 		});
 
 		//Unpack Pattern values for AA, AT and AO
@@ -797,7 +797,7 @@ AlgaPattern : AlgaNode {
 					if(scale == nil, {
 						if(scaleArrayAndChansAtParam != nil, {
 							scale = scaleArrayAndChansAtParam[0]; //0 == scaleArray
-							scale = scale.next(this.getCurrentEnvironment); //This has not been advanced yet
+							scale = scale.algaNext(this.getCurrentEnvironment); //This has not been advanced yet
 						});
 					});
 				}, {
@@ -828,7 +828,7 @@ AlgaPattern : AlgaNode {
 					if(chansMapping == nil, {
 						if(scaleArrayAndChansAtParam != nil, {
 							chansMapping = scaleArrayAndChansAtParam[1]; //1 == chans
-							chansMapping = chansMapping.next(this.getCurrentEnvironment); //This has not been advanced yet
+							chansMapping = chansMapping.algaNext(this.getCurrentEnvironment); //This has not been advanced yet
 						});
 					});
 				});
@@ -1038,7 +1038,7 @@ AlgaPattern : AlgaNode {
 						//Scalar parameters
 
 						//Unpack value
-						var paramValue = entry.next;
+						var paramValue = entry.algaNext;
 
 						//If symbol, skip
 						if(paramValue.isSymbol, { skipIterationFX = true });
@@ -1634,7 +1634,7 @@ AlgaPattern : AlgaNode {
 				if(interpStreamsEntriesAtParam != nil, {
 					interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry |
 						//Unpack Pattern value
-						if(entry.isStream, { entry = entry.next(this.getCurrentEnvironment) });
+						if(entry.isStream, { entry = entry.algaNext(this.getCurrentEnvironment) });
 
 						//Set entries at paramName
 						entries[paramName] = entries[paramName] ? IdentityDictionary();
@@ -2209,7 +2209,7 @@ AlgaPattern : AlgaNode {
 				//Scalar
 				newInterpStreams.addScalarAndGenericParams(paramName, paramValue);
 				patternPairsDict[paramName] = Pfunc { | e |
-					newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
+					newInterpStreams.scalarAndGenericParamsStreams[paramName].algaNext(e);
 				};
 				foundGenericParams.add(paramName);
 
@@ -2229,7 +2229,7 @@ AlgaPattern : AlgaNode {
 			if(paramName == \def, {
 				newInterpStreams.addDef(value);
 				patternPairsDict[\def] = Pfunc { | e |
-					newInterpStreams.defStream.next(e);
+					newInterpStreams.defStream.algaNext(e);
 				};
 				isAlgaParam = true;
 			});
@@ -2274,7 +2274,7 @@ AlgaPattern : AlgaNode {
 				newInterpStreams.addFX(parsedFX);
 				if(parsedFX != nil, {
 					patternPairsDict[\fx] = Pfunc { | e |
-						newInterpStreams.fxStream.next(e);
+						newInterpStreams.fxStream.algaNext(e);
 					};
 					foundFX = true;
 				});
@@ -2288,7 +2288,7 @@ AlgaPattern : AlgaNode {
 				if(parsedOut != nil, {
 					//Can't use \out as key for a pattern
 					patternPairsDict[\algaOut] = Pfunc { | e |
-						newInterpStreams.outStream.next(e);
+						newInterpStreams.outStream.algaNext(e);
 					};
 					foundOut = true;
 				});
@@ -2299,7 +2299,7 @@ AlgaPattern : AlgaNode {
 			if(isAlgaParam.not, {
 				newInterpStreams.addScalarAndGenericParams(paramName, value);
 				patternPairsDict[paramName] = Pfunc { | e |
-					newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
+					newInterpStreams.scalarAndGenericParamsStreams[paramName].algaNext(e);
 				};
 				foundGenericParams.add(paramName);
 			});
@@ -2422,7 +2422,7 @@ AlgaPattern : AlgaNode {
 					if(currentFX != nil, {
 						newInterpStreams.addFX(currentFX);
 						patternPairsDict[\fx] = Pfunc { | e |
-							newInterpStreams.fxStream.next(e)
+							newInterpStreams.fxStream.algaNext(e)
 						}
 					});
 				});
@@ -2434,7 +2434,7 @@ AlgaPattern : AlgaNode {
 					if(currentOut != nil, {
 						newInterpStreams.addOut(currentOut);
 						patternPairsDict[\algaOut] = Pfunc { | e |
-							newInterpStreams.outStream.next(e);
+							newInterpStreams.outStream.algaNext(e);
 						}
 					});
 				});
@@ -2451,7 +2451,7 @@ AlgaPattern : AlgaNode {
 								if(latestValue != nil, {
 									newInterpStreams.addScalarAndGenericParams(paramName, value);
 									patternPairsDict[paramName] = Pfunc { | e |
-										newInterpStreams.scalarAndGenericParamsStreams[paramName].next(e);
+										newInterpStreams.scalarAndGenericParamsStreams[paramName].algaNext(e);
 									};
 								});
 							})
@@ -2489,11 +2489,11 @@ AlgaPattern : AlgaNode {
 				//This allows for .replace to work correctly and not advance twice!
 				var currentTime = this.clock.seconds;
 				var dur = if(currentTime != latestPatternTime, {
-					newInterpStreams.dur.next(e)
+					newInterpStreams.dur.algaNext(e)
 				}, {
-					//If stream changed, run .next anyway
+					//If stream changed, run .algaNext anyway
 					if(newInterpStreams.dur != latestDurStream, {
-						newInterpStreams.dur.next(e)
+						newInterpStreams.dur.algaNext(e)
 					}, {
 						//Same time and no stream change: return the
 						//dur that was just triggered at this very time
@@ -2512,9 +2512,9 @@ AlgaPattern : AlgaNode {
 		});
 
 		//Add time parameters
-		patternPairsDict[\legato]  = Pfunc { | e | newInterpStreams.legato.next(e) };
-		patternPairsDict[\stretch] = Pfunc { | e | newInterpStreams.stretch.next(e) };
-		patternPairsDict[\sustain] = Pfunc { | e | newInterpStreams.sustain.next(e) };
+		patternPairsDict[\legato]  = Pfunc { | e | newInterpStreams.legato.algaNext(e) };
+		patternPairsDict[\stretch] = Pfunc { | e | newInterpStreams.stretch.algaNext(e) };
+		patternPairsDict[\sustain] = Pfunc { | e | newInterpStreams.sustain.algaNext(e) };
 
 		//Order pattern pairs dict alphabetically and convert to array.
 		//This allows the user to use Pfunc { | e | } functions with any
@@ -2798,7 +2798,7 @@ AlgaPattern : AlgaNode {
 					if(sched.isAlgaStep, {
 						if(sched.post.not, {
 							var scalarAndGenericParamsStreams = interpStreams.scalarAndGenericParamsStreams;
-							var value = scalarAndGenericParamsStreams[param].next(this.getCurrentEnvironment);
+							var value = scalarAndGenericParamsStreams[param].algaNext(this.getCurrentEnvironment);
 
 							//Substitute in currentEnvironment so it's picked up
 							//right away in the current createPatternSynth call
@@ -3294,11 +3294,11 @@ AlgaPattern : AlgaNode {
 				//If sched is 0, go right away: user might have its own scheduling setup
 				if(sched == 0, {
 					//Empty event as protoEvent!
-					patternAsStream.next(()).play;
+					patternAsStream.algaNext(()).play;
 				}, {
 					this.addAction(
 						//Empty event as protoEvent!
-						func: { patternAsStream.next(()).play },
+						func: { patternAsStream.algaNext(()).play },
 						sched: sched
 					);
 				});
