@@ -2,7 +2,7 @@
 
 # New features
 
-- `AlgaMonoPattern`: a new class for a monophonic interpolated sequencer. Check its help files for more examples
+- `AlgaMonoPattern`: a new class that implements a monophonic interpolated sequencer. Check its help files for more examples
 
     ```SuperCollider
     (
