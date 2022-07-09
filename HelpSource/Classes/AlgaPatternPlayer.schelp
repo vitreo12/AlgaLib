@@ -215,3 +215,4 @@ private:: interpShape
 private:: interpTime
 private:: shapeInner
 private:: it
+private:: player

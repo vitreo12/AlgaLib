@@ -39,6 +39,8 @@ AlgaPatternPlayer {
 	var <stretch = 1, <stretchAlgaPseg;
 	var <manualDur = false;
 
+	var <>player;
+
 	*initClass {
 		StartUp.add({ this.addAlgaPatternPlayerEventType });
 	}
@@ -89,16 +91,15 @@ AlgaPatternPlayer {
 		});
 	}
 
-	*new { | def, server |
-		^super.new.init(def, server)
+	*new { | def, player, server |
+		^super.new.init(def, player, server)
 	}
 
-	init { | argDef, argServer |
+	init { | argDef, argPlayer, argServer |
 		var scheduler;
 		var patternPairs = Array.newClear;
 		var foundDurOrDelta = false;
 		var functionSynthDefDict = IdentityDictionary(); //AlgaTemp parser needs this
-
 		manualDur = false;
 
 		//Get scheduler
@@ -112,6 +113,9 @@ AlgaPatternPlayer {
 			).error;
 			^nil;
 		});
+
+		//Assign player
+		player = argPlayer;
 
 		//Create AlgaActionScheduler
 		actionScheduler = AlgaActionScheduler(this, scheduler);
@@ -164,6 +168,12 @@ AlgaPatternPlayer {
 		}, {
 			("AlgaPatternPlayer: Invalid 'def': " ++ argDef.class.asString).error;
 			^nil;
+		});
+
+		//If player is AlgaPatternPlayer, dur is ALWAYS manual
+		if(player.isAlgaPatternPlayer, {
+			player.addAlgaPattern(this);
+			manualDur = true;
 		});
 
 		//Add reschedulable \dur
@@ -468,7 +478,7 @@ AlgaPatternPlayer {
 
 	//Add an AlgaPattern
 	addAlgaPattern { | algaPattern |
-		if(algaPattern.isAlgaPattern, { algaPatterns.add(algaPattern) });
+		algaPatterns.add(algaPattern);
 	}
 
 	//Remove an AlgaPattern and reset its .player. Works with scheduling

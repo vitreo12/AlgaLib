@@ -400,3 +400,4 @@ private:: interpolateScalarOrGenericParam
 private:: resetPattern
 private:: runFuncOnValidInterpStreams
 private:: startPattern
+private:: resetEventEntries
