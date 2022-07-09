@@ -143,6 +143,9 @@ AlgaPattern : AlgaNode {
 	//Start pattern when creted
 	var <>startPattern = true;
 
+	//Mainly used for Arrayed \def
+	var eventEntries;
+
 	//Add the \algaNote event to Event
 	*initClass {
 		//StartUp.add is needed: Event class must be compiled first
@@ -206,8 +209,8 @@ AlgaPattern : AlgaNode {
 			//Needed for Event syncing
 			~isPlaying = true;
 
-			//Check algaSynthDef to be a Symbol
-			if(algaSynthDef.isSymbol, {
+			//Check algaSynthDef to be a Symbol or an Array
+			if((algaSynthDef.isSymbol).or(algaSynthDef.isSequenceableCollection), {
 				//Deal with sustain
 				if(hasSustain, {
 					//scale by stretch
@@ -240,18 +243,41 @@ AlgaPattern : AlgaNode {
 					//First, consume scheduledStepActionsPre if there are any
 					~algaPattern.advanceAndConsumeScheduledStepActions(false);
 
+					//Reset internal eventEntries. This is crucial for multiple defs (Array)
+					~algaPattern.resetEventEntries;
+
 					//Then, create all needed synths
-					~algaPattern.createEventSynths(
-						algaSynthDef: algaSynthDef,
-						algaSynthBus: algaSynthBus,
-						algaPatternInterpStreams: algaPatternInterpStreams,
-						fx: fx,
-						algaOut: algaOut,
-						dur: dur,
-						sustain: sustain,
-						stretch: stretch,
-						legato: legato
-					);
+					if(algaSynthDef.isSymbol, {
+						//One def
+						~algaPattern.createEventSynths(
+							algaSynthDef: algaSynthDef,
+							algaSynthBus: algaSynthBus,
+							algaPatternInterpStreams: algaPatternInterpStreams,
+							fx: fx,
+							algaOut: algaOut,
+							dur: dur,
+							sustain: sustain,
+							stretch: stretch,
+							legato: legato
+						);
+					}, {
+						//Multiple defs
+						algaSynthDef.do({ | algaSynthDefEntry |
+							if(algaSynthDefEntry.isSymbol, {
+								~algaPattern.createEventSynths(
+									algaSynthDef: algaSynthDefEntry,
+									algaSynthBus: algaSynthBus,
+									algaPatternInterpStreams: algaPatternInterpStreams,
+									fx: fx,
+									algaOut: algaOut,
+									dur: dur,
+									sustain: sustain,
+									stretch: stretch,
+									legato: legato
+								);
+							});
+						});
+					});
 
 					//Finally, consume scheduledStepActionsPost if there are any
 					~algaPattern.advanceAndConsumeScheduledStepActions(true);
@@ -1262,7 +1288,7 @@ AlgaPattern : AlgaNode {
 	//Create all needed Synths / Busses for an individual patternSynth
 	createPatternSynth { | algaSynthDef, algaSynthDefClean, algaSynthBus,
 		algaPatternInterpStreams, controlNamesToUse, fx, algaOut,
-		mcSynthNum, mcEntries, dur, sustain, stretch, legato |
+		mcSynthNum, dur, sustain, stretch, legato |
 		//Used to check whether using a ListPattern of \defs
 		var numChannelsToUse  = numChannels;
 		var rateToUse = rate;
@@ -1358,7 +1384,7 @@ AlgaPattern : AlgaNode {
 
 				//MultiChannel: extract from mcEntries
 				if(useMultiChannelExpansion, {
-					mcEntriesAtParam = mcEntries[paramName]
+					mcEntriesAtParam = eventEntries[paramName]
 				});
 
 				//Create all interp synths for current param
@@ -1622,7 +1648,6 @@ AlgaPattern : AlgaNode {
 	//Each entry will be used to create an individual patternSynth
 	calculateMultiChannelMismatches { | controlNamesToUse, algaPatternInterpStreams, fx, algaOut |
 		var numOfSynths = 0;
-		var entries = IdentityDictionary();
 
 		//Loop over the actual control names
 		controlNamesToUse.do({ | controlName |
@@ -1633,14 +1658,21 @@ AlgaPattern : AlgaNode {
 				var interpStreamsEntriesAtParam = algaPatternInterpStreams.entries[paramName];
 				if(interpStreamsEntriesAtParam != nil, {
 					interpStreamsEntriesAtParam.keysValuesDo({ | uniqueID, entry |
-						//Unpack Pattern value
-						if(entry.isStream, { entry = entry.algaNext(this.getCurrentEnvironment) });
+						//This approach supports Arrays as \def
+						var oldEntry = eventEntries[paramName][uniqueID];
+						if(oldEntry == nil, {
+							//Advance the Stream.
+							//This will also advance the entry within interpStreamsEntriesAtParam
+							entry = entry.algaNext(this.getCurrentEnvironment);
+						}, {
+							entry = oldEntry;
+						});
 
 						//Set entries at paramName
-						entries[paramName] = entries[paramName] ? IdentityDictionary();
+						eventEntries[paramName] = eventEntries[paramName] ? IdentityDictionary();
 
 						//Use uniqueID
-						entries[paramName][uniqueID] = [entry, paramNumChannels];
+						eventEntries[paramName][uniqueID] = [entry, paramNumChannels];
 
 						//Retrieve the highest numOfSynths to spawn
 						if(entry.isArray, {
@@ -1660,24 +1692,24 @@ AlgaPattern : AlgaNode {
 		//Also check \fx
 		if(fx.isArray, {
 			var arraySize = fx.size;
-			entries[\fx] = entries[\fx] ? IdentityDictionary();
+			eventEntries[\fx] = eventEntries[\fx] ? IdentityDictionary();
 			numOfSynths = max(arraySize, numOfSynths);
-			entries[\fx] = fx.reshape(numOfSynths);
+			eventEntries[\fx] = fx.reshape(numOfSynths);
 		});
 
 		//Also check \out
 		if(algaOut.isArray, {
 			var arraySize = algaOut.size;
-			entries[\algaOut] = entries[\algaOut] ? IdentityDictionary();
-			numOfSynths = max(arraySize, numOfSynths);
-			entries[\algaOut] = algaOut.reshape(numOfSynths);
-			if(arraySize > numOfSynths, { //needs to be re-done, overwritten
-				entries[\fx] = fx.reshape(numOfSynths);
+			if(arraySize > numOfSynths, { //Needs to be overwritten
+				eventEntries[\fx] = fx.reshape(numOfSynths);
 			});
+			eventEntries[\algaOut] = eventEntries[\algaOut] ? IdentityDictionary();
+			numOfSynths = max(arraySize, numOfSynths);
+			eventEntries[\algaOut] = algaOut.reshape(numOfSynths);
 		});
 
 		//Loop over entries and distribute the values across the synths to spawn
-		entries.keysValuesDo({ | paramName, entriesAtParamName |
+		eventEntries.keysValuesDo({ | paramName, entriesAtParamName |
 			if((paramName != \fx).and(paramName != \algaOut), {
 				entriesAtParamName.keysValuesDo({ | uniqueID, entryAndParamNumChannels |
 					var entry = entryAndParamNumChannels[0];
@@ -1697,16 +1729,18 @@ AlgaPattern : AlgaNode {
 					}, {
 						newEntry = entry;
 					});
-					entries[paramName][uniqueID] = newEntry;
+					eventEntries[paramName][uniqueID] = newEntry;
 				});
 			});
 		});
 
 		//Add numOfSynths
-		entries[\numOfSynths] = numOfSynths;
+		eventEntries[\numOfSynths] = numOfSynths;
+	}
 
-		//Return the correct entries
-		^entries;
+	//Called before createEventSynths
+	resetEventEntries {
+		eventEntries = IdentityDictionary();
 	}
 
 	//Create all needed Synths for this Event. This is triggered by the \algaNote Event
@@ -1735,8 +1769,10 @@ AlgaPattern : AlgaNode {
 
 		//Check MC mismatches and create patternSynths accordingly
 		if(useMultiChannelExpansion, {
+			var numOfSynths;
+
 			//Each entry will be used to create a single patternSynth
-			var entries = this.calculateMultiChannelMismatches(
+			this.calculateMultiChannelMismatches(
 				controlNamesToUse: controlNamesToUse,
 				algaPatternInterpStreams: algaPatternInterpStreams,
 				fx: fx,
@@ -1744,21 +1780,21 @@ AlgaPattern : AlgaNode {
 			);
 
 			//Get numOfSynths
-			var numOfSynths = entries[\numOfSynths] ? 0;
+			numOfSynths = eventEntries[\numOfSynths] ? 0;
 
 			//Remove it
-			entries.removeAt(\numOfSynths);
+			eventEntries.removeAt(\numOfSynths);
 
 			//Get fx
-			if(entries[\fx] != nil, {
-				fx = entries[\fx];
-				entries.removeAt(\fx);
+			if(eventEntries[\fx] != nil, {
+				fx = eventEntries[\fx];
+				eventEntries.removeAt(\fx);
 			});
 
 			//Get out
-			if(entries[\algaOut] != nil, {
-				algaOut = entries[\algaOut];
-				entries.removeAt(\algaOut);
+			if(eventEntries[\algaOut] != nil, {
+				algaOut = eventEntries[\algaOut];
+				eventEntries.removeAt(\algaOut);
 			});
 
 			//Create MC expansion. If it fails (numSynths == 0)
@@ -1774,7 +1810,6 @@ AlgaPattern : AlgaNode {
 						fx: fx,
 						algaOut: algaOut,
 						mcSynthNum: synthNum,
-						mcEntries: entries,
 						dur: dur,
 						sustain: sustain,
 						stretch: stretch,
@@ -1794,7 +1829,6 @@ AlgaPattern : AlgaNode {
 					fx: fx,
 					algaOut: algaOut,
 					mcSynthNum: nil,
-					mcEntries: entries,
 					dur: dur,
 					sustain: sustain,
 					stretch: stretch,
@@ -1866,7 +1900,7 @@ AlgaPattern : AlgaNode {
 		}
 
 		//Patterns
-		{ defEntry.isPattern } {
+		{ (defEntry.isPattern).or(defEntry.isSequenceableCollection) } {
 			^this.dispatchPattern(
 				def: defEntry,
 				initGroups: initGroups,

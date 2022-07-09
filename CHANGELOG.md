@@ -34,6 +34,21 @@
     )
     ```
 
+- `AlgaPattern`: `'def'` now supports `Array` entries to create stacked voices:
+
+    ```SuperCollider
+    (
+    Alga.boot({
+        a = AlgaPattern((
+            def: [{ SinOsc.ar(\freq.kr) }, { Saw.ar(\freq.kr * 0.25) }],
+            amp: AlgaTemp({ EnvPerc.ar }),
+            freq: Pseq([220, 440, 880], inf), 
+            dur: 0.5
+        )).play(2)
+    })
+    )
+    ```
+
 # 1.2.1
 
 ## New features
