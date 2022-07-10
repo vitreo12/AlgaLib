@@ -94,6 +94,7 @@ AlgaNode {
 
 	//Spec of parameters (names, default values, channels, rate)
 	var <controlNames;
+	var <triggerControlNames;
 
 	//Number of channels and rate
 	var <numChannels, <rate;
@@ -312,6 +313,9 @@ AlgaNode {
 
 		//Keeps all the connectionTimes of the connected nodes
 		connectionTimeOutNodes = IdentityDictionary(10);
+
+		//This will be replaced. In case it's not, at least it doesn't index a nil
+		triggerControlNames = IdentitySet(1);
 
 		//AlgaPattern specific
 		if(this.isAlgaPattern, {
@@ -916,8 +920,8 @@ AlgaNode {
 			var paramName = controlName.name;
 			var paramRate = controlName.rate;
 			var paramNumChannels = controlName.numChannels;
-
-			if((paramRate == \control).or(paramRate == \audio), {
+			if((triggerControlNames.includes(paramName.asSymbol).not).and(
+				(paramRate == \control).or(paramRate == \audio)), {
 				//This is crucial: interpBusses have 1 more channel for the interp envelope!
 				interpBusses[paramName][\default] = AlgaBus(server, paramNumChannels + 1, paramRate);
 				normBusses[paramName] = AlgaBus(server, paramNumChannels, paramRate);
@@ -1239,6 +1243,9 @@ AlgaNode {
 		//Retrieve controlNames
 		var synthDescControlNames = synthDef.asSynthDesc.controls;
 		if(this.createControlNamesAndParamsConnectionTime(synthDescControlNames).not, { ^this });
+
+		//Check \trigger rates
+		triggerControlNames = synthDef.triggers;
 
 		numChannels = synthDef.numChannels;
 		if(numChannels > AlgaStartup.algaMaxIO, {
@@ -1778,391 +1785,391 @@ AlgaNode {
 	createInterpNormSynths { | replace = false, keepChannelsMapping = false, keepScale = false |
 		controlNames.do({ | controlName |
 			var normBus;
-
 			var paramName = controlName.name;
 			var paramNumChannels = controlName.numChannels;
-
 			var paramRate = controlName.rate;
 			var paramDefault = this.getDefaultOrArg(controlName, paramName, replace);
-
 			var noSenders = false;
 
-			normBus = normBusses[paramName];
-			if(normBus == nil, {
-				("AlgaNode: invalid normBus for param: '" ++ paramName ++ "'. Unlike AlgaPatterns, 'scalar' parameters are not supported in AlgaNodes. Use a 'control' parameter instead.").error;
-				^this
-			});
+			//Ignore .tr parameters
+			if(triggerControlNames.includes(paramName.asSymbol).not, {
+				normBus = normBusses[paramName];
+				if(normBus == nil, {
+					("AlgaNode: invalid normBus for param: '" ++ paramName ++ "'. Unlike AlgaPatterns, 'scalar' parameters are not supported in AlgaNodes. Use a 'control' parameter instead.").error;
+					^this
+				});
 
-			//If replace and sendersSet contains inNodes, connect back to the .synthBus of the AlgaNode.
-			//Note that an inNode can also be an AlgaArg, in which case it also gets unpacked accordingly
-			if(replace, {
-				//Restoring a connected parameter, being it normal or mix
-				var sendersSet = inNodes[paramName];
-				if(sendersSet != nil, {
-					if(sendersSet.size > 0, {
-						//if size == 1, index from \default
-						var onlyEntry = sendersSet.size == 1;
+				//If replace and sendersSet contains inNodes, connect back to the .synthBus of the AlgaNode.
+				//Note that an inNode can also be an AlgaArg, in which case it also gets unpacked accordingly
+				if(replace, {
+					//Restoring a connected parameter, being it normal or mix
+					var sendersSet = inNodes[paramName];
+					if(sendersSet != nil, {
+						if(sendersSet.size > 0, {
+							//if size == 1, index from \default
+							var onlyEntry = sendersSet.size == 1;
 
-						//Loop through
-						sendersSet.do({ | prevSender |
-							var interpBus, interpSynth, normSynth;
-							var interpSymbol, normSymbol;
+							//Loop through
+							sendersSet.do({ | prevSender |
+								var interpBus, interpSynth, normSynth;
+								var interpSymbol, normSymbol;
 
-							var prevSenderNumChannels, prevSenderRate;
+								var prevSenderNumChannels, prevSenderRate;
 
-							var oldParamsChansMapping = nil;
-							var oldParamScale = nil;
+								var oldParamsChansMapping = nil;
+								var oldParamScale = nil;
 
-							var interpSynthArgs;
+								var interpSynthArgs;
 
-							var channelsMapping;
-							var scaleArray;
+								var channelsMapping;
+								var scaleArray;
 
-							if(onlyEntry, {
-								//normal param... Also update default node!
-								interpBus = interpBusses[paramName][\default];
-							}, {
-								//mix param: create a new bus too
-								interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
-								interpBusses[paramName][prevSender] = interpBus;
-							});
-
-							//If AlgaArg, unpack
-							if(prevSender.isAlgaArg, {
-								oldParamsChansMapping = prevSender.chansStream;
-								oldParamScale = prevSender.scaleStream;
-								prevSender = prevSender.sender;
-							});
-
-							//If prevSender == this, it's a FB connection: consider it valid
-							//Make sure that the algaNode can actually send the connection
-							if((prevSender == this).or(prevSender.isAlgaNode.and(prevSender.algaInstantiatedAsSender)), {
-								prevSenderRate = prevSender.rate;
-								prevSenderNumChannels = prevSender.numChannels;
-
-								//Use previous entry for the channel mapping, otherwise, nil.
-								//nil will generate Array.series(...) in calculateSenderChansMappingArray
-								if(keepChannelsMapping, {
-									oldParamsChansMapping = oldParamsChansMapping ?
-									this.getParamChansMapping(paramName, prevSender);
-								});
-
-								//Use previous entry for inputs scaling
-								if(keepScale, {
-									oldParamScale = oldParamScale ?
-									this.getParamScaling(paramName, prevSender);
-								});
-
-								//overwrite interp symbol considering the senders' num channels!
-								interpSymbol = (
-									"alga_interp_" ++
-									prevSenderRate ++
-									prevSenderNumChannels ++
-									"_" ++
-									paramRate ++
-									paramNumChannels
-								).asSymbol;
-
-								normSymbol = (
-									"alga_norm_" ++
-									paramRate ++
-									paramNumChannels
-								).asSymbol;
-
-								//Calculate the array for channelsMapping
-								channelsMapping = this.calculateSenderChansMappingArray(
-									paramName,
-									prevSender,
-									oldParamsChansMapping,
-									prevSenderNumChannels,
-									paramNumChannels,
-									false
-								);
-
-								scaleArray = this.calculateScaling(
-									paramName,
-									prevSender,
-									paramNumChannels,
-									oldParamScale
-								);
-
-								interpSynthArgs = [
-									\in, prevSender.synthBus.busArg,
-									\out, interpBus.index,
-									\indices, channelsMapping,
-									\fadeTime, 0,
-									\envShape, AlgaDynamicEnvelopes.getOrAdd(interpShape, server)
-								];
-
-								//Add scale array to args
-								if(scaleArray != nil, {
-									interpSynthArgs = interpSynthArgs.addAll(scaleArray);
-								});
-
-								interpSynth = AlgaSynth(
-									interpSymbol,
-									interpSynthArgs,
-									interpGroup
-								);
-
-								//Instantiated right away, with no \fadeTime, as it will directly be connected to
-								//synth's parameter. Synth will read its params from all the normBusses
-								normSynth = AlgaSynth(
-									normSymbol,
-									[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-									normGroup,
-									waitForInst:false
-								);
-
-								//The activeInNode / activeOutNode counter MUST be updated on replace!
-								//AlgaPattern already does this with AlgaPatternInterpStreams.add
-								this.addActiveInOutNodes(prevSender, paramName);
-
-								//Normal param OR mix param
 								if(onlyEntry, {
-									//normal param
-									interpSynths[paramName][\default] = interpSynth;
-									normSynths[paramName][\default] = normSynth;
-
-									//Add interpSynth to the current active ones for specific param / sender combination
-									this.addActiveInterpSynthOnFree(paramName, prevSender, \default, interpSynth);
+									//normal param... Also update default node!
+									interpBus = interpBusses[paramName][\default];
 								}, {
-									//mix param
-									interpSynths[paramName][prevSender] = interpSynth;
-									normSynths[paramName][prevSender] = normSynth;
+									//mix param: create a new bus too
+									interpBus = AlgaBus(server, paramNumChannels + 1, paramRate);
+									interpBusses[paramName][prevSender] = interpBus;
+								});
 
-									//Add interpSynth to the current active ones for specific param / sender combination
-									this.addActiveInterpSynthOnFree(paramName, prevSender, prevSender, interpSynth);
+								//If AlgaArg, unpack
+								if(prevSender.isAlgaArg, {
+									oldParamsChansMapping = prevSender.chansStream;
+									oldParamScale = prevSender.scaleStream;
+									prevSender = prevSender.sender;
+								});
 
-									//And update the ones in \default if this sender is the currentDefaultNode!!!
-									//This is essential, because otherwise interpBusses[paramName][\default]
-									//would be a bus reading from nothing!
-									if(currentDefaultNodes[paramName] == prevSender, {
-										interpBusses[paramName][\default] = interpBus; //previous' \default should be freed
+								//If prevSender == this, it's a FB connection: consider it valid
+								//Make sure that the algaNode can actually send the connection
+								if((prevSender == this).or(prevSender.isAlgaNode.and(prevSender.algaInstantiatedAsSender)), {
+									prevSenderRate = prevSender.rate;
+									prevSenderNumChannels = prevSender.numChannels;
+
+									//Use previous entry for the channel mapping, otherwise, nil.
+									//nil will generate Array.series(...) in calculateSenderChansMappingArray
+									if(keepChannelsMapping, {
+										oldParamsChansMapping = oldParamsChansMapping ?
+										this.getParamChansMapping(paramName, prevSender);
+									});
+
+									//Use previous entry for inputs scaling
+									if(keepScale, {
+										oldParamScale = oldParamScale ?
+										this.getParamScaling(paramName, prevSender);
+									});
+
+									//overwrite interp symbol considering the senders' num channels!
+									interpSymbol = (
+										"alga_interp_" ++
+										prevSenderRate ++
+										prevSenderNumChannels ++
+										"_" ++
+										paramRate ++
+										paramNumChannels
+									).asSymbol;
+
+									normSymbol = (
+										"alga_norm_" ++
+										paramRate ++
+										paramNumChannels
+									).asSymbol;
+
+									//Calculate the array for channelsMapping
+									channelsMapping = this.calculateSenderChansMappingArray(
+										paramName,
+										prevSender,
+										oldParamsChansMapping,
+										prevSenderNumChannels,
+										paramNumChannels,
+										false
+									);
+
+									scaleArray = this.calculateScaling(
+										paramName,
+										prevSender,
+										paramNumChannels,
+										oldParamScale
+									);
+
+									interpSynthArgs = [
+										\in, prevSender.synthBus.busArg,
+										\out, interpBus.index,
+										\indices, channelsMapping,
+										\fadeTime, 0,
+										\envShape, AlgaDynamicEnvelopes.getOrAdd(interpShape, server)
+									];
+
+									//Add scale array to args
+									if(scaleArray != nil, {
+										interpSynthArgs = interpSynthArgs.addAll(scaleArray);
+									});
+
+									interpSynth = AlgaSynth(
+										interpSymbol,
+										interpSynthArgs,
+										interpGroup
+									);
+
+									//Instantiated right away, with no \fadeTime, as it will directly be connected to
+									//synth's parameter. Synth will read its params from all the normBusses
+									normSynth = AlgaSynth(
+										normSymbol,
+										[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
+										normGroup,
+										waitForInst:false
+									);
+
+									//The activeInNode / activeOutNode counter MUST be updated on replace!
+									//AlgaPattern already does this with AlgaPatternInterpStreams.add
+									this.addActiveInOutNodes(prevSender, paramName);
+
+									//Normal param OR mix param
+									if(onlyEntry, {
+										//normal param
 										interpSynths[paramName][\default] = interpSynth;
 										normSynths[paramName][\default] = normSynth;
+
+										//Add interpSynth to the current active ones for specific param / sender combination
+										this.addActiveInterpSynthOnFree(paramName, prevSender, \default, interpSynth);
+									}, {
+										//mix param
+										interpSynths[paramName][prevSender] = interpSynth;
+										normSynths[paramName][prevSender] = normSynth;
+
+										//Add interpSynth to the current active ones for specific param / sender combination
+										this.addActiveInterpSynthOnFree(paramName, prevSender, prevSender, interpSynth);
+
+										//And update the ones in \default if this sender is the currentDefaultNode!!!
+										//This is essential, because otherwise interpBusses[paramName][\default]
+										//would be a bus reading from nothing!
+										if(currentDefaultNodes[paramName] == prevSender, {
+											interpBusses[paramName][\default] = interpBus; //previous' \default should be freed
+											interpSynths[paramName][\default] = interpSynth;
+											normSynths[paramName][\default] = normSynth;
+										});
 									});
 								});
-							});
-						})
+							})
+						}, {
+							noSenders = true
+						});
 					}, {
-						noSenders = true
-					});
-				}, {
-					noSenders = true;
-				})
-			});
+						noSenders = true;
+					})
+				});
 
-			//paramDefault can either be an AlgaTemp or a Number / Array
-			if(replace.not.or(noSenders), {
-				var oldParamsChansMapping = nil;
-				var oldParamScale = nil;
-				var defaultNumChannels = paramNumChannels;
-				var defaultRate = paramRate;
-				var channelsMapping, scaleArray;
-				var interpSymbol, normSymbol, interpBus, interpSynthArgs, interpSynth, normSynth;
-				var tempSynthsAndBusses;
-				var isValid = false;
-				var storeCurrentDefaultForMix = false;
-				var senderToStoreForMix;
+				//paramDefault can either be an AlgaTemp or a Number / Array
+				if(replace.not.or(noSenders), {
+					var oldParamsChansMapping = nil;
+					var oldParamScale = nil;
+					var defaultNumChannels = paramNumChannels;
+					var defaultRate = paramRate;
+					var channelsMapping, scaleArray;
+					var interpSymbol, normSymbol, interpBus, interpSynthArgs, interpSynth, normSynth;
+					var tempSynthsAndBusses;
+					var isValid = false;
+					var storeCurrentDefaultForMix = false;
+					var senderToStoreForMix;
 
-				case
-				//AlgaNode
-				{ paramDefault.isAlgaNode } {
-					if(paramDefault.algaInstantiatedAsSender, {
-						var algaNodeSynthBus = paramDefault.synthBus;
-						senderToStoreForMix = paramDefault;
+					case
+					//AlgaNode
+					{ paramDefault.isAlgaNode } {
+						if(paramDefault.algaInstantiatedAsSender, {
+							var algaNodeSynthBus = paramDefault.synthBus;
+							senderToStoreForMix = paramDefault;
+							defaultNumChannels = paramDefault.numChannels;
+							defaultRate = paramDefault.rate;
+							paramDefault = algaNodeSynthBus.busArg;
+							isValid = true;
+							storeCurrentDefaultForMix = true;
+						});
+					}
+
+					//AlgaTemp
+					{ paramDefault.isAlgaTemp } {
+						tempSynthsAndBusses = IdentitySet(8);
+
+						//If invalid, exit
+						if(paramDefault.valid.not, {
+							("AlgaNode: invalid AlgaTemp for parameter '" ++ paramName.asString ++ "'").error;
+							^this;
+						});
+
 						defaultNumChannels = paramDefault.numChannels;
 						defaultRate = paramDefault.rate;
-						paramDefault = algaNodeSynthBus.busArg;
+
+						//Make sure to use AlgaTemp's scaling if possible (it will be nil otherwise)
+						oldParamsChansMapping = paramDefault.chans;
+						oldParamScale = paramDefault.scale;
+
+						paramDefault = this.createAlgaTempSynth(
+							algaTemp: paramDefault,
+							tempSynthsAndBusses: tempSynthsAndBusses
+						); //returns busArg that tempSynth is writing to
+
 						isValid = true;
-						storeCurrentDefaultForMix = true;
-					});
-				}
+					}
 
-				//AlgaTemp
-				{ paramDefault.isAlgaTemp } {
-					tempSynthsAndBusses = IdentitySet(8);
+					//AlgaArg
+					{ paramDefault.isAlgaArg } {
+						var algaNodeSynthBus;
+						var algaNode = paramDefault.sender;
 
-					//If invalid, exit
-					if(paramDefault.valid.not, {
-						("AlgaNode: invalid AlgaTemp for parameter '" ++ paramName.asString ++ "'").error;
-						^this;
-					});
+						if(algaNode.isAlgaNode.not, {
+							("AlgaNode: invalid AlgaArg for parameter '" ++ paramName.asString ++ "'").error;
+							^this
+						});
 
-					defaultNumChannels = paramDefault.numChannels;
-					defaultRate = paramDefault.rate;
+						if(algaNode.synthBus == nil, {
+							("AlgaNode: invalid AlgaArg synthBus for parameter '" ++ paramName.asString ++ "'").error;
+							^this
+						});
 
-					//Make sure to use AlgaTemp's scaling if possible (it will be nil otherwise)
-					oldParamsChansMapping = paramDefault.chans;
-					oldParamScale = paramDefault.scale;
+						defaultNumChannels = algaNode.numChannels;
+						defaultRate = algaNode.rate;
 
-					paramDefault = this.createAlgaTempSynth(
-						algaTemp: paramDefault,
-						tempSynthsAndBusses: tempSynthsAndBusses
-					); //returns busArg that tempSynth is writing to
+						//Make sure to use AlgaArgs's scaling if possible (it will be nil otherwise)
+						oldParamsChansMapping = paramDefault.chansStream;
+						oldParamScale = paramDefault.scaleStream;
 
-					isValid = true;
-				}
+						//Get the busArg of the synthBus
+						if(algaNode.algaInstantiatedAsSender, {
+							var algaNodeSynthBus = algaNode.synthBus;
+							senderToStoreForMix = algaNode;
+							paramDefault = algaNodeSynthBus.busArg;
+							isValid = true;
+							storeCurrentDefaultForMix = true;
+						});
+					}
 
-				//AlgaArg
-				{ paramDefault.isAlgaArg } {
-					var algaNodeSynthBus;
-					var algaNode = paramDefault.sender;
-
-					if(algaNode.isAlgaNode.not, {
-						("AlgaNode: invalid AlgaArg for parameter '" ++ paramName.asString ++ "'").error;
-						^this
-					});
-
-					if(algaNode.synthBus == nil, {
-						("AlgaNode: invalid AlgaArg synthBus for parameter '" ++ paramName.asString ++ "'").error;
-						^this
-					});
-
-					defaultNumChannels = algaNode.numChannels;
-					defaultRate = algaNode.rate;
-
-					//Make sure to use AlgaArgs's scaling if possible (it will be nil otherwise)
-					oldParamsChansMapping = paramDefault.chansStream;
-					oldParamScale = paramDefault.scaleStream;
-
-					//Get the busArg of the synthBus
-					if(algaNode.algaInstantiatedAsSender, {
-						var algaNodeSynthBus = algaNode.synthBus;
-						senderToStoreForMix = algaNode;
-						paramDefault = algaNodeSynthBus.busArg;
+					//Array
+					{ paramDefault.isArray } {
+						defaultNumChannels = paramDefault.size;
+						defaultRate = controlName.rate;
 						isValid = true;
-						storeCurrentDefaultForMix = true;
+					}
+
+					//Number
+					{ paramDefault.isNumber } {
+						defaultNumChannels = controlName.numChannels;
+						defaultRate = controlName.rate;
+						isValid = true;
+					};
+
+					//If valid is false, use default from controlNames
+					if(isValid.not, {
+						paramDefault = controlName.defaultValue;
+						defaultNumChannels = controlName.numChannels;
+						defaultRate = controlName.rate;
+						("AlgaNode: invalid default value retrieved. Using the definition's one").warn;
 					});
-				}
 
-				//Array
-				{ paramDefault.isArray } {
-					defaultNumChannels = paramDefault.size;
-					defaultRate = controlName.rate;
-					isValid = true;
-				}
+					//e.g. \alga_interp_audio1_control1
+					interpSymbol = (
+						"alga_interp_" ++
+						defaultRate ++
+						defaultNumChannels ++
+						"_" ++
+						paramRate ++
+						paramNumChannels
+					).asSymbol;
 
-				//Number
-				{ paramDefault.isNumber } {
-					defaultNumChannels = controlName.numChannels;
-					defaultRate = controlName.rate;
-					isValid = true;
-				};
+					//e.g. \alga_norm_audio1
+					normSymbol = (
+						"alga_norm_" ++
+						paramRate ++
+						paramNumChannels
+					).asSymbol;
 
-				//If valid is false, use default from controlNames
-				if(isValid.not, {
-					paramDefault = controlName.defaultValue;
-					defaultNumChannels = controlName.numChannels;
-					defaultRate = controlName.rate;
-					("AlgaNode: invalid default value retrieved. Using the definition's one").warn;
-				});
-
-				//e.g. \alga_interp_audio1_control1
-				interpSymbol = (
-					"alga_interp_" ++
-					defaultRate ++
-					defaultNumChannels ++
-					"_" ++
-					paramRate ++
-					paramNumChannels
-				).asSymbol;
-
-				//e.g. \alga_norm_audio1
-				normSymbol = (
-					"alga_norm_" ++
-					paramRate ++
-					paramNumChannels
-				).asSymbol;
-
-				//Use previous entry for the channel mapping, otherwise, nil.
-				//nil will generate Array.series(...) in calculateSenderChansMappingArray
-				if(keepChannelsMapping, {
-					//Might have been defined by AlgaTemp
-					oldParamsChansMapping = oldParamsChansMapping ? this.getParamChansMapping(paramName, \default);
-				});
-
-				//Use previous entry for inputs scaling
-				if(keepScale, {
-					//Might have been defined by AlgaTemp
-					oldParamScale = oldParamScale ? this.getParamScaling(paramName, \default);
-				});
-
-				//Calculate the array for channelsMapping
-				channelsMapping = this.calculateSenderChansMappingArray(
-					paramName,
-					\default,
-					oldParamsChansMapping,
-					defaultNumChannels,
-					paramNumChannels,
-					false //Always false, either if keeping the old one or using AlgaTemp's
-				);
-
-				//calculate scale array (use senderSym (\default))
-				scaleArray = this.calculateScaling(
-					paramName,
-					\default,
-					paramNumChannels,
-					oldParamScale,
-					false //Always false, either if keeping the old one or using AlgaTemp's
-				);
-
-				//default interpBus
-				interpBus = interpBusses[paramName][\default];
-
-				//args
-				interpSynthArgs = [
-					\in, paramDefault,
-					\out, interpBus.index,
-					\indices, channelsMapping,
-					\fadeTime, 0,
-					\envShape, AlgaDynamicEnvelopes.getOrAdd(interpShape, server)
-				];
-
-				//add scaleArray to args
-				if(scaleArray != nil, {
-					interpSynthArgs = interpSynthArgs.addAll(scaleArray);
-				});
-
-				//new interpSynth
-				interpSynth = AlgaSynth(
-					interpSymbol,
-					interpSynthArgs,
-					interpGroup
-				);
-
-				//Instantiated right away, with no \fadeTime, as it will directly be connected to
-				//synth's parameter. Synth will read its params from all the normBusses
-				normSynth = AlgaSynth(
-					normSymbol,
-					[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
-					normGroup,
-					waitForInst:false
-				);
-
-				//replace \default entries
-				interpSynths[paramName][\default] = interpSynth;
-				normSynths[paramName][\default] = normSynth;
-
-				//Add interpSynth to the current active ones for specific param / sender combination
-				this.addActiveInterpSynthOnFree(paramName, nil, \default, interpSynth);
-
-				//When interpSynth is freed, free the synths / busses for AlgaTemps
-				if(tempSynthsAndBusses != nil, {
-					interpSynth.onFree({
-						fork {
-							0.5.wait;
-							tempSynthsAndBusses.do({ | tempSynthOrBus |
-								tempSynthOrBus.free
-							})
-						}
+					//Use previous entry for the channel mapping, otherwise, nil.
+					//nil will generate Array.series(...) in calculateSenderChansMappingArray
+					if(keepChannelsMapping, {
+						//Might have been defined by AlgaTemp
+						oldParamsChansMapping = oldParamsChansMapping ? this.getParamChansMapping(paramName, \default);
 					});
-				});
 
-				//Store current \default: this is needed for .mixFrom.
-				//It's only true for AlgaNodes and AlgaArgs
-				if(storeCurrentDefaultForMix, { currentDefaultNodes[paramName] = senderToStoreForMix });
+					//Use previous entry for inputs scaling
+					if(keepScale, {
+						//Might have been defined by AlgaTemp
+						oldParamScale = oldParamScale ? this.getParamScaling(paramName, \default);
+					});
+
+					//Calculate the array for channelsMapping
+					channelsMapping = this.calculateSenderChansMappingArray(
+						paramName,
+						\default,
+						oldParamsChansMapping,
+						defaultNumChannels,
+						paramNumChannels,
+						false //Always false, either if keeping the old one or using AlgaTemp's
+					);
+
+					//calculate scale array (use senderSym (\default))
+					scaleArray = this.calculateScaling(
+						paramName,
+						\default,
+						paramNumChannels,
+						oldParamScale,
+						false //Always false, either if keeping the old one or using AlgaTemp's
+					);
+
+					//default interpBus
+					interpBus = interpBusses[paramName][\default];
+
+					//args
+					interpSynthArgs = [
+						\in, paramDefault,
+						\out, interpBus.index,
+						\indices, channelsMapping,
+						\fadeTime, 0,
+						\envShape, AlgaDynamicEnvelopes.getOrAdd(interpShape, server)
+					];
+
+					//add scaleArray to args
+					if(scaleArray != nil, {
+						interpSynthArgs = interpSynthArgs.addAll(scaleArray);
+					});
+
+					//new interpSynth
+					interpSynth = AlgaSynth(
+						interpSymbol,
+						interpSynthArgs,
+						interpGroup
+					);
+
+					//Instantiated right away, with no \fadeTime, as it will directly be connected to
+					//synth's parameter. Synth will read its params from all the normBusses
+					normSynth = AlgaSynth(
+						normSymbol,
+						[\args, interpBus.busArg, \out, normBus.index, \fadeTime, 0],
+						normGroup,
+						waitForInst:false
+					);
+
+					//replace \default entries
+					interpSynths[paramName][\default] = interpSynth;
+					normSynths[paramName][\default] = normSynth;
+
+					//Add interpSynth to the current active ones for specific param / sender combination
+					this.addActiveInterpSynthOnFree(paramName, nil, \default, interpSynth);
+
+					//When interpSynth is freed, free the synths / busses for AlgaTemps
+					if(tempSynthsAndBusses != nil, {
+						interpSynth.onFree({
+							fork {
+								0.5.wait;
+								tempSynthsAndBusses.do({ | tempSynthOrBus |
+									tempSynthOrBus.free
+								})
+							}
+						});
+					});
+
+					//Store current \default: this is needed for .mixFrom.
+					//It's only true for AlgaNodes and AlgaArgs
+					if(storeCurrentDefaultForMix, { currentDefaultNodes[paramName] = senderToStoreForMix });
+				});
 			});
 		});
 	}
@@ -3546,6 +3553,14 @@ AlgaNode {
 		^sender; //Just return sender if mix or not found!
 	}
 
+	//Send tr directly to synth
+	makeConnectionTr { | sender, param = \in, sched |
+		this.addAction(
+			func: { synth.set(param, sender) },
+			sched: sched
+		)
+	}
+
 	//<<.param sender
 	makeConnection { | sender, param = \in, replace = false, mix = false,
 		replaceMix = false, senderChansMapping, scale, time, shape,
@@ -3561,6 +3576,11 @@ AlgaNode {
 		if(forceReplace, {
 			if(mix, { "AlgaNode: 'forceReplace' does not work with mixing".error; ^this });
 			^this.replace(synthDef.name, [param, sender], time: time, sched: sched)
+		});
+
+		//If it's a tr, process it separately
+		if(triggerControlNames.includes(param), {
+			^this.makeConnectionTr(sender, param, sched)
 		});
 
 		//Store latest sender. This is used to only execute the latest .from call.

@@ -125,6 +125,7 @@ AlgaSynthDef : SynthDef {
 	var <>explicitFree;
 	var <>sampleAccurate;
 	var <>outsMapping;
+	var <>triggers;
 
 	*readAll { | path, server |
 		server = server ? Server.default;
@@ -217,6 +218,7 @@ AlgaSynthDef : SynthDef {
 		makePatternDef = false, makeOutDef = false, replaceOut = false, ignoreOutWarning = false, ignoreAmp = false |
 		var def, rate, numChannels, output, isScalar, envgen, canFree, hasOwnGate;
 		var outerBuildSynthDef = UGen.buildSynthDef;
+		var triggers = IdentitySet();
 
 		def = super.new(name, {
 			var out, outCtl, buildSynthDef;
@@ -249,6 +251,7 @@ AlgaSynthDef : SynthDef {
 			buildSynthDef.allControlNames.do({ | controlName |
 				var error = false;
 				var controlNameName = controlName.name;
+				var controlNameRate = controlName.rate;
 
 				//Check if amp was there already
 				if(controlNameName == \amp, { ampProvided = true });
@@ -281,6 +284,11 @@ AlgaSynthDef : SynthDef {
 				if((controlNameName == \dur).or(controlNameName == \delta).or(controlNameName == \sustain).or(
 					controlNameName == \stretch).or(controlNameName == \legato), {
 					("AlgaSynthDef: Note that the '" ++ controlNameName ++ "' parameter is a reserved name used in AlgaPatterns. If using this def for an AlgaNode, consider changing the name to activate the interpolation features").warn
+				});
+
+				//Check trigger rates
+				if(controlNameRate == \trigger, {
+					triggers.add(controlNameName.asSymbol);
 				});
 			});
 
@@ -433,6 +441,9 @@ AlgaSynthDef : SynthDef {
 				});
 			});
 		});
+
+		//Add triggers
+		def.triggers = triggers;
 
 		//Add variants and metadata
 		if(variants != nil, { def.variants = variants });
