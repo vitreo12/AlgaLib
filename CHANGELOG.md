@@ -49,6 +49,21 @@
     )
     ```
 
+- `AlgaNode`: trigger rate parameters are now supported:
+
+    ```SuperCollider
+    (
+    Alga.boot({
+        z = AlgaNode({
+            var env = Env.perc(0.01, 1).kr(0, \trig.tr(1));
+            SinOsc.ar(440) * env;
+        }).play(2)
+    })
+    )
+
+    z <<.trig 1
+    ```
+
 # 1.2.1
 
 ## New features
