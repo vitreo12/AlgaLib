@@ -301,7 +301,7 @@ AlgaParser {
 
 		//AlgaMonoPattern. Check validity of entries
 		if(obj.isAlgaMonoPattern, {
-			var defRate  = def[\rate] ? \audio;
+			var defRate  = def[\rate] ? \control;
 			var defChans = (((def[\chans] ? def[\channels]) ? def[\numChans]) ? def[\numChannels]) ? 1;
 			if(defRate == \ar, { defRate = \audio });
 			if(defRate == \kr, { defRate = \control });
