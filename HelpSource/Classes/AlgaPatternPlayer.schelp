@@ -11,6 +11,8 @@ CLASSMETHODS::
 METHOD:: new
 ARGUMENT:: def
 An link::Classes/Event:: describing the code::key:: / code::value:: pairs to be executed.
+ARGUMENT:: player
+Set an instance of a link::Classes/AlgaPatternPlayer:: that will be used to trigger the pattern.
 ARGUMENT:: server
 Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaPattern:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
 
