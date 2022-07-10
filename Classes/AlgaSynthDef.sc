@@ -115,9 +115,6 @@ AlgaSynthDefSpec {
 	}
 }
 
-//Hybrid between a normal SynthDef and a ProxySynthDef (makeFadeEnv).
-//makeFadeEnv, however, does not multiply the output, but it is only used for Alga's internal
-//freeing mechanism. Furthermore, outsMapping is provided.
 AlgaSynthDef : SynthDef {
 	var <>rate, <>numChannels;
 	var <>canReleaseSynth, <>canFreeSynth;
