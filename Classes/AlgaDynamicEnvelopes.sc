@@ -52,7 +52,7 @@ AlgaDynamicEnvelopes {
 				buffer.setn(0, envAsArray ++ 987654321.0);
 				preAllocatedBuffersCount = preAllocatedBuffersCount + 1;
 			}, {
-				buffer = Buffer.sendCollection(server, envAsArray);
+				buffer = Buffer.algaSendCollection(server, envAsArray);
 			});
 			envsAtServer[env] = buffer;
 			^buffer;

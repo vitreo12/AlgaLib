@@ -221,6 +221,9 @@
 
 //Needed for AlgaIEnvGen / IEnvGen to work
 +Env {
+	//Used for AlgaMonoPattern's shape. asStream is already parsing the Env instead
+	algaAsStream { ^this }
+
 	//Used in the AlgaSynthDef
 	algaAsArray {
 		^this.asArrayForInterpolation.unbubble;
@@ -291,6 +294,8 @@
 
 //Converts all Set entries to stream
 +Set {
+	isSet { ^true }
+
 	algaAsStream {
 		this.do({ | entry |
 			this.remove(entry);
@@ -468,10 +473,6 @@
 	*alga {
 		^this.getLib(\alga)
 	}
-}
-
-+Set {
-	isSet { ^true }
 }
 
 +Dictionary {
@@ -658,6 +659,18 @@
 //Add support for >> and >>+
 +Buffer {
 	isBuffer { ^true }
+
+	//Same as sendCollection but force fork (instead of forkIfNeeded).
+	//forkIfNeeded is buggy if used within AlgaPattern!
+	*algaSendCollection { arg server, collection, numChannels = 1, wait = -1, action;
+		var buffer = this.new(server, ceil(collection.size / numChannels), numChannels);
+		fork {
+			buffer.alloc;
+			server.sync;
+			buffer.sendCollection(collection, 0, wait, action);
+		}
+		^buffer
+	}
 
 	//To debug .sendCollection used for Envs
 	/*
