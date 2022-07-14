@@ -408,6 +408,16 @@ AlgaPattern : AlgaNode {
 		this.useMultiChannelExpansion(value)
 	}
 
+	//Alias
+	mc {
+		^useMultiChannelExpansion
+	}
+
+	//Alias
+	mc_ { | value = false |
+		this.useMultiChannelExpansion(value)
+	}
+
 	//Set stopPatternBeforeReplace
 	stopPatternBeforeReplace_ { | value = true |
 		if(value.isKindOf(Boolean).not, {

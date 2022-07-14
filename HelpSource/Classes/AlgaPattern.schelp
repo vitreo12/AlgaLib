@@ -162,6 +162,9 @@ Set if the link::Classes/AlgaPattern:: should treat multi channel expansion like
 METHOD:: multiChannelExpansion
 Alias for emphasis::useMultiChannelExpansion::.
 
+METHOD:: mc
+Alias for emphasis::useMultiChannelExpansion::.
+
 METHOD:: replaceDur
 Set if emphasis::replace:: should be executed when changing the code::'dur':: parameter.
 
