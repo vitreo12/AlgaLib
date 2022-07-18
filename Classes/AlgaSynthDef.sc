@@ -74,15 +74,8 @@ AlgaSynthDefSpec {
 		});
 	}
 
-	store { | libname=\alga, dir, completionMsg, mdPlugin |
-		synthDef.store(libname, dir, completionMsg, mdPlugin);
-		//Metadata is only needed for the main synthDef
-		if(synthDefPattern != nil, {
-			synthDefPattern.store(libname, dir, completionMsg, mdPlugin, false)
-		});
-		if(synthDefPatternOut != nil, {
-			synthDefPatternOut.store(libname, dir, completionMsg, mdPlugin, false)
-		});
+	store { | server, completionMsg, dir |
+		^this.load(server, completionMsg, dir)
 	}
 
 	asSynthDesc { | libname=\alga, keepDef = true |
@@ -496,15 +489,24 @@ AlgaSynthDef : SynthDef {
 		^this.writeDefFile(dir, overwrite, mdPlugin, writeMd)
 	}
 
-	//Store in Alga's AlgaSynthDefs folder
-	load { | server, completionMsg, dir, writeMd = true |
-		dir = this.createDirAndWriteArchiveMd(dir, writeMd);
-		^super.load(server, completionMsg, dir);
+	//Inner
+	loadInner { | server, completionMsg, dir |
+		var algaSynthDef;
+		server = server ? Server.default;
+		dir = dir ? synthDefDir;
+		super.writeDefFile(dir); //Don't use AlgaSynthDef's !!!
+		Alga.readAlgaSynthDef(dir, server);
+		^this;
 	}
 
 	//Store in Alga's AlgaSynthDefs folder
-	store { | libname=\alga, dir, completionMsg, mdPlugin, writeMd = true |
+	load { | server, completionMsg, dir, writeMd = true |
 		dir = this.createDirAndWriteArchiveMd(dir, writeMd);
-		^super.store(libname, dir, completionMsg, mdPlugin);
+		^this.loadInner(server, completionMsg, dir);
+	}
+
+	//Alias
+	store { | server, completionMsg, dir, writeMd = true |
+		^this.load(server, completionMsg, dir, writeMd);
 	}
 }

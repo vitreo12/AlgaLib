@@ -425,14 +425,12 @@
 
 			//Send to server too
 			if(server.isKindOf(Server), {
-				if(server.serverRunning, {
-					server.sendMsg("/d_load", file.fullPath);
-					if(algaPatternFileExists, {
-						server.sendMsg("/d_load", algaPatternFile)
-					});
-					if(algaPatternTempOutFileExists, {
-						server.sendMsg("/d_load", algaPatternTempOutFile)
-					});
+				server.sendMsg("/d_load", file.fullPath);
+				if(algaPatternFileExists, {
+					server.sendMsg("/d_load", algaPatternFile)
+				});
+				if(algaPatternTempOutFileExists, {
+					server.sendMsg("/d_load", algaPatternTempOutFile)
 				});
 			});
 
