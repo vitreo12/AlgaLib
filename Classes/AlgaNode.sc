@@ -1378,7 +1378,6 @@ AlgaNode {
 	//will have time to run fade ins and outs when running .replace!
 	createSynth {
 		var defName = synthDef.name;
-		var scalars;
 
 		//synth's \fadeTime is longestWaitTime. It could probably be removed here,
 		//as it will be set eventually in the case of .clear / etc...
