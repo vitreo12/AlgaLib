@@ -25,6 +25,7 @@ beginning of the audio block!
 */
 AlgaStartup {
 	classvar <algaMaxIO = 8;
+	classvar <algaMaxIOLimit = 512;
 	classvar <maxEnvPoints = 1024;
 
 	classvar <algaSynthDefPath;
@@ -65,14 +66,51 @@ AlgaStartup {
 		algaMonoPatternPath = (algaSynthDefIO_numberPath ++ "AlgaMonoPattern/");
 	}
 
-	*initSynthDefs {
+	*initSynthDefs { | rebuild = false |
+		var hasBuilt = false;
+		var maxIO = algaMaxIO;
+
+		//If a bigger number has already been built, no need to build again
+		block { | break |
+			algaMaxIOLimit.do({ | i |
+				var algaSynthDefIO_numberPath_temp;
+				i = i + 1;
+				algaSynthDefIO_numberPath_temp = (algaSynthDefIOPath ++ "IO_" ++ i ++ "/");
+				if(File.exists(algaSynthDefIO_numberPath_temp), {
+					if(algaMaxIO > i, {
+						this.buildSynthDefs;
+						hasBuilt = true;
+						maxIO = i;
+					});
+					break.(nil);
+				});
+			});
+		};
+
+		//Unless rebuild is set
+		if((hasBuilt.not).and(rebuild), {
+			this.buildSynthDefs;
+			hasBuilt = true;
+		});
+
+		//Reset maxIO accordingly
+		if(maxIO > algaMaxIO, {
+			algaMaxIO = maxIO;
+			this.initClass;
+		});
+	}
+
+	*buildSynthDefs {
 		var folderDeleted = true;
+
+		if(algaMaxIO > algaMaxIOLimit, {
+			("AlgaStartup: " ++ algaMaxIO ++ " exceeds maximum number of IO: " ++ algaMaxIOLimit).error;
+			^this;
+		});
 
 		if(File.exists(algaSynthDefIOPath), {
 			folderDeleted = File.deleteAll(algaSynthDefIOPath);
 		});
-
-		percentageSplit = 100.0 / algaMaxIO;
 
 		if(folderDeleted, {
 			var algaSynthDefFolderCreated = true;
@@ -90,6 +128,7 @@ AlgaStartup {
 					if(algaSynthDefIO_numberFolderCreated, {
 						("\n-> Generating all Alga definitions for a maximum of " ++ algaMaxIO ++ " I/O count, it may take a while...").postln;
 
+						percentageSplit = 100.0 / algaMaxIO;
 						this.initAlgaPlay;
 						this.initAlgaInterp;
 						this.initAlgaNorm;

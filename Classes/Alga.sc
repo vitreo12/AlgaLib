@@ -32,9 +32,9 @@ Alga {
 	//Store if server is supernova or not
 	classvar <supernovas;
 
-	*initSynthDefs { | maxIO = 8 |
+	*initSynthDefs { | maxIO = 8, rebuild = false |
 		AlgaStartup.algaMaxIO = maxIO;
-		AlgaStartup.initSynthDefs;
+		AlgaStartup.initSynthDefs(rebuild);
 	}
 
 	*initClass {
@@ -310,7 +310,6 @@ Alga {
 
 		//Check AlgaSynthDef/IO folder exists...
 		if(File.exists(AlgaStartup.algaSynthDefIO_numberPath) == false, {
-			("Could not retrieve the correct 'AlgaSyntDefs/IO_...' folder. Running 'Alga.initSynthDefs' now...").warn;
 			this.initSynthDefs;
 		});
 

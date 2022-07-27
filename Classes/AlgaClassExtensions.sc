@@ -389,13 +389,13 @@
 			path = PathName(path.standardizePath)
 		});
 		if(path.isKindOf(PathName).not, {
-			"path must be a String or PathName".error;
+			"SynthDescLib: Path must be a String or PathName".error;
 			^nil;
 		});
 		strPath = path.fullPath.withoutTrailingSlash;
 		path = PathName(strPath);
 		if((File.exists(strPath).not).or(path.isFolder.not), {
-			"Path does not exist or it's not a folder".error;
+			"SynthDescLib: Path does not exist or it's not a folder".error;
 			^nil;
 		});
 		this.readAllInner(path, server, beginsWithExclude);

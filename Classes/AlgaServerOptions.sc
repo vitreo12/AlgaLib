@@ -22,7 +22,7 @@ AlgaServerOptions {
 
 	*new { | sampleRate, blockSize, numInputBusChannels, numOutputBusChannels,
 		memSize=524288, numAudioBusChannels=32768, numControlBusChannels=32768,
-		numBuffers=32768, maxNodes=32768, maxSynthDefs=32768, numWireBufs=32768,
+		numBuffers=32768, maxNodes=32768, maxSynthDefs=65536, numWireBufs=32768,
 		supernova=false, supernovaThreads, supernovaUseSystemClock=true, latency |
 
 		^super.new.init(
@@ -35,7 +35,7 @@ AlgaServerOptions {
 
 	init { | argSampleRate, argBlockSize, argNumInputBusChannels, argNumOutputBusChannels,
 		argMemSize=524288, argNumAudioBusChannels=32768, argNumControlBusChannels=32768,
-		argNumBuffers=32768, argMaxNodes=32768, argMaxSynthDefs=32768, argNumWireBufs=32768,
+		argNumBuffers=32768, argMaxNodes=32768, argMaxSynthDefs=65536, argNumWireBufs=32768,
 		argSupernova=false, argSupernovaThreads, argSupernovaUseSystemClock=true, argLatency |
 
 		sampleRate = argSampleRate ? Server.default.options.sampleRate;
