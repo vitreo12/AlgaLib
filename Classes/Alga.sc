@@ -308,10 +308,8 @@ Alga {
 		server.options.protocol = \tcp; //Always \tcp!
 		server.latency = algaServerOptions.latency;
 
-		//Check AlgaSynthDef/IO folder exists...
-		if(File.exists(AlgaStartup.algaSynthDefIO_numberPath) == false, {
-			this.initSynthDefs;
-		});
+		//Init defs if needed
+		this.initSynthDefs;
 
 		//Add to SynthDescLib in order for SynthDef.add to work
 		SynthDescLib.alga.addServer(server);
