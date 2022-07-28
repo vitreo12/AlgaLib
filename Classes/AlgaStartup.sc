@@ -78,19 +78,23 @@ AlgaStartup {
 				algaSynthDefIO_numberPath_temp = (algaSynthDefPath ++ "IO/" ++ "IO_" ++ i ++ "/");
 				if(File.exists(algaSynthDefIO_numberPath_temp), {
 					if(algaMaxIO > i, {
-						//Check if default. If it exists, return
+						//Check for default. If it exists, return
 						if(algaMaxIO == algaMaxIODefault, {
 							algaSynthDefIO_numberPath_temp = (algaSynthDefPath ++ "IO_default/" ++ "IO_" ++ algaMaxIO ++ "/");
-							if(File.exists(algaSynthDefIO_numberPath_temp), { ^this });
+							if(File.exists(algaSynthDefIO_numberPath_temp), {
+								hasBuilt = true;
+								break.(nil)
+							});
 						});
 						maxIO = i;
 						this.initClass;
 						this.buildSynthDefs;
 						hasBuilt = true;
 					}, {
-						//Already built
+						//Already built (algaMaxIO < i: set it to i)
 						algaMaxIO = i;
 						this.initClass;
+						hasBuilt = true;
 					});
 					break.(nil);
 				});
@@ -98,11 +102,10 @@ AlgaStartup {
 		};
 
 		//Unless rebuild is set
-		if((hasBuilt.not).and(rebuild), {
+		if((hasBuilt.not).or(rebuild), {
 			algaMaxIO = maxIO;
 			this.initClass;
 			this.buildSynthDefs;
-			hasBuilt = true;
 		});
 	}
 
