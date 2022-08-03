@@ -24,6 +24,7 @@ specific definition within the audio block. Its controls, though, NEED to start 
 beginning of the audio block!
 */
 AlgaStartup {
+	classvar <algaMaxIODefault = 8;
 	classvar <algaMaxIO = 8;
 	classvar <algaMaxIOLimit = 512;
 	classvar <maxEnvPoints = 1024;
@@ -37,7 +38,11 @@ AlgaStartup {
 
 	*initClass {
 		algaSynthDefPath = File.realpath(Alga.class.filenameSymbol).dirname.withTrailingSlash ++ "../AlgaSynthDefs/";
-		algaSynthDefIOPath = (algaSynthDefPath ++ "IO/");
+		if(algaMaxIO == algaMaxIODefault, {
+			algaSynthDefIOPath = (algaSynthDefPath ++ "IO_default/")
+		}, {
+			algaSynthDefIOPath = (algaSynthDefPath ++ "IO/")
+		});
 		algaSynthDefIO_numberPath = (algaSynthDefIOPath ++ "IO_" ++ algaMaxIO ++ "/");
 		algaMonoPatternPath = (algaSynthDefIO_numberPath ++ "AlgaMonoPattern/");
 	}
@@ -45,7 +50,7 @@ AlgaStartup {
 	*algaMaxIO_ { | value |
 		if(value.isNumber.not, { "AlgaStartup: algaMaxIO must be a number".error; ^this });
 		algaMaxIO = value;
-		this.updateAlgaSynthDefIOPath;
+		this.initClass;
 	}
 
 	*maxIO {
@@ -61,11 +66,6 @@ AlgaStartup {
 		maxEnvPoints = value;
 	}
 
-	*updateAlgaSynthDefIOPath {
-		algaSynthDefIO_numberPath = (algaSynthDefIOPath ++ "/IO_" ++ algaMaxIO ++ "/").asString;
-		algaMonoPatternPath = (algaSynthDefIO_numberPath ++ "AlgaMonoPattern/");
-	}
-
 	*initSynthDefs { | rebuild = false |
 		var hasBuilt = false;
 		var maxIO = algaMaxIO;
@@ -75,12 +75,26 @@ AlgaStartup {
 			algaMaxIOLimit.do({ | i |
 				var algaSynthDefIO_numberPath_temp;
 				i = i + 1;
-				algaSynthDefIO_numberPath_temp = (algaSynthDefIOPath ++ "IO_" ++ i ++ "/");
+				algaSynthDefIO_numberPath_temp = (algaSynthDefPath ++ "IO/" ++ "IO_" ++ i ++ "/");
 				if(File.exists(algaSynthDefIO_numberPath_temp), {
 					if(algaMaxIO > i, {
+						//Check for default. If it exists, return
+						if(algaMaxIO == algaMaxIODefault, {
+							algaSynthDefIO_numberPath_temp = (algaSynthDefPath ++ "IO_default/" ++ "IO_" ++ algaMaxIO ++ "/");
+							if(File.exists(algaSynthDefIO_numberPath_temp), {
+								hasBuilt = true;
+								break.(nil)
+							});
+						});
+						maxIO = i;
+						this.initClass;
 						this.buildSynthDefs;
 						hasBuilt = true;
-						maxIO = i;
+					}, {
+						//Already built (algaMaxIO < i: set it to i)
+						algaMaxIO = i;
+						this.initClass;
+						hasBuilt = true;
 					});
 					break.(nil);
 				});
@@ -88,15 +102,10 @@ AlgaStartup {
 		};
 
 		//Unless rebuild is set
-		if((hasBuilt.not).and(rebuild), {
-			this.buildSynthDefs;
-			hasBuilt = true;
-		});
-
-		//Reset maxIO accordingly
-		if(maxIO > algaMaxIO, {
+		if((hasBuilt.not).or(rebuild), {
 			algaMaxIO = maxIO;
 			this.initClass;
+			this.buildSynthDefs;
 		});
 	}
 
@@ -127,7 +136,6 @@ AlgaStartup {
 
 					if(algaSynthDefIO_numberFolderCreated, {
 						("\n-> Generating all Alga definitions for a maximum of " ++ algaMaxIO ++ " I/O count, it may take a while...").postln;
-
 						percentageSplit = 100.0 / algaMaxIO;
 						this.initAlgaPlay;
 						this.initAlgaInterp;

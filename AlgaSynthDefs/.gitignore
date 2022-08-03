@@ -1,7 +1,10 @@
 *.scsyndef
 *.scsyndefmd
 
-#Never skip IO and AlgaMonoPattern
-!IO/*
-!IO/*/*
-!IO/*/AlgaMonoPattern/*
+#Never skip IO_default and AlgaMonoPattern
+!IO_default/*
+!IO_default/*/*
+!IO_default/*/AlgaMonoPattern/*
+
+#Always skip IO
+IO/
