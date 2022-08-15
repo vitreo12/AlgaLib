@@ -867,6 +867,11 @@ AlgaPatternPlayer {
 			entries[param] = IdentityDictionary();
 			entries[param][\entries] = IdentityDictionary();
 			results[param] = IdentityDictionary();
+
+			//Re-order
+			entriesOrder = entriesOrder ? Array.newClear;
+			entriesOrder = entriesOrder.add(param);
+			entriesOrder = entriesOrder[entriesOrder.order];
 		});
 
 		//New ID - sender
