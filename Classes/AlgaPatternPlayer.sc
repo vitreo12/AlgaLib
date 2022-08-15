@@ -26,6 +26,7 @@ AlgaPatternPlayer {
 
 	var <entriesOrder;
 	var <entries;
+	var <alreadyNexts;
 	var <results;
 	var <algaPatterns;
 	var <algaPatternEntries;
@@ -51,6 +52,7 @@ AlgaPatternPlayer {
 			var entries = algaPatternPlayer.entries;
 			var entriesOrder = algaPatternPlayer.entriesOrder;
 			var results = algaPatternPlayer.results;
+			var alreadyNexts = algaPatternPlayer.alreadyNexts;
 			var algaPatterns = algaPatternPlayer.algaPatterns;
 
 			//scheduledStepActionsPre
@@ -63,21 +65,29 @@ AlgaPatternPlayer {
 					//For interpolation, value can be IdentityDictionary(UniqueID -> entry)
 					if(key != \dur, {
 						value[\entries].keysValuesDo({ | uniqueID, entry |
-							//Advance patterns
-							var entryVal = entry.algaNext(currentEnvironment);
-							entryVal.algaAdvance(currentEnvironment);
+							//Check for the presence of an already .algaNext state.
+							//This can be triggered in reassignAlgaReaderPfunc mid-interpolation
+							if(alreadyNexts[key][uniqueID] == nil, {
+								//Advance patterns
+								var entryVal = entry.algaNext(currentEnvironment);
+								entryVal.algaAdvance(currentEnvironment);
 
-							//Store value for Pfunc / Pkey retrieval
-							//However, this doesn't work when triggering interpolation:
-							//it will only consider the lastID one
-							if(entryVal.isEvent.not, {
-								if(uniqueID == value[\lastID], {
-									currentEnvironment[key] = entryVal
+								//Store value for Pfunc / Pkey retrieval
+								//However, this doesn't work when triggering interpolation:
+								//it will only consider the lastID one
+								if(entryVal.isEvent.not, {
+									if(uniqueID == value[\lastID], {
+										currentEnvironment[key] = entryVal
+									});
 								});
-							});
 
-							//Assign results
-							results[key][uniqueID] = entryVal;
+								//Assign results
+								results[key][uniqueID] = entryVal;
+							}, {
+								//alreadyNexts is assigned in reassignAlgaReaderPfunc
+								//Here it needs to be cleared (already consumed)
+								alreadyNexts[key].removeAt(uniqueID);
+							});
 						});
 					});
 				});
@@ -126,6 +136,7 @@ AlgaPatternPlayer {
 		//Create vars
 		results = IdentityDictionary();
 		entries = IdentityDictionary();
+		alreadyNexts = IdentityDictionary();
 		entriesOrder = Array.newClear();
 		algaPatterns = IdentitySet();
 		algaPatternEntries = IdentityDictionary();
@@ -332,7 +343,7 @@ AlgaPatternPlayer {
 	}
 
 	//Run the pattern
-	play { | sched = 0 |
+	play { | sched = 1 |
 		var func = { | patternAsStreamArg, algaReschedulingEventStreamPlayerArg, schedArg |
 			if(manualDur.not, {
 				this.addAction(
@@ -790,11 +801,14 @@ AlgaPatternPlayer {
 			var keyOrFunc = algaReaderPfunc.keyOrFunc;
 			var repeats = algaReaderPfunc.repeats;
 
-			//Temporarily .algaNext the stream so that results[] have a valid value ASAP...
-			//Should this be done without copy?
+			//Temporarily .algaNext the stream so that results[] have a valid value ASAP
 			var lastID = entries[algaPatternPlayerParam][\lastID];
-			var tempEntryStream = entries[algaPatternPlayerParam][\entries][lastID].deepCopy;
-			results[algaPatternPlayerParam][lastID] = tempEntryStream.algaNext(currentEnvironment);
+			var entryStream = entries[algaPatternPlayerParam][\entries][lastID];
+			results[algaPatternPlayerParam][lastID] = entryStream.algaNext(currentEnvironment);
+
+			//Assign alreadyNexts. This gets cleared in the Event type. This avoids duplications of triggers
+			alreadyNexts[algaPatternPlayerParam] = alreadyNexts[algaPatternPlayerParam] ? IdentityDictionary();
+			alreadyNexts[algaPatternPlayerParam][lastID] = true;
 
 			//Re-build the AlgaReaderPfunc
 			case
@@ -929,6 +943,10 @@ AlgaPatternPlayer {
 						(time + 1).wait;
 						entries[param].removeAt(lastID);
 						entries[param][\entries].removeAt(lastID);
+						results[param].removeAt(lastID);
+						if(alreadyNexts[param] != nil, {
+							alreadyNexts[param].removeAt(lastID)
+						});
 					}
 				});
 			},
@@ -948,10 +966,8 @@ AlgaPatternPlayer {
 		functionSynthDefDict = senderAndFunctionSynthDefDict[1];
 
 		//Set time / sched accordingly
-		time = time ? timeInner;
-		time = time ? 0;
-		sched = sched ? schedInner;
-		sched = sched ? 0;
+		time = (time ? timeInner) ? 0;
+		sched = (sched ? schedInner) ? 0;
 		shape = shape ? shapeInner;
 
 		// \dur / \stretch
