@@ -798,6 +798,44 @@
 		)
 	}
 
+	algaGetScheduledTimeInSeconds { | seconds = 0 |
+		this.secs2beats(this.seconds + seconds)
+	}
+
+	algaGetScheduledTime { | quant = 1 |
+		case
+		//Beat syncing
+		{ quant.isNumber } {
+			if(quant < 1, {
+				//Sync to next availbale grid time
+				//quant = 1.25
+				//this.beats = 43.2345
+				//time = 44.25
+				^(this.nextTimeOnGrid(quant));
+			}, {
+				//Sync to beats in the future
+				//quant = 1.25
+				//this.beats = 43.62345
+				//time = 44.25
+				^(this.beats.floor + quant);
+			});
+		}
+		//Bar syncing
+		{ quant.isAlgaQuant } {
+			var nextBar = this.nextBar;
+			var beatsPerBar = this.beatsPerBar;
+			var algaQuantQuant = quant.quant;
+			var algaQuantWrapPhase = quant.wrapPhase;
+			var algaQuantPhase = if(algaQuantWrapPhase,
+				{ quant.phase % beatsPerBar },
+				{ quant.phase }
+			);
+
+			//Sync to the next available bar, shifting by phase - within the bar if wrapping
+			^((nextBar + ((algaQuantQuant - 1) * beatsPerBar)) + algaQuantPhase);
+		};
+	}
+
 	algaSchedAtQuant { | quant, task |
 		if(this.isTempoClock, {
 			this.algaTempoClockSchedAtQuant(quant, task);
@@ -865,12 +903,12 @@
 	}
 
 	algaSchedInSeconds { | when, task |
-		this.schedAbs(this.secs2beats(this.seconds + when), task);
+		this.schedAbs(this.algaGetScheduledTimeInSeconds(when), task);
 	}
 
 	algaSchedInSecondsOnce { | when, task |
 		var taskOnce = { task.value; nil };
-		this.schedAbs(this.secs2beats(this.seconds + when), taskOnce);
+		this.schedAbs(this.algaGetScheduledTimeInSeconds(when), taskOnce);
 	}
 
 	algaSchedInSecondsWithTopPriority { | when, task |
@@ -910,40 +948,7 @@
 
 +TempoClock {
 	algaTempoClockSchedAtQuant { | quant = 1, task |
-		var time;
-
-		case
-		//Beat syncing
-		{ quant.isNumber } {
-			if(quant < 1, {
-				//Sync to next availbale grid time
-				//quant = 1.25
-				//this.beats = 43.2345
-				//time = 44.25
-				time = this.nextTimeOnGrid(quant)
-			}, {
-				//Sync to beats in the future
-				//quant = 1.25
-				//this.beats = 43.62345
-				//time = 44.25
-				time = this.beats.floor + quant;
-			});
-		}
-		//Bar syncing
-		{ quant.isAlgaQuant } {
-			var nextBar = this.nextBar;
-			var beatsPerBar = this.beatsPerBar;
-			var algaQuantQuant = quant.quant;
-			var algaQuantWrapPhase = quant.wrapPhase;
-			var algaQuantPhase = if(algaQuantWrapPhase,
-				{ quant.phase % beatsPerBar },
-				{ quant.phase }
-			);
-
-			//Sync to the next available bar, shifting by phase - within the bar if wrapping
-			time = (nextBar + ((algaQuantQuant - 1) * beatsPerBar)) + algaQuantPhase;
-		};
-
+		var time = this.algaGetScheduledTime(quant);
 		if(time != nil, { this.schedAbs(time, task) });
 	}
 
