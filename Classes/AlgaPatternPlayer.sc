@@ -26,7 +26,7 @@ AlgaPatternPlayer {
 
 	var <entriesOrder;
 	var <entries;
-	var <alreadyNexts;
+	var <algaNextSchedTimes;
 	var <results;
 	var <algaPatterns;
 	var <algaPatternEntries;
@@ -52,8 +52,9 @@ AlgaPatternPlayer {
 			var entries = algaPatternPlayer.entries;
 			var entriesOrder = algaPatternPlayer.entriesOrder;
 			var results = algaPatternPlayer.results;
-			var alreadyNexts = algaPatternPlayer.alreadyNexts;
+			var algaNextSchedTimes = algaPatternPlayer.algaNextSchedTimes;
 			var algaPatterns = algaPatternPlayer.algaPatterns;
+			var beats = algaPatternPlayer.clock.beats;
 
 			//scheduledStepActionsPre
 			algaPatternPlayer.advanceAndConsumeScheduledStepActions(false);
@@ -65,9 +66,8 @@ AlgaPatternPlayer {
 					//For interpolation, value can be IdentityDictionary(UniqueID -> entry)
 					if(key != \dur, {
 						value[\entries].keysValuesDo({ | uniqueID, entry |
-							//Check for the presence of an already .algaNext state.
-							//This can be triggered in reassignAlgaReaderPfunc mid-interpolation
-							if(alreadyNexts[key][uniqueID] == nil, {
+							//Check for the presence of an already .algaNext state at current clock time
+							if(algaNextSchedTimes[key][uniqueID] != beats, {
 								//Advance patterns
 								var entryVal = entry.algaNext(currentEnvironment);
 								entryVal.algaAdvance(currentEnvironment);
@@ -83,10 +83,12 @@ AlgaPatternPlayer {
 
 								//Assign results
 								results[key][uniqueID] = entryVal;
-							}, {
-								//alreadyNexts is assigned in reassignAlgaReaderPfunc
-								//Here it needs to be cleared (already consumed)
-								alreadyNexts[key].removeAt(uniqueID);
+							});
+
+							//algaNextSchedTimes is assigned in reassignAlgaReaderPfunc
+							//Here it needs to be cleared (already consumed)
+							if(algaNextSchedTimes[key] != nil, {
+								algaNextSchedTimes[key].removeAt(uniqueID)
 							});
 						});
 					});
@@ -136,7 +138,7 @@ AlgaPatternPlayer {
 		//Create vars
 		results = IdentityDictionary();
 		entries = IdentityDictionary();
-		alreadyNexts = IdentityDictionary();
+		algaNextSchedTimes = IdentityDictionary();
 		entriesOrder = Array.newClear();
 		algaPatterns = IdentitySet();
 		algaPatternEntries = IdentityDictionary();
@@ -795,7 +797,7 @@ AlgaPatternPlayer {
 	}
 
 	//Re-assign correctly
-	reassignAlgaReaderPfunc { | algaReaderPfunc, algaPatternPlayerParam |
+	reassignAlgaReaderPfunc { | algaReaderPfunc, algaPatternPlayerParam, sched = 0 |
 		var params = algaReaderPfunc.params;
 		if(params.includes(algaPatternPlayerParam), {
 			var keyOrFunc = algaReaderPfunc.keyOrFunc;
@@ -806,9 +808,13 @@ AlgaPatternPlayer {
 			var entryStream = entries[algaPatternPlayerParam][\entries][lastID];
 			results[algaPatternPlayerParam][lastID] = entryStream.algaNext(currentEnvironment);
 
-			//Assign alreadyNexts. This gets cleared in the Event type. This avoids duplications of triggers
-			alreadyNexts[algaPatternPlayerParam] = alreadyNexts[algaPatternPlayerParam] ? IdentityDictionary();
-			alreadyNexts[algaPatternPlayerParam][lastID] = true;
+			//Assign algaNextSchedTimes. This gets cleared in the Event type. This avoids duplications of triggers
+			algaNextSchedTimes[algaPatternPlayerParam] = algaNextSchedTimes[algaPatternPlayerParam] ? IdentityDictionary();
+			if(schedInSeconds, {
+				algaNextSchedTimes[algaPatternPlayerParam][lastID] = this.clock.algaGetScheduledTimeInSeconds(sched)
+			}, {
+				algaNextSchedTimes[algaPatternPlayerParam][lastID] = this.clock.algaGetScheduledTime(sched)
+			});
 
 			//Re-build the AlgaReaderPfunc
 			case
@@ -820,11 +826,11 @@ AlgaPatternPlayer {
 
 	//Go through an AlgaTemp looking for things to re-assing to let
 	//AlgaReaderPfunc work correctly
-	reassignAlgaTemp { | algaTemp, algaPatternPlayerParam |
+	reassignAlgaTemp { | algaTemp, algaPatternPlayerParam, sched = 0 |
 		var def = algaTemp.def;
 		if(def.isEvent, {
 			def.keysValuesDo({ | key, entry |
-				def[key] = this.reassignAlgaReaderPfuncs(entry, algaPatternPlayerParam)
+				def[key] = this.reassignAlgaReaderPfuncs(entry, algaPatternPlayerParam, sched)
 			});
 		});
 		^algaTemp;
@@ -832,16 +838,16 @@ AlgaPatternPlayer {
 
 	//Go through AlgaTemp / ListPattern / FilterPattern looking for things
 	//to re-assing to let AlgaReaderPfunc work correctly
-	reassignAlgaReaderPfuncs { | value, algaPatternPlayerParam |
+	reassignAlgaReaderPfuncs { | value, algaPatternPlayerParam, sched = 0 |
 		var isAlgaReaderPfuncOrAlgaTemp = false;
 
 		case
 		{ value.isAlgaReaderPfunc } {
-			value = this.reassignAlgaReaderPfunc(value, algaPatternPlayerParam);
+			value = this.reassignAlgaReaderPfunc(value, algaPatternPlayerParam, sched);
 			isAlgaReaderPfuncOrAlgaTemp = true;
 		}
 		{ value.isAlgaTemp } {
-			value = this.reassignAlgaTemp(value, algaPatternPlayerParam);
+			value = this.reassignAlgaTemp(value, algaPatternPlayerParam, sched);
 			isAlgaReaderPfuncOrAlgaTemp = true;
 		};
 
@@ -849,7 +855,7 @@ AlgaPatternPlayer {
 		if(isAlgaReaderPfuncOrAlgaTemp.not, {
 			parser.parseGenericObject(value,
 				func: { | val |
-					this.reassignAlgaReaderPfuncs(val, algaPatternPlayerParam)
+					this.reassignAlgaReaderPfuncs(val, algaPatternPlayerParam, sched)
 				},
 				replace: false
 			)
@@ -859,11 +865,11 @@ AlgaPatternPlayer {
 	}
 
 	//Special case: FX is an Event
-	reassignFXEvent { | fxEvent, algaPatternPlayerParam |
+	reassignFXEvent { | fxEvent, algaPatternPlayerParam, sched = 0 |
 		if(fxEvent.isEvent, {
 			fxEvent.keysValuesDo({ | key, value |
 				if(key != \def, {
-					fxEvent[key] = this.reassignAlgaReaderPfuncs(value, algaPatternPlayerParam)
+					fxEvent[key] = this.reassignAlgaReaderPfuncs(value, algaPatternPlayerParam, sched)
 				});
 			});
 		});
@@ -911,13 +917,15 @@ AlgaPatternPlayer {
 								//Special case: \fx
 								reassignedEntry = this.reassignFXEvent(
 									fxEvent: algaPatternEventEntryAtParam,
-									algaPatternPlayerParam: param
+									algaPatternPlayerParam: param,
+									sched: sched
 								)
 							}, {
 								//Re-assign the AlgaReaderPfuncs
 								reassignedEntry = this.reassignAlgaReaderPfuncs(
 									value: algaPatternEventEntryAtParam,
-									algaPatternPlayerParam: param
+									algaPatternPlayerParam: param,
+									sched: sched
 								);
 							});
 
@@ -944,8 +952,8 @@ AlgaPatternPlayer {
 						entries[param].removeAt(lastID);
 						entries[param][\entries].removeAt(lastID);
 						results[param].removeAt(lastID);
-						if(alreadyNexts[param] != nil, {
-							alreadyNexts[param].removeAt(lastID)
+						if(algaNextSchedTimes[param] != nil, {
+							algaNextSchedTimes[param].removeAt(lastID)
 						});
 					}
 				});
