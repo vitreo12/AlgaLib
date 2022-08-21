@@ -380,6 +380,14 @@ AlgaPattern : AlgaNode {
 		durInterpResync = value
 	}
 
+	//Alias
+	durResync { ^durInterpResync }
+
+	//Alias
+	durResync_ { | value = true |
+		this.durInterpResync_(value)
+	}
+
 	//Set durInterpReset
 	durInterpReset_ { | value = false |
 		if(value.isKindOf(Boolean).not, {
@@ -387,6 +395,14 @@ AlgaPattern : AlgaNode {
 			value = false;
 		});
 		durInterpReset = value
+	}
+
+	//Alias
+	durReset { ^durInterpReset }
+
+	//Alias
+	durReset_ { | value = true |
+		this.durInterpReset_(value)
 	}
 
 	//Set useMultiChannelExpansion

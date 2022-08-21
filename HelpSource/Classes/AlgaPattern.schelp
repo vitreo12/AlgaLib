@@ -186,8 +186,14 @@ Set the default code::sched:: value for code::interpolateDur:: (and accompanying
 METHOD:: durInterpResync
 Set if code::interpolateDur:: (and accompanying functions) should resync by default.
 
+METHOD:: durResync
+Alias for code::durInterpResync::.
+
 METHOD:: durInterpReset
 Set if code::interpolateDur:: (and accompanying functions) should reset by default.
+
+METHOD:: durReset
+Alias for code::durInterpReset::.
 
 EXAMPLES::
 code::
