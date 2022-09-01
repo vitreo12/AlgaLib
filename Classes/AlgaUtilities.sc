@@ -249,9 +249,9 @@ AlgaQuant {
 	var <quant, <phase, <wrapPhase = false;
 
 	*new { | quant = 1, phase = 0, wrapPhase = false |
-		if(quant <= 0, {
-			quant = 1;
-			"AlgaQuant: only positive values are supported. 1 will be used instead.".warn;
+		if(quant < 0, {
+			quant = 0;
+			"AlgaQuant: only positive values are supported for 'quant'. 0 will be used instead.".warn;
 		});
 		^super.newCopyArgs(quant, phase, wrapPhase);
 	}

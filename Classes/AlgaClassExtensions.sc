@@ -802,23 +802,27 @@
 		this.secs2beats(this.seconds + seconds)
 	}
 
+	algaSchedNum { | quant = 1 |
+		if(quant < 1, {
+			//Sync to next availbale grid time
+			//quant = 1.25
+			//this.beats = 43.2345
+			//time = 44.25
+			^(this.nextTimeOnGrid(quant));
+		}, {
+			//Sync to beats in the future
+			//quant = 1.25
+			//this.beats = 43.62345
+			//time = 44.25
+			^(this.beats.floor + quant);
+		});
+	}
+
 	algaGetScheduledTime { | quant = 1 |
 		case
 		//Beat syncing
 		{ quant.isNumber } {
-			if(quant < 1, {
-				//Sync to next availbale grid time
-				//quant = 1.25
-				//this.beats = 43.2345
-				//time = 44.25
-				^(this.nextTimeOnGrid(quant));
-			}, {
-				//Sync to beats in the future
-				//quant = 1.25
-				//this.beats = 43.62345
-				//time = 44.25
-				^(this.beats.floor + quant);
-			});
+			^this.algaSchedNum(quant)
 		}
 		//Bar syncing
 		{ quant.isAlgaQuant } {
@@ -830,9 +834,13 @@
 				{ quant.phase % beatsPerBar },
 				{ quant.phase }
 			);
-
-			//Sync to the next available bar, shifting by phase - within the bar if wrapping
-			^((nextBar + ((algaQuantQuant - 1) * beatsPerBar)) + algaQuantPhase);
+			if(algaQuantQuant > 0, {
+				//Sync to the next available bar, shifting by phase - within the bar if wrapping
+				^((nextBar + ((algaQuantQuant - 1) * beatsPerBar)) + algaQuantPhase);
+			}, {
+				//quant = 0: sched just with phase
+				^this.algaSchedNum(algaQuantPhase)
+			});
 		};
 	}
 
