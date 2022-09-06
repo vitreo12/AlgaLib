@@ -1,7 +1,7 @@
 TITLE:: AlgaMonoPattern
 summary:: Alga module representing a monophonic interpolated sequencer
 categories:: Alga
-related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaPatternPlayer
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaPatternPlayer, Classes/AlgaSequencer
 
 DESCRIPTION::
 An link::Classes/AlgaMonoPattern:: is a monophonic sequencer with interpolation capabilities. It works similarly to an link link::Classes/AlgaPattern::, with the difference of the pattern being triggered sequentially. link::Classes/AlgaMonoPattern::s feature a set of special keys:
