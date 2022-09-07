@@ -3498,6 +3498,18 @@ AlgaPattern : AlgaNode {
 		this.runFuncOnValidInterpStreams(func, sched);
 	}
 
+	//Alias for stopPattern
+	stopP { | sched | this.stopPattern(sched) }
+
+	//Alias for playPattern
+	playP { | sched | this.playPattern(sched) }
+
+	//Alias for restartPattern
+	restartP { | sched | this.restartPattern(sched) }
+
+	//Alias for resetPattern
+	resetP { | sched | this.resetPattern(sched) }
+
 	//Remove an AlgaPatternPlayer
 	removePlayer { | sched |
 		if(player != nil, {

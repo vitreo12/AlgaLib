@@ -98,6 +98,20 @@ AlgaSequencer {
 		});
 	}
 
+	//Alias for resetPattern
+	reset { | sched = 0 |
+		monoPatterns.do({ | monoPattern |
+			monoPattern.resetPattern(sched)
+		});
+	}
+
+	//Alias for restartPattern
+	restart { | sched = 0 |
+		monoPatterns.do({ | monoPattern |
+			monoPattern.restartPattern(sched)
+		});
+	}
+
 	//Use . syntax to retrieve entries, dispatch a method or throw error
 	doesNotUnderstand { | selector ...args |
 		var latestDispatchedVal;

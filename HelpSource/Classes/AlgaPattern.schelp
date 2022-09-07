@@ -52,30 +52,42 @@ ARGUMENT:: sched
 Schedule the triggering at a specific time.
 
 METHOD:: step
-Alias for emphasis::advance::.
+Alias for code::advance::.
 
 METHOD:: value
-Alias for emphasis::advance::.
+Alias for code::advance::.
 
 METHOD:: stopPattern
 Stop the link::Classes/AlgaPattern::.
 ARGUMENT:: sched
 Schedule at a specific time.
 
+METHOD:: stopP
+Alias for code::stopPattern::.
+
 METHOD:: playPattern
 Play the link::Classes/AlgaPattern::.
 ARGUMENT:: sched
 Schedule at a specific time.
+
+METHOD:: playP
+Alias for code::playPattern::.
 
 METHOD:: restartPattern
 Restart the link::Classes/AlgaPattern::, resetting the entries.
 ARGUMENT:: sched
 Schedule at a specific time.
 
+METHOD:: restartP
+Alias for code::restartPattern::.
+
 METHOD:: restartPattern
 Reset the entries of the link::Classes/AlgaPattern::.
 ARGUMENT:: sched
 Schedule at a specific time.
+
+METHOD:: resetP
+Alias for code::restartPattern::.
 
 METHOD:: interpolateDur
 Manually trigger the interpolation of the code::'dur':: parameter. This can also be achieved with the standard code::from:: method, but code::interpolateDur:: also accepts a different set of arguments that are specific to this kind of interpolation.
