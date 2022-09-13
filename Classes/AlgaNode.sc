@@ -886,7 +886,7 @@ AlgaNode {
 	}
 
 	//Groups (and state) will be reset only if they are nil AND they are set to be freed.
-	freeAllGroups { | now = false, time |
+	freeAllGroups { | now = false, time, isClear = false |
 		if(group != nil, {
 			if(now, {
 				group.free;
@@ -2891,7 +2891,7 @@ AlgaNode {
 		});
 	}
 
-	freeAllSynths { | useConnectionTime = true, now = true, time |
+	freeAllSynths { | useConnectionTime = true, now = true, time, isClear = false |
 		this.freeInterpNormSynths(now, time);
 		this.freeSynth(useConnectionTime, now, time);
 	}
@@ -4381,7 +4381,7 @@ AlgaNode {
 		this.stopInner(stopTime, isClear:true, action:onClear);
 
 		//Just remove groups, they contain the synths
-		this.freeAllGroups(false, time);
+		this.freeAllGroups(false, time, true);
 		this.freeAllBusses(false, time, true);
 
 		fork {

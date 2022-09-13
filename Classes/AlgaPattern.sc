@@ -1105,7 +1105,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//If numChannels or rate mismatch between patternSynth -> fxSynth
-		if((fxInRate != nil).and(
+		if(((rateToUse != nil).and(fxInRate != nil)).and(
 			(numChannelsToUse != fxInNumChannels).or(rateToUse != fxInRate)
 		), {
 			//patternSynth -> \in
@@ -1149,7 +1149,7 @@ AlgaPattern : AlgaNode {
 		});
 
 		//If numChannels or rate mismatch between fxSynth -> algaSynthBus
-		if((rate != nil).and(
+		if(((rateToUse != nil).and(rate != nil)).and(
 			(fxNumChannels != numChannels).or(fxRate != rate)
 		), {
 			//Create the Bus fxSynth will write to
@@ -3310,19 +3310,19 @@ AlgaPattern : AlgaNode {
 	//IMPORTANT: this function must be empty. It's called from replaceInner, but synthBus is actually
 	//still being used by the pattern. It should only be freed when the pattern is freed, as it's done
 	//in the stopPatternAndFreeSynths function. LEAVE THIS FUNCTION EMPTY, OR FAST PATTERNS WILL BUG OUT!!!
-	freeAllBusses { | now = false, time | }
+	freeAllBusses { | now = false, time, isClear = false | }
 
 	//Called from replaceInner. freeInterpNormSynths is not used for AlgaPatterns
-	freeAllSynths { | useConnectionTime = true, now = true, time |
-		this.stopPatternAndFreeInterpNormSynths(now, time);
+	freeAllSynths { | useConnectionTime = true, now = true, time, isClear = false |
+		this.stopPatternAndFreeInterpNormSynths(now, time, isClear);
 	}
 
 	//Used when replacing. Stop pattern (if fadeIn / fadeOut mechanism) and free all synths
-	stopPatternAndFreeInterpNormSynths { | now = true, time |
+	stopPatternAndFreeInterpNormSynths { | now = true, time, isClear = false |
 		currentPatternOutTime = time; //store time for \out
 		if(interpStreams != nil, {
 			if(now, {
-				if(stopPatternBeforeReplace.not, {
+				if((isClear).or(stopPatternBeforeReplace.not), {
 					interpStreams.algaReschedulingEventStreamPlayer.stop;
 					patternsAsStreams.removeAt(interpStreams);
 				});
@@ -3334,7 +3334,7 @@ AlgaPattern : AlgaNode {
 				if(interpStreamsOld != nil, {
 					fork {
 						(time + 1.0).wait;
-						if(stopPatternBeforeReplace.not, {
+						if((isClear).or(stopPatternBeforeReplace.not), {
 							interpStreamsOld.algaReschedulingEventStreamPlayer.stop;
 							patternsAsStreams.removeAt(interpStreamsOld);
 						});
@@ -3869,8 +3869,8 @@ AlgaPattern : AlgaNode {
 	}
 
 	//Called from clearInner
-	freeAllGroups { | now = false, time |
-		this.freeAllSynths(false, now, time);
+	freeAllGroups { | now = false, time, isClear = false |
+		this.freeAllSynths(false, now, time, isClear);
 		super.freeAllGroups(now, time);
 	}
 
