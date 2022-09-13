@@ -378,6 +378,15 @@ Alga {
 		});
 	}
 
+	*forceBoot { | onBoot, server, algaServerOptions, clock |
+		Server.killAll;
+		this.boot(onBoot, server, algaServerOptions, clock)
+	}
+
+	*fBoot { | onBoot, server, algaServerOptions, clock |
+		this.forceBoot(onBoot, server, algaServerOptions, clock)
+	}
+
 	*quit { | onQuit, server |
 		server = server ? Server.default;
 		if(servers[server] != nil, {

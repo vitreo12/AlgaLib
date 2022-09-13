@@ -30,6 +30,12 @@ An instance of link::Classes/AlgaServerOptions:: to boot the server with. If not
 ARGUMENT:: clock
 The emphasis::Clock:: for the internal link::Classes/AlgaScheduler::. If not specified, a default link::Classes/TempoClock:: will be created.
 
+METHOD:: forceBoot
+Same as code::boot::, quitting all booted servers first.
+
+METHOD:: fBoot
+Alias for code:: forceBoot::.
+
 METHOD:: quit
 Quit emphasis::Alga::.
 ARGUMENT:: onQuit
