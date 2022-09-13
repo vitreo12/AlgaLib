@@ -11,6 +11,8 @@ CLASSMETHODS::
 METHOD:: new
 ARGUMENT:: def
 An link::Classes/Event:: describing the code::key:: / code::value:: pairs to be executed.
+ARGUMENT:: player
+Set an instance of a link::Classes/AlgaPatternPlayer:: that will be used to trigger the pattern.
 ARGUMENT:: server
 Specify a link::Classes/Server:: to instantiated the link::Classes/AlgaPattern:: on. This link::Classes/Server:: must have had link::Classes/Alga:: booted on it. It defaults to code::Server.default::.
 
@@ -23,14 +25,21 @@ Start the execution of the link::Classes/AlgaPatternPlayer::.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaNode:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
 
+METHOD:: stop
+Stop the link::Classes/AlgaPatternPlayer::
+
+METHOD:: reset
+Reset the link::Classes/AlgaPatternPlayer::
+
+METHOD:: restart
+Restart the link::Classes/AlgaPatternPlayer::
+
+
 METHOD:: advance
 Manually advance the link::Classes/AlgaPatternPlayer::.
 
 METHOD:: step
 Alias for code::advance::.
-
-METHOD:: stop
-Stop the link::Classes/AlgaPatternPlayer::
 
 METHOD:: from
 ARGUMENT:: sender
@@ -80,6 +89,9 @@ Manually set a code::sched:: value to use when not specified explicitly.
 
 METHOD:: time
 Manually set a code::time:: value to use when not specified explicitly.
+
+METHOD:: shape
+Manually set a code::shape:: value to use when not specified explicitly.
 
 METHOD:: tempoScaling
 Specify if all timed actions should be scaled by the clock's tempo. Default is code::false::.
@@ -197,3 +209,12 @@ private:: setDurAtSched
 private:: setStretchAtSched
 private:: stretch
 private:: stretchAlgaPseg
+private:: resetEntries
+private:: runFuncOnValidPatternAsStream
+
+private:: entriesOrder
+private:: interpShape
+private:: interpTime
+private:: shapeInner
+private:: it
+private:: player

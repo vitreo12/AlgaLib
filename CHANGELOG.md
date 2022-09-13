@@ -1,3 +1,100 @@
+# 1.3.0
+
+## New features
+
+- `AlgaMonoPattern`: a new class that implements a monophonic interpolated sequencer:
+
+    ```SuperCollider
+    (
+    Alga.boot({
+        //Mono sequencer featuring AlgaTemps modulating at audio rate
+        ~freqSeq = AlgaMonoPattern((
+            rate: \audio,
+            chans: 2,
+            in: Pseq([
+                AlgaTemp({ SinOsc.ar([Rand(1, 100), Rand(1, 100)]) }, scale: [Pwhite(220, 440), Pwhite(440, 880)]),
+                [440, 660],
+                880
+            ], inf),
+            time: Pwhite(0.01, 1),
+            dur: Prand([0.125, 0.25, 0.5, 1], inf)
+        ));
+
+        //Mono sequencer featuring AlgaTemps modulating at audio rate
+        ~ampSeq = AlgaMonoPattern((
+            rate: \audio,
+            in: AlgaTemp({ SinOsc.ar(Rand(1, 1000)) }),
+            time: Pwhite(0.01, 1),
+            dur: Prand([0.5, 1, 2], inf)
+        ));
+
+        //The AlgaNode to modulate using both FM and AM
+        ~sine = AlgaNode({ SinOsc.ar(\freq.ar(440!2)) }, [\freq, ~freqSeq, \amp, ~ampSeq]).play;
+    });
+    )
+    ```
+
+- `AlgaSequencer`: a new class that implements a sequence of `AlgaMonoPatterns`:
+
+    ```SuperCollider
+    (
+    Alga.boot({
+        //Poly sequencer featuring AlgaTemps modulating at audio rate
+        ~seq = AlgaSequencer((
+            freq: (
+                rate: \audio,
+                chans: 2,
+                in: Pseq([
+                    AlgaTemp({ SinOsc.ar([Rand(1, 100), Rand(1, 100)]) }, scale: [Pwhite(220, 440), Pwhite(440, 880)]),
+                    [440, 660],
+                    880
+                ], inf),
+                time: Pwhite(0.01, 1)
+            ),
+            amp: (
+                rate: \audio,
+                in: AlgaTemp({ SinOsc.ar(Rand(1, 1000)) }),
+                time: Pwhite(0.01, 1),
+            ),
+            dur: Prand([0.5, 1, 2], inf)
+        ));
+        
+        //The AlgaNode to modulate using both FM and AM
+        ~sine = AlgaNode({ SinOsc.ar(\freq.ar(440!2)) }, [\freq, ~seq.freq, \amp, ~seq.amp]).play;
+    });
+    )
+    ```
+
+- `AlgaPattern`: `'def'` now supports `Array` entries to create stacked voices:
+
+    ```SuperCollider
+    (
+    Alga.boot({
+        a = AlgaPattern((
+            def: [{ SinOsc.ar(\freq.kr) }, { Saw.ar(\freq.kr * 0.25) }],
+            amp: AlgaTemp({ EnvPerc.ar }),
+            freq: Pseq([220, 440, 880], inf), 
+            dur: 0.5
+        )).play(2)
+    })
+    )
+    ```
+
+- `AlgaNode`: trigger rate parameters are now supported:
+
+    ```SuperCollider
+    (
+    Alga.boot({
+        z = AlgaNode({
+            var env = Env.perc(0.01, 1).kr(0, \trig.tr(1));
+            SinOsc.ar(440) * env;
+        }).play(2)
+    })
+    )
+
+    z <<.trig 1
+    ```
+
 # 1.2.1
 
 ## New features
@@ -14,7 +111,7 @@
 
 - `AlgaOut`: Fixed the parameter argument. It was only working with `\in` before.
 
-# 1.2
+# 1.2.0
 
 ## New features
 

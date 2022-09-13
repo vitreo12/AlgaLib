@@ -32,9 +32,9 @@ Alga {
 	//Store if server is supernova or not
 	classvar <supernovas;
 
-	*initSynthDefs { | maxIO = 8 |
+	*initSynthDefs { | maxIO = 8, rebuild = false |
 		AlgaStartup.algaMaxIO = maxIO;
-		AlgaStartup.initSynthDefs;
+		AlgaStartup.initSynthDefs(rebuild);
 	}
 
 	*initClass {
@@ -245,7 +245,9 @@ Alga {
 	}
 
 	*readAlgaSynthDefsFolder {
-		this.readAllDefs(AlgaStartup.algaSynthDefPath)
+		this.readAllDefs(AlgaStartup.algaSynthDefPath);
+		//AlgaMonoPattern's defs are needed in the Alga library desc
+		this.readAllDefs(AlgaStartup.algaMonoPatternPath);
 	}
 
 	*readDef { | path, server |
@@ -306,11 +308,8 @@ Alga {
 		server.options.protocol = \tcp; //Always \tcp!
 		server.latency = algaServerOptions.latency;
 
-		//Check AlgaSynthDef/IO folder exists...
-		if(File.exists(AlgaStartup.algaSynthDefIO_numberPath) == false, {
-			("Could not retrieve the correct 'AlgaSyntDefs/IO_...' folder. Running 'Alga.initSynthDefs' now...").warn;
-			this.initSynthDefs;
-		});
+		//Init defs if needed
+		this.initSynthDefs;
 
 		//Add to SynthDescLib in order for SynthDef.add to work
 		SynthDescLib.alga.addServer(server);
@@ -379,6 +378,15 @@ Alga {
 		});
 	}
 
+	*forceBoot { | onBoot, server, algaServerOptions, clock |
+		Server.killAll;
+		this.boot(onBoot, server, algaServerOptions, clock)
+	}
+
+	*fBoot { | onBoot, server, algaServerOptions, clock |
+		this.forceBoot(onBoot, server, algaServerOptions, clock)
+	}
+
 	*quit { | onQuit, server |
 		server = server ? Server.default;
 		if(servers[server] != nil, {
@@ -390,11 +398,10 @@ Alga {
 		});
 	}
 
-	*interpolateTempo {| tempo = 1, time = 0, shape,
+	*interpolateTempo { | tempo = 1, time = 0, shape,
 		delta = 0.1, schedInSeconds = false, sched = 1, server |
-		var clock;
+		var clock = clocks[server];
 		server = server ? Server.default;
-		clock = clocks[server];
 		if(clock != nil, {
 			clock.interpolateTempo(
 				tempo: tempo,

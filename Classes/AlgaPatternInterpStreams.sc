@@ -385,8 +385,13 @@ AlgaPatternInterpStreams {
 			("AlgaPatternInterpStreams: Invalid controlName for param '" ++ paramName ++ "'").error
 		});
 
-		//Unpack
+		//Unpack name
 		paramName = controlName.name;
+
+		//AlgaMonoPattern: only consider the \in parameter
+		if((algaPattern.isAlgaMonoPattern).and(paramName != \in), { ^nil });
+
+		//Unpack other entries
 		paramRate = controlName.rate;
 		paramNumChannels = controlName.numChannels;
 		paramDefault = controlName.defaultValue;
@@ -458,11 +463,54 @@ AlgaPatternInterpStreams {
 		});
 	}
 
-	//Play a pattern as an AlgaReschedulingEventStreamPlayer and return it
-	playAlgaReschedulingEventStreamPlayer { | pattern, clock |
-		algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
-			clock: clock
-		)
+	//Create an AlgaReschedulingEventStreamPlayer and play it
+	newAlgaReschedulingEventStreamPlayer { | patternAsStream |
+		algaReschedulingEventStreamPlayer = patternAsStream.newAlgaReschedulingEventStreamPlayer;
+	}
+
+	//Play the AlgaReschedulingEventStreamPlayer
+	playAlgaReschedulingEventStreamPlayer { | clock |
+		clock = clock ? TempoClock.default;
+		if(algaReschedulingEventStreamPlayer != nil, {
+			algaReschedulingEventStreamPlayer.play(clock, false)
+		})
+	}
+
+	//Reset all Streams used
+	resetPattern {
+		//Reset algaReschedulingEventStreamPlayer
+		algaReschedulingEventStreamPlayer.reset;
+
+		//Reset all Streams
+		entries.do({ | entryDict |
+			entryDict.do({ | entry |
+				entry.reset
+			});
+		});
+
+		//Reset all scalar and generic params
+		scalarAndGenericParams.keysValuesDo({ | key, scalarAndGenericParam |
+			scalarAndGenericParam.reset;
+			scalarAndGenericParamsStreams[key].reset;
+		});
+
+		//Reset dur, sustain, stretch, legato
+		dur.reset;
+		durAlgaPseg.reset;
+		sustain.reset;
+		sustainAlgaPseg.reset;
+		stretch.reset;
+		stretchAlgaPseg.reset;
+		legato.reset;
+		legatoAlgaPseg.reset;
+
+		//Reset def, out, fx
+		def.reset;
+		defStream.reset;
+		out.reset;
+		outStream.reset;
+		fx.reset;
+		fxStream.reset;
 	}
 
 	//Store generic params for replaces

@@ -27,6 +27,8 @@ ARGUMENT:: playSafety
 Specify a different safety method to use to scale the output of a node when using the emphasis::play:: method. Accepted values are: code::'clip', 'tanh', 'softclip', 'limiter', 'none'::.
 ARGUMENT:: sched
 Just like any other link::Classes/AlgaPattern:: method, the current function can be scheduled at specific times in the future, according to the clock that the link::Classes/Alga:: instance booted on the server is using.
+ARGUMENT:: start
+Start the link::Classes/AlgaPattern:: when created. This will be started at the specified code::sched::.
 ARGUMENT:: schedInSeconds
 Specify if all sched actions should be scheduled in seconds, opposing to beats. Default is code::false::.
 ARGUMENT:: tempoScaling
@@ -50,15 +52,42 @@ ARGUMENT:: sched
 Schedule the triggering at a specific time.
 
 METHOD:: step
-Alias for emphasis::advance::.
+Alias for code::advance::.
 
 METHOD:: value
-Alias for emphasis::advance::.
+Alias for code::advance::.
 
 METHOD:: stopPattern
 Stop the link::Classes/AlgaPattern::.
 ARGUMENT:: sched
-Schedule the stop at a specific time.
+Schedule at a specific time.
+
+METHOD:: stopP
+Alias for code::stopPattern::.
+
+METHOD:: playPattern
+Play the link::Classes/AlgaPattern::.
+ARGUMENT:: sched
+Schedule at a specific time.
+
+METHOD:: playP
+Alias for code::playPattern::.
+
+METHOD:: restartPattern
+Restart the link::Classes/AlgaPattern::, resetting the entries.
+ARGUMENT:: sched
+Schedule at a specific time.
+
+METHOD:: restartP
+Alias for code::restartPattern::.
+
+METHOD:: restartPattern
+Reset the entries of the link::Classes/AlgaPattern::.
+ARGUMENT:: sched
+Schedule at a specific time.
+
+METHOD:: resetP
+Alias for code::restartPattern::.
 
 METHOD:: interpolateDur
 Manually trigger the interpolation of the code::'dur':: parameter. This can also be achieved with the standard code::from:: method, but code::interpolateDur:: also accepts a different set of arguments that are specific to this kind of interpolation.
@@ -145,6 +174,9 @@ Set if the link::Classes/AlgaPattern:: should treat multi channel expansion like
 METHOD:: multiChannelExpansion
 Alias for emphasis::useMultiChannelExpansion::.
 
+METHOD:: mc
+Alias for emphasis::useMultiChannelExpansion::.
+
 METHOD:: replaceDur
 Set if emphasis::replace:: should be executed when changing the code::'dur':: parameter.
 
@@ -166,8 +198,14 @@ Set the default code::sched:: value for code::interpolateDur:: (and accompanying
 METHOD:: durInterpResync
 Set if code::interpolateDur:: (and accompanying functions) should resync by default.
 
+METHOD:: durResync
+Alias for code::durInterpResync::.
+
 METHOD:: durInterpReset
 Set if code::interpolateDur:: (and accompanying functions) should reset by default.
+
+METHOD:: durReset
+Alias for code::durInterpReset::.
 
 EXAMPLES::
 code::
@@ -302,7 +340,6 @@ private:: reschedule
 private:: reset
 private:: resetAlgaPattern
 private:: resetParam
-private:: resumePattern
 private:: setDur
 private:: setDurAtSched
 private:: stopPatternAndFreeSynths
@@ -376,3 +413,12 @@ private:: addInNodeAlgaNodeAlgaArg
 private:: buildFromPattern
 private:: checkPatternValidityAndReturnControlNames
 private:: dispatchPattern
+
+private:: algaResetParsingVars
+private:: interpGroupEnv
+private:: interpolateScalarOrGenericParam
+
+private:: resetPattern
+private:: runFuncOnValidInterpStreams
+private:: startPattern
+private:: resetEventEntries

@@ -299,6 +299,50 @@ AlgaParser {
 		defFX  = def[\fx];
 		defOut = def[\out];
 
+		//AlgaMonoPattern. Check validity of entries
+		if(obj.isAlgaMonoPattern, {
+			var defRate  = def[\rate] ? \control;
+			var defChans = (((def[\chans] ? def[\channels]) ? def[\numChans]) ? def[\numChannels]) ? 1;
+			if(defRate == \ar, { defRate = \audio });
+			if(defRate == \kr, { defRate = \control });
+			if((defRate != \audio).and(defRate != \control), {
+				"AlgaMonoPattern: 'rate' can only be 'audio' or 'control'".error;
+				^nil;
+			});
+			if(defChans.isInteger.not, {
+				"AlgaMonoPattern: 'chans' can only be an Integer".error;
+				^nil;
+			});
+			if(defFX != nil, {
+				"AlgaMonoPattern: 'fx' is unsupported".error;
+				^nil;
+			});
+			if(defOut != nil, {
+				"AlgaMonoPattern: 'out' is unsupported".error;
+				^nil;
+			});
+			if(def[\in] == nil, {
+				def[\in] = def[\value] ? def[\val];
+				if(def[\in] == nil, {
+					"AlgaMonoPattern: invalid 'in', 'value' or 'val'".error;
+					^nil;
+				});
+			});
+			if(def[\time] == nil, {
+				def[\time] = def[\interpTime] ? def[\it];
+			});
+			if(def[\shape] == nil, {
+				def[\shape] = def[\interpShape] ? def[\is];
+			});
+
+			//Set numChannels / rate
+			obj.monoRate = defRate;
+			obj.monoNumChannels = defChans;
+
+			//Multichannel ????
+			defDef = ("alga_monoPattern_" ++ defRate ++ defChans).asSymbol;
+		});
+
 		//Return nil if no def
 		if(defDef == nil, {
 			"AlgaPattern: the Event does not provide a 'def' entry".error;

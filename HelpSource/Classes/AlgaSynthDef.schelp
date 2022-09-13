@@ -83,3 +83,4 @@ private:: rate
 private:: sampleAccurate
 private:: sendAndAddToGlobalDescLib
 private:: createDirAndWriteArchiveMd
+private:: triggers

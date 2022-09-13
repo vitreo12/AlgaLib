@@ -22,7 +22,6 @@ AlgaPseg : Pstep {
 	var hasBeenHeld = false;
 	var onDone;
 	var clock;
-	var time = 0;
 	var trigStartTime;
 	var <drift = 0;
 
@@ -106,15 +105,17 @@ AlgaPseg : Pstep {
 					env = [startVal,val, dur, curve].flop.collect { | args |
 						Env([args[0], args[1]], [args[2]], args[3]) };
 					while { thisThread.endBeat > curTime = thisThread.beats } {
+						if(hold, { hasBeenHeld = true });
 						inval = yield(env.collect{ | e |
-							time = if(hold, { hasBeenHeld = true; time }, { e.at(curTime - startTime) });
+							var time = env.at(curTime - startTime);
 							e.at(time)
 						})
 					};
 				} {
 					env = Env([startVal, val], [dur], curve);
 					while { thisThread.endBeat > curTime = thisThread.beats } {
-						time = if(hold, { hasBeenHeld = true; time }, { env.at(curTime - startTime) });
+						var time = env.at(curTime - startTime);
+						if(hold, { hasBeenHeld = true });
 						inval = yield(time);
 					};
 				}

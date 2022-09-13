@@ -26,33 +26,28 @@ AlgaSpinRoutine {
 			^nil;
 		});
 
-		if(condition.value, {
-			^func.value;
-		});
+		if(condition.value, { ^func.value });
 
-		if(breakCondition.isNil, {
-			breakCondition = { false }
-		});
+		if(breakCondition == nil, { breakCondition = { false } });
 
-		//Spin around condition, then execute onComplete.
-		//If breakCondition is true, break the loop and don't execute onComplete anymore.
+		//Spin around condition, once true, execute func
 		fork {
 			var accumTime = 0;
 			var break = false;
 
 			while( { condition.value.not }, {
-				if( breakCondition.value, { condition = { true }; break = true; });
+				if(breakCondition.value, { condition = { true }; break = true; });
 				interval.wait;
 				accumTime = accumTime + interval;
-				if(accumTime >= maxTime, {
-					("AlgaSpinRoutine: exceeded maximum wait time: " ++ maxTime).error;
-					condition = { true }; break = true;
+				if(maxTime != nil, {
+					if(accumTime >= maxTime, {
+						("AlgaSpinRoutine: exceeded maximum wait time: " ++ maxTime).error;
+						condition = { true }; break = true;
+					});
 				});
 			});
 
-			if(break.not, {
-				func.value;
-			});
+			if(break.not, { func.value });
 		}
 	}
 }

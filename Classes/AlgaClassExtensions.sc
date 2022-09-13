@@ -17,6 +17,7 @@
 +Object {
 	isAlgaNode { ^false }
 	isAlgaPattern { ^false }
+	isAlgaMonoPattern { ^false }
 	isAlgaEffect { ^false }
 	isAlgaMod { ^false }
 	isAlgaArg { ^false }
@@ -57,6 +58,9 @@
 
 	//Like asStream, but easily overloadable
 	algaAsStream { ^(this.asStream) }
+
+	//Like asStream, but easily overloadable
+	algaNext { | e | ^this.next(e) }
 
 	//Fallback on AlgaSpinRoutine if trying to addAction to a non-AlgaScheduler
 	addAction { | condition, func, sched = 0, topPriority = false,
@@ -217,6 +221,9 @@
 
 //Needed for AlgaIEnvGen / IEnvGen to work
 +Env {
+	//Used for AlgaMonoPattern's shape. asStream is already parsing the Env instead
+	algaAsStream { ^this }
+
 	//Used in the AlgaSynthDef
 	algaAsArray {
 		^this.asArrayForInterpolation.unbubble;
@@ -276,10 +283,19 @@
 			(item.canFreeSynth).or(item.algaCanFreeSynth)
 		})
 	}
+
+	//Support .next for [Pattern, Pattern, etc...]
+	algaNext { | e |
+		var result = Array.newClear(this.size);
+		this.do { | entry, i | result[i] = entry.algaNext(e) };
+		^result
+	}
 }
 
 //Converts all Set entries to stream
 +Set {
+	isSet { ^true }
+
 	algaAsStream {
 		this.do({ | entry |
 			this.remove(entry);
@@ -373,13 +389,13 @@
 			path = PathName(path.standardizePath)
 		});
 		if(path.isKindOf(PathName).not, {
-			"path must be a String or PathName".error;
+			"SynthDescLib: Path must be a String or PathName".error;
 			^nil;
 		});
 		strPath = path.fullPath.withoutTrailingSlash;
 		path = PathName(strPath);
 		if((File.exists(strPath).not).or(path.isFolder.not), {
-			"Path does not exist or it's not a folder".error;
+			"SynthDescLib: Path does not exist or it's not a folder".error;
 			^nil;
 		});
 		this.readAllInner(path, server, beginsWithExclude);
@@ -457,10 +473,6 @@
 	*alga {
 		^this.getLib(\alga)
 	}
-}
-
-+Set {
-	isSet { ^true }
 }
 
 +Dictionary {
@@ -583,18 +595,14 @@
 
 +Pattern {
 	isPattern { ^true }
-
-	playAlgaRescheduling { | clock, protoEvent, quant |
-		clock = clock ? TempoClock.default;
-		^AlgaReschedulingEventStreamPlayer(
-			this.asStream,
-			protoEvent
-		).play(clock, false, quant)
-	}
 }
 
 +Stream {
 	isStream { ^true }
+
+	newAlgaReschedulingEventStreamPlayer { | event  |
+		^AlgaReschedulingEventStreamPlayer(this, event)
+	}
 }
 
 +ListPattern {
@@ -651,6 +659,18 @@
 //Add support for >> and >>+
 +Buffer {
 	isBuffer { ^true }
+
+	//Same as sendCollection but force fork (instead of forkIfNeeded).
+	//forkIfNeeded is buggy if used within AlgaPattern!
+	*algaSendCollection { arg server, collection, numChannels = 1, wait = -1, action;
+		var buffer = this.new(server, ceil(collection.size / numChannels), numChannels);
+		fork {
+			buffer.alloc;
+			server.sync;
+			buffer.sendCollection(collection, 0, wait, action);
+		}
+		^buffer
+	}
 
 	//To debug .sendCollection used for Envs
 	/*
@@ -778,6 +798,52 @@
 		)
 	}
 
+	algaGetScheduledTimeInSeconds { | seconds = 0 |
+		^(this.secs2beats(this.seconds + seconds))
+	}
+
+	algaSchedNum { | quant = 1 |
+		if(quant < 1, {
+			//Sync to next availbale grid time
+			//quant = 1.25
+			//this.beats = 43.2345
+			//time = 44.25
+			^(this.nextTimeOnGrid(quant));
+		}, {
+			//Sync to beats in the future
+			//quant = 1.25
+			//this.beats = 43.62345
+			//time = 44.25
+			^(this.beats.floor + quant);
+		});
+	}
+
+	algaGetScheduledTime { | quant = 1 |
+		case
+		//Beat syncing
+		{ quant.isNumber } {
+			^this.algaSchedNum(quant)
+		}
+		//Bar syncing
+		{ quant.isAlgaQuant } {
+			var nextBar = this.nextBar;
+			var beatsPerBar = this.beatsPerBar;
+			var algaQuantQuant = quant.quant;
+			var algaQuantWrapPhase = quant.wrapPhase;
+			var algaQuantPhase = if(algaQuantWrapPhase,
+				{ quant.phase % beatsPerBar },
+				{ quant.phase }
+			);
+			if(algaQuantQuant > 0, {
+				//Sync to the next available bar, shifting by phase - within the bar if wrapping
+				^((nextBar + ((algaQuantQuant - 1) * beatsPerBar)) + algaQuantPhase);
+			}, {
+				//quant = 0: sched just with phase
+				^(this.algaSchedNum(algaQuantPhase))
+			});
+		};
+	}
+
 	algaSchedAtQuant { | quant, task |
 		if(this.isTempoClock, {
 			this.algaTempoClockSchedAtQuant(quant, task);
@@ -845,12 +911,12 @@
 	}
 
 	algaSchedInSeconds { | when, task |
-		this.schedAbs(this.secs2beats(this.seconds + when), task);
+		this.schedAbs(this.algaGetScheduledTimeInSeconds(when), task);
 	}
 
 	algaSchedInSecondsOnce { | when, task |
 		var taskOnce = { task.value; nil };
-		this.schedAbs(this.secs2beats(this.seconds + when), taskOnce);
+		this.schedAbs(this.algaGetScheduledTimeInSeconds(when), taskOnce);
 	}
 
 	algaSchedInSecondsWithTopPriority { | when, task |
@@ -890,40 +956,7 @@
 
 +TempoClock {
 	algaTempoClockSchedAtQuant { | quant = 1, task |
-		var time;
-
-		case
-		//Beat syncing
-		{ quant.isNumber } {
-			if(quant < 1, {
-				//Sync to next availbale grid time
-				//quant = 1.25
-				//this.beats = 43.2345
-				//time = 44.25
-				time = this.nextTimeOnGrid(quant)
-			}, {
-				//Sync to beats in the future
-				//quant = 1.25
-				//this.beats = 43.62345
-				//time = 44.25
-				time = this.beats.floor + quant;
-			});
-		}
-		//Bar syncing
-		{ quant.isAlgaQuant } {
-			var nextBar = this.nextBar;
-			var beatsPerBar = this.beatsPerBar;
-			var algaQuantQuant = quant.quant;
-			var algaQuantWrapPhase = quant.wrapPhase;
-			var algaQuantPhase = if(algaQuantWrapPhase,
-				{ quant.phase % beatsPerBar },
-				{ quant.phase }
-			);
-
-			//Sync to the next available bar, shifting by phase - within the bar if wrapping
-			time = (nextBar + ((algaQuantQuant - 1) * beatsPerBar)) + algaQuantPhase;
-		};
-
+		var time = this.algaGetScheduledTime(quant);
 		if(time != nil, { this.schedAbs(time, task) });
 	}
 

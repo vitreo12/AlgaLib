@@ -1,0 +1,73 @@
+TITLE:: AlgaMonoPattern
+summary:: Alga module representing a monophonic interpolated sequencer
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaPatternPlayer, Classes/AlgaSequencer
+
+DESCRIPTION::
+An link::Classes/AlgaMonoPattern:: is a monophonic sequencer with interpolation capabilities. It works similarly to an link link::Classes/AlgaPattern::, with the difference of the pattern being triggered sequentially. link::Classes/AlgaMonoPattern::s feature a set of special keys:
+
+1. code::rate:: - The rate of the sequencer, defaulting to code::\control::. Accepted values are: code::\control, \kr, \audio, \ar::.
+
+2. code::chans:: - The number of channels of the sequencer, defaulting to 1. This can be aliased to code::channels, numChans, numChannels::.
+
+3. code::in:: - The values of the sequencer. This can be aliased to code::value, val::.
+
+4. code::time:: - The interpolation times between triggers. This can be aliased to code::interpTime, it::.
+
+5. code::shape:: - The interpolation shapes of the interpolation times. This can be aliased to code::interpShape, is::.
+
+INSTANCEMETHODS::
+
+EXAMPLES::
+code::
+//Simple example
+(
+Alga.boot({
+	//Our mono sequencer
+	~seq = AlgaMonoPattern((
+		in: Pseq([220, 440, 880], inf),
+		time: Pseq([0.05, 0.1, 0.5], inf),
+		dur: 0.5
+	));
+
+	//The AlgaNode to modulate
+	~sine = AlgaNode({ SinOsc.ar(\freq.kr(440)) }, [\freq, ~seq]).play(2);
+});
+)
+
+//Audio rate manipulation
+(
+Alga.boot({
+	//Mono sequencer featuring AlgaTemps modulating at audio rate
+	~freqSeq = AlgaMonoPattern((
+		rate: \audio,
+		chans: 2,
+		in: Pseq([
+			AlgaTemp({ SinOsc.ar([Rand(1, 100), Rand(1, 100)]) }, scale: [Pwhite(220, 440), Pwhite(440, 880)]),
+			[440, 660],
+			880
+		], inf),
+		time: Pwhite(0.01, 1),
+		dur: Prand([0.125, 0.25, 0.5, 1], inf)
+	));
+
+	//Mono sequencer featuring AlgaTemps modulating at audio rate
+	~ampSeq = AlgaMonoPattern((
+		rate: \audio,
+		in: AlgaTemp({ SinOsc.ar(Rand(1, 1000)) }),
+		time: Pwhite(0.01, 1),
+		dur: Prand([0.5, 1, 2], inf)
+	));
+
+	//The AlgaNode to modulate using both FM and AM
+	~sine = AlgaNode({ SinOsc.ar(\freq.ar(440!2)) }, [\freq, ~freqSeq, \amp, ~ampSeq]).play;
+});
+)
+::
+
+private:: activeMonoSynths
+private:: isAlgaMonoPattern
+private:: monoNumChannels
+private:: monoRate
+private:: outNormBus
+private:: outNormSynth

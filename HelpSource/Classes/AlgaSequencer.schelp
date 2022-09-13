@@ -1,0 +1,53 @@
+TITLE:: AlgaSequencer
+summary:: Alga module representing a sequence of AlgaMonoPatterns
+categories:: Alga
+related:: Classes/Alga, Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaPatternPlayer, Classes/AlgaMonoPattern
+
+DESCRIPTION::
+An link::Classes/AlgaSequencer:: is the polyphonic counterpart of an link::Classes/AlgaMonoPattern::. It implements a series of parallel link::Classes/AlgaMonoPattern::s driven by a common clock. Each entry must be described exactly as an link::Classes/Event:: that would be used in an link::Classes/AlgaMonoPattern::.
+
+An link::Classes/AlgaSequencer:: responds to the same methods that an link::Classes/AlgaMonoPattern:: would respond to.
+
+CLASSMETHODS::
+
+private:: new
+
+INSTANCEMETHODS::
+
+EXAMPLES::
+code::
+(
+Alga.boot({
+	//Poly sequencer featuring AlgaTemps modulating at audio rate
+	~seq = AlgaSequencer((
+		freq: (
+			rate: \audio,
+			chans: 2,
+			in: Pseq([
+				AlgaTemp({ SinOsc.ar([Rand(1, 100), Rand(1, 100)]) }, scale: [Pwhite(220, 440), Pwhite(440, 880)]),
+				[440, 660],
+				880
+			], inf),
+			time: Pwhite(0.01, 1)
+		),
+		amp: (
+			rate: \audio,
+			in: AlgaTemp({ SinOsc.ar(Rand(1, 1000)) }),
+			time: Pwhite(0.01, 1),
+		),
+		dur: Prand([0.5, 1, 2], inf)
+	));
+
+	//The AlgaNode to modulate using both FM and AM
+	~sine = AlgaNode({ SinOsc.ar(\freq.ar(440!2)) }, [\freq, ~seq.freq, \amp, ~seq.amp]).play;
+});
+)
+::
+
+private:: <<
+private:: at
+private:: clear
+private:: doesNotUnderstand
+private:: monoPatterns
+private:: play
+private:: stop

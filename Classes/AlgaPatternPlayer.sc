@@ -18,13 +18,15 @@
 AlgaPatternPlayer {
 	var <pattern, <patternAsStream, <algaReschedulingEventStreamPlayer;
 	var actionScheduler, parser;
-	var <timeInner = 0, <schedInner = 1;
+	var <timeInner = 0, <schedInner = 1, <shapeInner;
 	var <schedResync = 1;
 	var <durInterpResync = true;
 	var <durInterpReset = false;
 	var <tempoScaling = false;
 
+	var <entriesOrder;
 	var <entries;
+	var <algaNextSchedTimes;
 	var <results;
 	var <algaPatterns;
 	var <algaPatternEntries;
@@ -38,6 +40,8 @@ AlgaPatternPlayer {
 	var <stretch = 1, <stretchAlgaPseg;
 	var <manualDur = false;
 
+	var <>player;
+
 	*initClass {
 		StartUp.add({ this.addAlgaPatternPlayerEventType });
 	}
@@ -46,24 +50,46 @@ AlgaPatternPlayer {
 		Event.addEventType(\algaPatternPlayer, #{
 			var algaPatternPlayer = ~algaPatternPlayer;
 			var entries = algaPatternPlayer.entries;
+			var entriesOrder = algaPatternPlayer.entriesOrder;
 			var results = algaPatternPlayer.results;
+			var algaNextSchedTimes = algaPatternPlayer.algaNextSchedTimes;
 			var algaPatterns = algaPatternPlayer.algaPatterns;
+			var beats = algaPatternPlayer.clock.beats;
 
 			//scheduledStepActionsPre
 			algaPatternPlayer.advanceAndConsumeScheduledStepActions(false);
 
 			//Advance entries and results' pointers
 			if(algaPatternPlayer.beingStopped.not, {
-				entries.keysValuesDo({ | key, value |
+				entriesOrder.do({ | key |
+					var value = entries[key];
 					//For interpolation, value can be IdentityDictionary(UniqueID -> entry)
 					if(key != \dur, {
 						value[\entries].keysValuesDo({ | uniqueID, entry |
-							//Advance patterns
-							entry = entry.next(currentEnvironment);
-							entry.algaAdvance(currentEnvironment);
+							//Check for the presence of an already .algaNext state at current clock time
+							if(algaNextSchedTimes[key][uniqueID] != beats, {
+								//Advance patterns
+								var entryVal = entry.algaNext(currentEnvironment);
+								entryVal.algaAdvance(currentEnvironment);
 
-							//Assign results
-							results[key][uniqueID] = entry;
+								//Store value for Pfunc / Pkey retrieval
+								//However, this doesn't work when triggering interpolation:
+								//it will only consider the lastID one
+								if(entryVal.isEvent.not, {
+									if(uniqueID == value[\lastID], {
+										currentEnvironment[key] = entryVal
+									});
+								});
+
+								//Assign results
+								results[key][uniqueID] = entryVal;
+							});
+
+							//algaNextSchedTimes is assigned in reassignAlgaReaderPfunc
+							//Here it needs to be cleared (already consumed)
+							if(algaNextSchedTimes[key] != nil, {
+								algaNextSchedTimes[key].removeAt(uniqueID)
+							});
 						});
 					});
 				});
@@ -77,14 +103,13 @@ AlgaPatternPlayer {
 		});
 	}
 
-	*new { | def, server |
-		^super.new.init(def, server)
+	*new { | def, player, server |
+		^super.new.init(def, player, server)
 	}
 
-	init { | argDef, argServer |
+	init { | argDef, argPlayer, argServer |
 		var scheduler;
 		var patternPairs = Array.newClear;
-		var patternPairsDict = IdentityDictionary();
 		var foundDurOrDelta = false;
 		var functionSynthDefDict = IdentityDictionary(); //AlgaTemp parser needs this
 		manualDur = false;
@@ -101,6 +126,9 @@ AlgaPatternPlayer {
 			^nil;
 		});
 
+		//Assign player
+		player = argPlayer;
+
 		//Create AlgaActionScheduler
 		actionScheduler = AlgaActionScheduler(this, scheduler);
 
@@ -110,10 +138,12 @@ AlgaPatternPlayer {
 		//Create vars
 		results = IdentityDictionary();
 		entries = IdentityDictionary();
+		algaNextSchedTimes = IdentityDictionary();
+		entriesOrder = Array.newClear();
 		algaPatterns = IdentitySet();
 		algaPatternEntries = IdentityDictionary();
 
-		//1) Add support for arrays to keep ordering of execution of params!
+		//1) Add support for alphabetical retrieval of parameters with Pkey / Pfunc
 
 		//Event handling
 		if(argDef.isEvent, {
@@ -142,34 +172,35 @@ AlgaPatternPlayer {
 					entries[key] = IdentityDictionary();
 					entries[key][\lastID] = uniqueID;
 					entries[key][\entries] = IdentityDictionary();
-					entries[key][\entries][uniqueID] = entry.algaAsStream; //.next support
-					patternPairsDict[key] = entry;
+					entries[key][\entries][uniqueID] = entry.algaAsStream; //.algaNext support
 				});
+
+				//Add to entriesOrder
+				entriesOrder = entriesOrder.add(key);
 			});
 		}, {
 			("AlgaPatternPlayer: Invalid 'def': " ++ argDef.class.asString).error;
 			^nil;
 		});
 
+		//If player is AlgaPatternPlayer, dur is ALWAYS manual
+		if(player.isAlgaPatternPlayer, {
+			player.addAlgaPattern(this);
+			manualDur = true;
+		});
+
 		//Add reschedulable \dur
 		if(foundDurOrDelta, {
 			if(manualDur.not, {
-				patternPairsDict[\dur] = Pfunc { | e | dur.next(e) }
+				patternPairs = patternPairs.add(\dur).add(Pfunc { | e | dur.algaNext(e) });
 			});
 		});
 
 		//Add reschedulable \stretch
-		patternPairsDict[\stretch] = Pfunc { | e | stretch.next(e) };
+		patternPairs = patternPairs.add(\stretch).add(Pfunc { | e | stretch.algaNext(e) });
 
-		//Order pattern pairs dict alphabetically and convert to array.
-		//This allows the user to use Pfunc { | e | } functions with any
-		//scalar OR generic parameter, as long as they're ordered alphabetically
-		if(patternPairsDict.size > 0, {
-			var order = patternPairsDict.order;
-			var entries = patternPairsDict.atAll(order);
-			var array = ([order] ++ [entries]).lace(order.size * 2);
-			patternPairs = patternPairs ++ array;
-		});
+		//Order entries alphabetically
+		entriesOrder = entriesOrder[entriesOrder.order];
 
 		//Finally, only activate the pattern if all AlgaTemps are compiled
 		this.compileFunctionSynthDefDictIfNeeded(
@@ -182,7 +213,7 @@ AlgaPatternPlayer {
 	}
 
 	//Add an action to scheduler. This takes into account sched == AlgaStep
-	addAction { | condition, func, sched = 0, topPriority = false, preCheck = false |
+	addAction { | condition, func, sched = 0, topPriority = false, preCheck = true |
 		actionScheduler.addAction(
 			condition: condition,
 			func: func,
@@ -226,6 +257,34 @@ AlgaPatternPlayer {
 			^this;
 		});
 		timeInner = value
+	}
+
+	interpTime { ^this.time }
+
+	interpTime_ { | value |
+		this.time_(value)
+	}
+
+	it { ^this.time }
+
+	it_ { | value |
+		this.time_(value)
+	}
+
+	shape { ^shapeInner }
+
+	shape_ { | value |
+		if(value.isKindOf(Env).not, {
+			"AlgaPatternPlayer: 'shape' can only be an Env".error;
+			^this;
+		});
+		shapeInner = value
+	}
+
+	interpShape { ^this.shape }
+
+	interpShape_ { | value |
+		this.shape_(value)
 	}
 
 	schedInSeconds_ { | value |
@@ -272,44 +331,140 @@ AlgaPatternPlayer {
 		tempoScaling = value
 	}
 
+	//Exec function when interpStreams are valid
+	runFuncOnValidPatternAsStream { | func, sched = 0 |
+		this.addAction(
+			condition: {
+				patternAsStream != nil
+			},
+			func: {
+				func.value(patternAsStream, algaReschedulingEventStreamPlayer, sched)
+			},
+			preCheck: true
+		)
+	}
+
 	//Run the pattern
 	play { | sched = 1 |
-		if(manualDur.not, {
-			sched = sched ? schedInner;
-			sched = sched ? 0;
-			this.addAction(
-				condition: { pattern != nil },
-				func: {
-					beingStopped = false;
-					algaReschedulingEventStreamPlayer = pattern.playAlgaRescheduling(
-						clock: this.clock
-					);
-				},
-				sched: sched
-			);
-		});
+		var func = { | patternAsStreamArg, algaReschedulingEventStreamPlayerArg, schedArg |
+			if(manualDur.not, {
+				this.addAction(
+					func: {
+						beingStopped = false;
+						algaReschedulingEventStreamPlayer =
+						patternAsStreamArg.newAlgaReschedulingEventStreamPlayer.play(
+							this.clock,
+							false
+						)
+					},
+					sched: schedArg
+				);
+			});
+		};
+
+		sched = sched ? schedInner;
+		sched = sched ? 0;
+
+		this.runFuncOnValidPatternAsStream(func, sched);
 	}
 
 	//Stop the pattern
-	stop { | sched = 1 |
+	stop { | sched = 0 |
+		var func = { | patternAsStreamArg, algaReschedulingEventStreamPlayerArg, schedArg |
+			if(schedArg.isAlgaStep, {
+				if(algaReschedulingEventStreamPlayerArg != nil, {
+					this.addAction(
+						func: {
+							if(schedArg.post.not, { beingStopped = true });
+							algaReschedulingEventStreamPlayerArg.stop
+						},
+						sched: schedArg
+					)
+				});
+			}, {
+				if(algaReschedulingEventStreamPlayerArg != nil, {
+					algaReschedulingEventStreamPlayerArg.stopAtTopPriority(
+						schedArg,
+						this.clock
+					)
+				});
+			});
+		};
+
 		sched = sched ? schedInner;
 		sched = sched ? 0;
-		if(sched.isAlgaStep, {
-			if(algaReschedulingEventStreamPlayer != nil, {
-				var algaReschedulingEventStreamPlayerLock = algaReschedulingEventStreamPlayer;
+
+		this.runFuncOnValidPatternAsStream(func, sched);
+	}
+
+	//Restart the pattern
+	restart { | sched = 0 |
+		var func = { | patternAsStreamArg, algaReschedulingEventStreamPlayerArg, schedArg |
+			if(schedArg.isAlgaStep, {
 				this.addAction(
 					func: {
-						if(sched.post.not, { beingStopped = true });
-						algaReschedulingEventStreamPlayerLock.stop
+						if(algaReschedulingEventStreamPlayerArg != nil, {
+							if(schedArg.post.not, {
+								beingStopped = true
+							});
+							algaReschedulingEventStreamPlayerArg.rescheduleAtQuant(
+								quant: 0,
+								func: {
+									this.resetEntries;
+									beingStopped = false;
+								},
+								clock: this.clock
+							);
+						});
 					},
-					sched: sched
+					sched: schedArg
 				)
+			}, {
+				if(algaReschedulingEventStreamPlayerArg != nil, {
+					algaReschedulingEventStreamPlayerArg.rescheduleAtQuant(
+						quant: schedArg,
+						func: { this.resetEntries },
+						clock: this.clock
+					);
+				});
 			});
-		}, {
-			if(algaReschedulingEventStreamPlayer != nil, {
-				algaReschedulingEventStreamPlayer.stopAtTopPriority(sched)
+		};
+
+		sched = sched ? schedInner;
+		sched = sched ? 0;
+
+		this.runFuncOnValidPatternAsStream(func, sched);
+	}
+
+	//Reset the pattern
+	reset { | sched = 0 |
+		var func = { | patternAsStreamArg, algaReschedulingEventStreamPlayerArg, schedArg |
+			this.addAction(
+				func: {
+					if(algaReschedulingEventStreamPlayerArg != nil, {
+						this.resetEntries
+					});
+				},
+				sched: schedArg
+			)
+		};
+
+		sched = sched ? schedInner;
+		sched = sched ? 0;
+
+		this.runFuncOnValidPatternAsStream(func, sched);
+	}
+
+	//Reset all entries
+	resetEntries {
+		entries.do({ | value |
+			value[\entries].do({ | entry |
+				entry.reset;
 			});
 		});
+
+		dur.reset;
+		stretch.reset;
 	}
 
 	//Manually advance the pattern. 'next' as function name won't work as it's reserved, apparently
@@ -320,11 +475,11 @@ AlgaPatternPlayer {
 			//If sched is 0, go right away: user might have its own scheduling setup
 			if(sched == 0, {
 				//Empty event as protoEvent!
-				patternAsStream.next(()).play;
+				patternAsStream.algaNext(()).play;
 			}, {
 				this.addAction(
 					//Empty event as protoEvent!
-					func: { patternAsStream.next(()).play },
+					func: { patternAsStream.algaNext(()).play },
 					sched: sched
 				);
 			});
@@ -336,7 +491,7 @@ AlgaPatternPlayer {
 
 	//Add an AlgaPattern
 	addAlgaPattern { | algaPattern |
-		if(algaPattern.isAlgaPattern, { algaPatterns.add(algaPattern) });
+		algaPatterns.add(algaPattern);
 	}
 
 	//Remove an AlgaPattern and reset its .player. Works with scheduling
@@ -642,17 +797,24 @@ AlgaPatternPlayer {
 	}
 
 	//Re-assign correctly
-	reassignAlgaReaderPfunc { | algaReaderPfunc, algaPatternPlayerParam |
+	reassignAlgaReaderPfunc { | algaReaderPfunc, algaPatternPlayerParam, sched = 0 |
 		var params = algaReaderPfunc.params;
 		if(params.includes(algaPatternPlayerParam), {
 			var keyOrFunc = algaReaderPfunc.keyOrFunc;
 			var repeats = algaReaderPfunc.repeats;
 
-			//Temporarily .next the stream so that results[] have a valid value ASAP...
-			//Should this be done without copy?
+			//Temporarily .algaNext the stream so that results[] have a valid value ASAP
 			var lastID = entries[algaPatternPlayerParam][\lastID];
-			var tempEntryStream = entries[algaPatternPlayerParam][\entries][lastID].deepCopy;
-			results[algaPatternPlayerParam][lastID] = tempEntryStream.next(currentEnvironment);
+			var entryStream = entries[algaPatternPlayerParam][\entries][lastID];
+			results[algaPatternPlayerParam][lastID] = entryStream.algaNext(currentEnvironment);
+
+			//Assign algaNextSchedTimes. This gets cleared in the Event type. This avoids duplications of triggers
+			algaNextSchedTimes[algaPatternPlayerParam] = algaNextSchedTimes[algaPatternPlayerParam] ? IdentityDictionary();
+			if(schedInSeconds, {
+				algaNextSchedTimes[algaPatternPlayerParam][lastID] = this.clock.algaGetScheduledTimeInSeconds(sched)
+			}, {
+				algaNextSchedTimes[algaPatternPlayerParam][lastID] = this.clock.algaGetScheduledTime(sched)
+			});
 
 			//Re-build the AlgaReaderPfunc
 			case
@@ -664,11 +826,11 @@ AlgaPatternPlayer {
 
 	//Go through an AlgaTemp looking for things to re-assing to let
 	//AlgaReaderPfunc work correctly
-	reassignAlgaTemp { | algaTemp, algaPatternPlayerParam |
+	reassignAlgaTemp { | algaTemp, algaPatternPlayerParam, sched = 0 |
 		var def = algaTemp.def;
 		if(def.isEvent, {
 			def.keysValuesDo({ | key, entry |
-				def[key] = this.reassignAlgaReaderPfuncs(entry, algaPatternPlayerParam)
+				def[key] = this.reassignAlgaReaderPfuncs(entry, algaPatternPlayerParam, sched)
 			});
 		});
 		^algaTemp;
@@ -676,16 +838,16 @@ AlgaPatternPlayer {
 
 	//Go through AlgaTemp / ListPattern / FilterPattern looking for things
 	//to re-assing to let AlgaReaderPfunc work correctly
-	reassignAlgaReaderPfuncs { | value, algaPatternPlayerParam |
+	reassignAlgaReaderPfuncs { | value, algaPatternPlayerParam, sched = 0 |
 		var isAlgaReaderPfuncOrAlgaTemp = false;
 
 		case
 		{ value.isAlgaReaderPfunc } {
-			value = this.reassignAlgaReaderPfunc(value, algaPatternPlayerParam);
+			value = this.reassignAlgaReaderPfunc(value, algaPatternPlayerParam, sched);
 			isAlgaReaderPfuncOrAlgaTemp = true;
 		}
 		{ value.isAlgaTemp } {
-			value = this.reassignAlgaTemp(value, algaPatternPlayerParam);
+			value = this.reassignAlgaTemp(value, algaPatternPlayerParam, sched);
 			isAlgaReaderPfuncOrAlgaTemp = true;
 		};
 
@@ -693,7 +855,7 @@ AlgaPatternPlayer {
 		if(isAlgaReaderPfuncOrAlgaTemp.not, {
 			parser.parseGenericObject(value,
 				func: { | val |
-					this.reassignAlgaReaderPfuncs(val, algaPatternPlayerParam)
+					this.reassignAlgaReaderPfuncs(val, algaPatternPlayerParam, sched)
 				},
 				replace: false
 			)
@@ -703,11 +865,11 @@ AlgaPatternPlayer {
 	}
 
 	//Special case: FX is an Event
-	reassignFXEvent { | fxEvent, algaPatternPlayerParam |
+	reassignFXEvent { | fxEvent, algaPatternPlayerParam, sched = 0 |
 		if(fxEvent.isEvent, {
 			fxEvent.keysValuesDo({ | key, value |
 				if(key != \def, {
-					fxEvent[key] = this.reassignAlgaReaderPfuncs(value, algaPatternPlayerParam)
+					fxEvent[key] = this.reassignAlgaReaderPfuncs(value, algaPatternPlayerParam, sched)
 				});
 			});
 		});
@@ -725,6 +887,11 @@ AlgaPatternPlayer {
 			entries[param] = IdentityDictionary();
 			entries[param][\entries] = IdentityDictionary();
 			results[param] = IdentityDictionary();
+
+			//Re-order
+			entriesOrder = entriesOrder ? Array.newClear;
+			entriesOrder = entriesOrder.add(param);
+			entriesOrder = entriesOrder[entriesOrder.order];
 		});
 
 		//New ID - sender
@@ -750,13 +917,15 @@ AlgaPatternPlayer {
 								//Special case: \fx
 								reassignedEntry = this.reassignFXEvent(
 									fxEvent: algaPatternEventEntryAtParam,
-									algaPatternPlayerParam: param
+									algaPatternPlayerParam: param,
+									sched: sched
 								)
 							}, {
 								//Re-assign the AlgaReaderPfuncs
 								reassignedEntry = this.reassignAlgaReaderPfuncs(
 									value: algaPatternEventEntryAtParam,
-									algaPatternPlayerParam: param
+									algaPatternPlayerParam: param,
+									sched: sched
 								);
 							});
 
@@ -782,6 +951,10 @@ AlgaPatternPlayer {
 						(time + 1).wait;
 						entries[param].removeAt(lastID);
 						entries[param][\entries].removeAt(lastID);
+						results[param].removeAt(lastID);
+						if(algaNextSchedTimes[param] != nil, {
+							algaNextSchedTimes[param].removeAt(lastID)
+						});
 					}
 				});
 			},
@@ -801,10 +974,9 @@ AlgaPatternPlayer {
 		functionSynthDefDict = senderAndFunctionSynthDefDict[1];
 
 		//Set time / sched accordingly
-		time = time ? timeInner;
-		time = time ? 0;
-		sched = sched ? schedInner;
-		sched = sched ? 0;
+		time = (time ? timeInner) ? 0;
+		sched = (sched ? schedInner) ? 0;
+		shape = shape ? shapeInner;
 
 		// \dur / \stretch
 		case

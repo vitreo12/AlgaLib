@@ -16,7 +16,7 @@ Alga.boot({
 		b <<.freq 25;
 		a <<.freq 103;
 
-		//Wait then perform modulation
+		//Wait then perform replacement
 		3.wait;
 
 		//Change the oscillator implementation, using a Saw wave instead
