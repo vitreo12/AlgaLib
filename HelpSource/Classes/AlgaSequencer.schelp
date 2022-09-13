@@ -17,7 +17,7 @@ INSTANCEMETHODS::
 EXAMPLES::
 code::
 (
-Alga.boot({
+Alga.fBoot({
 	//Poly sequencer featuring AlgaTemps modulating at audio rate
 	~seq = AlgaSequencer((
 		freq: (
@@ -36,12 +36,16 @@ Alga.boot({
 			time: Pwhite(0.01, 1),
 		),
 		dur: Prand([0.5, 1, 2], inf)
-	));
+	), interpTime: 2);
 
 	//The AlgaNode to modulate using both FM and AM
 	~sine = AlgaNode({ SinOsc.ar(\freq.ar(440!2)) }, [\freq, ~seq.freq, \amp, ~seq.amp]).play;
 });
 )
+
+//The dot syntax returns the underlying AlgaMonoPattern.
+//Then, all relevant methods can be used
+~seq.freq << Pbrown(100, 1000)
 ::
 
 private:: <<
