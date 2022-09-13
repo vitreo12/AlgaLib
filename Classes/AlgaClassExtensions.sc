@@ -799,7 +799,7 @@
 	}
 
 	algaGetScheduledTimeInSeconds { | seconds = 0 |
-		this.secs2beats(this.seconds + seconds)
+		^this.secs2beats(this.seconds + seconds)
 	}
 
 	algaSchedNum { | quant = 1 |
