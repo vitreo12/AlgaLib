@@ -1105,7 +1105,9 @@ AlgaPattern : AlgaNode {
 		});
 
 		//If numChannels or rate mismatch between patternSynth -> fxSynth
-		if((numChannelsToUse != fxInNumChannels).or(rateToUse != fxInRate), {
+		if((fxInRate != nil).and(
+			(numChannelsToUse != fxInNumChannels).or(rateToUse != fxInRate)
+		), {
 			//patternSynth -> \in
 			var patternInterpInSynthSymbol = (
 				"alga_pattern_" ++
@@ -1147,7 +1149,9 @@ AlgaPattern : AlgaNode {
 		});
 
 		//If numChannels or rate mismatch between fxSynth -> algaSynthBus
-		if((fxNumChannels != numChannels).or(fxRate != rate), {
+		if((rate != nil).and(
+			(fxNumChannels != numChannels).or(fxRate != rate)
+		), {
 			//Create the Bus fxSynth will write to
 			var fxBus = AlgaBus(server, fxNumChannels, fxRate);
 
