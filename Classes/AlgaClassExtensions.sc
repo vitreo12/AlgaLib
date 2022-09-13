@@ -799,7 +799,7 @@
 	}
 
 	algaGetScheduledTimeInSeconds { | seconds = 0 |
-		^this.secs2beats(this.seconds + seconds)
+		^(this.secs2beats(this.seconds + seconds))
 	}
 
 	algaSchedNum { | quant = 1 |
@@ -839,7 +839,7 @@
 				^((nextBar + ((algaQuantQuant - 1) * beatsPerBar)) + algaQuantPhase);
 			}, {
 				//quant = 0: sched just with phase
-				^this.algaSchedNum(algaQuantPhase)
+				^(this.algaSchedNum(algaQuantPhase))
 			});
 		};
 	}
