@@ -36,7 +36,7 @@
 			//[inTime.asStringPrec(17), nextBeat.asStringPrec(17)].debug("inTime, nextBeat");
 			roundedBeat = nextBeat.round;
 			deltaFromRounded = roundedBeat - nextBeat;
-			if (deltaFromRounded.abs < 1e-14 and: { deltaFromRounded != 0 }) {
+			if (deltaFromRounded.abs < 1e-15 and: { deltaFromRounded != 0 }) {
 				nextBeat = roundedBeat;
 				nextTime = nextTime + deltaFromRounded;
 				//nextTime.asStringPrec(17).debug("corrected time");
