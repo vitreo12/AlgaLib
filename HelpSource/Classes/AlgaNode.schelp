@@ -78,17 +78,17 @@ Just like any other link::Classes/AlgaNode:: method, the current function can be
 
 discussion::
 code::
-AlgaNode.ar({ SinOsc.ar([440, 450]) }).play //Play both channels
+AlgaNode({ SinOsc.ar([440, 450]) }).play //Play both channels
 
-AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: 2) //Play both channels, explicitly
+AlgaNode({ SinOsc.ar([440, 450]) }).play(chans: 2) //Play both channels, explicitly
 
-AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0]) //Play first channel mono (same as 'chans: 1')
+AlgaNode({ SinOsc.ar([440, 450]) }).play(chans: [0]) //Play first channel mono (same as 'chans: 1')
 
-AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 0]) //Play first channel stereo
+AlgaNode({ SinOsc.ar([440, 450]) }).play(chans: [0, 0]) //Play first channel stereo
 
-AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1]) //Play both channels, explicitly (same as 'chans: 2')
+AlgaNode({ SinOsc.ar([440, 450]) }).play(chans: [0, 1]) //Play both channels, explicitly (same as 'chans: 2')
 
-AlgaNode.ar({ SinOsc.ar([440, 450]) }).play(chans: [0, 1, 1, 0]) //Quadraphonic
+AlgaNode({ SinOsc.ar([440, 450]) }).play(chans: [0, 1, 1, 0]) //Quadraphonic
 ::
 
 
@@ -587,6 +587,7 @@ private:: parseFilterPatternParam
 private:: parseGenericPatternParam
 private:: parseParam
 private:: parseParam_inner
+
 private:: addActiveInOutNodes
 private:: checkValidControlName
 private:: addLatestSenderAtParam

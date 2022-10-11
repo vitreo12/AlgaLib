@@ -7,7 +7,7 @@ related:: Classes/AlgaNode, Classes/AlgaPattern, Classes/AlgaSynthDef, Classes/A
 DESCRIPTION::
 note::
 For link::Classes/Alga:: to work correctly, it is required to install the emphasis::AlgaUGens:: plugin extensions. To do so, download the emphasis::AlgaUGens:: zip file from
-https://github.com/vitreo12/AlgaUGens/releases/tag/v1.1.0 and extract it
+https://github.com/vitreo12/AlgaUGens/releases/tag/v1.2.0 and extract it
 to your code::Platform.userExtensionDir::
 ::
 

@@ -220,7 +220,7 @@ Alga {
 		if((\AlgaDynamicIEnvGenBuf.asClass == nil).or(\AlgaDynamicIEnvGen.asClass == nil).or(\AlgaAudioControl.asClass == nil), {
 			"\n************************************************\n".postln;
 			"The AlgaUGens plugin extension is not installed, or it needs to be updated to a new version. Read the following instructions to install it:".warn;
-			"\n1) Download the AlgaUGens plugin extension from https://github.com/vitreo12/AlgaUGens/releases/tag/v1.1.0".postln;
+			"\n1) Download the AlgaUGens plugin extension from https://github.com/vitreo12/AlgaUGens/releases/tag/v1.2.0".postln;
 			"2) Unzip the file to your 'Platform.userExtensionDir'".postln;
 			"\nAfter the installation, no further action is required: Alga will detect the UGens, use them internally and this message will not be shown again.\n".postln;
 			"************************************************\n".postln;

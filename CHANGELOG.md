@@ -223,18 +223,6 @@ These are used for `keys` that would interpret all `Functions` as `UGen Function
 
 # 1.1.1
 
-## Bug fixes
-
-- `AlgaBlock`: check for new connections to trigger a re-order, and not just for `upperMostNodes`.
-
-- `AlgaBlock`: fix `findAllUnusedFeedback` in order to be used on any new connection.
-
-- `AlgaNode`: trigger `addActiveInOutNodes` on `replace` for old input connections.
-
-- `AlgaPattern`: do not run `dur.next` twice on `replace`.
-
-- `AlgaNode` and `AlgaPattern`: only the latest executed `replace` and `from` is executed on scheduled time. This allows the user to correct his/her/their own mistakes while live coding with only having the latest iteration considered as valid code.
-
 ## New features
 
 - Added the `AlgaQuant` class to schedule actions on specific bars:
@@ -256,9 +244,21 @@ These are used for `keys` that would interpret all `Functions` as `UGen Function
     a.from(0.5, \dur, sched: AlgaQuant(1, 1));
     ```
     
+## Bug fixes
+
+- `AlgaBlock`: check for new connections to trigger a re-order, and not just for `upperMostNodes`.
+
+- `AlgaBlock`: fix `findAllUnusedFeedback` in order to be used on any new connection.
+
+- `AlgaNode`: trigger `addActiveInOutNodes` on `replace` for old input connections.
+
+- `AlgaPattern`: do not run `dur.next` twice on `replace`.
+
+- `AlgaNode` and `AlgaPattern`: only the latest executed `replace` and `from` is executed on scheduled time. This allows the user to correct his/her/their own mistakes while live coding with only having the latest iteration considered as valid code.
+
 # 1.1.0
 
-## Features
+## New features
 
 - Added the `interpShape` option. This allows to specify an interpolation shape in the form of an
   `Env`. All connection methods have also been updated to receive a `shape` argument to set the `Env`
