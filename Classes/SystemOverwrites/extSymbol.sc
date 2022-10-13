@@ -18,10 +18,10 @@
 +Symbol {
 	ar { | val, lag, spec |
 		if((val.isAlgaNode).or(val.isAlgaArg), {
-			AlgaProxySpace.addParamArgs(this, val);
 			if(AlgaProxySpace.isTriggerDef.not, {
 				^NamedControl.ar(this, 0, lag, spec);
 			}, {
+				AlgaProxySpace.addParamArgs(this, val);
 				^DC.ar(0)
 			});
 		});
@@ -34,10 +34,10 @@
 
 	kr { | val, lag, fixedLag = false, spec |
 		if((val.isAlgaNode).or(val.isAlgaArg), {
-			AlgaProxySpace.addParamArgs(this, val);
 			if(AlgaProxySpace.isTriggerDef.not, {
 				^NamedControl.kr(this, 0, lag, fixedLag, spec)
 			}, {
+				AlgaProxySpace.addParamArgs(this, val);
 				^DC.kr(0)
 			});
 		});
