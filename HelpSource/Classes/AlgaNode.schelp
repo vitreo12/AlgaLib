@@ -262,7 +262,7 @@ Shortcut for emphasis::playTime::.
 
 
 METHOD:: replacePlayTime
-Specify fade in / fade out times when calling emphasis::replace:: on a node that was playing.
+Specify a boolean to determine whether to use code::playTime:: as the time parameter when calling emphasis::replace:: on a node that was playing.
 
 
 METHOD:: rpt

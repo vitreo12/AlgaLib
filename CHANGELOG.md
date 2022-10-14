@@ -1,3 +1,13 @@
+# 1.3.1
+
+## Bug fixes
+
+- `AlgaTemp`: fixed support everywhere (e.g, within a `Pfunc`) for `AlgaTemp`s declared with a already compiled `AlgaSynthDef`s.
+
+- `AlgaProxySpace`: removed the overrides for `Symbol.ar` and `Symbol.kr`.
+
+- `AlgaNode`: fixed help filed for `replacePlayTime`.
+
 # 1.3.0
 
 ## New features

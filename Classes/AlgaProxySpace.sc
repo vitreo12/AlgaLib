@@ -17,7 +17,10 @@
 AlgaProxySpace {
 	classvar <paramsArgs;
 	classvar <currentNode;
+	/*
+	// SystemOverwrites/extSymbol
 	classvar <isTriggerDef = false;
+	*/
 	var <nodes;
 	var <objects;
 	var <patternsEvents;
@@ -34,12 +37,26 @@ AlgaProxySpace {
 		^newSpace;
 	}
 
+	*forceBoot { | onBoot, server, algaServerOptions, clock |
+		var newSpace = this.new.init;
+		newSpace.push;
+		server = server ? Server.default;
+		Alga.fBoot(onBoot, server, algaServerOptions, clock);
+		^newSpace;
+	}
+
+	*fBoot { | onBoot, server, algaServerOptions, clock |
+		^this.forceBoot(onBoot, server, algaServerOptions, clock)
+	}
+
 	*initClass {
 		paramsArgs = IdentityDictionary(10);
 	}
 
 	*addParamArgs { | param, value |
-		if(paramsArgs[currentNode] == nil, { paramsArgs[currentNode] = IdentityDictionary() });
+		if(paramsArgs[currentNode] == nil, {
+			paramsArgs[currentNode] = IdentityDictionary()
+		});
 		paramsArgs[currentNode][param] = value;
 	}
 
@@ -134,6 +151,11 @@ AlgaProxySpace {
 
 	pop { Environment.pop }
 
+	quit { | onQuit |
+		Alga.quit(onQuit, server);
+		this.pop;
+	}
+
 	keys { ^nodes.keys }
 
 	//////////////////////
@@ -187,6 +209,8 @@ AlgaProxySpace {
 		^node
 	}
 
+	/*
+	// SystemOverwrites/extSymbol
 	//This allows to retrieve Symbol.kr / Symbol.ar BEFORE they're sent to the server.
 	triggerDef { | node, def |
 		currentNode = node;
@@ -196,6 +220,7 @@ AlgaProxySpace {
 		};
 		isTriggerDef = false;
 	}
+	*/
 
 	explicitNode { | node, key, def |
 		node.clear;
@@ -282,6 +307,8 @@ AlgaProxySpace {
 	}
 
 	replaceNode { | node, key, def |
+		/*
+		// SystemOverwrites/extSymbol
 		//The args replacement ONLY works with AlgaNode
 		if(node.isAlgaPattern.not, {
 			var currentArgsID, currentArgs;
@@ -304,6 +331,7 @@ AlgaProxySpace {
 				});
 			});
 		});
+		*/
 
 		//Standard replace
 		^node.replace(def: def);

@@ -14,14 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-//Support for AlgaNode and AlgaArg
+//Support for AlgaNode and AlgaArg.
+//This has been commented out because I could not yet figure out a safe way to implement it
+//so that I would be sure of the instantiation of the AlgaNode sender.
+/*
 +Symbol {
 	ar { | val, lag, spec |
 		if((val.isAlgaNode).or(val.isAlgaArg), {
-			AlgaProxySpace.addParamArgs(this, val);
 			if(AlgaProxySpace.isTriggerDef.not, {
 				^NamedControl.ar(this, 0, lag, spec);
 			}, {
+				AlgaProxySpace.addParamArgs(this, val);
 				^DC.ar(0)
 			});
 		});
@@ -34,10 +37,10 @@
 
 	kr { | val, lag, fixedLag = false, spec |
 		if((val.isAlgaNode).or(val.isAlgaArg), {
-			AlgaProxySpace.addParamArgs(this, val);
 			if(AlgaProxySpace.isTriggerDef.not, {
 				^NamedControl.kr(this, 0, lag, fixedLag, spec)
 			}, {
+				AlgaProxySpace.addParamArgs(this, val);
 				^DC.kr(0)
 			});
 		});
@@ -60,3 +63,4 @@
 	maxLocalBufs { ^nil }
 	maxLocalBufs_ { }
 }
+*/

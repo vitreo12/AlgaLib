@@ -119,18 +119,21 @@ AlgaParser {
 			{ defDef.isFunction } {
 				var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
-				//AlgaTemp can be sampleAccurate in AlgaPatterns!
-				functionSynthDefDict[defName] = [
-					AlgaSynthDef.new_inner(
-						defName,
-						defDef,
-						sampleAccurate: algaTemp.sampleAccurate,
-						makeFadeEnv: false,
-						makePatternDef: false,
-						makeOutDef: false
-					),
-					algaTemp
-				];
+				//Protection
+				if(functionSynthDefDict != nil, {
+					//AlgaTemp can be sampleAccurate in AlgaPatterns!
+					functionSynthDefDict[defName] = [
+						AlgaSynthDef.new_inner(
+							defName,
+							defDef,
+							sampleAccurate: algaTemp.sampleAccurate,
+							makeFadeEnv: false,
+							makePatternDef: false,
+							makeOutDef: false
+						),
+						algaTemp
+					];
+				});
 
 				defDef = defName;
 				def[\def] = defName;
@@ -153,18 +156,21 @@ AlgaParser {
 		{ def.isFunction } {
 			var defName = ("alga_" ++ UniqueID.next).asSymbol;
 
-			//AlgaTemp can be sampleAccurate in AlgaPatterns!
-			functionSynthDefDict[defName] = [
-				AlgaSynthDef.new_inner(
-					defName,
-					def,
-					sampleAccurate: algaTemp.sampleAccurate,
-					makeFadeEnv: false,
-					makePatternDef: false,
-					makeOutDef: false
-				),
-				algaTemp
-			];
+			//Protection
+			if(functionSynthDefDict != nil, {
+				//AlgaTemp can be sampleAccurate in AlgaPatterns!
+				functionSynthDefDict[defName] = [
+					AlgaSynthDef.new_inner(
+						defName,
+						def,
+						sampleAccurate: algaTemp.sampleAccurate,
+						makeFadeEnv: false,
+						makePatternDef: false,
+						makeOutDef: false
+					),
+					algaTemp
+				];
+			});
 
 			defDef = defName;
 			algaTemp.setDef(defName); //Substitute .def with the Symbol

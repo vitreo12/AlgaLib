@@ -18,6 +18,12 @@ An instance of link::Classes/AlgaServerOptions:: to boot the server with. If not
 ARGUMENT:: clock
 The emphasis::Clock:: for the internal link::Classes/AlgaScheduler::. If not specified, a default link::Classes/TempoClock:: will be created.
 
+METHOD:: forceBoot
+Same as code::boot::, but using link::Classes/Alga::'s code::forceBoot::.
+
+METHOD:: fBoot
+Alias for code::forceBoot::.
+
 private:: addParamArgs
 private:: currentNode
 private:: nodes
@@ -41,11 +47,14 @@ The link::Classes/Symbol:: key.
 ARGUMENT:: def
 This can be any def supported by an link::Classes/AlgaNode:: / link::Classes/AlgaPattern::.
 
+METHOD:: push
+Push the link::Classes/AlgaProxySpace:: as the new code::currentEnvironment::.
+
 METHOD:: pop
 Restore the previous link::Classes/Environment::.
 
-METHOD:: push
-Push the link::Classes/AlgaProxySpace:: as the new code::currentEnvironment::.
+METHOD:: quit
+Quit link::Classes/Alga:: and restore the previous link::Classes/Environment::.
 
 METHOD:: clear
 Clear all nodes.

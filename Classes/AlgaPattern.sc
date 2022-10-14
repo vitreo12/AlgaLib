@@ -522,9 +522,8 @@ AlgaPattern : AlgaNode {
 		createAlgaTempGroup = false, isFX = false |
 		var tempBus, tempSynth;
 		var tempSynthArgs = [ \gate, 1 ];
-		var tempNumChannels = algaTemp.numChannels;
-		var tempRate = algaTemp.rate;
-		var def, algaTempDef, tempControlNames;
+		var tempNumChannels, tempRate, tempControlNames;
+		var def, algaTempDef;
 		var defIsEvent = false;
 
 		//New AlgaTemp at top level: create a new currentAlgaTempGroup.
@@ -536,8 +535,12 @@ AlgaPattern : AlgaNode {
 
 		//Check AlgaTemp validity
 		if(algaTemp.valid.not, {
-			"AlgaPattern: Invalid AlgaTemp, using default parameter".error;
-			^nil
+			//Try to evaluate once more. It could be an AlgaTemp(\validDef) in a Pfunc
+			this.parseAlgaTempParam(algaTemp);
+			if(algaTemp.valid.not, {
+				"AlgaPattern: Invalid AlgaTemp, using default parameter".error;
+				^nil
+			});
 		});
 
 		//Unpack SynthDef
@@ -550,7 +553,9 @@ AlgaPattern : AlgaNode {
 			defIsEvent = true;
 		});
 
-		//Unpack controlNames
+		//Unpack channels, rate, controlNames
+		tempNumChannels = algaTemp.numChannels;
+		tempRate = algaTemp.rate;
 		tempControlNames = algaTemp.controlNames;
 
 		//Loop around the controlNames to set relevant parameters
@@ -595,7 +600,7 @@ AlgaPattern : AlgaNode {
 						//Scalar parameters
 
 						//Unpack value
-						var paramValue = entry.algaNext;
+						var paramValue = entry.algaNext(this.getCurrentEnvironment);
 
 						//If Symbol, skip iteration
 						if(paramValue.isSymbol, {

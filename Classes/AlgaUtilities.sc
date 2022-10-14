@@ -175,18 +175,22 @@ AlgaTemp {
 		def = argDef
 	}
 
-	checkValidSynthDef { | def |
-		var synthDesc = SynthDescLib.alga.at(def);
+	checkValidSynthDef { | argDef |
+		var synthDesc;
 		var synthDef;
 
+		argDef = argDef ? def;
+		if(argDef.isEvent, { argDef = argDef[\def] });
+
+		synthDesc = SynthDescLib.alga.at(argDef);
 		if(synthDesc == nil, {
-			("AlgaTemp: Invalid AlgaSynthDef: '" ++ def.asString ++ "'").error;
+			("AlgaTemp: Invalid AlgaSynthDef: '" ++ argDef.asString ++ "'").error;
 			^nil;
 		});
 
 		synthDef = synthDesc.def;
 		if(synthDef.isKindOf(SynthDef).not, {
-			("AlgaTemp: Invalid AlgaSynthDef: '" ++ def.asString ++"'").error;
+			("AlgaTemp: Invalid AlgaSynthDef: '" ++ argDef.asString ++ "'").error;
 			^nil;
 		});
 
