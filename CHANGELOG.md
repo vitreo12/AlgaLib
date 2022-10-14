@@ -2,7 +2,7 @@
 
 ## Bug fixes
 
-- `AlgaTemp`: fixed support everywhere (e.g, within a `Pfunc`) for `AlgaTemp`s declared with a already compiled `AlgaSynthDef`s.
+- `AlgaTemp`: fixed support everywhere (e.g, within a `Pfunc`) for `AlgaTemp`s declared with already compiled `AlgaSynthDef`s.
 
 - `AlgaProxySpace`: removed the overrides for `Symbol.ar` and `Symbol.kr`.
 
