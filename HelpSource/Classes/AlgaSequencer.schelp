@@ -17,7 +17,7 @@ INSTANCEMETHODS::
 EXAMPLES::
 code::
 (
-Alga.fBoot({
+Alga.boot({
 	//Poly sequencer featuring AlgaTemps modulating at audio rate
 	~seq = AlgaSequencer((
 		freq: (
