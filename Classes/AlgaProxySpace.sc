@@ -17,7 +17,10 @@
 AlgaProxySpace {
 	classvar <paramsArgs;
 	classvar <currentNode;
+	/*
+	// SystemOverwrites/extSymbol
 	classvar <isTriggerDef = false;
+	*/
 	var <nodes;
 	var <objects;
 	var <patternsEvents;
@@ -206,6 +209,8 @@ AlgaProxySpace {
 		^node
 	}
 
+	/*
+	// SystemOverwrites/extSymbol
 	//This allows to retrieve Symbol.kr / Symbol.ar BEFORE they're sent to the server.
 	triggerDef { | node, def |
 		currentNode = node;
@@ -215,6 +220,7 @@ AlgaProxySpace {
 		};
 		isTriggerDef = false;
 	}
+	*/
 
 	explicitNode { | node, key, def |
 		node.clear;
@@ -301,6 +307,8 @@ AlgaProxySpace {
 	}
 
 	replaceNode { | node, key, def |
+		/*
+		// SystemOverwrites/extSymbol
 		//The args replacement ONLY works with AlgaNode
 		if(node.isAlgaPattern.not, {
 			var currentArgsID, currentArgs;
@@ -323,6 +331,7 @@ AlgaProxySpace {
 				});
 			});
 		});
+		*/
 
 		//Standard replace
 		^node.replace(def: def);
