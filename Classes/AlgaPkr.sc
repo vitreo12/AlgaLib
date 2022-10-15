@@ -16,41 +16,34 @@
 
 //Credits go to Pkr from BenoitLib: https://github.com/cappelnord/BenoitLib
 AlgaPkr : Pfunc {
-	*new { | algaNode, limit |
+	*new { | algaNode, limit, valOnError = 1 |
 		var check;
 		var last = 0.0;
+		var func;
 
-		var bus = algaNode.synthBus.bus;
-
-		if(algaNode.algaInstantiatedAsSender.not, {
-			"AlgaPkr: the sender AlgaNode is not instantiated yet. This will yield 0".warn;
-			^Pfunc( { 0 } );
-		});
-
-		bus.isSettable.not.if {
-			"AlgaPkr: not a kr Bus. This will only yield 0".warn;
-			^Pfunc( { 0 } );
-		};
-
-		check = { bus.server.hasShmInterface }.try;
-
-		check.if ({
-			var func;
-			if(limit != nil, {
-				func = {
+		if(limit != nil, {
+			func = {
+				if(algaNode.algaInstantiatedAsSender, {
+					var bus = algaNode.synthBus.bus;
 					var val = bus.getSynchronous();
 					if(val < limit, { val = limit });
 					val;
-				};
-			}, {
-				func = { bus.getSynchronous() };
-			});
-
-			^Pfunc( func );
+				}, {
+					("AlgaNode: not instantiated yet. Returning " ++ valOnError).error;
+					valOnError
+				});
+			};
 		}, {
-			"AlgaPkr: no shared memory interface detected. Use localhost server on SC 3.5 or higher to get better performance".warn;
-			bus.get( { |v| last = v } );
-			^Pfunc( { bus.get( { |v| last = v } ); last } );
+			func = {
+				if(algaNode.algaInstantiatedAsSender, {
+					algaNode.synthBus.bus.getSynchronous();
+				}, {
+					("AlgaNode: not instantiated yet. Returning " ++ valOnError).error;
+					valOnError
+				});
+			};
 		});
+
+		^Pfunc( func );
 	}
 }
