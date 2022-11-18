@@ -1,3 +1,9 @@
+# 1.3.2
+
+## Bug fixes
+
+- `Alga`: Fixed a bug for SC 3.13 rebuiling `AlgaSynthDefs` on `boot`.
+
 # 1.3.1
 
 ## Bug fixes
