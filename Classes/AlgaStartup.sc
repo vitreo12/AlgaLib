@@ -69,6 +69,14 @@ AlgaStartup {
 	*initSynthDefs { | rebuild = false |
 		var hasBuilt = false;
 		var maxIO = algaMaxIO;
+		var checkDefault = {
+			if(algaMaxIO == algaMaxIODefault, {
+				var algaSynthDefIO_numberPath_temp = (algaSynthDefPath ++ "IO_default/" ++ "IO_" ++ algaMaxIO ++ "/");
+				if(File.exists(algaSynthDefIO_numberPath_temp), {
+					hasBuilt = true;
+				});
+			});
+		};
 
 		//If a bigger number has already been built, no need to build again
 		block { | break |
@@ -79,13 +87,7 @@ AlgaStartup {
 				if(File.exists(algaSynthDefIO_numberPath_temp), {
 					if(algaMaxIO > i, {
 						//Check for default. If it exists, return
-						if(algaMaxIO == algaMaxIODefault, {
-							algaSynthDefIO_numberPath_temp = (algaSynthDefPath ++ "IO_default/" ++ "IO_" ++ algaMaxIO ++ "/");
-							if(File.exists(algaSynthDefIO_numberPath_temp), {
-								hasBuilt = true;
-								break.(nil)
-							});
-						});
+						checkDefault.(); if(hasBuilt, { break.(nil) });
 						maxIO = i;
 						this.initClass;
 						this.buildSynthDefs;
@@ -100,6 +102,9 @@ AlgaStartup {
 				});
 			});
 		};
+
+		//Re-check default
+		if(hasBuilt.not, { checkDefault.() });
 
 		//Unless rebuild is set
 		if((hasBuilt.not).or(rebuild), {
