@@ -400,8 +400,9 @@ Alga {
 
 	*interpolateTempo { | tempo = 1, time = 0, shape,
 		delta = 0.1, schedInSeconds = false, sched = 1, server |
-		var clock = clocks[server];
+		var clock;
 		server = server ? Server.default;
+		clock = clocks[server];
 		if(clock != nil, {
 			clock.interpolateTempo(
 				tempo: tempo,
