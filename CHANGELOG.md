@@ -1,3 +1,9 @@
+# 1.3.3
+
+## Bug fixes 
+
+- `Alga`: fix `interpolateTempo`'s clock retrieval.
+
 # 1.3.2
 
 ## Bug fixes
