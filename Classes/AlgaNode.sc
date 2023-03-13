@@ -839,6 +839,8 @@ AlgaNode {
 				this.interpGroupEnv = AlgaGroup(group);
 				tempGroup = AlgaGroup(group);
 			}, {
+				//Should all this (except synthGroup) be AlgaGroup?
+				//The processing of each Synth here might outweight the benefits
 				this.fxConvGroup = AlgaParGroup(group);
 				this.fxGroup = AlgaParGroup(group);
 				this.synthConvGroup = AlgaParGroup(group);
