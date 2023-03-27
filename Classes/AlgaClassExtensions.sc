@@ -525,14 +525,12 @@
 
 		path.folders.do({ | folder, i |
 			folder = PathName(folder.fullPath.withoutTrailingSlash);
-			this.loadSamplesInner(folder, newDict, server, i)
+			this.loadSamplesInner(folder, newDict, server, i, post: post)
 		});
-
-		server.sync;
 	}
 
 	//Load samples of a path to a dict, recursively
-	*loadSamples { | path, server, post = true |
+	*loadSamples { | path, server, post = false |
 		server = server ? Server.default;
 		if(server.serverRunning, {
 			var dict = this.new();
@@ -551,13 +549,40 @@
 				^nil;
 			});
 			fork {
+				"Loading...".postln;
 				this.loadSamplesInner(path, dict, server, post: post);
-				"\n- Done!\n".postln;
+				server.sync;
+				"Done!".postln;
 			};
 			^dict;
 		}, {
 			"Server is not running. Cannot load samples.".warn
 			^nil
+		});
+	}
+
+	//Load samples on an already declared dict
+	loadSamples { | path, server, post = false |
+		server = server ? Server.default;
+		if(server.serverRunning, {
+			var strPath;
+			if(path.isString, {
+				path = PathName(path.standardizePath)
+			});
+			if(path.isKindOf(PathName).not, {
+				"path must be a String or PathName".error;
+				^this;
+			});
+			strPath = path.fullPath.withoutTrailingSlash;
+			path = PathName(strPath);
+			if((File.exists(strPath).not).or(path.isFolder.not), {
+				"Path does not exist or it's not a folder".error;
+				^this;
+			});
+			Dictionary.loadSamplesInner(path, this, server, post: post);
+		}, {
+			"Server is not running. Cannot load samples.".warn
+			^this
 		});
 	}
 
